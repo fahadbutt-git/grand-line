@@ -59,6 +59,12 @@ step_macos_defaults() {
   run defaults write com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool true
   run defaults write com.apple.desktopservices DSDontWriteUSBStores -bool true
 
+  # Clipboard history never keeps what is copied in the clinical remote
+  # apps (Citrix, Horizon), so patient information stays out of it.
+  run defaults write org.p0deje.Maccy ignoredApps -array \
+    com.citrix.receiver.icaviewer.mac com.citrix.receiver.nomas com.vmware.horizon com.omnissa.horizon.client.mac
+  run defaults write org.p0deje.Maccy historySize -int 300
+
   # Screenshots without the drop shadow
   run defaults write com.apple.screencapture disable-shadow -bool true
 

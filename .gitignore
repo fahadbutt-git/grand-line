@@ -3,5 +3,4 @@
 config/ghostty/theme.conf
 tests/vm-logs/
 *.backup-*
-config/nvim/lazy-lock.json
 config/nvim/lazyvim.json

@@ -48,6 +48,7 @@ cask "claude-code"
 cask "codex"
 cask "chatgpt"
 cask "google-gemini"
+brew "ccusage"              # where Claude Code tokens go: ccusage daily, ccusage blocks --live
 cask "antigravity-cli"      # Google's replacement for gemini-cli (command: agy)
 
 # Storage and notes (tasks live in Apple Reminders, built in)

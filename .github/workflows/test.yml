@@ -13,6 +13,10 @@ on:
     # Mondays: catches apps that were renamed or removed from Homebrew.
     - cron: "17 11 * * 1"
 
+# The test runs only read this repository.
+permissions:
+  contents: read
+
 jobs:
   checks:
     name: Checks (Linux, fast)
@@ -48,12 +52,13 @@ jobs:
     timeout-minutes: 120
     env:
       MAC_SETUP_HOME: ${{ github.workspace }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       HOMEBREW_NO_INSTALL_CLEANUP: 1
     steps:
       - uses: actions/checkout@v5
       - name: Run 1, full setup
         run: /bin/bash setup.sh --ci --skip r-packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # only for ArtCraft release lookups
       - name: Report what was installed
         if: always()
         run: |

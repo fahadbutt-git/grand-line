@@ -22,7 +22,7 @@ export REPO_DIR
 source "$REPO_DIR/lib/common.sh"
 
 # Steps that keep an installed Mac current (used by --update and bin/update).
-UPDATE_STEPS="apps,artcraft,folders,dotfiles,native-tools,default-apps,downloads"
+UPDATE_STEPS="apps,artcraft,security,folders,dotfiles,native-tools,default-apps,downloads"
 
 STEPS=()
 for f in "$REPO_DIR"/steps/[0-9][0-9]-*.sh; do
@@ -95,7 +95,17 @@ KEEPALIVE_PID=""
 trap '[[ -n "$KEEPALIVE_PID" ]] && kill "$KEEPALIVE_PID" 2>/dev/null' EXIT
 
 FAILED=()
+# The password is needed only up to the declutter step (installers, the
+# firewall, moving Apple's apps). After it, sudo is closed again, so nothing
+# later in the run can use it.
+end_sudo() {
+  [[ -n "$KEEPALIVE_PID" ]] && kill "$KEEPALIVE_PID" 2>/dev/null
+  KEEPALIVE_PID=""
+  [[ "$DRY_RUN" == 0 ]] && sudo -k
+}
+
 for step in "${STEPS[@]}"; do
+  [[ "$step" == r-packages ]] && end_sudo
   selected "$step" || continue
   heading "$step"
   if ! "step_${step//-/_}"; then

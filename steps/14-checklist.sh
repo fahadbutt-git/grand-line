@@ -37,7 +37,7 @@ macOS requires these clicks from you. Work down the list once.
 
 6. Downloads sorting
    The first time a file lands in Downloads, macOS asks whether
-   bash may use the Downloads folder. Click Allow.
+   downloads-agent may use the Downloads folder. Click Allow.
 
 7. Notifications from the shortcuts
    In Terminal run:  osascript -e 'display notification "test"'
@@ -49,7 +49,8 @@ macOS requires these clicks from you. Work down the list once.
 
 9. Screen capture and text capture
    The first time you use the capture menu, allow Screen Recording
-   for karabiner_console_user_server when macOS asks.
+   for karabiner_console_user_server when macOS asks. This lets the
+   package's own shortcut commands see the screen, nothing else.
 
 10. Sign in to your apps
     Chrome, Claude, Claude Code (claude), Codex (codex), Antigravity

@@ -63,13 +63,11 @@ artcraft_install_one() {
   if ! curl -fsSL --retry 3 --connect-timeout 10 -o "$work/$name" "$url"; then
     echo "  ! $app: download failed"; rm -rf "$work"; return 1
   fi
-  local verified=0
-  if [[ "$digest" == sha256:* ]]; then
-    if [[ "$(shasum -a 256 "$work/$name" | cut -d' ' -f1)" != "${digest#sha256:}" ]]; then
-      echo "  ! $app: the download does not match GitHub's checksum, so it was not installed"
-      rm -rf "$work"; return 1
-    fi
-    verified=1
+  # Catches a damaged download. Trust in the app itself comes from its
+  # signature, checked before it is copied into /Applications.
+  if [[ "$digest" == sha256:* ]] && [[ "$(shasum -a 256 "$work/$name" | cut -d' ' -f1)" != "${digest#sha256:}" ]]; then
+    echo "  ! $app: the download does not match GitHub's checksum, so it was not installed"
+    rm -rf "$work"; return 1
   fi
 
   local found="" mounted=0
@@ -88,18 +86,32 @@ artcraft_install_one() {
       ;;
   esac
 
-  local status=0 dest
+  local status=0 dest team="" trusted=0 known
+  [[ -n "$found" ]] && team="$(codesign -dv "$found" 2>&1 | sed -n 's/^TeamIdentifier=//p')"
+  known="$(cat "$state/$app.team" 2>/dev/null)"
   if [[ -z "$found" ]]; then
     echo "  ! $app: no app found inside $name"; status=1
+  elif [[ "$(basename "$found")" != "$app.app" ]]; then
+    # Only ever install the app this line is for, so a bad release cannot
+    # replace another app (Chrome, Claude...) in /Applications.
+    echo "  ! $app: the download contains $(basename "$found") instead of $app.app, so nothing was installed"; status=1
+  elif [[ -n "$known" && "$team" != "$known" ]]; then
+    # The developer that signed this app before must sign its updates.
+    echo "  ! $app: this release is signed by ${team:-nobody}, not by $known as before, so it was not installed"; status=1
   else
+    # Signed, notarized apps are trusted as Apple would trust them. Anything
+    # else gets the quarantine flag, so macOS checks it the first time it opens.
+    codesign --verify --deep --strict "$found" 2>/dev/null && spctl -a -t exec "$found" 2>/dev/null && trusted=1
     dest="/Applications/$(basename "$found")"
     # Copy beside the old version first, then swap: the old one goes to the
     # Trash, and a failed copy leaves the old one working.
     rm -rf "$dest.new"   # only ever a leftover of this package's own copy
     if ditto "$found" "$dest.new" && move_to_trash "$dest" && mv "$dest.new" "$dest"; then
-      # Skip macOS's first-open check only for a download whose checksum was
-      # confirmed. Otherwise macOS checks the app the first time it opens.
-      [[ "$verified" == 1 ]] && { xattr -dr com.apple.quarantine "$dest" 2>/dev/null || true; }
+      if [[ "$trusted" == 0 ]]; then
+        xattr -w com.apple.quarantine "0081;$(printf %x "$(date +%s)");mac-setup;" "$dest" 2>/dev/null
+        echo "  ! $app: not notarized by Apple, so macOS will ask before it first opens"
+      fi
+      [[ -n "$team" ]] && printf '%s\n' "$team" > "$state/$app.team"
       register_app "$dest"
       printf '%s\n' "$tag" > "$state/$app.tag"
       printf '%s\n' "$dest" > "$state/$app.path"

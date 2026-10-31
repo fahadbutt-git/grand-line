@@ -23,7 +23,7 @@ if ! ls "$DL" >/dev/null 2>&1; then
   stamp="$MAC_SETUP_STATE/downloads-access-asked"
   if [[ -z "$(find "$stamp" -mtime -1 2>/dev/null)" ]]; then
     touch "$stamp"
-    notify "Downloads sorting needs access" "System Settings, Privacy and Security, Files and Folders: allow bash to use Downloads."
+    notify "Downloads sorting needs access" "System Settings, Privacy and Security, Files and Folders: allow downloads-agent to use Downloads."
   fi
   exit 1
 fi

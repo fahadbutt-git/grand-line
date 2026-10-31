@@ -600,7 +600,11 @@
         },
         "to": [
          {
-          "shell_command": "pmset displaysleepnow"
+          "key_code": "q",
+          "modifiers": [
+           "control",
+           "command"
+          ]
          }
         ]
        },

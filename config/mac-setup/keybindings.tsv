@@ -4,7 +4,7 @@ Caps + Option + Space	Menus	Main menu	$HOME/.mac-setup/bin/menu
 Caps + K	Menus	Shortcut list (type to filter, Return runs it)	$HOME/.mac-setup/bin/keybindings
 Caps + Escape	Menus	System menu (lock, sleep, restart, shut down)	$HOME/.mac-setup/bin/menu System
 Caps + W	Windows	Close window	
-Caps + Ctrl + L	Windows	Lock screen	pmset displaysleepnow
+Caps + Ctrl + L	Windows	Lock screen	
 Caps + T	Windows	Toggle tiling and floating	/opt/homebrew/bin/aerospace layout floating tiling
 Caps + J	Windows	Toggle split direction	/opt/homebrew/bin/aerospace layout horizontal vertical
 Caps + F	Windows	Full screen	/opt/homebrew/bin/aerospace fullscreen

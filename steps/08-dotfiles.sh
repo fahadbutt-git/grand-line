@@ -43,8 +43,12 @@ step_dotfiles() {
   [[ -f "$esp/config/default.yml" ]] || run cp "$cfg/espanso/config/default.yml" "$esp/config/default.yml"
 
   # Download Neovim's plugins now, so the first launch is instant.
+  # Plugin versions are pinned in config/nvim/lazy-lock.json, so a new Mac
+  # gets exactly the tested set (update moves them forward).
   if have nvim && [[ ! -d "$HOME/.local/share/nvim/lazy/LazyVim" ]]; then
-    run_sh "nvim --headless '+Lazy! sync' +qa >/dev/null 2>&1" || warn "Neovim plugins did not download. Open nvim once to finish."
+    local lazy_cmd="Lazy! sync"
+    [[ -f "$cfg/nvim/lazy-lock.json" ]] && lazy_cmd="Lazy! restore"
+    run_sh "nvim --headless '+$lazy_cmd' +qa >/dev/null 2>&1" || warn "Neovim plugins did not download. Open nvim once to finish."
   fi
 
   # Karabiner rewrites and backs up its own settings file, so it gets a copy

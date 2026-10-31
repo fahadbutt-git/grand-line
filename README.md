@@ -69,6 +69,8 @@ As in Omarchy: mise for language versions, uv for Python packages, Docker, lazyg
 | `uv init`, `uv add pandas` | Starts a Python project and adds packages |
 | `n` | Neovim (LazyVim). Space Space finds a file, Space / searches text, Space g g opens lazygit, Space e the file tree |
 | `cx`, `codex` | Claude Code or Codex in the current folder |
+| `ccusage`, `ccusage blocks --live` | Claude Code token use by day, and the current usage window as it runs |
+| Caps menu, Transcode, To text | Turns selected PDFs and Word files into plain text before giving them to an AI, which costs far fewer tokens than PDF pages |
 | `bat file`, `tldr command` | Shows a file with syntax colours, or short examples for a command |
 | `duckdb` | SQL straight over CSV or Parquet files: `duckdb -c "select count(*) from 'export.csv'"` |
 | Caps menu, Toggle, Local AI | Starts or stops Ollama for local models (`ollama run llama3.2`). Nothing runs until you start it |
@@ -81,7 +83,7 @@ Building native Mac apps (such as the search app) needs Xcode from the App Store
 
 ## Downloads
 
-New files are sorted as they arrive, by the rules in `config/mac-setup/downloads-rules.tsv`. Files from Claude, ChatGPT and Gemini go to `Downloads/AI/<app>`, papers from journal and PubMed sites to `Downloads/Papers`, and everything else by type (Documents, Data, Slides, Images, Video, Installers and so on). Installers go to the Trash after a week, and anything left loose moves to `Downloads/Archive/<year-month>` after 30 days. Nothing is deleted, and every move is logged. The first time it runs, macOS asks whether bash may use Downloads. Allow it.
+New files are sorted as they arrive, by the rules in `config/mac-setup/downloads-rules.tsv`. Files from Claude, ChatGPT and Gemini go to `Downloads/AI/<app>`, papers from journal and PubMed sites to `Downloads/Papers`, and everything else by type (Documents, Data, Slides, Images, Video, Installers and so on). Installers go to the Trash after a week, and anything left loose moves to `Downloads/Archive/<year-month>` after 30 days. Nothing is deleted, and every move is logged. The first time it runs, macOS asks whether downloads-agent (the sorter's own small launcher) may use Downloads. Allow it. No other program gets that access.
 
 ## Text shortcuts
 
@@ -230,7 +232,7 @@ Kept deliberately small: Karabiner-Elements (keyboard), AeroSpace (windows), Mac
 
 ## Security
 
-Every run checks that the firewall (in stealth mode) and automatic security updates are on, and warns if FileVault is off. Nothing turns off Gatekeeper or System Integrity Protection. ArtCraft downloads are checked against GitHub's published checksum, and macOS still checks any app whose checksum was not published the first time it opens. Nothing is ever deleted: removed apps, old installers and replaced files go to the Trash, and removing an app keeps its data. No service listens on the network: Ollama and Docker answer only on this Mac.
+Every run checks that the firewall (in stealth mode) and automatic security updates are on, and warns if FileVault is off. Nothing turns off Gatekeeper or System Integrity Protection. ArtCraft downloads must carry the expected app name, match GitHub's checksum when one is published, and keep the same signing developer on every update. An app that Apple has not notarized is flagged so macOS asks before it first opens. sudo is used only by the steps that need it, then closed. The Downloads permission belongs to the sorter's own launcher, not to bash. Clipboard history ignores Citrix and Horizon, so patient information is not kept. Neovim plugins are pinned, and the GitHub test runs can only read the repository. Nothing is ever deleted: removed apps, old installers and replaced files go to the Trash, and removing an app keeps its data. No service listens on the network: Ollama and Docker answer only on this Mac.
 
 ## Running setup again
 

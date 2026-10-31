@@ -21,6 +21,7 @@ Transcode/Compress selected video for upload (1080p)	transcode video
 Transcode/Convert selected images to PNG	transcode png
 Transcode/Convert selected images to JPEG	transcode jpeg
 Transcode/Shrink selected PDFs	transcode pdf
+Transcode/Selected PDFs and Word files to text (for AI)	transcode text
 Toggle/Keep the Mac awake	toggle awake
 Toggle/Dark and light mode	toggle dark
 Toggle/Hidden files in Finder	toggle hidden
@@ -49,7 +50,7 @@ Hardware/Battery	notice battery
 Hardware/System information	open -a 'System Information'
 Hardware/Disk space	notice disk
 Update/Update everything	update --window
-System/Lock	pmset displaysleepnow
+System/Lock	osascript -e 'tell application "System Events" to keystroke "q" using {control down, command down}'
 System/Sleep	pmset sleepnow
 System/Log out	osascript -e 'tell application "System Events" to log out'
 System/Restart	osascript -e 'tell application "System Events" to restart'

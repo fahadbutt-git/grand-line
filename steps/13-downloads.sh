@@ -5,6 +5,15 @@
 
 DOWNLOADS_LABEL="mac-setup.downloads"
 
+# The launcher built from tools/downloads-agent.swift, or bash if it is missing.
+downloads_program() {
+  if [[ -x "$MAC_SETUP_BUILD/downloads-agent" ]]; then
+    echo "<string>$MAC_SETUP_BUILD/downloads-agent</string><string>run</string>"
+  else
+    echo "<string>/bin/bash</string><string>$MAC_SETUP_BIN/tidy-downloads</string>"
+  fi
+}
+
 downloads_plist() {
   cat <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -13,7 +22,7 @@ downloads_plist() {
 <dict>
   <key>Label</key><string>$DOWNLOADS_LABEL</string>
   <key>ProgramArguments</key>
-  <array><string>/bin/bash</string><string>$MAC_SETUP_BIN/tidy-downloads</string></array>
+  <array>$(downloads_program)</array>
   <key>WatchPaths</key><array><string>$HOME/Downloads</string></array>
   <key>StartInterval</key><integer>3600</integer>
   <key>ThrottleInterval</key><integer>20</integer>

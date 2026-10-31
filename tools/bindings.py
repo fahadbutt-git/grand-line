@@ -58,7 +58,7 @@ BINDINGS = [
 
     # Windows and workspaces
     ("w", [], "Windows", "Close window", key("w", "command")),
-    ("l", ["control"], "Windows", "Lock screen", sh("pmset displaysleepnow")),
+    ("l", ["control"], "Windows", "Lock screen", key("q", "control", "command")),
     ("t", [], "Windows", "Toggle tiling and floating", aero("layout floating tiling")),
     ("j", [], "Windows", "Toggle split direction", aero("layout horizontal vertical")),
     ("f", [], "Windows", "Full screen", aero("fullscreen")),

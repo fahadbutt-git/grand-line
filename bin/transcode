@@ -4,11 +4,12 @@
 #   transcode png     convert images (TIFF, HEIC, JPEG) to PNG
 #   transcode jpeg    convert images to JPEG
 #   transcode pdf     shrink PDFs
+#   transcode text    PDFs and Word files to plain text, for AI tools (fewer tokens)
 # Uses tools built into macOS, plus the pdfshrink helper built by setup.
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 
 mode="${1:-}"
-case "$mode" in video|png|jpeg|pdf) ;; *) echo "usage: transcode video|png|jpeg|pdf [files]" >&2; exit 2 ;; esac
+case "$mode" in video|png|jpeg|pdf|text) ;; *) echo "usage: transcode video|png|jpeg|pdf|text [files]" >&2; exit 2 ;; esac
 shift
 
 files=()
@@ -46,6 +47,11 @@ for f in "${files[@]}"; do
     png)   sips -s format png "$f" --out "$(out_for "$f" "" png)" >/dev/null ;;
     jpeg)  sips -s format jpeg -s formatOptions 85 "$f" --out "$(out_for "$f" "" jpg)" >/dev/null ;;
     pdf)   pdfshrink "$f" "$(out_for "$f" -small pdf)" ;;
+    text)
+      case "$(printf '%s' "${f##*.}" | tr '[:upper:]' '[:lower:]')" in
+        pdf) pdf2txt "$f" > "$(out_for "$f" "" txt)" ;;
+        *)   textutil -convert txt -output "$(out_for "$f" "" txt)" "$f" >/dev/null 2>&1 ;;
+      esac ;;
   esac && done_count=$((done_count + 1))
 done
 notify "Transcode finished" "$done_count of ${#files[@]} files converted."

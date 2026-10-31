@@ -48,12 +48,12 @@ case "${1:-}" in
       path="$(cat "$MAC_SETUP_STATE/artcraft/$name.path" 2>/dev/null)"
       [[ -d "$path" ]] && { move_to_trash "$path" || { notify "$name was not removed" "It could not be moved to the Trash."; exit 1; }; }
       rm -f "$MAC_SETUP_STATE/artcraft/$name.path" "$MAC_SETUP_STATE/artcraft/$name.tag"
-      perl -i -ne "print unless /^\Q$name\E\t/" "$ARTCRAFT"
+      N="$name" perl -i -ne 'print unless /^\Q$ENV{N}\E\t/' "$ARTCRAFT"
       default-apps primary >/dev/null 2>&1   # its file types move to the fallback app
     else
       brew uninstall --cask "$name" >/dev/null 2>&1 \
         || { notify "$name was not removed" "Try in Terminal: brew uninstall --cask $name"; exit 1; }
-      perl -i -ne "print unless /^cask \"(?:[^\"]*\/)?\Q$name\E\"/" "$BREWFILE"
+      N="$name" perl -i -ne 'print unless /^cask "(?:[^"]*\/)?\Q$ENV{N}\E"/' "$BREWFILE"
     fi
     record "Remove $name"
     notify "$name removed" "Also taken off the install list."

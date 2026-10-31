@@ -84,8 +84,8 @@ while IFS=$'\t' read -r app exts _; do
 done < "$ROOT/config/mac-setup/default-apps.tsv"
 
 echo "Preinstalled apps the package replaces"
-# shellcheck source=steps/12-declutter.sh
-source "$ROOT/steps/12-declutter.sh"
+# shellcheck source=steps/05-declutter.sh
+source "$ROOT/steps/05-declutter.sh"
 for app in "${DECLUTTER_APPS[@]}"; do
   [[ -d "/Applications/$app.app" ]] && fail "$app is still installed" || pass "$app removed"
 done

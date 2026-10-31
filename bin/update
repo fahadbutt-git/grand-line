@@ -44,7 +44,12 @@ bash "$REPO/setup.sh" --update || failed+=("setup")
 
 echo "== Neovim plugins and language versions"
 if command -v nvim >/dev/null; then
-  nvim --headless '+Lazy! sync' +qa >/dev/null 2>&1 && echo "Neovim plugins updated" || failed+=("Neovim plugins")
+  if nvim --headless '+Lazy! sync' +qa >/dev/null 2>&1; then
+    echo "Neovim plugins updated"
+    git -C "$REPO" commit -q -m "Update Neovim plugins" -- config/nvim/lazy-lock.json >/dev/null 2>&1 || true
+  else
+    failed+=("Neovim plugins")
+  fi
 fi
 command -v mise >/dev/null && { mise upgrade --yes >/dev/null 2>&1 || failed+=("mise"); }
 
