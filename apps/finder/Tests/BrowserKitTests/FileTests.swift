@@ -131,8 +131,9 @@ final class FileTests: XCTestCase {
     }
 
     func testClutterIsFoundForTheCleaner() throws {
+        // "._" files are hidden on the Mac's own disk, so the disk check uses .DS_Store.
         try temp.file("Drive/.DS_Store")
-        try temp.file("Drive/sub/._a")
+        try temp.file("Drive/sub/.DS_Store")
         try temp.file("Drive/sub/a")
         XCTAssertEqual(Clutter.find(in: temp.url("Drive")).count, 2)
     }

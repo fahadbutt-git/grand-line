@@ -55,7 +55,7 @@ public struct SelectionSummary: Sendable, Equatable {
     }
 
     static func commonParent(of items: [URL]) -> URL? {
-        let parents = items.map { $0.standardizedFileURL.deletingLastPathComponent().pathComponents }
+        let parents = items.map { FilePath.canonical($0).deletingLastPathComponent().pathComponents }
         guard var shared = parents.first else { return nil }
         for parts in parents.dropFirst() {
             var length = 0

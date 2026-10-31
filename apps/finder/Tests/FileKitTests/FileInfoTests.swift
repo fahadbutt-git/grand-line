@@ -95,7 +95,7 @@ final class FileInfoTests: XCTestCase {
         XCTAssertEqual(summary.oldest, old)
         XCTAssertNotNil(summary.newest)
         XCTAssertEqual(summary.commonTags, ["Work"])
-        XCTAssertEqual(summary.commonParent?.path, box.url("s").path)
+        XCTAssertEqual(summary.commonParent?.path, FilePath.canonical(box.url("s")).path)
     }
 
     func testCommonParent() {
@@ -141,7 +141,7 @@ final class FileInfoTests: XCTestCase {
         try await recents.record(two, at: Date(timeIntervalSince1970: 200))
         try await recents.record(one, at: Date(timeIntervalSince1970: 300))
         let list = await recents.list()
-        XCTAssertEqual(list.map(\.path), [one.standardizedFileURL.path, two.standardizedFileURL.path])
+        XCTAssertEqual(list.map(\.path), [FilePath.canonical(one).path, FilePath.canonical(two).path])
         XCTAssertEqual(list.first?.opened, Date(timeIntervalSince1970: 300))
 
         let reloaded = Recents(file: log, limit: 2)
@@ -151,7 +151,7 @@ final class FileInfoTests: XCTestCase {
         try await reloaded.record(try box.file("r/three.txt"))
         let capped = await reloaded.list()
         XCTAssertEqual(capped.count, 2)
-        XCTAssertEqual(capped.last?.path, one.standardizedFileURL.path)
+        XCTAssertEqual(capped.last?.path, FilePath.canonical(one).path)
     }
 
     func testRecentsDropMissingAndClear() async throws {
@@ -162,7 +162,7 @@ final class FileInfoTests: XCTestCase {
         let visible = await recents.list()
         XCTAssertTrue(visible.isEmpty)
         let all = await recents.list(includingMissing: true)
-        XCTAssertEqual(all.map(\.path), [file.standardizedFileURL.path])
+        XCTAssertEqual(all.map(\.path), [FilePath.canonical(file).path])
         try await recents.remove(file)
         let removed = await recents.list(includingMissing: true)
         XCTAssertTrue(removed.isEmpty)
@@ -171,5 +171,14 @@ final class FileInfoTests: XCTestCase {
         let cleared = await recents.list(includingMissing: true)
         XCTAssertTrue(cleared.isEmpty)
         XCTAssertTrue(Recents.defaultFile.path.hasSuffix("Application Support/Log Pose/recents.json"))
+    }
+
+    func testCanonicalPathsDoNotDependOnTheFileExisting() {
+        func canon(_ p: String) -> String { FilePath.canonical(URL(fileURLWithPath: p)).path }
+        XCTAssertEqual(canon("/private/var/folders/x/gone.txt"), "/var/folders/x/gone.txt")
+        XCTAssertEqual(canon("/var/folders/x/gone.txt"), "/var/folders/x/gone.txt")
+        XCTAssertEqual(canon("/private/tmp"), "/tmp")
+        XCTAssertEqual(canon("/private/variable/a"), "/private/variable/a")
+        XCTAssertEqual(canon("/Users/me/a/../b/./c.pdf"), "/Users/me/b/c.pdf")
     }
 }

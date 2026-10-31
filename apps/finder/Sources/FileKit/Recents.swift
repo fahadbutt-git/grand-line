@@ -26,7 +26,7 @@ public actor Recents {
     }
 
     public func record(_ url: URL, at date: Date = Date()) throws {
-        let path = url.standardizedFileURL.path
+        let path = FilePath.canonical(url).path
         var list = load().filter { $0.path != path }
         list.insert(Item(path: path, opened: date), at: 0)
         if list.count > limit { list.removeLast(list.count - limit) }
@@ -40,7 +40,7 @@ public actor Recents {
     }
 
     public func remove(_ url: URL) throws {
-        let path = url.standardizedFileURL.path
+        let path = FilePath.canonical(url).path
         try save(load().filter { $0.path != path })
     }
 
