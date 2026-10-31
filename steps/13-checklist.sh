@@ -53,7 +53,10 @@ macOS requires these clicks from you. Work down the list once.
 
 10. Sign in to your apps
     Chrome, Claude, ChatGPT, Gemini, Notion, WhatsApp, Zoom,
-    Discord, Spotify, Plaud, Citrix and Horizon.
+    Discord, Spotify, Plaud, Citrix, Horizon, Proton VPN (free
+    plan) and Tailscale. Leave the VPN off on hospital and school networks, where it
+    can block Citrix and Horizon. Run one VPN at a time: turn Proton
+    off while using Tailscale to reach the homelab.
 
 11. Keep start-up light
     In Spotify and Discord settings, turn off "Open at login".

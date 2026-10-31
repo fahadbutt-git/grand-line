@@ -77,6 +77,14 @@ cask "discord"
 # converter or archive apps.
 cask "iina"                 # plays every video format; FilmCraft is for editing
 
+# Privacy and the homelab
+cask "protonvpn"            # free VPN with no data cap; open-source, audited apps
+cask "tailscale-app"        # private network to your own NAS and servers, from anywhere
+brew "nmap"             # find devices and open ports on your network
+brew "mtr"              # trace where a connection slows or drops
+brew "iperf3"           # measure speed between two machines
+brew "wakeonlan"        # wake the NAS or a server from sleep
+
 # Browser, terminal and music
 cask "google-chrome"
 cask "ghostty"

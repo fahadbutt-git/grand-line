@@ -41,6 +41,26 @@ alias lzg='lazygit'
 alias d='docker'
 alias lzd='lazydocker'
 
+# Homelab, as in Omarchy
+# fip host port...  forward ports from a server to this Mac over SSH
+# dip port...       stop forwarding those ports
+# lip               list forwarded ports
+fip() { local h="$1"; shift; for p in "$@"; do ssh -f -N -L "$p:localhost:$p" "$h" && echo "localhost:$p -> $h:$p"; done; }
+dip() { for p in "$@"; do pkill -f "ssh -f -N -L $p:localhost:$p" && echo "stopped $p"; done; }
+lip() { pgrep -lf "ssh -f -N -L" || echo "no ports forwarded"; }
+
+# iso2sd image.iso disk4: write an image to an SD card or USB stick.
+# Refuses anything that is not an external disk, and asks before writing.
+iso2sd() {
+  local img="$1" disk="${2#/dev/}"
+  [[ -f "$img" && -n "$disk" ]] || { echo "usage: iso2sd image.iso disk4   (find the disk with: diskutil list external)"; return 1; }
+  diskutil info "$disk" | grep -q "Device Location: *External" || { echo "$disk is not an external disk. Stopping."; return 1; }
+  diskutil list "$disk"
+  read -r "?Erase /dev/$disk and write $(basename "$img") to it? Type yes: " ok
+  [[ "$ok" == yes ]] || return 1
+  diskutil unmountDisk "/dev/$disk" && sudo dd if="$img" of="/dev/r$disk" bs=4m status=progress && sync && diskutil eject "/dev/$disk"
+}
+
 # ff: find a file with a live preview, then print its path
 alias ff="fzf --preview 'head -100 {}'"
 

@@ -72,6 +72,8 @@ As in Omarchy: mise for language versions, uv for Python packages, Docker, lazyg
 | `lzg`, `lzd`, `btop` | Git, containers, and system load in the terminal |
 | `g`, `gcm "message"`, `gcam`, `gcad` | git, commit, commit all, amend |
 
+For the homelab: Tailscale joins this Mac to a private network with your NAS and servers. `nmap`, `mtr`, `iperf3` and `wakeonlan` find, trace, speed-test and wake machines. `fip server 8080` forwards a server's port to this Mac, `dip 8080` stops it, and `lip` lists them. `iso2sd image.iso disk4` writes an image to an SD card or USB stick, and refuses internal disks.
+
 Building native Mac apps (such as the search app) needs Xcode from the App Store. Install it when that work starts. It is about 15 GB.
 
 ## Downloads
