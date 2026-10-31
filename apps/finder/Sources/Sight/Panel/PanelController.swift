@@ -101,6 +101,8 @@ final class PanelController: NSObject, NSWindowDelegate {
             control: flags.contains(.control)
         )
         if flags == .command, event.charactersIgnoringModifiers == ",", let openSettings {
+            // Hidden first, so Settings never opens under the floating search window.
+            hide()
             openSettings()
             return true
         }

@@ -1,4 +1,5 @@
 # Atlas dark. Blue greys of a chart table. Every app that has colours takes them from this file.
+FORMAT=1
 LABEL="Atlas Dark"
 FAMILY=atlas
 MODE=dark

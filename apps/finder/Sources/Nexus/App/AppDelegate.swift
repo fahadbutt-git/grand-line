@@ -72,6 +72,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         guard let raw = (sender as? NSMenuItem)?.representedObject as? String,
               let command = BrowserCommand(rawValue: raw) else { return }
         if TextFieldGuard.forward(command, in: NSApp.keyWindow) { return }
+        // Another window is in front (Settings, a panel): Close Window closes
+        // it, as Cmd+W does for every window on a Mac.
+        if command == .closeWindow || command == .closeAllWindows, let window = NSApp.keyWindow {
+            window.performClose(nil)
+            return
+        }
         let controller = WindowManager.shared.newWindow(from: nil)
         if command != .newWindow { controller.model.perform(command) }
     }
@@ -83,6 +89,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
               let raw = menuItem.representedObject as? String, let command = BrowserCommand(rawValue: raw) else { return true }
         if let editing = TextFieldGuard.validate(menuItem, command, in: NSApp.keyWindow) { return editing }
         if NSApp.modalWindow != nil { return false }
+        if command == .closeWindow || command == .closeAllWindows {
+            return NSApp.keyWindow?.styleMask.contains(.closable) == true
+        }
         return CommandCatalog.spec(command).menu == .go || [.newWindow, .newTab, .find, .connectToServer].contains(command)
     }
 

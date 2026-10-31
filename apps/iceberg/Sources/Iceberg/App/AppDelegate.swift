@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow = SettingsWindow(host: host)
         host.onLayoutChange = { [weak self] in self?.rebuildPanels(force: true) }
         host.openSettings = { [weak self] in self?.showSettings() }
+        host.hotKey.action = { [weak self] in self?.targetController()?.toggle() }
         NSApp.mainMenu = makeMainMenu()
         rebuildPanels(force: false)
         settingsSink = host.$settings
@@ -39,7 +40,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static let urlSchemes: Set<String> = ["iceberg", "denden"]
 
     /// `iceberg://toggle`, `open`, `close`, `reload` and `settings`, so a keyboard shortcut
-    /// (Karabiner, `open -g iceberg://toggle`) can drive the panel.
+    /// (Karabiner, `open -g iceberg://toggle`) can drive the panel, and
+    /// `iceberg://trigger/NAME`, which runs a widget (`iceberg trigger NAME`
+    /// uses it when Iceberg is not running yet).
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls where Self.urlSchemes.contains(url.scheme?.lowercased() ?? "") {
             switch url.host ?? url.path {
@@ -48,6 +51,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "close": controllers.values.forEach { $0.close() }
             case "reload": host.reloadEverything()
             case "settings": showSettings()
+            case "trigger":
+                let fromPath = url.pathComponents.filter { $0 != "/" }
+                let fromQuery = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                    .queryItems?.filter { $0.name == "widget" }.compactMap(\.value) ?? []
+                for name in fromPath + fromQuery where !name.isEmpty { host.user.trigger(name) }
             default: break
             }
         }

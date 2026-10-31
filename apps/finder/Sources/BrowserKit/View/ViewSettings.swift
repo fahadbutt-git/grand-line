@@ -6,11 +6,15 @@ public struct ViewSettings: Codable, Hashable, Sendable {
     public var sort: ItemSort
     /// Icon and gallery thumbnail edge, in points.
     public var iconSize: Double
+    /// The list view's columns; nil is Finder's set (`ListColumn.standard`).
+    /// Settings stored before columns could be chosen read as nil.
+    public var columns: [ListColumn]?
 
-    public init(mode: ViewMode = .list, sort: ItemSort = ItemSort(), iconSize: Double = 64) {
+    public init(mode: ViewMode = .list, sort: ItemSort = ItemSort(), iconSize: Double = 64, columns: [ListColumn]? = nil) {
         self.mode = mode
         self.sort = sort
         self.iconSize = iconSize
+        self.columns = columns
     }
 
     public static let iconSizes: ClosedRange<Double> = 32...256

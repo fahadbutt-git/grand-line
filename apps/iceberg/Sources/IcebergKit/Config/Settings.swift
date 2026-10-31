@@ -36,64 +36,86 @@ public struct IcebergSettings: Equatable, Sendable {
     public var launchAtLogin = true
     /// An Iceberg item in the menu bar, with Settings and the panel's menu.
     public var menuBarIcon = true
+    /// Opens or closes the panel from any app; nil when turned off.
+    public var toggleShortcut: KeyShortcut? = .defaultToggle
+    /// The most widget commands that run at once (and the most streams).
+    public var maxConcurrent = 4
 
     public init() {}
 
     public static func parse(_ text: String, fileName: String = "iceberg.toml") -> (IcebergSettings, [ConfigIssue]) {
         var settings = IcebergSettings()
-        var issues: [ConfigIssue] = []
-        func warn(_ m: String) { issues.append(ConfigIssue(file: fileName, message: m, severity: .warning)) }
 
-        let table: [String: TOMLValue]
+        let document: TOMLDocument
         do {
-            table = try TOML.parse(text)
+            document = try TOML.parseDocument(text)
         } catch let error as TOMLError {
-            return (settings, [ConfigIssue(file: fileName, line: error.line, message: error.message + "; using the defaults")])
+            return (settings, [ConfigIssue(file: fileName, line: error.line, message: error.message + "; using the defaults",
+                                           severity: .error, fix: WidgetConfig.syntaxFix(for: error))])
         } catch {
             return (settings, [ConfigIssue(file: fileName, message: "unreadable; using the defaults")])
         }
 
-        for (key, value) in table.sorted(by: { $0.key < $1.key }) {
+        let checked = ConfigSchema.settings.check(document.values, lines: document.lines, fileName: fileName)
+        var issues = checked.issues
+        func warn(_ key: String, _ m: String, fix: String) {
+            issues.append(ConfigIssue(file: fileName, line: checked.lines[key], message: m, severity: .warning, fix: fix))
+        }
+        func number(_ v: TOMLValue) -> Double? {
+            switch v {
+            case .integer(let n): return Double(n)
+            case .float(let d): return d
+            default: return nil
+            }
+        }
+
+        for (key, value) in checked.values.sorted(by: { $0.key < $1.key }) {
             switch (key, value) {
             case ("external_displays", .string(let s)):
-                if let v = ExternalDisplays(rawValue: s.lowercased()) { settings.externalDisplays = v }
-                else { warn("external_displays must be \"none\" or \"pill\"") }
+                settings.externalDisplays = ExternalDisplays(rawValue: s) ?? .none
             case ("open_on", .string(let s)):
-                if let v = OpenOn(rawValue: s.lowercased()) { settings.openOn = v }
-                else { warn("open_on must be \"hover\" or \"click\"") }
-            case ("hover_delay", _), ("close_delay", _):
-                let seconds: Double?
-                switch value {
-                case .integer(let n): seconds = Double(n)
-                case .float(let d): seconds = d
-                default: seconds = nil
-                }
-                guard let s = seconds, s >= 0, s <= 3 else { warn("\(key) must be between 0 and 3 seconds"); continue }
-                if key == "hover_delay" { settings.hoverDelay = s } else { settings.closeDelay = s }
+                settings.openOn = OpenOn(rawValue: s) ?? .hover
+            case ("hover_delay", _):
+                settings.hoverDelay = number(value) ?? settings.hoverDelay
+            case ("close_delay", _):
+                settings.closeDelay = number(value) ?? settings.closeDelay
             case ("live_activity", .bool(let b)):
                 settings.liveActivity = b
             case ("launch_at_login", .bool(let b)):
                 settings.launchAtLogin = b
             case ("menu_bar_icon", .bool(let b)):
                 settings.menuBarIcon = b
+            case ("toggle_shortcut", .string(let s)):
+                settings.toggleShortcut = s.isEmpty ? nil : KeyShortcut.parse(s)
+            case ("max_concurrent", .integer(let n)):
+                settings.maxConcurrent = n
             case ("panel", .array(let items)):
                 var list: [String] = []
                 for item in items {
-                    guard case .string(let name) = item, !name.isEmpty else { warn("panel lists names in quotes"); continue }
+                    guard case .string(let name) = item, !name.isEmpty else {
+                        warn(key, "panel lists names in quotes", fix: "Write each name in double quotes, like panel = [\"date\", \"today\"].")
+                        continue
+                    }
                     if !list.contains(name) { list.append(name) }
                 }
                 settings.panel = list
             case ("builtin", .array(let items)):
                 var list: [String] = []
                 for item in items {
-                    guard case .string(let name) = item else { warn("builtin lists widget names in quotes"); continue }
+                    guard case .string(let name) = item else {
+                        warn(key, "builtin lists widget names in quotes", fix: "Write each name in double quotes.")
+                        continue
+                    }
                     if builtinWidgets.contains(name) { if !list.contains(name) { list.append(name) } }
-                    else { warn("\"\(name)\" is not a built-in widget (\(builtinWidgets.joined(separator: ", ")))") }
+                    else {
+                        warn(key, "\"\(name)\" is not a built-in widget (\(builtinWidgets.joined(separator: ", ")))",
+                             fix: "Remove \"\(name)\", or use panel = [...], which also takes widget file names.")
+                    }
                 }
                 settings.builtin = list
                 settings.builtinIsSet = true
             default:
-                warn("unknown or mistyped setting \"\(key)\" is ignored")
+                break
             }
         }
         return (settings, issues)

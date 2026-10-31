@@ -28,6 +28,12 @@ public struct PaneState: Equatable, Sendable {
     /// Last-opened dates by path, read only while sorting by them.
     public private(set) var lastOpened: [String: Date] = [:]
     public private(set) var manualOrder: [String] = []
+    /// The omnibar's filter on the rows (`ItemFilter`); empty shows them all.
+    /// It belongs to the place, so going anywhere else clears it.
+    public private(set) var filter = ""
+    /// Flat view: the folder and everything below it in one list. A transient
+    /// scope of the pane, never stored with the folder's view settings.
+    public var isFlat = false
 
     public init(location: BrowserLocation, settings: ViewSettings = ViewSettings()) {
         self.history = NavigationHistory(location)
@@ -88,8 +94,20 @@ public struct PaneState: Equatable, Sendable {
         return order
     }
 
+    /// Filters the rows as typed. The selection keeps only rows still shown.
+    public mutating func setFilter(_ text: String) {
+        guard text != filter else { return }
+        filter = text
+        resort()
+        selection.prune(to: ids)
+    }
+
+    /// Rows before the filter, for "3 of 40".
+    public var unfilteredCount: Int { loaded.count }
+
     mutating func resort() {
-        items = ItemSorter.sorted(loaded, by: settings.sort, folderSizes: folderSizes, lastOpened: lastOpened, manual: manualOrder)
+        let sorted = ItemSorter.sorted(loaded, by: settings.sort, folderSizes: folderSizes, lastOpened: lastOpened, manual: manualOrder)
+        items = filter.isEmpty ? sorted : sorted.filter { ItemFilter.matches($0.name, filter) }
         ids = items.map(\.id)
     }
 
@@ -103,6 +121,7 @@ public struct PaneState: Equatable, Sendable {
         ids = []
         selection.clear()
         manualOrder = []
+        filter = ""
         pendingSelection = select.map { $0.standardizedFileURL.path }
     }
 
@@ -149,6 +168,7 @@ public struct PaneState: Equatable, Sendable {
         ids = []
         selection.clear()
         pendingSelection = []
+        filter = ""
     }
 
     // MARK: Opening

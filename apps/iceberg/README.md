@@ -10,11 +10,19 @@ The notch app of Grand Line. Hover over the MacBook's camera notch and it opens 
 
 It follows the theme (`theme pick`) as it changes (and, with Follow macOS chosen in Nexus or Sight Settings, Appearance, the dark or light variant macOS shows), uses SF Pro and SF Symbols, and takes every colour from the theme file, as `DESIGN.md` asks: the open panel, its chips and the lines between its columns (`NOTCH_PANEL`, `NOTCH_CARD`, `NOTCH_LINE`, which fall back to the theme's own surfaces). The closed notch, and the part of the open panel under the camera, are black so they match the camera housing. Its app icon, an iceberg, is drawn in the theme's colours too. It shows on the built-in display. With `external_displays = "pill"` other displays get a small pill at the top centre, and with the lid closed the main display gets one.
 
-Iceberg's menu bar item (and a right-click on the panel) has Settings, Reload, the widgets folder, the log and Quit. `open -g iceberg://toggle` opens or closes it from a shortcut (also `open`, `close`, `reload` and `settings`). Command + Comma opens Settings from the menu bar item's menu or while the Settings window is in front; the panel itself never takes the keyboard, so it does not see the shortcut.
+Iceberg's menu bar item (and a right-click on the panel) has Settings, Reload, the widgets folder, the log and Quit. Control + Option + Command + N opens or closes the panel from any app (`toggle_shortcut`; the Caps Lock layer's Caps + Control + Option + N does the same through Karabiner). `open -g iceberg://toggle` does it from a script (also `open`, `close`, `reload`, `settings` and `trigger/NAME`), as does the `iceberg` command below. Command + Comma opens Settings from the menu bar item's menu or while the Settings window is in front; the panel itself never takes the keyboard, so it does not see the shortcut.
+
+Saving iceberg.toml, a widget file or a script beside it applies at once, with no restart (hot reload).
 
 ## Settings window
 
-Lists every built-in item and every widget file with a switch, a line on what it is, and arrows (or drag) to set the order. Below are buttons for the widgets folder, iceberg.toml and the log, the general options (open on hover or click, which displays, artwork beside the closed notch, the menu bar item, open at login), and a Problems list naming any file Iceberg could not fully read. The panel itself never shows problems.
+Lists every built-in item and every widget file with a switch, a line on what it is, and arrows (or drag) to set the order. Below are:
+
+- buttons for the widgets folder, iceberg.toml and the log;
+- **General**: open on hover or click, the hover delay, the keyboard shortcut (click it and press new keys; Reset and Turn off beside it), which displays, artwork beside the closed notch, the menu bar item, open at login;
+- **Now Playing**: where what is playing comes from (see below), with Check again;
+- **Diagnostics**: for each widget in the panel, how many times it ran, its average and last run time, what it last printed and its last error, whether it is paused or waiting after failures, and Run now;
+- **Problems**: each file Iceberg could not fully read, as `file:line`, what is wrong, and the fix in plain words. The panel itself never shows problems.
 
 Every change applies at once and is written to `iceberg.toml`: only the line for that setting changes, so your comments and the rest of the file stay as you wrote them. A file with a mistake in it is left alone, and the window says so.
 
@@ -31,31 +39,83 @@ refresh = "5m"                              # seconds, "30s", "5m", "1h", or "on
 click = "open -a 'Disk Utility'"            # optional
 ```
 
-The command's first line of output is shown. A bare setup note such as `Set LOCATION` shows as "Needs setup", with the note in the tooltip. To set the symbol or colour from the command, print JSON instead:
+### What a command prints
+
+The contract is Waybar's custom module, so its scripts work unchanged. The command prints one line of text, or one line of JSON:
 
 ```sh
-echo '{"text": "3 new", "icon": "tray.full", "color": "highlight"}'
+echo '{"text": "3 new", "tooltip": "From: …", "class": "warning", "percentage": 60, "icon": "tray.full"}'
 ```
+
+| Field | Meaning |
+| --- | --- |
+| `text` | What the chip shows (a number is shown as written) |
+| `tooltip` | Shown when the pointer rests on the chip |
+| `class` | One name or a list. A name that is a theme colour (`warning`, `critical`, `red` …) colours the text |
+| `percentage` | 0 to 100, drawn as a thin bar along the chip |
+| `alt` | A second word for the state; kept for Waybar scripts |
+| `icon` | Iceberg's own: an SF Symbol name for this run |
+| `color` | Iceberg's own: a theme colour name, which wins over `class` |
+
+Plain text shows its first line. A bare setup note such as `Set LOCATION` shows as "Needs setup", with the note in the tooltip. Colour codes are removed. Colours are theme names, so they follow the theme: `foreground`, `muted`, `highlight`, `accent`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`.
+
+### Three kinds of widget
+
+- **Interval** (the default): runs on its `refresh` schedule while the panel is open, and as it opens when its value is older than that.
+- **Signal** (`signal = true`): runs when asked, with `iceberg trigger NAME` from any script or hook (or `open -g iceberg://trigger/NAME`), and once as the panel opens. Use it for things that change on an event, such as mail arriving or a VPN connecting, instead of polling. With `refresh` set as well it also runs on that schedule.
+- **Stream** (`stream = true`): the command keeps running and prints one line per update (Waybar's continuous mode). Iceberg shows each new line, at most ten a second; it stops the script when the panel closes (unless `updates = "always"`) and starts it again, waiting longer each time, if it ends by itself. Print with line buffering (`stdbuf -oL`, `fflush()` in awk, `python3 -u`); a buffered script looks frozen.
+
+```toml
+# widgets/vpn.toml: refreshed by a hook calling `iceberg trigger vpn`
+title = "VPN"
+icon = "lock.shield"
+command = "./vpn-status.sh"
+signal = true
+```
+
+```toml
+# widgets/log.toml: the newest line of a log, while the panel is open
+title = "Build"
+icon = "hammer"
+command = "tail -n 1 -F ~/build.log"
+stream = true
+```
+
+### Keys
 
 | Key | Meaning |
 | --- | --- |
 | `title` | The label. Defaults to the file name |
 | `icon` | An SF Symbol name |
-| `command` | Run with `/bin/sh` in the widgets folder, so `./script.sh` works |
+| `command` | Run with `/bin/sh` in the widgets folder, so `./script.sh` works (also `exec` or `script`) |
 | `refresh` | How often it runs while the panel is open (5 seconds at the fastest), or `"on open"` (the default) |
-| `click` | Run when the widget is clicked, then the widget refreshes |
-| `timeout` | Seconds before a stuck command is stopped (default 10, 1 to 120) |
+| `signal` | `true`: runs when `iceberg trigger NAME` asks, and as the panel opens |
+| `stream` | `true`: the command keeps running and prints a line per update |
+| `updates` | `"when_shown"` (the default): only while the panel is open, plus once as it opens. `"always"`: also while it is closed, so the value is current when it opens |
+| `always` | `true`: keeps running during Low Power Mode and around sleep |
+| `click` | Run when the widget is clicked, then the widget refreshes (also `on-click`) |
+| `timeout` | Seconds before a stuck command and everything it started are stopped (default 10, 1 to 120; not for streams) |
 | `order` | Only for files from before `panel`: the position, lowest first |
 | `enabled` | `false` keeps it off, whatever Settings says |
 
-The same keys work in a `.json` file. Colours are theme names, so they follow the theme: `foreground`, `muted`, `highlight`, `accent`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`. Commands get `GRAND_LINE_ICEBERG_WIDGET`, `GRAND_LINE_ICEBERG_WIDGETS_DIR`, `GRAND_LINE_ICEBERG_THEME` and `GRAND_LINE_ICEBERG_MODE`, and a PATH with Homebrew and `~/.grand-line/bin`.
+The same keys work in a `.json` file. Commands get `GRAND_LINE_ICEBERG_WIDGET`, `GRAND_LINE_ICEBERG_WIDGETS_DIR`, `GRAND_LINE_ICEBERG_THEME` and `GRAND_LINE_ICEBERG_MODE`, and a PATH with Homebrew and `~/.grand-line/bin`.
 
-A file with a mistake is skipped and named at the bottom of the panel and in `~/Library/Logs/grand-line/iceberg.log`, with its line number. The other widgets keep working.
+A file with a mistake is named in Settings, Problems, with its line and how to fix it, and in `~/Library/Logs/grand-line/iceberg.log`. A widget that was working keeps its last good version until the file is fixed; the other widgets keep working. Unknown keys are warned about, with the nearest known key when there is one.
 
 Two examples are copied into the folder the first time Iceberg runs (from `Resources/Iceberg/examples/widgets/`). They start turned off:
 
 - **Weather** from Open-Meteo, for `LOCATION="lat lon Place"` in `~/.config/grand-line/personal.env`.
 - **Services**: whether Docker and local AI are running, from the package's toggles. Click it for the Toggle menu.
+
+## The iceberg command
+
+```
+iceberg trigger NAME...   run widgets now (by file name, without .toml); a stream widget restarts
+iceberg toggle | open | close | reload | settings
+iceberg schema            where iceberg.schema.json is, for editors
+```
+
+A trigger reaches a running Iceberg as a distributed notification, so nothing comes forward. While the panel is closed the widget runs as the panel next opens (at once with `updates = "always"`), and during Low Power Mode once it ends (at once with `always = true`). When Iceberg is not running, `iceberg trigger` starts it with `iceberg://trigger/NAME`.
 
 ## Settings
 
@@ -64,19 +124,44 @@ All optional, in `~/.config/grand-line/iceberg/iceberg.toml`:
 ```toml
 external_displays = "none"   # "pill" adds a pill to every display without a notch
 open_on = "hover"            # or "click"
-hover_delay = 0.12           # seconds
-close_delay = 0.35
+hover_delay = 0.12           # seconds, 0 to 3
+close_delay = 0.35           # seconds, 0 to 3
+toggle_shortcut = "ctrl+option+cmd+n"   # "" for none
 live_activity = true         # artwork beside the closed notch while music plays
 launch_at_login = true
 menu_bar_icon = true         # Iceberg's item in the menu bar
+max_concurrent = 4           # widget commands at once (and streams), 1 to 16
 panel = ["date", "now-playing", "today"]   # what shows, in order: built-in items and widget file names
 ```
 
 `panel` is the one list of what the panel shows. The built-in names are `date`, `now-playing`, `today`, `reminders` and `battery`; anything else is a widget's file name without `.toml`. Without `panel`, a file from before it keeps its `builtin = [...]` list (plus the date), and a new install shows `date`, `now-playing` and `today`. The Settings window writes `panel` and then drops the old `builtin` line.
 
+`toggle_shortcut` is modifier names and a key joined with `+`: `ctrl`, `option`, `cmd`, `shift` (at least one besides `shift`), then a letter, digit, `space`, `return`, `escape`, an arrow, or `f1` to `f15`. It needs no Accessibility permission. If another app holds the same keys, Settings says so.
+
+### Schema
+
+`Resources/Iceberg/iceberg.schema.json` (also inside the app, and printed by `iceberg schema`) is a JSON Schema for iceberg.toml, with widget files under `#/$defs/widget`. It gives every key's type, allowed values, range, default and a description. Iceberg checks both kinds of file against the same rules on every load (`ConfigSchema` in IcebergKit; a test keeps the two the same), so an editor that reads JSON Schema for TOML (Taplo, or VS Code with Even Better TOML) flags the same mistakes as you type. Point it at the file with a first line such as this, with your home folder in place of `/Users/me`:
+
+```toml
+#:schema /Users/me/.grand-line/apps/iceberg/Resources/Iceberg/iceberg.schema.json
+```
+
+What the checks do with a mistake: a wrong type, or a value outside its range or list, is named with its line and a fix, and the default is used (`timeout` and `max_concurrent` are brought into range instead); an unknown key is warned about and ignored; a widget file without `command`, or with a syntax error, is not loaded (a widget that was working keeps its last good version). iceberg.toml with a syntax error gives the defaults until it is fixed.
+
+## Now Playing
+
+Since macOS 15.4 only Apple's own programs may read what is playing, so Iceberg uses mediaremote-adapter, which runs through Apple's `/usr/bin/perl`. A macOS update can break that, so Iceberg checks it as it starts and every five minutes (the adapter's own `test`). When the check fails, or the adapter keeps stopping, Iceberg asks Music and Spotify directly with AppleScript (only when they are running, so it never opens them) and follows their change notices: Music and Spotify keep working, without artwork; other players do not show. The first time, macOS asks to let Iceberg control Music or Spotify. Settings, Now Playing says which of the two is in use, and when neither works, why and what to do (usually allowing Iceberg in Privacy & Security, Automation). A later check that passes switches back by itself, or click Check again.
+
 ## Resource use
 
-Nothing polls. Now Playing, the calendars, reminders and the battery are pushed by macOS. Widget commands run only while the panel is open (or as it opens), four at a time at most, each with a time limit after which it and anything it started are stopped. One timer is set for the next widget due, and none while the panel is closed. The playback bar redraws once a second, only while the panel is open and something plays.
+Nothing polls. Now Playing, the calendars, reminders and the battery are pushed by macOS. Widget commands:
+
+- run only while the panel is open, plus once as it opens (`updates = "when_shown"`, the default); `updates = "always"` lets one keep running while it is closed;
+- run at most `max_concurrent` at a time (4), each with a time limit (`timeout`) after which it and everything it started (its process group) are stopped;
+- do not run during sleep (from macOS's will-sleep notice to the wake) or in Low Power Mode, unless the widget says `always = true`; what was missed runs once afterwards;
+- wait longer after repeated failures: one failure changes nothing, then 10 s, 20 s, 40 s … up to 30 minutes on top of the schedule, and one success clears it (a click or Run now runs it at once).
+
+One timer is set for the next widget due, and none while nothing is due. The playback bar redraws once a second, only while the panel is open and something plays. Settings, Diagnostics shows what each widget costs.
 
 ## Build and test
 
@@ -89,7 +174,9 @@ bash build.sh --open     # the same, then opened
 bash build.sh --test     # or: swift test
 ```
 
-The tests cover widget and settings parsing (TOML and JSON), what shows and in what order, writing iceberg.toml without losing comments, the cover tint, command output parsing, the command runner (time limits, killed process groups, capped output), refresh scheduling, theme parsing (every shipped theme), panel sizes and placement, the Now Playing stream, battery and agenda logic, and stress cases: 50 widgets, hung commands, malformed and binary files, random input.
+The tests cover widget and settings parsing (TOML and JSON), the schema checks and that `iceberg.schema.json` and this README match them, what shows and in what order, writing iceberg.toml without losing comments, the cover tint, the widget output contract (Waybar's fields), the three widget kinds, the command runner and stream runner (time limits, killed process groups, capped and thinned output), refresh scheduling with backoff, sleep and Low Power Mode, hot reload (a broken save keeps the last good widget, saved scripts re-run their widgets), the diagnostics, the keyboard shortcut, the Now Playing stream, its health check and AppleScript fallback, theme parsing (every shipped theme), panel sizes and placement, battery and agenda logic, and stress cases: 50 widgets, hung commands, malformed and binary files, random input.
+
+The user journeys (`tests/journeys`, on a Mac) also drive a signal widget through `bin/iceberg trigger` and `iceberg://trigger/NAME`, and save widget files and iceberg.toml while the panel is open.
 
 ## Layout
 
@@ -97,8 +184,8 @@ The tests cover widget and settings parsing (TOML and JSON), what shows and in w
 Package.swift
 apps.tsv                     how setup builds and names the app
 Info/Iceberg.plist           extra Info.plist keys (permissions, URL scheme)
-Resources/Iceberg/           copied into the app: adapter script, example widgets, licence, AppIcon.icns
-Sources/IcebergKit/          everything testable: Config, Commands, Scheduling, Theme, Layout, Media, Agenda, Battery, Panel
+Resources/Iceberg/           copied into the app: adapter script, iceberg.schema.json, example widgets, licence, AppIcon.icns
+Sources/IcebergKit/          everything testable: Config (and its schema), Commands, Scheduling, Diagnostics, Theme, Layout, Media, Agenda, Battery, Panel
 Sources/Iceberg/Settings/    the Settings window
 Sources/Iceberg/App/         start-up, displays, URL commands
 Sources/Iceberg/Notch/       the panel window, its shape, open and close
@@ -118,4 +205,5 @@ Iceberg is MIT licensed (`LICENSE`). It was written fresh, using techniques lear
 - [DynamicNotchKit](https://github.com/MrKai77/DynamicNotchKit) (MIT): how to measure the notch from the menu bar areas either side of it, and the notch outline, which `NotchShape.swift` adapts with credit.
 - [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter) (BSD-3): the Now Playing workaround for macOS 15.4 and later, included unchanged in `Vendor/`.
 - [Boring Notch](https://github.com/TheBoredTeam/boring.notch) and [Atoll](https://github.com/Ebullioscopic/Atoll) (GPL-3.0): how a notch panel window is set up and how media commands are sent. Read as references only. No code is copied, so Iceberg is not GPL.
-- [SketchyBar](https://github.com/FelixKratz/SketchyBar) (GPL-3.0): script-driven items with an update interval and a time limit on scripts. Read as a reference only.
+- [SketchyBar](https://github.com/FelixKratz/SketchyBar) (GPL-3.0): script-driven items with an update interval, `updates = when_shown`, no runs during sleep, and a time limit on scripts. Read as a reference only.
+- [Waybar](https://github.com/Alexays/Waybar) (MIT): the custom module's script contract (one JSON line with text, alt, tooltip, class and percentage; interval, signal and continuous modes), which Iceberg's widgets follow so its scripts carry over. No code is copied.

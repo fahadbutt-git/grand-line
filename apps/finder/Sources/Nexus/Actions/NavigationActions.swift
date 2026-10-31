@@ -39,8 +39,10 @@ extension BrowserModel {
         return ["Drive": drive.myDrive]
     }
 
+    /// Shift+Cmd+G: Finder's Go to Folder, in the path bar's field.
     func beginPathEditing() {
         let folder = focused.location.diskFolder ?? services.paths.home
+        omnibarOrigin = .goToFolder
         pathText = PathSegments.editableText(for: folder, home: services.paths.home)
         pathProblem = nil
         editingPath = true
@@ -102,13 +104,10 @@ extension BrowserModel {
         return FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder) && isFolder.boolValue
     }
 
+    /// Tab: the one matching folder, or as much as the matches share.
     func completePath(_ text: String) -> String? {
-        let current = focused.location.diskFolder ?? services.paths.home
-        let options = PathInput.completions(
-            for: text, relativeTo: current, home: services.paths.home, aliases: pathAliases, children: FolderReader.subfolderNames
-        )
-        guard let first = options.first else { return nil }
-        return PathSegments.editableText(for: first, home: services.paths.home) + "/"
+        let home = services.paths.home
+        return PathInput.complete(text, options: pathCompletions(text)) { PathSegments.editableText(for: $0, home: home) }
     }
 
     /// Folder names from the index for Go to Folder.
@@ -225,17 +224,31 @@ extension BrowserModel {
         if case .search = focused.location { focused.back() }
     }
 
+    /// Saves the query with where it looks and how its results show: the
+    /// scope, the list's columns, the sort and the grouping.
     func saveSearch() {
-        guard case .search(let query, _) = focused.location,
-              let name = Prompt.text("Save Search", message: "It appears in the sidebar and as @name in any search.", action: "Save")
+        guard case .search(let query, let scope) = focused.location,
+              let name = Prompt.text("Save Search", message: "It appears in the sidebar and as @name in any search. Its scope, columns, sort and grouping are kept with it.", action: "Save")
         else { return }
-        services.savedSearches.save(name, query: query)
+        let settings = focused.state.settings
+        services.savedSearches.save(SavedSearch(name: name, query: query, scope: scope, columns: settings.columns, sort: settings.sort))
         services.saveSearches()
     }
 
     func runSavedSearch(_ name: String) {
-        guard let query = services.savedSearches.query(named: name) else { return }
-        searchText = query
-        focused.go(.search(query: query, scope: .home))
+        guard let saved = services.savedSearches.search(named: name) else { return }
+        searchText = saved.query
+        focused.go(.search(query: saved.query, scope: saved.runScope))
+        guard saved.columns != nil || saved.sort != nil else { return }
+        var settings = focused.state.settings
+        if let columns = saved.columns { settings.columns = columns }
+        if let sort = saved.sort { settings.sort = sort }
+        focused.showTransiently(settings)
+    }
+
+    /// View › Show Contents of Subfolders: the folder flat, from the index.
+    func toggleFlatView() {
+        guard focused.location.folderURL != nil else { return }
+        focused.setFlat(!focused.state.isFlat)
     }
 }

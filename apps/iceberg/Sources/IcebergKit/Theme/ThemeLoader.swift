@@ -2,10 +2,15 @@ import Foundation
 
 /// Reads the active theme the way the rest of the package does: the name from
 /// `~/.local/state/grand-line/theme`, the colours from
-/// `~/.grand-line/config/themes/<name>.theme`. Always returns a theme; what was
-/// missing or wrong comes back as issues.
+/// `~/.grand-line/config/themes/<name>.theme` with its EXTENDS parents, through
+/// the format 1 checker (ThemeSpec.swift, as `theme check`). Always returns a
+/// theme; what was missing or wrong comes back as issues with their lines.
 public enum ThemeLoader {
     public static let defaultName = "graphite"
+
+    /// Posted (distributed) by `theme set` and `theme apply` once the new
+    /// theme is rendered: reload at once rather than wait for the file watch.
+    public static let changedNotification = Notification.Name(ThemeSpec.changedNotification)
 
     /// The theme's name from the state file, or "graphite".
     public static func currentName(paths: IcebergPaths) -> String {
@@ -53,8 +58,8 @@ public enum ThemeLoader {
         if name == "graphite" || name == "daylight" {
             target = systemIsDark ? "graphite" : "daylight"
         } else {
-            let text = (try? String(contentsOf: paths.themeFile(named: name), encoding: .utf8)) ?? ""
-            guard let family = fields(text)["FAMILY"].flatMap(sanitizedName) else { return nil }
+            // A light variant may take FAMILY from the dark one it EXTENDS.
+            guard let family = resolvedFields(paths: paths, named: name)["FAMILY"].flatMap(sanitizedName) else { return nil }
             target = family + (systemIsDark ? "-dark" : "-light")
         }
         guard target != name,
@@ -71,7 +76,22 @@ public enum ThemeLoader {
             let fallback = Theme.graphite
             return (fallback, [ConfigIssue(file: "\(name).theme", message: "theme file not found; using \(fallback.label)", severity: .warning)])
         }
-        return parse(text, name: name)
+        return parse(text, name: name, folder: paths.themesFolder)
+    }
+
+    /// Every key of a theme file as the checker leaves it: EXTENDS followed,
+    /// values cleaned, defaults filled. Empty when there is no file (a
+    /// built-in theme). For the keys `Theme` does not hold (NOTCH_*, ICON_*).
+    public static func resolvedFields(paths: IcebergPaths, named name: String) -> [String: String] {
+        guard let source = ThemeSource.resolve(url: paths.themeFile(named: name)) else { return [:] }
+        return check(source).values
+    }
+
+    /// The checker, with the built-in theme of the file's mode standing in for
+    /// required keys that are missing or wrong.
+    static func check(_ source: ThemeSource) -> ThemeValidation {
+        let mode = source.entries["MODE"].flatMap { Theme.Mode(rawValue: $0.value.lowercased()) }
+        return ThemeSpec.validate(source, fallback: (mode == .light ? Theme.daylight : Theme.graphite).fields)
     }
 
     /// KEY=VALUE lines, values optionally in quotes, # comments.
@@ -95,14 +115,12 @@ public enum ThemeLoader {
         return out
     }
 
-    public static func parse(_ text: String, name: String) -> (Theme, [ConfigIssue]) {
-        let f = fields(text)
-        let file = "\(name).theme"
-        var issues: [ConfigIssue] = []
-
-        let modeText = f["MODE"]?.lowercased()
-        let mode = Theme.Mode(rawValue: modeText ?? "")
-        if mode == nil { issues.append(ConfigIssue(file: file, message: "MODE must be dark or light; using dark", severity: .warning)) }
+    /// A theme file's text. With `folder`, EXTENDS reads the parent from it.
+    public static func parse(_ text: String, name: String, folder: URL? = nil) -> (Theme, [ConfigIssue]) {
+        let source = ThemeSource.resolve(text: text, file: "\(name).theme", folder: folder)
+        let checked = check(source)
+        let f = checked.values
+        let mode = f["MODE"].flatMap(Theme.Mode.init(rawValue:))
         let base = mode == .light ? Theme.daylight : Theme.graphite
         var theme = base
         theme.name = name
@@ -110,15 +128,7 @@ public enum ThemeLoader {
         theme.label = f["LABEL"].flatMap { $0.isEmpty ? nil : $0 } ?? name.capitalized
 
         func color(_ key: String, _ keyPath: WritableKeyPath<Theme, RGB>) {
-            guard let raw = f[key] else {
-                issues.append(ConfigIssue(file: file, message: "\(key) is missing; using \(base.label)'s", severity: .warning))
-                return
-            }
-            guard let rgb = RGB(hex: raw) else {
-                issues.append(ConfigIssue(file: file, message: "\(key)=\(raw) is not a hex colour", severity: .warning))
-                return
-            }
-            theme[keyPath: keyPath] = rgb
+            if let rgb = f[key].flatMap(RGB.init(hex:)) { theme[keyPath: keyPath] = rgb }
         }
         color("TERM_BG", \.background)
         color("TERM_FG", \.foreground)
@@ -128,14 +138,16 @@ public enum ThemeLoader {
         color("ACCENT_HEX", \.accent)
         color("BG_LIGHTER", \.backgroundLighter)
         color("BG_DARKER", \.backgroundDarker)
+        let colours = (f["PALETTE"] ?? "").split(separator: " ").compactMap { RGB(hex: String($0)) }
+        if colours.count == 16 { theme.palette = colours }
+        return (theme, checked.diagnostics.map(ConfigIssue.init(theme:)))
+    }
+}
 
-        if let raw = f["PALETTE"] {
-            let colours = raw.split(whereSeparator: { $0 == " " || $0 == "," }).compactMap { RGB(hex: String($0)) }
-            if colours.count >= 8 { theme.palette = colours }
-            else { issues.append(ConfigIssue(file: file, message: "PALETTE needs 16 hex colours", severity: .warning)) }
-        } else {
-            issues.append(ConfigIssue(file: file, message: "PALETTE is missing; using \(base.label)'s", severity: .warning))
-        }
-        return (theme, issues)
+extension ConfigIssue {
+    /// A checker diagnostic, keeping its file (a parent's, when the key came from one) and line.
+    init(theme diagnostic: ThemeDiagnostic) {
+        self.init(file: diagnostic.file, line: diagnostic.line, message: diagnostic.message,
+                  severity: diagnostic.severity == .error ? .error : .warning)
     }
 }

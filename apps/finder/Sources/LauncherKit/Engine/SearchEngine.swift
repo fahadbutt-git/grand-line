@@ -21,32 +21,61 @@ public final class SearchEngine: Sendable {
         /// Whether the best row is lifted into Top hit.
         public let topHit: Bool
         public let limitScale: Int
+        /// The hint chip at the start of the field ("Files", "Clipboard", "Zotero"), if any.
+        public let chip: String?
     }
 
     /// Which providers a query goes to, and how its results are shown.
     public func plan(_ text: String) -> Plan {
         let query = router.parse(text)
         if query.isPath {
-            return Plan(query: query, providers: providers.filter { $0.handlesPaths }, topHit: false, limitScale: Self.prefixScale)
+            return Plan(query: query, providers: providers.filter { $0.handlesPaths }, topHit: false, limitScale: Self.prefixScale, chip: "Path")
         }
         if let prefix = query.prefix, prefix != .exact {
-            return Plan(query: query, providers: providers.filter { $0.prefix == prefix }, topHit: false, limitScale: Self.prefixScale)
+            return Plan(query: query, providers: providers.filter { $0.serves(prefix) }, topHit: false, limitScale: Self.prefixScale, chip: prefix.chip)
         }
         if query.prefix == nil, let split = query.keywordSplit,
            let owner = providers.first(where: { $0.keyword?.lowercased() == split.keyword }) {
             let inner = LaunchQuery(raw: query.raw, term: split.rest)
-            return Plan(query: inner, providers: [owner], topHit: false, limitScale: Self.prefixScale)
+            return Plan(query: inner, providers: [owner], topHit: false, limitScale: Self.prefixScale, chip: owner.title)
         }
-        return Plan(query: query, providers: providers.filter { $0.inGlobalSearch }, topHit: !query.isEmpty, limitScale: 1)
+        // "name " with nothing after it enters a provider that asks for that.
+        if query.prefix == nil, query.raw.hasSuffix(" "), !query.term.isEmpty, !query.term.contains(" "),
+           let owner = providers.first(where: { $0.routesBareKeyword && $0.keyword?.lowercased() == query.term.lowercased() }) {
+            let inner = LaunchQuery(raw: query.raw, term: "")
+            return Plan(query: inner, providers: [owner], topHit: false, limitScale: Self.prefixScale, chip: owner.title)
+        }
+        return Plan(query: query, providers: providers.filter { $0.inGlobalSearch }, topHit: !query.isEmpty, limitScale: 1,
+                    chip: query.prefix == .exact ? Prefix.exact.chip : nil)
     }
 
-    /// The instant providers' results, ranked and grouped, without waiting.
-    public func instantGroups(_ plan: Plan) -> [ResultGroup] {
+    /// The instant providers' results, ranked, best first. When none of them is
+    /// more than a fallback, the no-match rows (create a file, run in Terminal,
+    /// calculate) are added at the bottom.
+    public func instantRanked(_ plan: Plan) -> [LaunchResult] {
         var results: [LaunchResult] = []
         for case let provider as any InstantProvider in plan.providers {
             results += provider.instantResults(for: plan.query)
         }
-        let ranked = ranker.rank(results, query: plan.query)
+        let query = plan.query
+        if !query.term.isEmpty, query.prefix == nil || query.prefix == .exact, !query.isPath,
+           results.allSatisfy(\.isFallback) {
+            for case let provider as any NoMatchProvider in plan.providers {
+                results += provider.noMatchResults(for: query)
+            }
+        }
+        return ranker.rank(results, query: query)
+    }
+
+    /// The instant providers' results, ranked and grouped, without waiting.
+    public func instantGroups(_ plan: Plan) -> [ResultGroup] {
+        ResultGrouping.group(instantRanked(plan), topHit: plan.topHit, limitScale: plan.limitScale)
+    }
+
+    /// The same, keeping the row that was on top for a shorter query on top (TopRowHold).
+    public func instantGroups(_ plan: Plan, hold: inout TopRowHold) -> [ResultGroup] {
+        let ranked = plan.topHit ? hold.apply(instantRanked(plan), query: plan.query) : instantRanked(plan)
+        if !plan.topHit { hold.reset() }
         return ResultGrouping.group(ranked, topHit: plan.topHit, limitScale: plan.limitScale)
     }
 

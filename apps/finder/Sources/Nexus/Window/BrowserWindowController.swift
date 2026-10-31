@@ -88,5 +88,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
         panel.dataSource = nil
         panel.delegate = nil
+        QuickLook.shared.panelClosed()
     }
 }

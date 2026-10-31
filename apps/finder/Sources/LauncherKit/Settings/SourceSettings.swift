@@ -71,7 +71,9 @@ public enum LauncherSource: String, CaseIterable, Sendable, Codable {
         case .bookmarks: return .bookmarks
         case .snippets: return .snippets
         case .files: return .files
-        case .apps, .commands, .menu, .settingsActions, .webFallbacks: return nil
+        case .commands, .menu: return .shell
+        case .settingsActions: return .settings
+        case .apps, .webFallbacks: return nil
         }
     }
 

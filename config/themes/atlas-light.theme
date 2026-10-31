@@ -1,8 +1,8 @@
-# Atlas light. Blue greys of a chart table. Every app that has colours takes them from this file.
+# Atlas light. Blue greys of a chart table. Extends atlas-dark for the accent, family, editor scheme and kind style, with colours of its own.
+FORMAT=1
+EXTENDS=atlas-dark
 LABEL="Atlas Light"
-FAMILY=atlas
 MODE=light
-ACCENT=4
 BACKGROUND=daylight.jpg
 TERM_BG=ffffff
 TERM_FG=17202a
@@ -17,12 +17,10 @@ HIGHLIGHT=1660c9
 SIDEBAR=f3f5f8
 FIELD=eef1f5
 LINE=dde2e8
-NVIM=vscode
 ICON_STYLE=line
 ICON_SEARCH=c63a2d
 ICON_TILE=ffffff
 ICON_INK=17202a
-KIND_STYLE=text
 KIND_FOLDER=1660c9
 KIND_DOCUMENT=4352d6
 KIND_PDF=c63a2d

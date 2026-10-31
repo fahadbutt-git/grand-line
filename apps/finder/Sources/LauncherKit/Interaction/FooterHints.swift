@@ -15,7 +15,8 @@ public enum FooterHints {
         var hints: [Hint] = []
         if let primary = result.primary { hints.append(Hint(keys: "↩", label: primary.title.lowercased())) }
         if let secondary = result.secondary { hints.append(Hint(keys: "⌘↩", label: secondary.title.lowercased())) }
-        if result.actions.count > 2 { hints.append(Hint(keys: "⌘K", label: "actions")) }
+        if ActionPanel.actions(for: result).count > 2 { hints.append(Hint(keys: "⌘K", label: "actions")) }
+        if FileBuffer.path(of: result) != nil { hints.append(Hint(keys: "⌘B", label: "buffer")) }
         if result.previewPath != nil || result.detail != nil { hints.append(Hint(keys: "⌘Y", label: "preview")) }
         return hints
     }

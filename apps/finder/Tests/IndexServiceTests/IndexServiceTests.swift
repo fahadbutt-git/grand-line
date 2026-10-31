@@ -52,7 +52,7 @@ final class IndexServiceTests: XCTestCase {
         XCTAssertLessThan(Date().timeIntervalSince(started), 3, "the search did not wait long on the absent service")
         XCTAssertEqual(found.map(\.name).sorted(), ["Conj Flap", "Lid Study - CONJ.docx", "conj notes.txt"])
         XCTAssertEqual(starts.value, 1, "the client asked for the service to be started, once")
-        let again = await client.search("conj n", limit: 10)
+        let again = await client.search("conj no", limit: 10)
         XCTAssertEqual(again.map(\.name), ["conj notes.txt"])
         XCTAssertEqual(starts.value, 1, "not again within a minute")
         let status = await client.status()

@@ -9,8 +9,12 @@ public protocol LaunchProvider: Sendable {
     var symbol: String { get }
     /// The prefix that runs this provider alone, if any.
     var prefix: Prefix? { get }
+    /// Other prefixes it also answers ("," for the settings rows, ">" for commands).
+    var extraPrefixes: [Prefix] { get }
     /// A first word that runs this provider alone ("zot glaucoma"), if any.
     var keyword: String? { get }
+    /// Whether the keyword and a space alone ("zot ") already run it, with an empty term.
+    var routesBareKeyword: Bool { get }
     /// Whether it runs for an unprefixed query.
     var inGlobalSearch: Bool { get }
     /// Whether it answers queries that are paths (~/ or /…).
@@ -27,7 +31,20 @@ public protocol InstantProvider: LaunchProvider {
 
 public extension LaunchProvider {
     var keyword: String? { nil }
+    var routesBareKeyword: Bool { false }
     var handlesPaths: Bool { false }
+    var extraPrefixes: [Prefix] { [] }
+
+    /// Whether a query with this prefix goes to this provider.
+    func serves(_ prefix: Prefix) -> Bool {
+        self.prefix == prefix || extraPrefixes.contains(prefix)
+    }
+}
+
+/// A provider whose rows only appear when nothing else matched: create a
+/// file with that name, run it in Terminal, calculate it.
+public protocol NoMatchProvider: LaunchProvider {
+    func noMatchResults(for query: LaunchQuery) -> [LaunchResult]
 }
 
 public extension InstantProvider {

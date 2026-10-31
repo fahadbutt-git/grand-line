@@ -11,6 +11,9 @@ final class FileCellView: NSTableCellView {
         let isCut: Bool
         let theme: Theme?
         var display = Display()
+        /// The Where column's text: the folder below the flat view's, or the
+        /// folder of a search result.
+        var place = ""
     }
 
     /// What Settings changes about every row.
@@ -93,8 +96,19 @@ final class FileCellView: NSTableCellView {
             extra.contentTintColor = dim
             extra.toolTip = info.badge?.label
             showTags(item.tags, theme: info.theme)
+        case .path:
+            label.stringValue = info.place
+            label.textColor = dim
+            label.lineBreakMode = .byTruncatingHead
+            toolTip = info.place
         case .modified:
             label.stringValue = item.modified.map { ItemFormat.date($0) } ?? "--"
+            label.textColor = dim
+        case .created:
+            label.stringValue = item.created.map { ItemFormat.date($0) } ?? "--"
+            label.textColor = dim
+        case .added:
+            label.stringValue = item.added.map { ItemFormat.date($0) } ?? "--"
             label.textColor = dim
         case .size:
             let bytes = item.isFolder ? info.folderSize : item.size

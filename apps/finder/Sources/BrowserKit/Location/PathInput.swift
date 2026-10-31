@@ -13,12 +13,20 @@ public enum PathInput {
     public static func interpret(_ text: String, relativeTo current: URL, home: URL, aliases: [String: URL] = [:]) -> Intent? {
         let trimmed = clean(text)
         guard !trimmed.isEmpty else { return nil }
-        let looksLikePath = trimmed.hasPrefix("/") || trimmed.hasPrefix("~") || trimmed.hasPrefix(".")
-            || trimmed.contains("/") || trimmed.hasPrefix("file://") || aliases[trimmed] != nil
-        guard looksLikePath, let url = resolve(trimmed, relativeTo: current, home: home, aliases: aliases) else {
+        guard looksLikePath(trimmed, aliases: aliases),
+              let url = resolve(trimmed, relativeTo: current, home: home, aliases: aliases) else {
             return .fuzzy(trimmed)
         }
         return .path(url)
+    }
+
+    /// Whether typed text is a path rather than a name: it starts with `/`, `~`
+    /// or `.`, holds a slash, is a file URL, or is a short name such as `Drive`.
+    public static func looksLikePath(_ text: String, aliases: [String: URL] = [:]) -> Bool {
+        let trimmed = clean(text)
+        guard !trimmed.isEmpty else { return false }
+        return trimmed.hasPrefix("/") || trimmed.hasPrefix("~") || trimmed.hasPrefix(".")
+            || trimmed.contains("/") || trimmed.hasPrefix("file://") || aliases[trimmed] != nil
     }
 
     /// `~/x`, `/x`, `file:///x`, `Drive/x` (an alias), or a path relative to the
@@ -80,6 +88,39 @@ public enum PathInput {
         trimmed = trimmed.replacingOccurrences(of: "\\ ", with: " ")
         if trimmed.count > 1, trimmed.hasSuffix("/") { trimmed.removeLast() }
         return trimmed
+    }
+
+    /// What Tab makes of the text: the one matching folder in full (ending in
+    /// a slash, ready for the next level); with several, as much as they share
+    /// beyond what is typed, else the first. `options` are `completions`, and
+    /// `editable` writes a folder as the field shows it (`~/Documents`).
+    public static func complete(_ text: String, options: [URL], editable: (URL) -> String) -> String? {
+        guard let first = options.first else { return nil }
+        if options.count == 1 { return editable(first) + "/" }
+        let typed = text.trimmingCharacters(in: .whitespaces)
+        let stem = typed.hasSuffix("/") ? "" : (typed as NSString).lastPathComponent
+        let names = options.map(\.lastPathComponent)
+        let shared = commonPrefix(names)
+        if shared.count > stem.count {
+            let parent = editable(first.deletingLastPathComponent())
+            return (parent.hasSuffix("/") ? parent : parent + "/") + shared
+        }
+        return editable(first) + "/"
+    }
+
+    /// The longest start all names share, ignoring case, spelled as in the first.
+    static func commonPrefix(_ names: [String]) -> String {
+        guard var shared = names.first.map({ Array($0) }) else { return "" }
+        for name in names.dropFirst() {
+            let other = Array(name)
+            var length = 0
+            while length < shared.count, length < other.count,
+                  String(shared[length]).lowercased() == String(other[length]).lowercased() {
+                length += 1
+            }
+            shared = Array(shared.prefix(length))
+        }
+        return String(shared)
     }
 
     /// Tab completion: folders in the typed parent whose names start with the

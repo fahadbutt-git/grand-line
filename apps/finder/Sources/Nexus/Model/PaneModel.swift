@@ -107,6 +107,26 @@ final class PaneModel: ObservableObject, Identifiable {
         onSelectionChange?()
     }
 
+    /// A saved search's own columns and sort, for its results only: the
+    /// window's settings stay as they are for the folders you go to next.
+    func showTransiently(_ settings: ViewSettings) {
+        state.setSettings(settings)
+        readLastOpened()
+    }
+
+    /// The omnibar's filter: rows narrow as you type.
+    func setFilter(_ text: String) {
+        state.setFilter(text)
+        onSelectionChange?()
+    }
+
+    /// Flat view: the folder and everything below it, or back to the folder.
+    func setFlat(_ on: Bool) {
+        guard state.isFlat != on else { return }
+        state.isFlat = on
+        reload()
+    }
+
     func moveManually(_ names: [String], to index: Int) {
         let order = state.moveManually(names, to: index)
         guard let folder = location.folderURL else { return }
@@ -127,7 +147,7 @@ final class PaneModel: ObservableObject, Identifiable {
         switch location {
         case .folder(let url):
             watch(url)
-            loadFolder(url)
+            if state.isFlat { loadFlat(url) } else { loadFolder(url) }
             services.sidebar.visited(url)
         case .archive(let url, let entry):
             stopWatching()
@@ -189,6 +209,39 @@ final class PaneModel: ObservableObject, Identifiable {
                 self.problem = error.localizedDescription
                 self.finish([])
             }
+        }
+    }
+
+    /// Flat view: names from the shared index, scoped to the folder, read from
+    /// disk where the index does not look (`FlatListing`).
+    private func loadFlat(_ url: URL) {
+        let hidden = showHidden
+        let home = services.paths.home.path
+        let index = services.index
+        let folder = url.standardizedFileURL.path
+        loadTask = Task { [weak self] in
+            var indexed: [String] = []
+            if !FlatListing.needsDisk(folder, home: home) {
+                let batches = await withTaskGroup(of: [String].self) { group -> [[String]] in
+                    for probe in FlatListing.probes {
+                        group.addTask { await index.search(probe, limit: FlatListing.limit, scope: [folder]).map(\.path) }
+                    }
+                    var all: [[String]] = []
+                    for await batch in group { all.append(batch) }
+                    return all
+                }
+                indexed = FlatListing.merge(batches, under: folder, home: home, showHidden: hidden)
+            }
+            // An index still building (or a folder it skips) is read from disk.
+            let found = indexed
+            let items = await Task.detached(priority: .userInitiated) { () -> [FileItem] in
+                let paths = found.isEmpty ? FlatListing.walk(url, home: home, showHidden: hidden) : found
+                return paths.compactMap { FileItem.read(URL(fileURLWithPath: $0)) }
+            }.value
+            guard let self, !Task.isCancelled else { return }
+            self.badges = [:]
+            self.finish(items)
+            self.freeSpace = VolumeInfo.containing(url)?.availableBytes
         }
     }
 
@@ -269,7 +322,9 @@ final class PaneModel: ObservableObject, Identifiable {
     private func changed(_ batch: [FolderChange], in folder: URL) {
         let real = FolderWatcher.realPath(folder.path)
         let direct = batch.contains { $0.path == real || $0.recursive }
-        if direct, location.folderURL == folder {
+        if state.isFlat, location.folderURL == folder, !batch.isEmpty {
+            loadFlat(folder)
+        } else if direct, location.folderURL == folder {
             loadFolder(folder)
         } else {
             measureSizes()

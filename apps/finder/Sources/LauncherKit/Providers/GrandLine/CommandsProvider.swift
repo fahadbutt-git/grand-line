@@ -8,6 +8,7 @@ public final class CommandsProvider: InstantProvider, @unchecked Sendable {
     public let title = "Grand Line commands"
     public let symbol = "terminal"
     public let prefix: Prefix? = nil
+    public let extraPrefixes: [Prefix] = [.shell]
     public let inGlobalSearch = true
     let folder: String
     let catalog = Catalog()
@@ -40,7 +41,13 @@ public final class CommandsProvider: InstantProvider, @unchecked Sendable {
             icon: .symbol("terminal"),
             section: .grandLine,
             keywords: [script.summary],
-            actions: [primary, LaunchAction("Run in a terminal window", symbol: "macwindow", .run(GrandLinePaths().command("in-window"), arguments: [script.path])), .favourite],
+            actions: [
+                primary,
+                LaunchAction("Run in a terminal window", symbol: "macwindow", .run(GrandLinePaths().command("in-window"), arguments: [script.path])),
+                LaunchAction("Edit", symbol: "pencil", shortcut: KeyShortcut("e"), .run("/usr/bin/open", arguments: ["-t", script.path])),
+                LaunchAction.copy(script.path, title: "Copy path"),
+                .favourite,
+            ],
             providerID: "commands"
         )
     }

@@ -5,7 +5,7 @@ import AppKit
 enum LauncherJourneys {
     static let role = "launcher"
 
-    static var all: [Journey] { [openAndFiles, answers, settings] }
+    static var all: [Journey] { [openAndFiles, answers, actions, fallbacks, settings] }
 
     static func journey(_ name: String, _ summary: String, fixtureHome: Bool = true, _ steps: [Step]) -> Journey {
         Journey(name, role: role, summary: summary, waitsForWindow: false, usesFixtureHome: fixtureHome,
@@ -104,6 +104,113 @@ enum LauncherJourneys {
         ])
     }
 
+    /// Command+K on a file row: the panel lists every file action, Escape
+    /// closes it and keeps the query, a shortcut and a click run an action.
+    static var actions: Journey {
+        journey("launcher-actions", "Command+K lists the file actions; a shortcut and a click run them", [
+            step("let the name index of the fixture home build", layout: false) { _ in Input.pause(2) },
+            step("open it and find conj notes.txt") { ctx in
+                try ctx.showPanel(metric: "time to visible")
+                ctx.type("conj notes")
+                try ctx.wait("conj notes.txt as a result", timeout: 10) { ctx.panelTexts().contains { $0.hasPrefix("conj notes") } }
+            },
+            step("Command+K opens the action panel with the file actions") { ctx in
+                try ctx.key("cmd+k")
+                let wanted = ["action.open-with", "action.show-in-nexus", "action.quick-look", "action.copy-path",
+                              "action.copy-name", "action.add-to-buffer", "action.move-to-trash"]
+                try ctx.wait("the action panel") { ctx.panelIdentifiers().contains("action.copy-name") }
+                let shown = ctx.panelIdentifiers()
+                let missing = wanted.filter { !shown.contains($0) }
+                try ctx.check(missing.isEmpty, "the panel lacks \(missing.joined(separator: ", "))")
+                try ctx.check(!shown.contains { $0.contains("delete") }, "the panel offers to delete a file")
+            },
+            step("Escape closes the panel and keeps the query") { ctx in
+                try ctx.key("escape")
+                try ctx.wait("the panel to close") { !ctx.panelIdentifiers().contains("action.copy-name") }
+                try ctx.check(ctx.panelVisible(), "Escape closed the window instead of the action panel")
+                try ctx.check((ctx.fieldText() ?? "").contains("conj notes"), "the query was cleared: \(ctx.fieldText() ?? "")")
+            },
+            step("Option+Command+C copies the path without opening the panel") { ctx in
+                NSPasteboard.general.clearContents()
+                try ctx.key("opt+cmd+c")
+                try ctx.wait("the path on the clipboard") {
+                    (NSPasteboard.general.string(forType: .string) ?? "").hasSuffix("/conj notes.txt")
+                }
+            },
+            step("clicking Copy name in the panel copies the name") { ctx in
+                // Copy path closed the window.
+                if !ctx.panelVisible() { try ctx.showPanel(metric: "time to visible again") }
+                try ctx.replaceQuery("conj notes")
+                try ctx.wait("conj notes.txt as a result", timeout: 10) { ctx.panelTexts().contains { $0.hasPrefix("conj notes") } }
+                NSPasteboard.general.clearContents()
+                try ctx.key("cmd+k")
+                try ctx.wait("the action panel") { ctx.panelIdentifiers().contains("action.copy-name") }
+                guard let node = ctx.panelSnapshot()?.first(nil, { $0.identifier == "action.copy-name" }) else {
+                    throw StepFailure("no Copy name action to click")
+                }
+                try ctx.click(node)
+                try ctx.wait("the name on the clipboard") { NSPasteboard.general.string(forType: .string) == "conj notes.txt" }
+            },
+            step("Move to Trash asks first, and Escape leaves the file alone", layout: false) { ctx in
+                if !ctx.panelVisible() { try ctx.showPanel(metric: "time to visible again") }
+                try ctx.replaceQuery("conj notes")
+                try ctx.wait("conj notes.txt as a result", timeout: 10) { ctx.panelTexts().contains { $0.hasPrefix("conj notes") } }
+                try ctx.key("cmd+k")
+                try ctx.wait("the action panel") { ctx.panelIdentifiers().contains("action.move-to-trash") }
+                guard let node = ctx.panelSnapshot()?.first(nil, { $0.identifier == "action.move-to-trash" }) else {
+                    throw StepFailure("no Move to Trash action")
+                }
+                try ctx.click(node)
+                try ctx.wait("the question in the footer") { ctx.panelTexts().contains("cancel") }
+                try ctx.key("escape")
+                try ctx.wait("Esc to cancel the question") { !ctx.panelTexts().contains("cancel") }
+                let found = FileManager.default.enumerator(atPath: ctx.home.path)?
+                    .contains { ($0 as? String)?.hasSuffix("conj notes.txt") == true } ?? false
+                try ctx.check(found, "conj notes.txt is gone although the question was cancelled")
+                try ctx.key("escape"); try ctx.key("escape"); try ctx.key("escape")
+            },
+        ])
+    }
+
+    /// Nothing matches: the web engines, Create file in Downloads and Run in
+    /// Terminal are offered; creating works, and running asks first.
+    static var fallbacks: Journey {
+        journey("launcher-fallback", "with no match, Create file makes it in Downloads and Run in Terminal asks first", [
+            step("open it and type words nothing matches") { ctx in
+                try ctx.showPanel(metric: "time to visible")
+                ctx.type("qzxv journey note")
+                try ctx.wait("the fallback rows", timeout: 10) {
+                    let ids = ctx.panelIdentifiers()
+                    return ids.contains("fallback:create-file") && ids.contains("fallback:run-terminal")
+                }
+                try ctx.check(ctx.panelTexts().contains { $0.hasPrefix("Search") && $0.contains("qzxv journey note") },
+                              "no web engine row for the words")
+            },
+            step("Run in Terminal asks before it runs") { ctx in
+                guard let node = ctx.panelSnapshot()?.first(nil, { $0.identifier == "fallback:run-terminal" }) else {
+                    throw StepFailure("no Run in Terminal row")
+                }
+                try ctx.click(node)
+                try ctx.wait("the question in the footer") { ctx.panelTexts().contains("cancel") }
+                try ctx.key("escape")
+                try ctx.wait("Esc to cancel the question") { !ctx.panelTexts().contains("cancel") }
+                try ctx.check(ctx.panelVisible(), "the window closed: did it run the words?")
+            },
+            step("Create file makes an empty file in Downloads") { ctx in
+                let file = ctx.home.appendingPathComponent("Downloads/qzxv journey note")
+                try? FileManager.default.removeItem(at: file)
+                guard let node = ctx.panelSnapshot()?.first(nil, { $0.identifier == "fallback:create-file" }) else {
+                    throw StepFailure("no Create file row")
+                }
+                try ctx.click(node)
+                try ctx.wait("the new file in Downloads") { FileManager.default.fileExists(atPath: file.path) }
+                let size = (try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int) ?? -1
+                try ctx.check(size == 0, "the new file is not empty (\(size) bytes)")
+                try? FileManager.default.removeItem(at: file)
+            },
+        ])
+    }
+
     // MARK: System settings, one line each
 
     /// How to read a setting without the launcher, and what a run may do.
@@ -147,7 +254,7 @@ enum LauncherJourneys {
     /// The launcher's section headings, to tell which one a row sits under.
     static let headings: Set<String> = [
         "Favourites", "Recent", "Top hit", "Answers", "Apps", "Grand Line", "Windows", "System",
-        "Bookmarks", "Snippets", "Symbols", "Files", "Web",
+        "Bookmarks", "Snippets", "Symbols", "Files", "Web", "Other actions",
     ]
 
     static var settings: Journey {
@@ -159,6 +266,19 @@ enum LauncherJourneys {
         // The system's own settings are what is under test, so the real home.
         return journey("launcher-settings", "each system setting switched from the launcher, checked against the system", fixtureHome: false,
                        [step("let the launcher settle", layout: false) { _ in Input.pause(1.5) }] + steps)
+    }
+
+    /// The launcher's own words when macOS refused Automation for System Events,
+    /// which a test machine cannot grant. Reported as a skip (a notice in CI,
+    /// never a pass); any other failure stays a failure.
+    static let automationRefused = "Automation not allowed"
+
+    static func skipIfAutomationRefused(_ setting: Setting, row: String) throws {
+        guard row.contains(automationRefused) else { return }
+        if ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] != nil {
+            print("::notice title=\(setting.phrase) not checked::\(automationRefused) for System Events on this Mac; the row reads \"\(row)\"")
+        }
+        throw StepSkip("\(automationRefused) for System Events on this Mac, so \(setting.phrase) could not be switched; the row reads \"\(row)\"")
     }
 
     /// "on" or "off" from what a read command printed; nil when it is a number or other value.
@@ -184,19 +304,30 @@ enum LauncherJourneys {
 }
 
 extension Ctx {
-    /// The launcher's panel window, if it is on screen.
+    /// The launcher's panel window, if it is on screen: not its Settings window.
     func panel() -> Element? {
         guard panelVisible() else { return nil }
-        return windows().first { ($0.frame?.height ?? 0) > 100 }
+        return windows().first { window in
+            (window.frame?.height ?? 0) > 100 && window.string("AXIdentifier") != app.id("settings")
+                && window.title != "\(app.name) Settings"
+        }
     }
 
+    /// Whether the search panel is on screen. It floats above normal windows
+    /// (a window level above 0), which tells it from the Settings window.
     func panelVisible() -> Bool {
-        Capture.windows(pid: pid).contains { $0.bounds.height > 100 }
+        Capture.windows(pid: pid).contains { $0.bounds.height > 100 && $0.layer > 0 }
     }
 
     func panelSnapshot() -> Snapshot? { panel().map { snapshot($0) } }
 
     func panelTexts() -> [String] { panelSnapshot()?.texts ?? [] }
+
+    /// The accessibility identifiers on screen: action panel rows ("action.copy-name"),
+    /// settings rows and the rows offered when nothing matches.
+    func panelIdentifiers() -> [String] {
+        panelSnapshot()?.nodes.map(\.identifier).filter { !$0.isEmpty } ?? []
+    }
 
     func fieldText() -> String? {
         panelSnapshot()?.first(nil) { Layout.inputRoles.contains($0.role) }?.value
@@ -318,13 +449,18 @@ extension Ctx {
                     }
                     newSystem = readSetting(setting).map(LauncherJourneys.normalise)
                     if newSystem == nil || newSystem == system {
+                        try LauncherJourneys.skipIfAutomationRefused(setting, row: row)
                         throw StepFailure(failure.message + (row.isEmpty ? "; the row is not shown" : "; the row reads \"\(row)\""))
                     }
                     note("\(setting.phrase) took more than 10 s to change (\(label))")
                 }
-                if let refused { throw StepFailure("\(setting.phrase) was not changed (\(label)); the row reads \"\(refused)\"") }
+                if let refused {
+                    try LauncherJourneys.skipIfAutomationRefused(setting, row: refused)
+                    throw StepFailure("\(setting.phrase) was not changed (\(label)); the row reads \"\(refused)\"")
+                }
             }
             let rowText2 = try showSetting(setting)
+            try LauncherJourneys.skipIfAutomationRefused(setting, row: rowText2)
             var latest = rowText2
             try wait("the row's state to change (\(label)): was \"\(rowText)\"") {
                 latest = self.settingRow(setting.id)?.text ?? latest

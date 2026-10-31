@@ -1,5 +1,20 @@
 import Foundation
 
+/// What a file action does to every file it is given: one file from a row,
+/// all of the file buffer, or the Finder or Nexus selection.
+public enum FileVerb: String, Codable, Hashable, Sendable, CaseIterable {
+    case open
+    /// Shows them selected in Nexus.
+    case reveal
+    case copyFiles
+    /// Asks for a folder and moves them there; nothing is ever replaced.
+    case moveTo
+    case airDrop
+    /// Moves them to the Trash (Put Back works); nothing is ever deleted.
+    case trash
+    case quickLook
+}
+
 /// What an action does. LauncherKit only describes it; the app carries it out.
 public enum ActionCommand: Codable, Hashable, Sendable {
     /// A file, folder or URL with its default app. Folders open in Nexus.
@@ -37,4 +52,14 @@ public enum ActionCommand: Codable, Hashable, Sendable {
     case lookUp(String)
     /// Adds the row to the favourites, or removes it.
     case toggleFavourite
+    /// A file action on several files at once.
+    case files(FileVerb, [String])
+    /// Adds files to the file buffer (Command+B), or takes them out.
+    case buffer([String])
+    /// Empties the file buffer.
+    case clearBuffer
+    /// Creates an empty file (never over an existing one) and shows it in Nexus.
+    case createFile(String)
+    /// Runs a script command again with the chosen row's value (ScriptCommands).
+    case script(path: String, value: String)
 }

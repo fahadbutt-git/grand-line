@@ -1,6 +1,7 @@
 import AppKit
 import ArchiveKit
 import BrowserKit
+import FileKit
 import UniformTypeIdentifiers
 
 /// Opening (R4), Open With (R34) and items inside archives (R26).
@@ -66,7 +67,7 @@ extension BrowserModel {
         let entries = ArchiveRows.entries(items)
         Task {
             let result = await Task.detached { () -> Result<[URL], Error> in
-                Result { try entries.map { try Archive.preview($0, from: archive) } }
+                Result { try entries.map { try Archive.preview($0, from: archive, in: Archive.TemporaryFolder.opened) } }
             }.value
             switch result {
             case .success(let urls):
@@ -84,25 +85,34 @@ extension BrowserModel {
     // MARK: Extract
 
     /// Cmd+E in an archive: the selection goes to the next pane's folder, or
-    /// beside the archive with one pane (R26).
+    /// beside the archive with one pane (R26). It runs as a task; the items
+    /// keep the archive's quarantine flag and Undo moves them to the Trash.
     func extract(to destination: URL?) {
         guard case .archive(let archive, _) = focused.location else { return }
         let target = destination ?? nextPaneFolder() ?? archive.deletingLastPathComponent()
         let entries = ArchiveRows.entries(focused.selectedItems)
         guard !entries.isEmpty else { return }
         let panes = self.panes
+        let services = self.services
+        let names = entries.map { URL(fileURLWithPath: "/" + $0) }
         Task {
-            let result = await Task.detached { () -> Result<[URL], Error> in
-                Result { try Archive.extract(entries, from: archive, to: target) }
-            }.value
-            switch result {
-            case .success(let made):
+            do {
+                let made = try await services.run(.extract, TaskTitles.title(.extract, names, to: target)) { operations in
+                    try Task.checkCancellation()
+                    let extracted = try await Task.detached(priority: .userInitiated) {
+                        try Archive.extract(entries, from: archive, to: target)
+                    }.value
+                    await operations.recordCreated(extracted, kind: .extract)
+                    return extracted
+                }
                 for pane in panes where pane.location.folderURL?.standardizedFileURL == target.standardizedFileURL {
                     pane.go(.folder(target), select: made)
                 }
-            case .failure(let error):
+            } catch is CancellationError {
+            } catch {
                 Prompt.problem("The items could not be extracted.", error)
             }
+            services.refreshUndo()
         }
     }
 

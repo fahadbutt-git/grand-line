@@ -29,10 +29,16 @@ public struct ThemeLocation: Sendable, Equatable {
         themesFolder.appendingPathComponent(name + ".theme")
     }
 
-    /// A theme by name: its file, else a built-in theme of that name, else nil.
+    /// A theme by name: its file (with its EXTENDS parents, checked, defaults
+    /// filled), else a built-in theme of that name, else nil.
     public func load(named name: String) -> Theme? {
-        if let values = ThemeFile.read(file(named: name)) { return Theme(name: name, values: values) }
+        if let source = ThemeSource.resolve(url: file(named: name)) { return Theme(name: name, source: source) }
         return BuiltInThemes.named(name)
+    }
+
+    /// What `theme check NAME` reports for a theme file, or nil when there is no file.
+    public func check(named name: String) -> ThemeValidation? {
+        ThemeSource.resolve(url: file(named: name)).map { ThemeSpec.validate($0) }
     }
 
     /// The active theme, falling back to Graphite.
@@ -80,7 +86,8 @@ public struct ThemeLocation: Sendable, Equatable {
     /// The FAMILY= of a theme file, or nil for a theme without a pair.
     public func family(of name: String) -> String? {
         if ThemeFollow.systemPair.contains(name) { return ThemeFollow.systemFamily }
-        let family = ThemeFile.read(file(named: name))?["FAMILY"]?.trimmingCharacters(in: .whitespaces) ?? ""
+        // A light variant may take FAMILY from the dark one it EXTENDS.
+        let family = ThemeSource.resolve(url: file(named: name))?.entries["FAMILY"]?.value.trimmingCharacters(in: .whitespaces) ?? ""
         return family.isEmpty ? nil : family
     }
 

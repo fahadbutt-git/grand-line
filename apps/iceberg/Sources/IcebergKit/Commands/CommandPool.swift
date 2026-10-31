@@ -27,6 +27,13 @@ public final class CommandPool: @unchecked Sendable {
         return body()
     }
 
+    /// The cap on commands running at once (`max_concurrent`). Commands
+    /// already running finish; the new cap applies to the next ones.
+    public var maxConcurrent: Int {
+        get { queue.maxConcurrentOperationCount }
+        set { queue.maxConcurrentOperationCount = max(1, newValue) }
+    }
+
     /// The most commands that ran at the same moment (for the tests).
     public var peakConcurrency: Int { locked { peak } }
 

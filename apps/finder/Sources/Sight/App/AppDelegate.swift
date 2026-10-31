@@ -16,6 +16,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         services = Services()
+        // Connect to the index service first, so the first search finds it ready.
+        services.start()
         panel = PanelController(services: services)
         preferences = SightPreferencesStore(services: services)
         settings = SightSettingsWindow(services: services, themes: panel.themes, store: preferences)
@@ -24,7 +26,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if preferences.current.launchAtLogin { startAtLogin() }
         if preferences.current.showMenuBarIcon { statusItem = makeStatusItem() }
         applyDensity()
-        services.start()
         saveTimer = Timer.scheduledTimer(withTimeInterval: 1_800, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.services.save() }
         }
@@ -40,8 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// "sight settings" and the main menu's Settings entries use it).
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls where url.scheme?.lowercased() == "sight" && (url.host ?? "") == "settings" {
-            panel.hide()
-            settings.show(pane: url.pathComponents.dropFirst().first)
+            openSettings(pane: url.pathComponents.dropFirst().first)
         }
     }
 
@@ -70,14 +70,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         preferences.onDensityChange = { [weak self] in self?.applyDensity() }
         // A menu-bar app has no menu bar of its own; the Settings window gets
         // one while it is in front, so Cmd+W, Cmd+Q and editing keys work there.
-        settings.onKeyChange = { key in
+        settings.onKeyChange = { [weak self] key in
             NSApp.mainMenu = key ? AppDelegate.settingsMenu() : nil
+            // Settings in front never sits under the search window.
+            if key { self?.panel.hide() }
         }
     }
 
+    /// Every way into Settings (Cmd+, in the search window, the menu bar
+    /// item, sight://settings) hides the search window first, then brings
+    /// Settings to the front.
     @objc func showSettings() {
+        openSettings(pane: nil)
+    }
+
+    private func openSettings(pane: String?) {
         panel.hide()
-        settings.show()
+        settings.show(pane: pane)
     }
 
     private func applyDensity() {

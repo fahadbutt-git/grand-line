@@ -14,6 +14,7 @@ final class QuickLook: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelegat
         guard let panel = QLPreviewPanel.shared() else { return }
         if QLPreviewPanel.sharedPreviewPanelExists(), panel.isVisible {
             panel.orderOut(nil)
+            panelClosed()
             return
         }
         prepare(model.focused) { [weak self] urls in
@@ -42,6 +43,22 @@ final class QuickLook: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelegat
         prepare(pane) { [weak self] urls in
             self?.urls = urls
             panel.reloadData()
+        }
+    }
+
+    /// The panel is gone: its copies of archive items are removed from
+    /// $TMPDIR/Archive Preview (security note L2). Items opened in apps and
+    /// the preview pane's item live in folders of their own.
+    func panelClosed() {
+        if QLPreviewPanel.sharedPreviewPanelExists(), QLPreviewPanel.shared()?.isVisible == true { return }
+        urls = []
+        // Only what is there now: a preview made a moment later for a panel
+        // opened again is left alone.
+        let doomed = (try? FileManager.default.contentsOfDirectory(
+            at: Archive.TemporaryFolder.quickLook, includingPropertiesForKeys: nil)) ?? []
+        guard !doomed.isEmpty else { return }
+        Task.detached(priority: .utility) {
+            for folder in doomed { try? FileManager.default.removeItem(at: folder) }
         }
     }
 

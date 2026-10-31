@@ -1,7 +1,9 @@
 import Foundation
 
 /// A config/themes/<name>.theme file: KEY=value lines, values optionally quoted,
-/// # comments.
+/// # comments. This reads one file as written; loading a theme goes through
+/// `ThemeSource.resolve(url:)` and `ThemeSpec.validate`, which follow EXTENDS,
+/// fill the defaults and check the values.
 public enum ThemeFile {
     public static func parse(_ text: String) -> [String: String] {
         var values: [String: String] = [:]

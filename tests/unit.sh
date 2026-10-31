@@ -91,7 +91,7 @@ mkdir -p "$HOME/.config/grand-line/themed"; echo "mine {{ LABEL }} {{ COLOR1 }} 
 "$ROOT/bin/theme" set daylight --no-wallpaper >/dev/null 2>&1
 grep -qx 'color_theme = "nord"' "$HOME/.config/btop/btop.conf" && t_ok "theme leaves a btop theme you chose" || t_fail "btop setting overwritten"
 grep -qx "mine: true" "$HOME/Library/Application Support/lazygit/config.yml" && t_ok "theme leaves your own lazygit settings" || t_fail "lazygit settings replaced"
-[[ "$(cat "$cur/menu-flags")" == "mine Daylight d70015 {{ NOPE }}" ]] && t_ok "your own template overrides the package's, unknown keys stay as written" \
+[[ "$(cat "$cur/menu-flags")" == "mine Daylight #d70015 {{ NOPE }}" ]] && t_ok "your own template overrides the package's, unknown keys stay as written" \
   || t_fail "user template not used" "$(cat "$cur/menu-flags")"
 [[ "$(sed -n 2p "$cur/nvim-theme")" == light && ! -d "$HOME/.local/state/grand-line/current/next-theme" ]] \
   && t_ok "theme swaps the rendered folder in whole" || t_fail "rendered folder not swapped"
@@ -121,6 +121,140 @@ if ! "$ROOT/bin/theme" set nonexistent >/dev/null 2>&1; then t_ok "unknown theme
 names="$("$ROOT/bin/theme" list)"
 [[ "$(printf '%s\n' "$names" | sed -n 1p)" == atlas ]] && grep -qx paper <<< "$names" && grep -qx paper-light <<< "$names" \
   && t_ok "theme list names families and every variant" || t_fail "theme list"
+"$ROOT/bin/theme" set nord --no-wallpaper >/dev/null 2>&1
+
+# --- theme format 1: EXTENDS, the checker, colour forms, live switching, apply, base16
+tt="$tmp/themes"; mkdir -p "$tt"
+# Every value the shipped themes had before EXTENDS still resolves the same.
+bad=""
+while read -r n kv; do
+  [[ "$n" == "#" || -z "$n" ]] && continue
+  got="$(theme_get "$ROOT/config/themes/$n.theme" "${kv%%=*}")"
+  [[ "$got" == "${kv#*=}" ]] || bad="$bad $n:${kv%%=*}=$got"
+done < "$ROOT/tests/fixtures/theme-values-before-extends.txt"
+[[ -z "$bad" ]] && t_ok "EXTENDS: every shipped theme resolves to the values it had before" || t_fail "EXTENDS changed values" "$bad"
+short=1
+for fam in harbour lantern signal ledger atlas paper; do
+  grep -qx "EXTENDS=$fam-dark" "$ROOT/config/themes/$fam-light.theme" || short=0
+  [[ $(wc -l < "$ROOT/config/themes/$fam-light.theme") -lt $(wc -l < "$ROOT/config/themes/$fam-dark.theme") ]] || short=0
+done
+[[ "$short" == 1 ]] && t_ok "EXTENDS: each light variant extends its dark sibling and is shorter" || t_fail "light variants do not extend"
+fresh="$(for t in "$ROOT"/config/themes/*.theme; do n="${t##*/}"; n="${n%.theme}"; theme_resolve "$t" 2>/dev/null | sed "s/^/$n /"; done)"
+[[ "$fresh" == "$(grep -v '^#' "$ROOT/tests/fixtures/theme-resolved.txt")" ]] \
+  && t_ok "tests/fixtures/theme-resolved.txt (read by the Swift tests) is current" || t_fail "theme-resolved.txt is stale; regenerate it (see its header)"
+cmp -s "$ROOT/apps/finder/Sources/ThemeKit/ThemeSpec.swift" "$ROOT/apps/iceberg/Sources/IcebergKit/Theme/ThemeSpec.swift" \
+  && t_ok "ThemeKit and IcebergKit share one ThemeSpec.swift" || t_fail "the two ThemeSpec.swift copies differ"
+
+printf 'FORMAT=1\nEXTENDS=b\nLABEL=A\n' > "$tt/a.theme"
+printf 'FORMAT=1\nEXTENDS=a\nLABEL=B\n' > "$tt/b.theme"
+out="$("$ROOT/bin/theme" check "$tt/a.theme" 2>&1)"; rc=$?
+[[ $rc != 0 && "$out" == *"b.theme:2: error: EXTENDS=a leads back to a (a loop)"* ]] && t_ok "EXTENDS: a loop is an error, not a hang" || t_fail "EXTENDS loop" "$out"
+printf 'FORMAT=1\nEXTENDS=gone\n' > "$tt/c.theme"
+out="$("$ROOT/bin/theme" check "$tt/c.theme" 2>&1)"
+[[ "$out" == *"c.theme:2: error: EXTENDS=gone names no theme"* ]] && t_ok "EXTENDS: a missing parent names the line" || t_fail "missing parent" "$out"
+cat > "$tt/base.theme" <<'EOF'
+FORMAT=1
+LABEL="Base"
+MODE=dark
+TERM_BG=1a1b1e
+TERM_FG=e8e9eb
+PALETTE="24262a f2665a 3cc57f e3c24a 6e8bff a281f5 57b4f0 e8e9eb 6d7076 f5857b 63d199 e9ce6e 8ba2ff b59af7 79c3f3 ffffff"
+KIND_STYLE=dot
+EOF
+cat > "$tt/kid.theme" <<'EOF'
+FORMAT=1
+EXTENDS=base
+LABEL="Kid"
+TERM_FG=#FFFFFF
+EOF
+r="$(theme_resolve "$tt/kid.theme")"
+grep -qx 'LABEL=Kid' <<< "$r" && grep -qx 'TERM_FG=ffffff' <<< "$r" && grep -qx 'TERM_BG=1a1b1e' <<< "$r" \
+  && grep -qx 'KIND_STYLE=dot' <<< "$r" && ! grep -q '^EXTENDS=' <<< "$r" \
+  && t_ok "EXTENDS: the child's keys win, the rest come from the parent" || t_fail "inheritance" "$r"
+r="$(theme_resolve "$tt/base.theme")"
+grep -qx 'ACCENT_HEX=6e8bff' <<< "$r" && grep -qx 'HIGHLIGHT=6e8bff' <<< "$r" && grep -qx 'MUTED=8b8c8f' <<< "$r" \
+  && grep -qx 'KIND_PDF=f2665a' <<< "$r" && grep -qx 'UI_MOTION=full' <<< "$r" && grep -qx 'RADIUS_WINDOW=10' <<< "$r" \
+  && grep -qx 'BACKGROUND=graphite.jpg' <<< "$r" && ! grep -q '^UI_DENSITY=' <<< "$r" \
+  && t_ok "checker fills the defaults (colours from the theme's own, density left to each app)" || t_fail "defaults" "$r"
+cat > "$tt/bad.theme" <<'EOF'
+FORMAT=2
+LABEL="Bad"
+MODE=dusk
+TERM_BG=12345g
+TERM_FG=eeeeee
+PALETTE="000000 111111"
+UI_MOTION=wild
+RADIUS_CHIP=99
+EOF
+out="$("$ROOT/bin/theme" check "$tt/bad.theme" 2>&1)"; rc=$?
+n=0
+for want in "bad.theme:1: error: FORMAT=2 is newer" "bad.theme:3: error: MODE=dusk" "bad.theme:4: error: TERM_BG=12345g is not a six-digit hex colour" \
+            "bad.theme:6: error: PALETTE has 2 colours" "bad.theme:7: error: UI_MOTION=wild" "bad.theme:8: error: RADIUS_CHIP=99"; do
+  [[ "$out" == *"$want"* ]] && n=$((n + 1))
+done
+[[ $rc != 0 && $n == 6 ]] && t_ok "checker rejects bad values with FILE:LINE messages" || t_fail "checker messages" "$out"
+printf 'FORMAT=1\nLABEL=Dim\nMODE=dark\nTERM_BG=202020\nTERM_FG=444444\nMUTED=303030\nPALETTE="%s"\n' \
+  "$(printf '%s ' 000000 111111 222222 333333 444444 555555 666666 777777 888888 999999 aaaaaa bbbbbb cccccc dddddd eeeeee | sed 's/ $//') ffffff" > "$tt/dim.theme"
+out="$("$ROOT/bin/theme" check "$tt/dim.theme" 2>&1)"; rc=$?
+[[ $rc == 0 && "$out" == *"dim.theme:5: warning: TERM_FG #444444 is"*"text needs 4.5:1"* && "$out" == *"dim.theme:6: warning: MUTED #303030"*"needs 3.0:1"* ]] \
+  && t_ok "checker warns when text falls under 4.5:1 or secondary text under 3:1" || t_fail "contrast warnings" "$out"
+"$ROOT/bin/theme" check --strict "$tt/dim.theme" >/dev/null 2>&1 && t_fail "--strict passed a warning" || t_ok "theme check --strict fails on warnings"
+
+# Colour forms, and templates written for bare values still render one #.
+mkdir -p "$tmp/forms"
+printf '%s\n' '{{ ACCENT_HEX }}|{{ ACCENT_HEX.hex }}|{{ ACCENT_HEX.rgb }}|{{ ACCENT_HEX.dec }}|#{{ COLOR1 }}|{{ COLOR1.rgb }}|{{ LABEL }}|{{ LABEL.hex }}|{{ MODE.dec }}' > "$tmp/forms/f.tpl"
+render_templates "$ROOT/config/themes/harbour-dark.theme" harbour-dark "$tmp/forms-out" "$tmp/forms" 2>/dev/null
+[[ "$(cat "$tmp/forms-out/f")" == '#57b4f0|57b4f0|87,180,240|0.341 0.706 0.941|#f2665a|242,102,90|Harbour Dark|{{ LABEL.hex }}|{{ MODE.dec }}' ]] \
+  && t_ok "templates: every colour as #rrggbb, .hex, .rgb and .dec" || t_fail "colour forms" "$(cat "$tmp/forms-out/f" 2>/dev/null)"
+render_templates "$tt/bad.theme" bad "$tmp/forms-bad" "$tmp/forms" 2>/dev/null && t_fail "a theme with errors rendered" \
+  || { [[ ! -f "$tmp/forms-bad/f" ]] && t_ok "templates: a theme with errors renders nothing"; }
+
+# A copy of the package, so test themes never land in the real themes folder.
+pkg="$tmp/pkg"; mkdir -p "$pkg/config"
+cp -R "$ROOT/bin" "$ROOT/lib" "$pkg/"; cp -R "$ROOT/config/themes" "$ROOT/config/themed" "$pkg/config/"
+
+# theme set: a broken theme changes nothing; a good one tells the apps at once.
+cp "$tt/bad.theme" "$pkg/config/themes/bad.theme"
+"$pkg/bin/theme" set bad --no-wallpaper >/dev/null 2>&1; rc=$?
+[[ $rc != 0 && "$(cat "$HOME/.local/state/grand-line/theme")" == nord ]] && t_ok "theme set refuses a theme with errors" || t_fail "broken theme applied"
+: > "$STUB_LOG"
+"$ROOT/bin/theme" set harbour-light --no-wallpaper >/dev/null 2>&1
+grep -q "osascript -l JavaScript .*postNotificationNameObjectUserInfoDeliverImmediately.*com.grandline.theme.changed.* harbour-light$" "$STUB_LOG" \
+  && t_ok "theme set posts com.grandline.theme.changed for the apps" || t_fail "no theme notification" "$(grep JavaScript "$STUB_LOG")"
+
+# theme apply: renders again and reloads each running tool that can reload.
+mkdir -p "$tmp/tools"
+printf '#!/bin/bash\necho "Ghostty 1.2.3"\n' > "$tmp/tools/ghostty"
+printf '#!/bin/bash\necho "btop version: 1.4.0"\n' > "$tmp/tools/btop"
+chmod +x "$tmp/tools/ghostty" "$tmp/tools/btop"
+printf 'ghostty\nbtop\n' > "$tmp/running"
+rm -f "$HOME/.config/ghostty/theme.conf"; : > "$STUB_LOG"
+PATH="$PATH:$tmp/tools" STUB_RUNNING="$tmp/running" "$ROOT/bin/theme" apply >/dev/null 2>&1
+grep -q "background = ffffff" "$HOME/.config/ghostty/theme.conf" 2>/dev/null && grep -qx "pkill -USR2 -x ghostty" "$STUB_LOG" \
+  && grep -qx "pkill -USR2 -x btop" "$STUB_LOG" && grep -q "com.grandline.theme.changed" "$STUB_LOG" \
+  && t_ok "theme apply renders again, reloads Ghostty and btop, and tells the apps" || t_fail "theme apply" "$(cat "$STUB_LOG")"
+printf '#!/bin/bash\necho "Ghostty 1.1.3"\n' > "$tmp/tools/ghostty"
+printf 'ghostty\nbtop\n' > "$tmp/running"; : > "$STUB_LOG"
+PATH="$PATH:$tmp/tools" STUB_RUNNING="$tmp/running" "$ROOT/bin/theme" refresh >/dev/null 2>&1
+! grep -q "USR2 -x ghostty" "$STUB_LOG" && t_ok "theme apply leaves a Ghostty too old to reload (it would quit)" || t_fail "old Ghostty signalled"
+
+# base16 import (into the copy of the package).
+if "$pkg/bin/theme" import-base16 "$ROOT/tests/fixtures/base16-flat.yaml" tide >/dev/null 2>&1; then
+  r="$(theme_resolve "$pkg/config/themes/tide.theme" 2>/dev/null)"
+  grep -qx 'MODE=dark' <<< "$r" && grep -qx 'TERM_BG=1b2027' <<< "$r" && grep -qx 'TERM_FG=dde3ea' <<< "$r" \
+    && grep -qx 'ACCENT_HEX=5a9cf0' <<< "$r" && grep -qx 'ACCENT=4' <<< "$r" && grep -qx 'KIND_ARCHIVE=c29468' <<< "$r" \
+    && grep -q '^PALETTE="1b2027 f2665a 3cc57f e3c24a 5a9cf0 a281f5 57c4d0 dde3ea 5c6672 ' <<< "$r" \
+    && "$pkg/bin/theme" check tide >/dev/null 2>&1 \
+    && t_ok "import-base16 maps base00 to base0F onto a dark theme that passes the checker" || t_fail "base16 mapping" "$r"
+else t_fail "import-base16 failed"; fi
+"$pkg/bin/theme" import-base16 "$ROOT/tests/fixtures/base16-tinted.yaml" shore >/dev/null 2>&1 \
+  && [[ "$(theme_get "$pkg/config/themes/shore.theme" MODE)" == light && "$(theme_get "$pkg/config/themes/shore.theme" TERM_BG)" == fbfaf7 ]] \
+  && t_ok "import-base16 reads the newer palette: layout, and a light variant stays light" || t_fail "tinted base16"
+"$pkg/bin/theme" import-base16 "$ROOT/tests/fixtures/base16-flat.yaml" tide >/dev/null 2>&1 \
+  && t_fail "import-base16 replaced a theme without --force" || t_ok "import-base16 keeps an existing theme unless --force"
+grep -v base0F "$ROOT/tests/fixtures/base16-flat.yaml" > "$tmp/short.yaml"
+out="$("$pkg/bin/theme" import-base16 "$tmp/short.yaml" short 2>&1)"
+[[ "$out" == *"lacks base0F"* && ! -e "$pkg/config/themes/short.theme" ]] && t_ok "import-base16 refuses a scheme with a colour missing" || t_fail "short scheme" "$out"
 "$ROOT/bin/theme" set nord --no-wallpaper >/dev/null 2>&1
 
 mkdir -p "$HOME/Pictures/Backgrounds"
@@ -853,7 +987,8 @@ grep -q '^UNATTENDED_STEPS="folders,dotfiles,native-tools,downloads"$' "$ROOT/se
   PATH="$stub:$PATH" GRAND_LINE_TRASH_STAGE="$tmp/stage-root" move_to_trash "$tmp/Old.app" || exit 4
   unset -f mv
   [[ ! -e "$tmp/Old.app" && -z "$(ls -A "$victim")" ]] || exit 5
-  grep -q "^sudo mv -n $tmp/Old.app $tmp/stage-root/grand-line-trash\..*/Old.app$" "$STUB_LOG" || exit 6
+  real="$(cd -P "$tmp" && pwd -P)"   # macOS: /var is /private/var
+  grep -qE "^sudo mv -n ($tmp|$real)/Old.app ($tmp|$real)/stage-root/grand-line-trash\..*/Old.app$" "$STUB_LOG" || exit 6
   grep -q "^sudo chown -R -h " "$STUB_LOG" || exit 7
   compgen -G "$HOME/.Trash/Old *.app" >/dev/null || exit 8
   [[ -z "$(ls -A "$tmp/stage-root")" ]] || exit 9

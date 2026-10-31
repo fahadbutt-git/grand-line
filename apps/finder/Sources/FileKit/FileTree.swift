@@ -25,7 +25,7 @@ enum FileTree {
 
     /// Copies a file or folder. Files are cloned on APFS. Folders keep their dates,
     /// permissions and extended attributes (tags).
-    static func copy(_ source: URL, to destination: URL, onFile: (URL, Int64) -> Void) throws {
+    static func copy(_ source: URL, to destination: URL, onFile: (URL, Int64) throws -> Void) throws {
         let values = try source.resourceValues(forKeys: Set(keys))
         let fileManager = FileManager.default
         if values.isDirectory == true, values.isSymbolicLink != true {
@@ -37,7 +37,7 @@ enum FileTree {
             copyFolderDetails(from: source, to: destination)
         } else {
             try fileManager.copyItem(at: source, to: destination)
-            onFile(source, Int64(values.fileSize ?? 0))
+            try onFile(source, Int64(values.fileSize ?? 0))
         }
     }
 

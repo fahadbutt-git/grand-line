@@ -46,6 +46,9 @@ public enum Archive {
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: staging) }
         try unpack(wanted, of: listing, into: staging)
+        // Before anything lands where you can open it: a quarantined archive's
+        // items keep the quarantine flag (security note L1).
+        Quarantine.copy(from: archive, to: wanted.map { staging.appendingPathComponent($0) })
 
         var results: [URL] = []
         for path in wanted {
@@ -58,16 +61,63 @@ public enum Archive {
         return results
     }
 
-    /// Extracts one item into a new temporary folder and returns its location there.
-    public static func preview(_ path: String, from archive: URL) throws -> URL {
+    /// Extracts one item into a new temporary folder under `root` and returns
+    /// its location there. Quick Look uses `TemporaryFolder.quickLook`, which is
+    /// emptied when its panel closes; items opened in an app use their own.
+    public static func preview(_ path: String, from archive: URL, in root: URL = TemporaryFolder.quickLook) throws -> URL {
         let listing = try list(archive)
         let wanted = try check([path], in: listing)
-        let folder = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Archive Preview", isDirectory: true)
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let folder = root.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try unpack(wanted, of: listing, into: folder)
-        return folder.appendingPathComponent(wanted[0])
+        let item = folder.appendingPathComponent(wanted[0])
+        Quarantine.copy(from: archive, to: [item])
+        return item
+    }
+
+    /// Where previews of archive items are written, in $TMPDIR. Each is
+    /// removed by `TemporaryFolder.clean` (security note L2): Quick Look's when
+    /// its panel closes and at launch, the others at launch.
+    public enum TemporaryFolder {
+        /// $TMPDIR/Archive Preview: the Quick Look panel's items.
+        public static var quickLook: URL { named("Archive Preview") }
+        /// $TMPDIR/Archive Pane: the preview pane's item.
+        public static var pane: URL { named("Archive Pane") }
+        /// $TMPDIR/Archive Open: items opened in another app, which may still
+        /// have them open, so only those older than a day are cleaned.
+        public static var opened: URL { named("Archive Open") }
+
+        static func named(_ name: String) -> URL {
+            FileManager.default.temporaryDirectory.appendingPathComponent(name, isDirectory: true)
+        }
+
+        /// Removes the preview folders in `root`, or only those last changed
+        /// before `cutoff`. Returns how many went. These are copies Nexus made
+        /// itself, never a person's files.
+        @discardableResult
+        public static func clean(_ root: URL, before cutoff: Date? = nil) -> Int {
+            let fileManager = FileManager.default
+            let children = (try? fileManager.contentsOfDirectory(
+                at: root, includingPropertiesForKeys: [.contentModificationDateKey], options: []
+            )) ?? []
+            var removed = 0
+            for child in children {
+                if let cutoff {
+                    let changed = (try? child.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+                    if let changed, changed >= cutoff { continue }
+                }
+                if (try? fileManager.removeItem(at: child)) != nil { removed += 1 }
+            }
+            return removed
+        }
+
+        /// At launch: Quick Look's and the pane's folders entirely, opened
+        /// items older than a day.
+        public static func cleanAtLaunch(now: Date = Date()) {
+            clean(quickLook)
+            clean(pane)
+            clean(opened, before: now.addingTimeInterval(-86_400))
+        }
     }
 
     static func check(_ paths: [String], in listing: ArchiveListing) throws -> [String] {

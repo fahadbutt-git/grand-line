@@ -66,11 +66,12 @@ final class RankingTests: XCTestCase {
         let clock = Clock()
         let usage = UsageStore(halfLife: 100, now: { clock.now })
         usage.record(Make.row("A"), query: router.parse("a"))
-        XCTAssertEqual(usage.frecency(id: "test:A", query: router.parse("")), 1, accuracy: 1e-9)
+        // Picked within the hour: zoxide's ×4.
+        XCTAssertEqual(usage.frecency(id: "test:A", query: router.parse("")), 4, accuracy: 1e-9)
         clock.now += 100
-        XCTAssertEqual(usage.frecency(id: "test:A", query: router.parse("")), 0.5, accuracy: 1e-9)
+        XCTAssertEqual(usage.frecency(id: "test:A", query: router.parse("")), 2, accuracy: 1e-9)
         usage.record(Make.row("A"), query: router.parse("a"))
-        XCTAssertEqual(usage.frecency(id: "test:A", query: router.parse("")), 1.5, accuracy: 1e-9)
+        XCTAssertEqual(usage.frecency(id: "test:A", query: router.parse("")), 6, accuracy: 1e-9)
     }
 
     func testUsageSavesAndLoads() throws {

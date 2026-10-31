@@ -10,12 +10,15 @@ import IcebergKit
 @MainActor
 final class SettingsWindow: NSObject, NSWindowDelegate {
     private let host: PanelHost
-    private let permissions = PermissionStatus()
+    private let permissions: PermissionStatus
+    private let recorder: ShortcutRecorder
     private var window: NSWindow?
     private var themeSink: AnyCancellable?
 
     init(host: PanelHost) {
         self.host = host
+        self.permissions = PermissionStatus()
+        self.recorder = ShortcutRecorder()
     }
 
     func show() {
@@ -27,7 +30,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 
     private func make() -> NSWindow {
-        let root = SettingsView(host: host, user: host.user, theme: host.theme, permissions: permissions)
+        let root = SettingsView(host: host, user: host.user, theme: host.theme, permissions: permissions, recorder: recorder)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 640),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable],
                               backing: .buffered, defer: false)
@@ -55,6 +58,69 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
 
     func windowDidBecomeKey(_ notification: Notification) {
         permissions.refresh()
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        recorder.cancel()
+    }
+}
+
+/// Records a new keyboard shortcut in Settings: the next key pressed with
+/// Control, Option or Command becomes the shortcut; Escape cancels. The
+/// current shortcut is let go meanwhile, so pressing it records it rather
+/// than toggling the panel.
+@MainActor
+final class ShortcutRecorder: ObservableObject {
+    @Published private(set) var recording = false
+    @Published private(set) var hint: String?
+    private var monitor: Any?
+    private var done: (@MainActor (KeyShortcut?) -> Void)?
+
+    func start(_ onDone: @escaping @MainActor (KeyShortcut?) -> Void) {
+        cancel()
+        done = onDone
+        recording = true
+        hint = nil
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            MainActor.assumeIsolated { () -> NSEvent? in
+                guard let self else { return event }
+                return self.handle(event)
+            }
+        }
+    }
+
+    func cancel() {
+        guard recording else { return }
+        finish(nil)
+    }
+
+    private func handle(_ event: NSEvent) -> NSEvent? {
+        if event.keyCode == 53 && event.modifierFlags.intersection([.control, .option, .command]).isEmpty {
+            finish(nil)
+            return nil
+        }
+        var modifiers: KeyShortcut.Modifiers = []
+        let flags = event.modifierFlags
+        if flags.contains(.control) { modifiers.insert(.control) }
+        if flags.contains(.option) { modifiers.insert(.option) }
+        if flags.contains(.shift) { modifiers.insert(.shift) }
+        if flags.contains(.command) { modifiers.insert(.command) }
+        guard let shortcut = KeyShortcut(keyCode: event.keyCode, modifiers: modifiers) else {
+            hint = "Hold Control, Option or Command with the key (Escape cancels)."
+            return nil
+        }
+        finish(shortcut)
+        return nil
+    }
+
+    private func finish(_ shortcut: KeyShortcut?) {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        recording = false
+        hint = nil
+        let done = self.done
+        self.done = nil
+        done?(shortcut)
     }
 }
 
@@ -102,6 +168,7 @@ struct SettingsView: View {
     @ObservedObject var user: UserWidgets
     @ObservedObject var theme: ThemeStore
     @ObservedObject var permissions: PermissionStatus
+    @ObservedObject var recorder: ShortcutRecorder
     @Local private var failure: String?
 
     var body: some View {
@@ -172,21 +239,28 @@ struct SettingsView: View {
                     SettingsHeader(text: "General")
                 }
 
+                if let player = host.nowPlaying {
+                    Section {
+                        NowPlayingHealthRow(model: player)
+                    } header: {
+                        SettingsHeader(text: "Now Playing", note: "Where what is playing comes from.")
+                    }
+                }
+
+                Section {
+                    DiagnosticsView(user: user, settings: host.settings)
+                } header: {
+                    SettingsHeader(text: "Diagnostics", note: "What each widget in the panel has done since Iceberg started.")
+                }
+
                 let issues = host.allIssues
                 if !issues.isEmpty {
                     Section {
                         ForEach(Array(issues.enumerated()), id: \.offset) { _, issue in
-                            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                Image(systemName: issue.severity == .error ? "xmark.octagon" : "exclamationmark.triangle")
-                                    .foregroundStyle(theme.muted)
-                                Text(issue.description)
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(theme.foreground)
-                                    .textSelection(.enabled)
-                            }
+                            ProblemRow(issue: issue)
                         }
                     } header: {
-                        SettingsHeader(text: "Problems", note: "Files Iceberg could not fully read. The rest keeps working.")
+                        SettingsHeader(text: "Problems", note: "Files Iceberg could not fully read. The rest keeps working, and a saved fix applies at once.")
                     }
                 }
             }
@@ -208,6 +282,15 @@ struct SettingsView: View {
                 Text("When the pointer rests on the notch").tag(IcebergSettings.OpenOn.hover)
                 Text("When the notch is clicked").tag(IcebergSettings.OpenOn.click)
             }
+            Stepper(value: Binding(
+                get: { host.settings.hoverDelay },
+                set: { failure = host.save("hover_delay", .float((min(max($0, 0), 3) * 100).rounded() / 100)) }),
+                    in: 0...3, step: 0.05) {
+                Text("Hover delay: \(Self.seconds(host.settings.hoverDelay))")
+            }
+            .disabled(host.settings.openOn != .hover)
+            .help("How long the pointer rests on the notch before the panel opens. Longer stops it opening as you pass to the menu bar.")
+            shortcutRow
             Picker("Show on", selection: Binding(
                 get: { host.settings.externalDisplays },
                 set: { failure = host.save("external_displays", .string($0.rawValue)) })) {
@@ -219,6 +302,49 @@ struct SettingsView: View {
             settingToggle("Open at login", key: "launch_at_login", value: host.settings.launchAtLogin)
         }
         .font(.system(size: 13))
+    }
+
+    private var shortcutRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Text("Open or close with")
+                Button(action: recordShortcut) {
+                    Text(recorder.recording ? "Type a shortcut…" : (host.settings.toggleShortcut?.symbols ?? "None"))
+                        .font(.system(size: 12, weight: .medium).monospaced())
+                        .frame(minWidth: 90)
+                }
+                .help("Click, then press the keys. Escape cancels.")
+                if host.settings.toggleShortcut != KeyShortcut.defaultToggle {
+                    Button("Reset") { failure = host.save("toggle_shortcut", .string(KeyShortcut.defaultToggle.text)) }
+                        .controlSize(.small)
+                }
+                if host.settings.toggleShortcut != nil {
+                    Button("Turn off") { failure = host.save("toggle_shortcut", .string("")) }
+                        .controlSize(.small)
+                }
+            }
+            if let hint = recorder.hint {
+                Text(hint).font(.system(size: 11)).foregroundStyle(theme.muted)
+            } else if let problem = host.hotKeyProblem {
+                Text(problem).font(.system(size: 11)).foregroundStyle(theme.color(.theme(.red)) ?? theme.foreground)
+            }
+        }
+    }
+
+    private func recordShortcut() {
+        if recorder.recording {
+            recorder.cancel()
+            return
+        }
+        host.suspendShortcut()
+        recorder.start { shortcut in
+            if let shortcut { failure = host.save("toggle_shortcut", .string(shortcut.text)) }
+            host.resumeShortcut()
+        }
+    }
+
+    static func seconds(_ s: TimeInterval) -> String {
+        String(format: "%.2f s", s)
     }
 
     private func settingToggle(_ title: String, key: String, value: Bool) -> some View {
@@ -242,7 +368,10 @@ struct SettingsView: View {
 
     static func detail(for w: WidgetConfig) -> String {
         let file = w.file?.lastPathComponent ?? "\(w.id).toml"
-        return "Widget from \(file), runs \(w.refresh.description)."
+        var text = "Widget from \(file), \(w.mode.description)"
+        if w.runsWhileClosed { text += ", also while the panel is closed" }
+        if w.always { text += ", even in Low Power Mode" }
+        return text + "."
     }
 
     static func symbol(_ name: String) -> String {

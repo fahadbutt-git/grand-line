@@ -75,14 +75,7 @@ enum FileTableSetup {
         table.selectionHighlightStyle = .regular
         table.gridStyleMask = []
         table.columnAutoresizingStyle = .noColumnAutoresizing
-        for column in FileColumn.allCases {
-            let tableColumn = NSTableColumn(identifier: column.identifier)
-            tableColumn.title = column.title
-            tableColumn.width = column.width
-            tableColumn.minWidth = 60
-            tableColumn.headerCell.alignment = column.alignment
-            table.addTableColumn(tableColumn)
-        }
+        for column in ListColumn.standard.map(FileColumn.init) { table.addTableColumn(makeColumn(column)) }
         table.dataSource = coordinator
         table.delegate = coordinator
         table.target = coordinator
@@ -92,26 +85,49 @@ enum FileTableSetup {
         table.setDraggingSourceOperationMask([.move, .copy], forLocal: true)
         table.draggingDestinationFeedbackStyle = .regular
     }
+
+    static func makeColumn(_ column: FileColumn) -> NSTableColumn {
+        let tableColumn = NSTableColumn(identifier: column.identifier)
+        tableColumn.title = column.title
+        tableColumn.width = column.width
+        tableColumn.minWidth = 60
+        tableColumn.headerCell.alignment = column.alignment
+        return tableColumn
+    }
+
+    /// Shows exactly `columns`, in their order: a saved search's own set, or
+    /// Where added in flat view. Columns already shown keep their width.
+    static func apply(_ columns: [FileColumn], to table: NSTableView) {
+        let wanted = columns.map(\.identifier)
+        guard table.tableColumns.map(\.identifier) != wanted else { return }
+        for column in table.tableColumns where !wanted.contains(column.identifier) { table.removeTableColumn(column) }
+        for (index, column) in columns.enumerated() {
+            if table.tableColumn(withIdentifier: column.identifier) == nil { table.addTableColumn(makeColumn(column)) }
+            let current = table.column(withIdentifier: column.identifier)
+            if current >= 0, current != index { table.moveColumn(current, toColumn: index) }
+        }
+    }
 }
 
+/// A list column on screen, from BrowserKit's `ListColumn`.
 enum FileColumn: String, CaseIterable {
-    case name, modified, size, kind
+    case name, path, modified, created, added, size, kind
+
+    init(_ column: ListColumn) {
+        self = FileColumn(rawValue: column.rawValue) ?? .name
+    }
+
+    var list: ListColumn { ListColumn(rawValue: rawValue) ?? .name }
 
     var identifier: NSUserInterfaceItemIdentifier { NSUserInterfaceItemIdentifier(rawValue) }
 
-    var title: String {
-        switch self {
-        case .name: return "Name"
-        case .modified: return "Date Modified"
-        case .size: return "Size"
-        case .kind: return "Kind"
-        }
-    }
+    var title: String { list.title }
 
     var width: CGFloat {
         switch self {
         case .name: return 320
-        case .modified: return 150
+        case .path: return 220
+        case .modified, .created, .added: return 150
         case .size: return 80
         case .kind: return 140
         }
@@ -119,12 +135,5 @@ enum FileColumn: String, CaseIterable {
 
     var alignment: NSTextAlignment { self == .size ? .right : .left }
 
-    var sortField: SortField {
-        switch self {
-        case .name: return .name
-        case .modified: return .modified
-        case .size: return .size
-        case .kind: return .kind
-        }
-    }
+    var sortField: SortField { list.sortField }
 }

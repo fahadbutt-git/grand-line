@@ -2,7 +2,8 @@ import Foundation
 import IndexKit
 
 /// Publishes the theme again whenever `theme set` changes it or its file is
-/// edited, and, while the theme follows macOS (`ThemeLocation.followFile`),
+/// edited (at once on the `com.grandline.theme.changed` notification that
+/// `theme set` and `theme apply` post, else when the file watch notices), and, while the theme follows macOS (`ThemeLocation.followFile`),
 /// whenever the system switches between dark and light: the variant for the
 /// new appearance is shown at once, and one app runs `theme mode` so the rest
 /// of the package follows too.
@@ -24,6 +25,10 @@ public final class ThemeWatcher: @unchecked Sendable {
     private var task: Task<Void, Never>?
     private var systemIsDark: Bool
     private var appearanceObserver: (any NSObjectProtocol)?
+    private var changeObserver: (any NSObjectProtocol)?
+
+    /// Posted by the `theme` command once a new theme is rendered.
+    public static let changedNotification = Notification.Name(ThemeSpec.changedNotification)
 
     public init(location: ThemeLocation = ThemeLocation(), latency: TimeInterval = 0.2) {
         self.location = location
@@ -40,6 +45,7 @@ public final class ThemeWatcher: @unchecked Sendable {
         task?.cancel()
         watcher?.stop()
         if let appearanceObserver { DistributedNotificationCenter.default().removeObserver(appearanceObserver) }
+        if let changeObserver { DistributedNotificationCenter.default().removeObserver(changeObserver) }
         continuation.finish()
     }
 
@@ -67,6 +73,15 @@ public final class ThemeWatcher: @unchecked Sendable {
                 }
             }
         }
+        if changeObserver == nil {
+            // The theme command has written the state file and rendered the
+            // templates before it posts, so reading now sees the new theme.
+            changeObserver = DistributedNotificationCenter.default().addObserver(
+                forName: Self.changedNotification, object: nil, queue: nil
+            ) { [weak self] _ in
+                self?.reload()
+            }
+        }
         let folders = [location.stateFile.deletingLastPathComponent(), location.themesFolder]
             .map(\.path)
             .filter { FileManager.default.fileExists(atPath: $0) }
@@ -90,6 +105,8 @@ public final class ThemeWatcher: @unchecked Sendable {
         watcher = nil
         if let appearanceObserver { DistributedNotificationCenter.default().removeObserver(appearanceObserver) }
         appearanceObserver = nil
+        if let changeObserver { DistributedNotificationCenter.default().removeObserver(changeObserver) }
+        changeObserver = nil
     }
 
     /// macOS switched between dark and light. While the theme follows macOS,

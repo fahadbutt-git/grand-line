@@ -17,7 +17,8 @@ final class CommandTests: XCTestCase {
         XCTAssertEqual(plain.text, "buy 2 eggs")
         XCTAssertEqual(plain.minutes, ReminderProvider.defaultMinutes)
         XCTAssertFalse(plain.given)
-        let row = reminder.instantResults(for: LaunchQuery(raw: "!call Smith 20m", prefix: .reminder, term: "call Smith 20m")).first
+        let row = reminder.instantResults(for: LaunchQuery(raw: "remind call Smith 20m", term: "call Smith 20m")).first
+        XCTAssertEqual(reminder.keyword, "remind")
         XCTAssertEqual(row?.primary?.command, .run("/Users/me/.grand-line/bin/reminder", arguments: ["call Smith", "20"]))
     }
 

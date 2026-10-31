@@ -27,6 +27,13 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
     private var lastStart = Date.distantPast
     private var lastLocalUse = Date.distantPast
     private var changeHandler: (@Sendable (Int) -> Void)?
+    private var lateHandler: (@Sendable () -> Void)?
+    /// How long a search gives the service before the copy races it. The
+    /// service is the one that knows about files made while an app was closed.
+    public let headStart: TimeInterval
+    /// How long a search's answer from the service is still waited for once
+    /// the copy has answered, to refine what is shown.
+    static let lateAnswer: TimeInterval = 3
 
     enum State: Equatable {
         /// Not asked yet, or a new connection is being tried.
@@ -46,10 +53,12 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
         serviceName: String? = IndexServiceName.forClient(),
         replyTimeout: TimeInterval = 0.5,
         liveAfter: TimeInterval = 5,
+        headStart: TimeInterval = 0.15,
         starter: Starter? = nil
     ) {
         self.home = home
         self.serviceName = serviceName
+        self.headStart = min(headStart, replyTimeout)
         self.replyTimeout = replyTimeout
         self.liveAfter = liveAfter
         self.starter = starter ?? SharedIndexClient.defaultStarter()
@@ -71,8 +80,10 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
         }
     }
 
-    /// Connects in the background. Without a service, the copy is loaded and
-    /// followed at once.
+    /// Connects in the background, at once (an app calls it at launch, before
+    /// its first search). Without a service, the copy is loaded and followed at
+    /// once. When the service has not said hello within a second, the copy is
+    /// loaded too, so a search racing a slow service has an answer ready.
     public func start() {
         guard serviceName != nil else {
             local.goLive()
@@ -80,7 +91,25 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
         }
         Task.detached(priority: .userInitiated) { [self] in
             _ = self.shouldAskService()
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if self.currentState != .up, self.currentState != .refused { _ = await self.local.index() }
         }
+    }
+
+    /// Keeps the connection open: reconnects when it was dropped (after the
+    /// usual pause), so the next search finds it ready. Cheap; call it when a
+    /// window opens and now and then.
+    public func warm() {
+        guard serviceName != nil else { return }
+        _ = shouldAskService()
+    }
+
+    /// Called when the service answered a search after the copy already had:
+    /// the app searches again to show the service's fuller answer.
+    public func onLateAnswer(_ handler: @escaping @Sendable () -> Void) {
+        lock.lock()
+        lateHandler = handler
+        lock.unlock()
     }
 
     public func stop() {
@@ -102,16 +131,63 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
     // MARK: Asking
 
     /// The best `limit` name matches below `scope` (nil: the whole index).
+    ///
+    /// The service gets a head start; after it, the copy races it and the
+    /// first to answer is shown, so a slow connection (just after launch)
+    /// never holds up a search. When the copy wins, the service's answer is
+    /// still awaited: it marks the service up and calls `onLateAnswer`, so the
+    /// app can search again and show what only the service knows. Only a
+    /// failed connection, not a slow one, sends searches to the copy for a while.
     public func search(_ text: String, limit: Int, scope: [String]? = nil) async -> [IndexMatch] {
-        if shouldAskService() {
-            let data: Data? = await call(timeout: replyTimeout) { service, done in
+        guard shouldAskService() else {
+            noteLocalUse()
+            return await local.search(text, limit: limit, scope: scope)
+        }
+        let asked = Task { () -> Reply<Data> in
+            await self.reply(timeout: Self.lateAnswer) { service, done in
                 service.search(text, limit: limit, scope: scope ?? [], reply: done)
             }
-            if let data, let matches = MatchCodec.decode(data) {
+        }
+        let local = self.local
+        let headStart = self.headStart
+        let first: SearchRace = await withCheckedContinuation { (continuation: CheckedContinuation<SearchRace?, Never>) in
+            let once = Once(continuation)
+            Task { once.resume(.service(await asked.value)) }
+            Task {
+                try? await Task.sleep(nanoseconds: UInt64(headStart * 1_000_000_000))
+                guard !once.isDone else { return }
+                once.resume(.copy(await local.search(text, limit: limit, scope: scope)))
+            }
+        } ?? .copy([])
+        switch first {
+        case .service(.value(let data)):
+            if let matches = MatchCodec.decode(data) {
                 markUp()
                 return matches
             }
             markDown()
+        case .service(.failed), .service(.timedOut):
+            markDown()
+        case .copy(let matches):
+            noteLocalUse()
+            Task.detached(priority: .userInitiated) { [weak self] in
+                let late = await asked.value
+                guard let self else { return }
+                switch late {
+                case .value(let data) where MatchCodec.decode(data) != nil:
+                    self.markUp()
+                    self.lock.lock()
+                    let handler = self.lateHandler
+                    self.lock.unlock()
+                    handler?()
+                case .value, .failed:
+                    self.markDown()
+                case .timedOut:
+                    // Still saying hello: the greeting decides whether it is down.
+                    if self.currentState != .unknown { self.markDown() }
+                }
+            }
+            return matches
         }
         noteLocalUse()
         return await local.search(text, limit: limit, scope: scope)
@@ -301,6 +377,33 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
         let handler = changeHandler
         lock.unlock()
         handler?(files)
+    }
+
+    /// A call's outcome: an answer, a connection error, or no answer in time.
+    enum Reply<T> {
+        case value(T)
+        case failed
+        case timedOut
+    }
+
+    private enum SearchRace {
+        case service(Reply<Data>)
+        case copy([IndexMatch])
+    }
+
+    private func reply<T>(timeout: TimeInterval, _ body: @escaping (IndexServiceXPC, @escaping (T) -> Void) -> Void) async -> Reply<T> {
+        guard let connection = currentConnection() else { return .failed }
+        let result: Reply<T>? = await withCheckedContinuation { (continuation: CheckedContinuation<Reply<T>?, Never>) in
+            let once = Once(continuation)
+            let proxy = connection.remoteObjectProxyWithErrorHandler { _ in once.resume(.failed) }
+            guard let service = proxy as? IndexServiceXPC else {
+                once.resume(.failed)
+                return
+            }
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + timeout) { once.resume(.timedOut) }
+            body(service) { value in once.resume(.value(value)) }
+        }
+        return result ?? .failed
     }
 
     private func call<T>(timeout: TimeInterval, _ body: @escaping (IndexServiceXPC, @escaping (T) -> Void) -> Void) async -> T? {

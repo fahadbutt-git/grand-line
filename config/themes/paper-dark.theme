@@ -1,4 +1,5 @@
 # Paper dark. Ink on warm paper, one red pencil accent. Every app that has colours takes them from this file.
+FORMAT=1
 LABEL="Paper Dark"
 FAMILY=paper
 MODE=dark

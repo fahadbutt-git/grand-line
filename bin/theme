@@ -6,9 +6,16 @@
 #                               current macOS appearance
 # theme mode dark|light|toggle  the other variant of the current family
 #                               (Graphite and Daylight pair up too)
+# theme apply                   render every template for the current theme again
+#                               and reload the terminal, tmux, btop, Neovim and
+#                               the apps (refresh is the same)
+# theme check [--strict] [NAME|FILE...]   check themes (all of them by default):
+#                               FILE:LINE messages, fails on an error (with
+#                               --strict, on a warning too)
+# theme resolve NAME|FILE       the theme with its parent and defaults filled in
+# theme import-base16 FILE.yaml NAME [--force]   a theme made from a base16 scheme
 # theme next-background         cycle through ~/Pictures/Backgrounds
 # theme list
-# theme refresh                 render the current theme's templates again (update)
 # theme icons [NAME]            the installed apps' Finder icons in the theme's
 #                               colours (set and mode do this in the background)
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
@@ -68,16 +75,9 @@ render_theme() {
 install_theme_outputs() {
   local out="$THEME_OUT"
   # ~/.config/ghostty links to the package; theme.conf is listed in .gitignore.
-  # Ghostty reads it when a window opens (Cmd + Shift + , reloads open ones).
   if [[ -f "$out/ghostty.conf" ]]; then
     [[ -d "$HOME/.config/ghostty" ]] || mkdir -p "$HOME/.config/ghostty"
     cp "$out/ghostty.conf" "$HOME/.config/ghostty/theme.conf"
-  fi
-
-  # tmux sources the colours from config/tmux/tmux.conf; a running server
-  # takes them now.
-  if [[ -f "$out/tmux.conf" ]] && command -v tmux >/dev/null 2>&1 && tmux info >/dev/null 2>&1; then
-    tmux source-file "$out/tmux.conf" >/dev/null 2>&1
   fi
 
   # btop: the theme file always, the setting only if you have not chosen one.
@@ -104,6 +104,75 @@ install_theme_outputs() {
   fi
 }
 
+# version_at_least VERSION MINIMUM: both dotted numbers (1.2.3).
+version_at_least() {
+  local a b i x y
+  IFS=. read -r -a a <<< "$1"
+  IFS=. read -r -a b <<< "$2"
+  for i in 0 1 2; do
+    x="${a[$i]:-0}"; y="${b[$i]:-0}"
+    x="${x%%[!0-9]*}"; y="${y%%[!0-9]*}"
+    [[ "${x:-0}" -gt "${y:-0}" ]] && return 0
+    [[ "${x:-0}" -lt "${y:-0}" ]] && return 1
+  done
+  return 0
+}
+
+# The ghostty command: on the PATH, or inside the app.
+ghostty_command() {
+  local p
+  for p in "$(command -v ghostty 2>/dev/null)" /Applications/Ghostty.app/Contents/MacOS/ghostty \
+           "$HOME/Applications/Ghostty.app/Contents/MacOS/ghostty"; do
+    [[ -n "$p" && -x "$p" ]] && { echo "$p"; return 0; }
+  done
+  return 1
+}
+
+# Every running tool takes the rendered theme now. A signal goes only to a
+# version that handles it (Ghostty 1.2 and btop 1.3.1 reload their settings
+# on SIGUSR2; older ones would quit), so an older one keeps its colours until
+# it next starts.
+reload_tools() {
+  local mode="$1" scheme="$2" bin version sock
+
+  # Ghostty: the new theme.conf in every open window.
+  if pgrep -x ghostty >/dev/null 2>&1 && bin="$(ghostty_command)"; then
+    version="$("$bin" +version 2>/dev/null | sed -n 's/^Ghostty \([0-9][0-9.]*\).*/\1/p' | head -1)"
+    [[ -n "$version" ]] && version_at_least "$version" 1.2 && pkill -USR2 -x ghostty >/dev/null 2>&1
+  fi
+
+  # tmux sources the colours from config/tmux/tmux.conf; a running server
+  # takes them now, status bar included.
+  if [[ -f "$THEME_OUT/tmux.conf" ]] && command -v tmux >/dev/null 2>&1 && tmux info >/dev/null 2>&1; then
+    tmux source-file "$THEME_OUT/tmux.conf" >/dev/null 2>&1
+  fi
+
+  # btop: reread btop.conf and the theme file.
+  if pgrep -x btop >/dev/null 2>&1 && command -v btop >/dev/null 2>&1; then
+    version="$(btop --version 2>/dev/null | sed -n 's/.*version:* *\([0-9][0-9.]*\).*/\1/p' | head -1)"
+    [[ -n "$version" ]] && version_at_least "$version" 1.3.1 && pkill -USR2 -x btop >/dev/null 2>&1
+  fi
+
+  # Neovim: every running editor switches scheme (lazy.nvim loads it on use).
+  # MODE and NVIM passed the checker, so they are plain lower-case words.
+  if command -v nvim >/dev/null 2>&1; then
+    for sock in "${TMPDIR:-/tmp}"/nvim."${USER:-$(id -un)}"/*/nvim.*.0; do
+      [[ -S "$sock" ]] || continue
+      nvim --server "$sock" --remote-expr "execute('set background=$mode | silent! colorscheme $scheme')" \
+        </dev/null >/dev/null 2>&1 &
+    done
+  fi
+}
+
+# Nexus, Sight and Iceberg reload at once on this notification (they also
+# watch the files, which takes a moment longer). JavaScript for Automation
+# posts it, so no helper needs building; it sends no Apple events.
+THEME_CHANGED_JS='function run(argv) { ObjC.import("Foundation"); $.NSDistributedNotificationCenter.defaultCenter.postNotificationNameObjectUserInfoDeliverImmediately("com.grandline.theme.changed", argv[0], null, true); }'
+post_theme_changed() {
+  command -v osascript >/dev/null 2>&1 || return 0
+  osascript -l JavaScript -e "$THEME_CHANGED_JS" "$1" >/dev/null 2>&1
+}
+
 # The macOS appearance now: dark or light.
 system_mode() {
   if [[ "$(defaults read -g AppleInterfaceStyle 2>/dev/null)" == Dark ]]; then echo dark; else echo light; fi
@@ -125,58 +194,194 @@ resolve_name() {
   echo "$name"
 }
 
-# family_of NAME: the FAMILY= of a theme file, or graphite/daylight's pair.
+# family_of NAME: the FAMILY= of a theme (its own or its parent's), or
+# graphite/daylight's pair.
 family_of() {
   case "$1" in
     graphite|daylight) echo system; return ;;
   esac
-  sed -n 's/^FAMILY=//p' "$THEMES/$1.theme" 2>/dev/null | tr -d '"' | head -1
+  [[ -f "$THEMES/$1.theme" ]] && theme_get "$THEMES/$1.theme" FAMILY
 }
 
 # The list for theme pick and theme list: families first, then every file.
 theme_names() {
   local f fam seen=" "
   for f in "$THEMES"/*.theme; do
-    fam="$(sed -n 's/^FAMILY=//p' "$f" | tr -d '"' | head -1)"
+    fam="$(theme_get "$f" FAMILY)"
     [[ -n "$fam" && "$seen" != *" $fam "* ]] && { seen="$seen$fam "; echo "$fam"; }
   done
   for f in "$THEMES"/*.theme; do basename "$f" .theme; done
 }
 
+# value KEY: from $resolved, the output of theme_resolve.
+value() {
+  local line
+  line="$(printf '%s\n' "$resolved" | grep -m1 "^$1=")" || return 0
+  line="${line#*=}"; line="${line#\"}"; printf '%s\n' "${line%\"}"
+}
+
+# apply_outputs NAME FILE: render the templates, put them in place, reload
+# every tool and tell the apps. Used by set, mode and apply.
+apply_outputs() {
+  local name="$1" file="$2" resolved
+  resolved="$(theme_resolve "$file" "$REPO" 2>/dev/null)" || resolved=""
+  render_theme "$name" "$file" || return 1
+  install_theme_outputs
+  reload_tools "$(value MODE)" "$(value NVIM)"
+  post_theme_changed "$name"
+}
+
 apply_theme() {
-  local name wallpaper="${2:-yes}" file
+  local name wallpaper="${2:-yes}" file resolved
   name="$(resolve_name "$1" "${3:-}")"
   file="$THEMES/$name.theme"
   if [[ ! -f "$file" ]]; then
     echo "No theme called '$name'. Themes: $(cd "$THEMES" && ls ./*.theme | sed -e 's#^\./##' -e 's/\.theme$//' | tr '\n' ' ')" >&2
     return 1
   fi
-  local LABEL MODE ACCENT BACKGROUND
-  # shellcheck source=/dev/null
-  source "$file"
+  # The checker's messages (errors stop here, warnings go to stderr).
+  resolved="$(theme_resolve "$file" "$REPO")" || { echo "theme $name has errors; nothing changed" >&2; return 1; }
+  local label mode accent background
+  label="$(value LABEL)"; mode="$(value MODE)"; accent="$(value ACCENT)"; background="$(value BACKGROUND)"
 
   # Test machines cannot answer macOS's Automation prompt, so they skip it.
   if [[ -z "${GRAND_LINE_NO_APPLEEVENTS:-}" ]]; then
-    local dark=false; [[ "$MODE" == dark ]] && dark=true
+    local dark=false; [[ "$mode" == dark ]] && dark=true
     osascript -e "tell application \"System Events\" to tell appearance preferences to set dark mode to $dark" >/dev/null 2>&1
   fi
 
-  if [[ "$ACCENT" == multicolor ]]; then
+  if [[ "$accent" == multicolor ]]; then
     defaults delete -g AppleAccentColor >/dev/null 2>&1
   else
-    defaults write -g AppleAccentColor -int "$ACCENT"
+    defaults write -g AppleAccentColor -int "$accent"
   fi
 
-  render_theme "$name" "$file" || return 1
+  render_theme "$name" "$file" 2>/dev/null || return 1
   install_theme_outputs
 
   if [[ "$wallpaper" == yes && -z "${GRAND_LINE_NO_APPLEEVENTS:-}" ]]; then
-    set_wallpaper "$BACKGROUNDS/$BACKGROUND" || set_wallpaper "$REPO/backgrounds/$BACKGROUND"
+    set_wallpaper "$BACKGROUNDS/$background" || set_wallpaper "$REPO/backgrounds/$background"
   fi
   printf '%s\n' "$name" > "$GRAND_LINE_STATE/theme"
-  notify "Theme: $LABEL" "Accent colour applies to newly opened windows."
+  reload_tools "$mode" "$(value NVIM)"
+  post_theme_changed "$name"
+  notify "Theme: $label" "Accent colour applies to newly opened windows."
   icons_in_background "$name"
   "$REPO/bin/hook" theme-set "$name"
+}
+
+# check_targets ARG...: the files theme check reads. A theme name, a family
+# (both variants) or a path; nothing means every theme.
+check_targets() {
+  local a
+  if [[ $# -eq 0 ]]; then printf '%s\n' "$THEMES"/*.theme; return 0; fi
+  for a in "$@"; do
+    if [[ -f "$THEMES/$a.theme" ]]; then echo "$THEMES/$a.theme"
+    elif [[ -f "$THEMES/$a-dark.theme" || -f "$THEMES/$a-light.theme" ]]; then
+      [[ -f "$THEMES/$a-dark.theme" ]] && echo "$THEMES/$a-dark.theme"
+      [[ -f "$THEMES/$a-light.theme" ]] && echo "$THEMES/$a-light.theme"
+    elif [[ -f "$a" ]]; then echo "$a"
+    else echo "No theme called '$a'" >&2; return 1
+    fi
+  done
+}
+
+# base16 roles (https://github.com/tinted-theming/home, styling guide) onto
+# ours: base00 to base07 run from the background to the brightest text,
+# base08 to base0F are red, orange, yellow, green, cyan, blue, magenta and
+# brown. Reads both the classic flat scheme files and the newer ones with a
+# palette: block. Prints the theme file, or the keys it lacks on stderr.
+BASE16_AWK='
+function hexval(s,    i, n) { s = tolower(s); n = 0; for (i = 1; i <= length(s); i++) n = n * 16 + index("0123456789abcdef", substr(s, i, 1)) - 1; return n }
+function chan(h, i) { return hexval(substr(h, i * 2 + 1, 2)) / 255 }
+function lum(h,    i, c, l) { l = 0; for (i = 0; i < 3; i++) { c = chan(h, i); c = (c <= 0.04045) ? c / 12.92 : ((c + 0.055) / 1.055) ^ 2.4; l += (i == 0 ? 0.2126 : (i == 1 ? 0.7152 : 0.0722)) * c }; return l }
+# The macOS accent number nearest the colour: -1 graphite for a grey.
+function accent(h,    r, g, b, mx, mn, d, hue) {
+  r = chan(h, 0); g = chan(h, 1); b = chan(h, 2)
+  mx = r; if (g > mx) mx = g; if (b > mx) mx = b
+  mn = r; if (g < mn) mn = g; if (b < mn) mn = b
+  d = mx - mn
+  if (d < 0.12) return -1
+  if (mx == r) hue = 60 * ((g - b) / d); else if (mx == g) hue = 60 * ((b - r) / d + 2); else hue = 60 * ((r - g) / d + 4)
+  if (hue < 0) hue += 360
+  if (hue < 15 || hue >= 340) return 0
+  if (hue < 45) return 1
+  if (hue < 70) return 2
+  if (hue < 170) return 3
+  if (hue < 260) return 4
+  if (hue < 300) return 5
+  return 6
+}
+function text(v) { sub(/^[ \t]*/, "", v); sub(/[ \t]+#.*$/, "", v); gsub(/^["\047]|["\047][ \t]*$/, "", v); gsub(/"/, "", v); return v }
+{ sub(/\r$/, "") }
+match($0, /^[ \t]*base0[0-9A-Fa-f][ \t]*:/) {
+  k = substr($0, RSTART, RLENGTH); gsub(/[ \t:]/, "", k); k = "base0" toupper(substr(k, 6, 1))
+  v = substr($0, RSTART + RLENGTH); sub(/^[ \t"\047#]*/, "", v)
+  if (match(v, /^[0-9A-Fa-f]+/) && RLENGTH == 6) c[k] = tolower(substr(v, 1, 6))
+  else bad = bad " " k
+  next
+}
+/^[ \t]*(scheme|name)[ \t]*:/ && label == "" { v = $0; sub(/^[^:]*:/, "", v); label = text(v); next }
+/^[ \t]*author[ \t]*:/ { v = $0; sub(/^[^:]*:/, "", v); author = text(v); next }
+/^[ \t]*variant[ \t]*:/ { v = $0; sub(/^[^:]*:/, "", v); variant = tolower(text(v)); next }
+END {
+  split("base00 base01 base02 base03 base04 base05 base06 base07 base08 base09 base0A base0B base0C base0D base0E base0F", all, " ")
+  for (i = 1; i <= 16; i++) if (!(all[i] in c)) missing = missing " " all[i]
+  if (bad != "") { print src ": not six-digit hex colours:" bad > "/dev/stderr"; exit 1 }
+  if (missing != "") { print src ": not a base16 scheme, it lacks" missing > "/dev/stderr"; exit 1 }
+  if (label == "") label = name
+  mode = (variant == "light" || (variant != "dark" && lum(c["base00"]) >= 0.4)) ? "light" : "dark"
+  print "# " label ", imported from the base16 scheme" (author != "" ? " by " author : "") " with theme import-base16."
+  print "FORMAT=1"
+  print "LABEL=\"" label "\""
+  print "MODE=" mode
+  print "ACCENT=" accent(c["base0D"])
+  print "BACKGROUND=" (mode == "dark" ? "graphite.jpg" : "daylight.jpg")
+  print "TERM_BG=" c["base00"]
+  print "TERM_FG=" c["base05"]
+  print "TERM_CURSOR=" c["base05"]
+  print "TERM_SELECTION=" c["base02"]
+  printf "PALETTE=\"%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s\"\n", c["base00"], c["base08"], c["base0B"], c["base0A"], c["base0D"], c["base0E"], c["base0C"], c["base05"], c["base03"], c["base08"], c["base0B"], c["base0A"], c["base0D"], c["base0E"], c["base0C"], c["base07"]
+  print "ACCENT_HEX=" c["base0D"]
+  print "MUTED=" c["base04"]
+  print "BG_LIGHTER=" c["base01"]
+  print "HIGHLIGHT=" c["base0D"]
+  print "LINE=" c["base02"]
+  print "NVIM=vscode"
+  print "ICON_STYLE=line"
+  print "ICON_FILES=" c["base0D"]
+  print "ICON_SEARCH=" c["base08"]
+  print "ICON_NOTCH=" c["base0C"]
+  print "KIND_STYLE=tag"
+  print "KIND_FOLDER=" c["base0C"]
+  print "KIND_DOCUMENT=" c["base0D"]
+  print "KIND_PDF=" c["base08"]
+  print "KIND_PRESENTATION=" c["base09"]
+  print "KIND_SPREADSHEET=" c["base0B"]
+  print "KIND_IMAGE=" c["base0E"]
+  print "KIND_VIDEO=" c["base0E"]
+  print "KIND_CODE=" c["base0A"]
+  print "KIND_ARCHIVE=" c["base0F"]
+  print "KIND_TEXT=" c["base04"]
+}'
+
+# import_base16 YAML NAME [--force]: writes config/themes/NAME.theme from a
+# base16 scheme and checks it; a theme with errors is not kept.
+import_base16() {
+  local yaml="$1" name="$2" force="${3:-}" target text
+  [[ -f "$yaml" ]] || { echo "No file $yaml" >&2; return 1; }
+  [[ "$name" =~ ^[a-z0-9][a-z0-9-]*$ ]] || { echo "The name must be lower-case letters, digits and -" >&2; return 2; }
+  target="$THEMES/$name.theme"
+  if [[ -e "$target" && "$force" != --force ]]; then
+    echo "$name already exists; add --force to replace it" >&2; return 1
+  fi
+  text="$(awk -v src="$yaml" -v name="$name" "$BASE16_AWK" "$yaml")" || return 1
+  printf '%s\n' "$text" > "$target.new" || return 1
+  if ! theme_check "$target.new" "$REPO"; then
+    rm -f "$target.new"; return 1
+  fi
+  mv "$target.new" "$target"
+  echo "Made $name ($(theme_get "$target" MODE)). Try it: theme set $name"
 }
 
 case "${1:-pick}" in
@@ -197,7 +402,7 @@ case "${1:-pick}" in
   mode)
     current="$(cat "$GRAND_LINE_STATE/theme" 2>/dev/null)"
     [[ -n "$current" ]] || current=graphite
-    cur_mode="$(sed -n 's/^MODE=//p' "$THEMES/$current.theme" 2>/dev/null | tr -d '"')"
+    cur_mode="$(theme_get "$THEMES/$current.theme" MODE)"
     want="${2:-toggle}"
     if [[ "$want" == toggle ]]; then
       if [[ "$cur_mode" == dark ]]; then want=light; else want=dark; fi
@@ -212,11 +417,34 @@ case "${1:-pick}" in
     [[ -f "$THEMES/$target.theme" ]] || { echo "No $want variant of $current" >&2; exit 1; }
     apply_theme "$target" no
     ;;
-  refresh)
+  apply|refresh)
     current="$(cat "$GRAND_LINE_STATE/theme" 2>/dev/null)"
     [[ -n "$current" ]] || exit 0
     [[ -f "$THEMES/$current.theme" ]] || current=daylight
-    render_theme "$current" "$THEMES/$current.theme" && install_theme_outputs
+    apply_outputs "$current" "$THEMES/$current.theme"
+    ;;
+  check)
+    shift
+    strict=0
+    [[ "${1:-}" == --strict ]] && { strict=1; shift; }
+    targets="$(check_targets "$@")" || exit 2
+    files=()
+    while IFS= read -r f; do [[ -n "$f" ]] && files+=("$f"); done <<< "$targets"
+    [[ ${#files[@]} -gt 0 ]] || { echo "No themes to check" >&2; exit 2; }
+    status=0
+    for f in "${files[@]}"; do theme_check "$f" "$REPO" "$strict" || status=1; done
+    if [[ "$status" == 0 ]]; then echo "${#files[@]} theme(s) pass"; else echo "Some themes have errors" >&2; fi
+    exit "$status"
+    ;;
+  resolve)
+    [[ -n "${2:-}" ]] || { echo "usage: theme resolve NAME|FILE" >&2; exit 2; }
+    if [[ -f "$THEMES/$2.theme" ]]; then theme_resolve "$THEMES/$2.theme" "$REPO"
+    elif [[ -f "$2" ]]; then theme_resolve "$2" "$REPO"
+    else echo "No theme called '$2'" >&2; exit 1; fi
+    ;;
+  import-base16)
+    [[ -n "${2:-}" && -n "${3:-}" ]] || { echo "usage: theme import-base16 FILE.yaml NAME [--force]" >&2; exit 2; }
+    import_base16 "$2" "$3" "${4:-}"
     ;;
   icons)
     current="${2:-$(cat "$GRAND_LINE_STATE/theme" 2>/dev/null)}"
@@ -240,5 +468,5 @@ case "${1:-pick}" in
     done
     set_wallpaper "$next"
     ;;
-  *) echo "usage: theme pick | set NAME | mode dark|light|toggle | next-background | list | refresh | icons [NAME]" >&2; exit 2 ;;
+  *) echo "usage: theme pick | set NAME | mode dark|light|toggle | apply | check [--strict] [NAME...] | resolve NAME | import-base16 FILE NAME | next-background | list | icons [NAME]" >&2; exit 2 ;;
 esac

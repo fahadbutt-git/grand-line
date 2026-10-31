@@ -26,6 +26,7 @@ struct ToolbarView: View {
                 ViewModePicker(model: model, palette: palette)
                 SearchField(model: model, palette: palette)
                     .frame(width: 220)
+                TasksButton(model: model, services: model.services, palette: palette)
                 SymbolButton(symbol: "sidebar.right", help: "Inspector  ⌥⌘I", palette: palette,
                              isOn: model.showInspector) { model.perform(.toggleInspector) }
             }
@@ -33,6 +34,9 @@ struct ToolbarView: View {
             .frame(height: 44)
             if case .search(let query, let scope) = model.focused.location {
                 SearchChips(model: model, query: query, scope: scope, palette: palette)
+            }
+            if !model.editingPath, !model.focused.state.filter.isEmpty {
+                FilterBar(model: model, pane: model.focused, palette: palette)
             }
         }
         .background(palette.background)
@@ -122,5 +126,60 @@ extension BrowserModel {
             query, scope: .home, home: services.paths.home.path, drives: [],
             savedSearch: { [services] in services.savedSearches.query(named: $0) }
         ).chips
+    }
+}
+
+/// Under the toolbar while the omnibar's filter narrows the folder: what is
+/// filtered and how much shows. Search has its scope chips instead, so the
+/// two are never mistaken for each other.
+struct FilterBar: View {
+    @ObservedObject var model: BrowserModel
+    @ObservedObject var pane: PaneModel
+    let palette: Palette
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "line.3.horizontal.decrease")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(palette.accent)
+            Text("Filter").font(.system(size: 11, weight: .medium)).foregroundStyle(palette.accent)
+            Chip(title: pane.state.filter, palette: palette) { model.beginFilter() }
+                .help("Edit the filter  ⌥⌘G")
+            Text("\(pane.items.count) of \(ItemFormat.count(pane.state.unfilteredCount)) in this folder")
+                .font(.system(size: 11).monospacedDigit())
+                .foregroundStyle(palette.dim)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            Button { model.clearFilter(in: pane) } label: {
+                HStack(spacing: 4) {
+                    Text("Clear").font(.system(size: 11))
+                    KeyCap(text: "Esc", palette: palette)
+                }
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(palette.accent)
+            .accessibilityIdentifier("nexus.filter.clear")
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 30)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("nexus.filter")
+    }
+}
+
+/// The tasks popover's button: busy while a task runs (Shift+Cmd+J).
+struct TasksButton: View {
+    @ObservedObject var model: BrowserModel
+    @ObservedObject var services: Services
+    let palette: Palette
+
+    var body: some View {
+        let busy = services.transfers.isBusy
+        SymbolButton(symbol: busy ? "arrow.triangle.2.circlepath" : "checklist", help: "Tasks  ⇧⌘J", palette: palette,
+                     isOn: busy || model.showTransfers) { model.perform(.showTransfers) }
+            .accessibilityIdentifier("nexus.tasks")
+            .popover(isPresented: $model.showTransfers, arrowEdge: .bottom) {
+                TasksView(model: model, services: services, palette: palette)
+            }
     }
 }

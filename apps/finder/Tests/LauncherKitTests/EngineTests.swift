@@ -28,7 +28,7 @@ final class EngineTests: XCTestCase {
             instant([Make.row("alpha one")], id: "a", prefix: .symbols),
             instant([Make.row("alpha two")], id: "b"),
         ], router: router)
-        let plan = engine.plan(":alpha")
+        let plan = engine.plan("::alpha")
         XCTAssertEqual(plan.providers.map { $0.id }, ["a"])
         XCTAssertFalse(plan.topHit)
         XCTAssertEqual(engine.instantGroups(plan).flatMap(\.rows).map(\.title), ["alpha one"])

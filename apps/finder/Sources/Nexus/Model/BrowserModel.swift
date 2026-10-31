@@ -20,13 +20,18 @@ final class BrowserModel: ObservableObject {
     @Published var showHidden = false
     @Published var sidebarWidth: Double = SidebarMetrics.defaultWidth
     @Published var editingPath = false
+    /// How the path bar's field was opened: Go to Folder or the filter.
+    @Published var omnibarOrigin: Omnibar.Origin = .goToFolder
     @Published var pathText = ""
     /// Under the Go to Folder field: why Return went nowhere.
     @Published var pathProblem: String?
     @Published var searchText = ""
     @Published var searchFocused = false
     @Published var pinned = false
+    /// The tasks popover in the toolbar (Shift+Cmd+J).
     @Published var showTransfers = false
+    /// Rename N Items: the items the sheet is open for; empty when closed.
+    @Published var batchRenameItems: [URL] = []
     /// Increments to ask the focused list to start renaming its selection.
     @Published var renameRequest = 0
     weak var window: NSWindow?

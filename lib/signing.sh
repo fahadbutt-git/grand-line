@@ -170,7 +170,19 @@ sign_code() {
   else
     args+=(--sign -)
   fi
-  codesign "${args[@]}" "$path" >/dev/null 2>&1
+  SIGN_ERROR=""
+  SIGN_ERROR="$(codesign "${args[@]}" "$path" 2>&1 >/dev/null)" && return 0
+  SIGN_ERROR="$(printf '%s' "$SIGN_ERROR" | tail -n 3 | tr '\n' ' ')"
+  return 1
+}
+
+# sign_code_adhoc PATH [ENTITLEMENTS]: the fallback when the identity cannot
+# sign, so a first install still gets a working app (permissions are then
+# granted again once the identity works).
+sign_code_adhoc() {
+  local args=(--force --options runtime --sign -)
+  [[ -n "${2:-}" && -f "$2" ]] && args+=(--entitlements "$2")
+  SIGN_ERROR="$(codesign "${args[@]}" "$1" 2>&1 >/dev/null)"
 }
 
 # signing_check APP: hardened runtime is on and, when the identity exists,
@@ -181,6 +193,7 @@ signing_check() {
   if ! printf '%s\n' "$detail" | grep -qE 'flags=0x[0-9a-f]+\([^)]*runtime'; then
     echo "$app is not signed with hardened runtime"; return 1
   fi
+  [[ "${SIGN_ADHOC_FALLBACK:-0}" == 1 ]] && return 0
   hash="$(signing_identity)" || return 0
   hash="$(printf '%s' "$hash" | tr 'A-F' 'a-f')"
   req="$(codesign -d -r- "$app" 2>&1)"

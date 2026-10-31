@@ -18,7 +18,7 @@ extension BrowserModel {
         case .closeWindow: window?.performClose(nil)
         case .closeAllWindows: WindowManager.shared.closeAll()
         case .getInfo, .toggleInspector: showInspector.toggle()
-        case .rename: renameRequest += 1
+        case .rename: beginRename()
         case .compress: compress()
         case .duplicate: duplicate()
         case .makeAlias: makeAlias()
@@ -40,7 +40,10 @@ extension BrowserModel {
         case .tagRed, .tagOrange, .tagYellow, .tagGreen, .tagBlue, .tagPurple, .tagGray: toggleTag(command)
         case .removeTags: removeTags()
         case .editTags: showInspector = true
-        case .find: searchFocused = true
+        case .find:
+            // Cmd+F is Finder's: the search field, even from the path bar's field.
+            if editingPath { endPathEditing() }
+            searchFocused = true
         case .saveSearch: saveSearch()
         case .cleanClutter: cleanClutter()
         case .undo: undo()
@@ -57,6 +60,8 @@ extension BrowserModel {
         case .keepFoldersOnTop: toggleFoldersOnTop()
         case .groupNone: group(by: .none)
         case .groupKind: group(by: .kind)
+        case .toggleFlatView: toggleFlatView()
+        case .filterFolder: beginFilter()
         case .showViewOptions: showViewOptions.toggle()
         case .rememberView: rememberView()
         case .useAsDefaultView: useAsDefaultView()
@@ -118,7 +123,9 @@ extension BrowserModel {
              .tagRed, .tagOrange, .tagYellow, .tagGreen, .tagBlue, .tagPurple, .tagGray:
             return !onDisk.isEmpty
         case .rename:
-            return onDisk.count == 1
+            return !onDisk.isEmpty
+        case .toggleFlatView:
+            return folder != nil
         case .showOriginal:
             return onDisk.count == 1 && onDisk[0].isAlias
         case .putBack:
@@ -172,6 +179,9 @@ extension BrowserModel {
         case .toggleStatusBar: return showStatusBar ? "Hide Status Bar" : title
         case .toggleHidden: return showHidden ? "Hide Hidden Files" : title
         case .pinWindow: return pinned ? "Unpin Window" : title
+        case .rename:
+            let count = focused.selectedItems.filter { !$0.isInArchive }.count
+            return count > 1 ? "Rename \(count) Items\u{2026}" : title
         default: return title
         }
     }
@@ -198,6 +208,7 @@ extension BrowserModel {
         case .keepFoldersOnTop: return order.foldersFirst
         case .groupNone: return order.grouping == .none
         case .groupKind: return order.grouping == .kind
+        case .toggleFlatView: return focused.state.isFlat
         case .onePane: return layout.count == 1
         case .twoPanes: return layout.count == 2
         case .threePanes: return layout.count == 3

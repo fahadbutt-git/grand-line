@@ -96,6 +96,15 @@ public struct Theme: Equatable, Sendable {
         index < palette.count ? palette[index] : foreground
     }
 
+    /// This theme as theme file keys: the fallback for a file whose required
+    /// keys are missing or wrong.
+    public var fields: [String: String] {
+        ["LABEL": label, "MODE": mode.rawValue, "TERM_BG": background.hex, "TERM_FG": foreground.hex,
+         "TERM_SELECTION": selection.hex, "HIGHLIGHT": highlight.hex, "MUTED": muted.hex, "ACCENT_HEX": accent.hex,
+         "BG_LIGHTER": backgroundLighter.hex, "BG_DARKER": backgroundDarker.hex, "FORMAT": String(ThemeSpec.format),
+         "PALETTE": palette.map(\.hex).joined(separator: " ")]
+    }
+
     /// The fields a theme file must have for Iceberg.
     public static let requiredKeys = ["LABEL", "MODE", "TERM_BG", "TERM_FG", "TERM_SELECTION", "PALETTE",
                                       "ACCENT_HEX", "MUTED", "BG_LIGHTER", "BG_DARKER", "HIGHLIGHT"]

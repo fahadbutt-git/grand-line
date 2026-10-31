@@ -7,6 +7,7 @@ public final class CatalogProvider: InstantProvider, @unchecked Sendable {
     public let title: String
     public let symbol: String
     public let prefix: Prefix?
+    public let extraPrefixes: [Prefix]
     public let inGlobalSearch: Bool
     public let catalog: Catalog
     /// Rows a global search keeps from this provider before ranking.
@@ -18,6 +19,7 @@ public final class CatalogProvider: InstantProvider, @unchecked Sendable {
         title: String,
         symbol: String,
         prefix: Prefix? = nil,
+        extraPrefixes: [Prefix] = [],
         inGlobalSearch: Bool = true,
         globalLimit: Int = 40,
         stripsExtensions: Bool = false,
@@ -27,6 +29,7 @@ public final class CatalogProvider: InstantProvider, @unchecked Sendable {
         self.title = title
         self.symbol = symbol
         self.prefix = prefix
+        self.extraPrefixes = extraPrefixes
         self.inGlobalSearch = inGlobalSearch
         self.globalLimit = globalLimit
         self.catalog = Catalog(stripsExtensions: stripsExtensions)
@@ -44,7 +47,7 @@ public final class CatalogProvider: InstantProvider, @unchecked Sendable {
     }
 
     public func instantResults(for query: LaunchQuery) -> [LaunchResult] {
-        let own = query.prefix != nil && query.prefix == prefix
+        let own = query.prefix.map { serves($0) } ?? false
         if query.term.isEmpty && !own { return [] }
         return catalog.search(query.term, exactOnly: query.prefix == .exact, limit: own ? 500 : globalLimit)
     }

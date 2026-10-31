@@ -382,9 +382,20 @@ public enum SettingPhase: Sendable, Equatable {
 public struct SettingFailure: Sendable, Equatable {
     public let message: String
     public let permission: SettingsActions.Permission?
+    /// macOS refused the permission (Automation for System Events, or
+    /// Accessibility): the row then says "<Permission> not allowed". false when
+    /// the permission is only a likely cause (the change did not take).
+    public let refused: Bool
 
-    public init(_ message: String, permission: SettingsActions.Permission? = nil) {
+    public init(_ message: String, permission: SettingsActions.Permission? = nil, refused: Bool? = nil) {
         self.message = message
         self.permission = permission
+        self.refused = refused ?? (permission != nil)
+    }
+
+    /// The row's state: "Automation not allowed", "Accessibility not allowed" or "Failed".
+    public var state: String {
+        guard refused, let permission else { return "Failed" }
+        return permission.title + " not allowed"
     }
 }

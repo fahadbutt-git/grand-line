@@ -15,29 +15,13 @@ extension BrowserModel {
         let target = panes[next]
         switch PaneTransfer.plan(moving: moving, from: focused.location, to: target.location) {
         case .copy(let folder)?:
-            let items = selectedOnDisk
-            runTransfer(into: target, "The items could not be copied.") { try await $0.copy(items, to: folder) }
+            transfer(selectedOnDisk, to: folder, moving: false, select: target)
         case .move(let folder)?:
-            let items = selectedOnDisk
-            runTransfer(into: target, "The items could not be moved.") { try await $0.move(items, to: folder) }
+            transfer(selectedOnDisk, to: folder, moving: true, select: target)
         case .extract(let folder)?:
             extract(to: folder)
         case nil:
             break
-        }
-    }
-
-    /// The copies show selected in the pane they went to; the source reloads by itself.
-    private func runTransfer(into target: PaneModel, _ title: String, _ body: @escaping (FileOperations) async throws -> [URL]) {
-        let operations = services.operations
-        Task { [weak self] in
-            do {
-                let made = try await body(operations)
-                if let folder = target.location.folderURL { target.go(.folder(folder), select: made) }
-            } catch {
-                Prompt.problem(title, error)
-            }
-            self?.services.refreshUndo()
         }
     }
 

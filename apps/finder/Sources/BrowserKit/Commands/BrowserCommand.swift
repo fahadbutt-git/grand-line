@@ -17,7 +17,7 @@ public enum BrowserCommand: String, CaseIterable, Codable, Sendable {
     // View
     case viewIcons, viewList, viewColumns, viewGallery, viewPanes
     case sortName, sortKind, sortLastOpened, sortAdded, sortModified, sortCreated, sortSize, sortTags, sortManual
-    case keepFoldersOnTop, groupNone, groupKind
+    case keepFoldersOnTop, groupNone, groupKind, toggleFlatView, filterFolder
     case showViewOptions, rememberView, useAsDefaultView
     case toggleHidden, togglePreview, toggleInspector, toggleSidebar, toggleStatusBar, toggleToolbar, togglePathBar
     case biggerIcons, smallerIcons, showTransfers

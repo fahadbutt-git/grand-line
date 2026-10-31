@@ -88,7 +88,16 @@ public struct FilesProvider: LaunchProvider {
         // Apps have their own provider; outside `.` they would show twice.
         if !own { hits.removeAll { $0.ext == "app" } }
         let now = Date()
-        let rows = hits.map { FileResults.result($0, paths: paths, now: now) }
+        // The index gives the tier; fzf's score (the same matcher every other
+        // provider uses) orders files within it.
+        let matcher = plan.names.map { TextMatcher($0) }
+        let rows = hits.map { hit -> LaunchResult in
+            var row = FileResults.result(hit, paths: paths, now: now)
+            if let matcher, let scored = matcher.match(FoldedText(hit.name, stripsExtension: !hit.isFolder)) {
+                row.match.quality = scored.quality
+            }
+            return row
+        }
         guard plan.names != nil || plan.spotlight != nil else { return rows }
         return rows + FileResults.permissionRows(await unreadable(), home: paths.home)
     }

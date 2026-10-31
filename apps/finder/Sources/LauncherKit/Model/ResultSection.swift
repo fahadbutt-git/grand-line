@@ -15,6 +15,8 @@ public enum ResultSection: Int, Codable, CaseIterable, Comparable, Sendable {
     case symbols
     case files
     case web
+    /// Offered when nothing matches: create a file, run in Terminal, calculate.
+    case otherActions
 
     public var title: String {
         switch self {
@@ -31,6 +33,7 @@ public enum ResultSection: Int, Codable, CaseIterable, Comparable, Sendable {
         case .symbols: return "Symbols"
         case .files: return "Files"
         case .web: return "Web"
+        case .otherActions: return "Other actions"
         }
     }
 
@@ -38,7 +41,7 @@ public enum ResultSection: Int, Codable, CaseIterable, Comparable, Sendable {
     public var limit: Int {
         switch self {
         case .topHit: return 1
-        case .answers: return 3
+        case .answers, .otherActions: return 3
         case .symbols: return 10
         case .files, .web: return 8
         case .favourites, .recents: return 9

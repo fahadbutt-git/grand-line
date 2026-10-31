@@ -11,6 +11,8 @@ struct RedoRecord: Sendable {
         case move([UndoRecord.Move])
         /// Undone renames: from the old name to the new one.
         case rename(UndoRecord.Move)
+        /// Undone Rename N Items: each from the old name to the new one.
+        case renameMany([UndoRecord.Move])
         /// Undone trashing: the items, back in place, to go to the Trash again.
         case trash([URL])
     }

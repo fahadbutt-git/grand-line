@@ -1,8 +1,8 @@
-# Paper light. Ink on warm paper, one red pencil accent. Every app that has colours takes them from this file.
+# Paper light. Ink on warm paper, one red pencil accent. Extends paper-dark for the accent, family, editor scheme and kind style, with colours of its own.
+FORMAT=1
+EXTENDS=paper-dark
 LABEL="Paper Light"
-FAMILY=paper
 MODE=light
-ACCENT=0
 BACKGROUND=daylight.jpg
 TERM_BG=fbfaf7
 TERM_FG=16181b
@@ -17,12 +17,10 @@ HIGHLIGHT=b03a28
 SIDEBAR=f3f1ec
 FIELD=efece6
 LINE=e3dfd6
-NVIM=vscode
 ICON_STYLE=line
 ICON_SEARCH=b03a28
 ICON_TILE=fbfaf7
 ICON_INK=16181b
-KIND_STYLE=text
 KIND_FOLDER=3f5c7e
 KIND_DOCUMENT=46568c
 KIND_PDF=b03a28

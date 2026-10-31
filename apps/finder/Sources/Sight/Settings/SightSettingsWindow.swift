@@ -137,13 +137,13 @@ struct SightSourcesPane: View {
                     SettingsRow(source.title, detail: source.detail, symbol: source.symbol) {
                         HStack(spacing: 10) {
                             if let prefix = source.prefix {
-                                Text(prefix.rawValue)
+                                Text(prefix.display)
                                     .font(.system(size: 12, design: .monospaced))
                                     .padding(.horizontal, 6)
                                     .frame(height: 18)
                                     .background(RoundedRectangle(cornerRadius: 5).strokeBorder(Color.secondary.opacity(0.4)))
-                                    .help("Type \(prefix.rawValue) first to search \(source.title.lowercased()) alone")
-                                    .accessibilityLabel("Prefix \(prefix.rawValue)")
+                                    .help("Type \(prefix.display) first to search \(source.title.lowercased()) alone")
+                                    .accessibilityLabel("Prefix \(prefix.display)")
                             }
                             ReorderButtons(canMoveUp: index > 0, canMoveDown: index < sources.order.count - 1) { offset in
                                 store.update { $0.sources.move(source, by: offset) }

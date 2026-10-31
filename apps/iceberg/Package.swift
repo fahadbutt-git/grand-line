@@ -31,6 +31,8 @@ let package = Package(
                 .linkedFramework("EventKit"),
                 .linkedFramework("IOKit"),
                 .linkedFramework("ServiceManagement"),
+                .linkedFramework("Carbon"),
+                .linkedFramework("CoreServices"),
             ]
         ),
         .target(

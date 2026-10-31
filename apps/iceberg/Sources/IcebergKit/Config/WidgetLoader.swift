@@ -8,6 +8,8 @@ public enum WidgetLoader {
         public var issues: [ConfigIssue]
         /// Files that load but say `enabled = false`, for the Settings window.
         public var disabled: [WidgetConfig] = []
+        /// Widgets whose file has an error, by id, with the file's name.
+        public var failed: [String: String] = [:]
     }
 
     /// Files larger than this are refused (a widget file is a few lines).
@@ -30,6 +32,7 @@ public enum WidgetLoader {
         var widgets: [WidgetConfig] = []
         var disabled: [WidgetConfig] = []
         var issues: [ConfigIssue] = []
+        var failed: [String: String] = [:]
         var seen: [String: String] = [:]
         let files = names
             .filter { !$0.hasPrefix(".") }
@@ -61,12 +64,54 @@ public enum WidgetLoader {
             if let config {
                 seen[id] = name
                 if config.enabled { widgets.append(config) } else { disabled.append(config) }
+            } else {
+                failed[id] = name
             }
         }
         // Stable: by `order`, then by file name (the order they were read in).
         let indexed = widgets.enumerated().sorted { a, b in
             a.element.order != b.element.order ? a.element.order < b.element.order : a.offset < b.offset
         }
-        return Result(widgets: indexed.map(\.element), issues: issues, disabled: disabled)
+        return Result(widgets: indexed.map(\.element), issues: issues, disabled: disabled, failed: failed)
+    }
+}
+
+/// What a save in the config folder changes, worked out without touching
+/// the screen, so hot reload can be tested.
+public enum WidgetReload {
+    /// Widgets whose file has a mistake keep their last good version until
+    /// the file is fixed, so a half-typed edit does not blank the widget.
+    /// Returns the widgets to use and the ids kept from before.
+    public static func keepLastGood(previous: [WidgetConfig], loaded: WidgetLoader.Result) -> (widgets: [WidgetConfig], kept: [String]) {
+        var widgets = loaded.widgets
+        var kept: [String] = []
+        let present = Set(loaded.widgets.map(\.id) + loaded.disabled.map(\.id))
+        for old in previous where loaded.failed[old.id] != nil && !present.contains(old.id) {
+            widgets.append(old)
+            kept.append(old.id)
+        }
+        return (widgets, kept)
+    }
+
+    /// Ids that are new or whose file now says something different.
+    public static func changed(from old: [WidgetConfig], to new: [WidgetConfig]) -> Set<String> {
+        var before: [String: WidgetConfig] = [:]
+        for w in old { before[w.id] = w }
+        return Set(new.filter { before[$0.id] != $0 }.map(\.id))
+    }
+
+    /// Widgets that use a script that was saved: a changed file that is not
+    /// a widget file, named in a widget's command or click.
+    public static func affected(byChangedFiles names: [String], widgets: [WidgetConfig]) -> Set<String> {
+        let scripts = names
+            .filter { !["toml", "json"].contains(($0 as NSString).pathExtension.lowercased()) }
+            .filter { !$0.hasPrefix(".") && !$0.isEmpty }
+        guard !scripts.isEmpty else { return [] }
+        var ids: Set<String> = []
+        for w in widgets {
+            let text = w.command + " " + (w.click ?? "")
+            if scripts.contains(where: { text.contains($0) }) { ids.insert(w.id) }
+        }
+        return ids
     }
 }

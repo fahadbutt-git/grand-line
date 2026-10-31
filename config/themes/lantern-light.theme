@@ -1,8 +1,8 @@
-# Lantern light. Warm lamplight amber on brown greys. Every app that has colours takes them from this file.
+# Lantern light. Warm lamplight amber on brown greys. Extends lantern-dark for the accent, family, editor scheme and kind style, with colours of its own.
+FORMAT=1
+EXTENDS=lantern-dark
 LABEL="Lantern Light"
-FAMILY=lantern
 MODE=light
-ACCENT=1
 BACKGROUND=daylight.jpg
 TERM_BG=fffdf9
 TERM_FG=1c1d20
@@ -17,10 +17,8 @@ HIGHLIGHT=af600e
 SIDEBAR=f6f2ec
 FIELD=f0ebe3
 LINE=e6e0d7
-NVIM=vscode
 ICON_STYLE=solid
 ICON_SEARCH=c93a2e
-KIND_STYLE=dot
 KIND_FOLDER=1f7fc4
 KIND_DOCUMENT=3f5fe0
 KIND_PDF=c93a2e

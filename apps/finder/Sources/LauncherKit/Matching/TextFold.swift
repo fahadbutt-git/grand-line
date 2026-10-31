@@ -11,12 +11,20 @@ public struct FoldedText: Sendable, Hashable {
     let utf16End: [Int32]
     /// Bytes of the text without its extension ("Report.docx" → "report"), when it has one.
     let stemLength: Int?
+    /// For each byte, fzf's bonus for a match there: after a space or at the
+    /// start, after a delimiter, after other punctuation, at a camelCase hump
+    /// or a letter-digit change; 0 inside a word.
+    let bonus: [Int8]
+    /// One bit per byte value (modulo 64) that occurs: the prefilter.
+    let mask: UInt64
 
     public init(_ text: String, stripsExtension: Bool = false) {
         var bytes: [UInt8] = []
         var starts: [Bool] = []
         var lo: [Int32] = []
         var hi: [Int32] = []
+        var bonus: [Int8] = []
+        var mask: UInt64 = 0
         bytes.reserveCapacity(text.utf8.count)
         var offset: Int32 = 0
         var previous: Character?
@@ -24,9 +32,12 @@ public struct FoldedText: Sendable, Hashable {
             let width = Int32(character.utf16.count)
             let folded = TextFold.character(character)
             let boundary = TextFold.isBoundary(character, after: previous)
+            let score = TextFold.bonus(character, after: previous)
             for (k, byte) in folded.utf8.enumerated() {
                 bytes.append(byte)
                 starts.append(boundary && k == 0)
+                bonus.append(k == 0 ? score : 0)
+                mask |= 1 << UInt64(byte & 63)
                 lo.append(offset)
                 hi.append(offset + width)
             }
@@ -37,6 +48,8 @@ public struct FoldedText: Sendable, Hashable {
         self.starts = starts
         self.utf16Start = lo
         self.utf16End = hi
+        self.bonus = bonus
+        self.mask = mask
         if stripsExtension, let dot = bytes.lastIndex(of: UInt8(ascii: ".")), dot > 0 {
             stemLength = dot
         } else {
@@ -77,6 +90,26 @@ public enum TextFold {
         if character.isNumber && previous.isLetter { return true }
         if character.isLetter && previous.isNumber { return true }
         return false
+    }
+
+    /// fzf's bonuses for a match at this character.
+    static func bonus(_ character: Character, after previous: Character?) -> Int8 {
+        if isSeparator(character) { return 0 }
+        guard let previous else { return FuzzyScore.bonusBoundaryWhite }
+        if previous.isWhitespace { return FuzzyScore.bonusBoundaryWhite }
+        if "/:;|,".contains(previous) { return FuzzyScore.bonusBoundaryDelimiter }
+        if isSeparator(previous) { return FuzzyScore.bonusBoundary }
+        if character.isUppercase && previous.isLowercase { return FuzzyScore.bonusCamel }
+        if character.isNumber != previous.isNumber, character.isLetter || character.isNumber,
+           previous.isLetter || previous.isNumber { return FuzzyScore.bonusCamel }
+        return 0
+    }
+
+    /// The prefilter bits of some folded bytes.
+    static func mask<S: Sequence>(_ bytes: S) -> UInt64 where S.Element == UInt8 {
+        var mask: UInt64 = 0
+        for byte in bytes { mask |= 1 << UInt64(byte & 63) }
+        return mask
     }
 
     static func isSeparator(_ character: Character) -> Bool {

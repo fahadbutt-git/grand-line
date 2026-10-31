@@ -91,6 +91,7 @@ public extension ResultSection {
         case .symbols: return "symbols"
         case .files: return "files"
         case .web: return "web"
+        case .otherActions: return "otherActions"
         }
     }
 

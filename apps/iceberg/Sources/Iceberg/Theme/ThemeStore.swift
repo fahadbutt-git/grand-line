@@ -3,8 +3,9 @@ import AppKit
 import SwiftUI
 import IcebergKit
 
-/// The active theme, kept current: it reloads whenever `theme pick` writes
-/// the state file or a theme file changes, and every view redraws from it.
+/// The active theme, kept current: it reloads at once on the notification
+/// `theme set` and `theme apply` post, and whenever the state file or a theme
+/// file changes, and every view redraws from it.
 @MainActor
 final class ThemeStore: ObservableObject {
     @Published private(set) var theme: Theme = .graphite
@@ -19,6 +20,7 @@ final class ThemeStore: ObservableObject {
     /// macOS's own appearance, for a theme that follows it.
     private var systemIsDark = SystemStyle.isDark()
     private var appearanceObserver: NSObjectProtocol?
+    private var changeObserver: NSObjectProtocol?
 
     init(paths: IcebergPaths) {
         self.paths = paths
@@ -26,6 +28,11 @@ final class ThemeStore: ObservableObject {
         // Not the whole state folder: Nexus rewrites a file there on every selection.
         watcher = FileWatcher(paths: [paths.themeState, paths.renderedTheme, paths.themesFolder]) { [weak self] in
             self?.reload()
+        }
+        changeObserver = DistributedNotificationCenter.default().addObserver(
+            forName: ThemeLoader.changedNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.reload() }
         }
         appearanceObserver = DistributedNotificationCenter.default().addObserver(
             forName: SystemStyle.changed, object: nil, queue: .main
@@ -55,9 +62,9 @@ final class ThemeStore: ObservableObject {
         let (loaded, problems) = ThemeLoader.load(paths: paths, named: name)
         if loaded != theme { theme = loaded }
         if problems != issues { issues = problems }
-        // The keys Iceberg's Theme does not hold: the panel's own colours and the icon's.
-        let file = paths.themeFile(named: name)
-        let fields = (try? String(contentsOf: file, encoding: .utf8)).map(ThemeLoader.fields) ?? [:]
+        // The keys Iceberg's Theme does not hold: the panel's own colours and
+        // the icon's, with what the theme inherits through EXTENDS.
+        let fields = ThemeLoader.resolvedFields(paths: paths, named: name)
         let palette = NotchPalette(fields: fields, theme: loaded)
         if palette != notch { notch = palette }
         // Without a file (a built-in theme) the icon keeps the bundled colours.

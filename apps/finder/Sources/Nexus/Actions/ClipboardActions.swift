@@ -25,10 +25,7 @@ extension BrowserModel {
             pasteboard: FilePasteboard.read(board), changeCount: board.changeCount, forceMove: forceMove
         ) else { return }
         services.clipboard.didPaste(plan)
-        runOperation(plan.moves ? "The items could not be moved." : "The items could not be copied.") { operations in
-            if plan.moves { return try await operations.move(plan.items, to: folder) }
-            return try await operations.copy(plan.items, to: folder)
-        }
+        transfer(plan.items, to: folder, moving: plan.moves, select: focused)
     }
 
     func copyPath() {

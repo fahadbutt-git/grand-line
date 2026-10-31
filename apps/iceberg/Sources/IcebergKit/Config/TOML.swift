@@ -19,6 +19,17 @@ public enum TOMLValue: Equatable, Sendable {
     }
 }
 
+/// A parsed file: its values, and the line each key is on.
+public struct TOMLDocument: Equatable, Sendable {
+    public var values: [String: TOMLValue]
+    public var lines: [String: Int]
+
+    public init(values: [String: TOMLValue], lines: [String: Int] = [:]) {
+        self.values = values
+        self.lines = lines
+    }
+}
+
 public struct TOMLError: Error, Equatable, Sendable, CustomStringConvertible {
     public var line: Int
     public var message: String
@@ -32,8 +43,15 @@ public struct TOMLError: Error, Equatable, Sendable, CustomStringConvertible {
 /// tables are reported as unsupported rather than misread.
 public enum TOML {
     public static func parse(_ text: String) throws -> [String: TOMLValue] {
+        try parseDocument(text).values
+    }
+
+    /// The values and the line each key was written on, for messages that
+    /// name the line to fix.
+    public static func parseDocument(_ text: String) throws -> TOMLDocument {
         var parser = Parser(text)
-        return try parser.document()
+        let values = try parser.document()
+        return TOMLDocument(values: values, lines: parser.keyLines)
     }
 
     private struct Parser {
@@ -41,6 +59,8 @@ public enum TOML {
         var index = 0
         var line = 1
         var depth = 0
+        /// The line of each key, by its full dotted name.
+        var keyLines: [String: Int] = [:]
         /// Lists nested deeper than this are refused, so a hostile file
         /// cannot exhaust the stack.
         static let maxDepth = 32
@@ -116,6 +136,7 @@ public enum TOML {
                         throw TOMLError(line: keyLine, message: "the key \"\(full)\" appears twice")
                     }
                     result[full] = value
+                    keyLines[full] = keyLine
                 }
             }
             return result

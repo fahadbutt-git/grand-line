@@ -37,7 +37,9 @@ final class ThemeTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(files.count, 2, Self.repoThemes.path)
         for file in files {
             let name = file.deletingPathExtension().lastPathComponent
-            let theme = Theme(name: name, values: try XCTUnwrap(ThemeFile.read(file)))
+            // Read as the apps read it: EXTENDS followed, checked, defaults filled.
+            let theme = Theme(name: name, source: try XCTUnwrap(ThemeSource.resolve(url: file)))
+            XCTAssertEqual(theme.issues.filter { $0.severity == .error }, [], name)
             for (role, color) in [("text", theme.text), ("dim", theme.dim)] {
                 XCTAssertGreaterThanOrEqual(color.contrast(with: theme.background), 4.5, "\(name) \(role) on background")
                 XCTAssertGreaterThanOrEqual(color.contrast(with: theme.panel), 4.5, "\(name) \(role) on panel")
@@ -52,6 +54,8 @@ final class ThemeTests: XCTestCase {
             let file = Self.repoThemes.appendingPathComponent(name + ".theme")
             let fromFile = Theme(name: name, values: try XCTUnwrap(ThemeFile.read(file)))
             XCTAssertEqual(BuiltInThemes.named(name), fromFile, name)
+            let checked = Theme(name: name, source: try XCTUnwrap(ThemeSource.resolve(url: file)))
+            XCTAssertEqual(BuiltInThemes.named(name), checked, "\(name), read through the checker")
         }
         XCTAssertNil(BuiltInThemes.named("nord"))
     }

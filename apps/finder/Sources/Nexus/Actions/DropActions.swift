@@ -11,21 +11,7 @@ extension BrowserModel {
         guard !sources.isEmpty else { return }
         let moves = !forceCopy && GoogleDrive.dragOperation(from: sources, to: folder, home: services.paths.home) == .move
         let pane = panes.first { $0.location.folderURL?.standardizedFileURL == folder.standardizedFileURL }
-        let operations = services.operations
-        Task { [weak self] in
-            do {
-                let made: [URL]
-                if moves {
-                    made = try await operations.move(sources, to: folder)
-                } else {
-                    made = try await operations.copy(sources, to: folder)
-                }
-                pane?.go(.folder(folder), select: made)
-            } catch {
-                Prompt.problem(moves ? "The items could not be moved." : "The items could not be copied.", error)
-            }
-            self?.services.refreshUndo()
-        }
+        transfer(sources, to: folder, moving: moves, select: pane)
     }
 }
 

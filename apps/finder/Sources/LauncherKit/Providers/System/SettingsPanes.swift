@@ -79,7 +79,7 @@ public enum SettingsPanes {
     }
 
     public static func provider() -> CatalogProvider {
-        let provider = CatalogProvider(id: "settings", title: "System Settings", symbol: "gear", globalLimit: 10)
+        let provider = CatalogProvider(id: "settings", title: "System Settings", symbol: "gear", extraPrefixes: [.settings], globalLimit: 10)
         provider.replace(results())
         return provider
     }

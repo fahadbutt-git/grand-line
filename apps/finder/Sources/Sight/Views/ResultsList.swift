@@ -42,12 +42,13 @@ struct ResultsList: View {
 
 /// Settings rows are one accessibility element each, named by their stable id
 /// ("setting.darkmode") with the state as the value ("On", "Working", "Failed"),
-/// so the journey tests can find a row, press it and read what it did.
+/// so the journey tests can find a row, press it and read what it did. The
+/// rows offered when nothing matches ("fallback:create-file") are named the same way.
 struct SettingRowAccessibility: ViewModifier {
     let row: LaunchResult
 
     @ViewBuilder func body(content: Content) -> some View {
-        if row.providerID == SettingsActionsProvider.providerID {
+        if row.providerID == SettingsActionsProvider.providerID || row.providerID == FallbackCommandsProvider.providerID {
             content
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier(row.id)

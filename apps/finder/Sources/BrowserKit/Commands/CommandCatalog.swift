@@ -4,6 +4,8 @@ import Foundation
 /// shortcut keeps its Finder meaning; Nexus only adds keys Finder leaves
 /// free. Return opens as well as Cmd+O and F2 renames (R4), Cmd+Shift+G opens
 /// the editable path bar with fuzzy folder search (Finder's Go to Folder, R5),
+/// Option+Cmd+G opens the same field as a filter on the folder (the omnibar),
+/// Control+Option+Cmd+F shows the folder flat,
 /// and Nexus's own tools sit on Control+Option (Ghostty, Claude Code and
 /// transcoding, R31, R33), which Finder does not use.
 public enum CommandCatalog {
@@ -104,6 +106,11 @@ public enum CommandCatalog {
         item(.groupNone, "None", [cmd("0", .control)], .view, group: true, submenu: "Group By"),
         item(.groupKind, "Kind", [cmd("2", .control)], .view, submenu: "Group By"),
         item(.keepFoldersOnTop, "Keep Folders on Top", [cmd("9", [.control, .option])], .view),
+        // Finder has no flat view. Shift+Cmd+F is Finder's Recents and
+        // Control+Cmd+F is Enter Full Screen, so it takes Control+Option+Cmd+F.
+        item(.toggleFlatView, "Show Contents of Subfolders", [cmd("f", [.control, .option])], .view),
+        // The path bar's field as a filter: Go to Folder's own key with Option.
+        item(.filterFolder, "Filter This Folder…", [cmd("g", .option)], .view),
         item(.showViewOptions, "Show View Options", [cmd("j")], .view, group: true),
         item(.rememberView, "Remember View for This Folder", [cmd("j", .control)], .view),
         item(.useAsDefaultView, "Use as Default View", [cmd("j", .option)], .view),
@@ -116,7 +123,7 @@ public enum CommandCatalog {
         item(.togglePathBar, "Show Path Bar", [cmd("p", .option)], .view),
         item(.biggerIcons, "Bigger Icons", [cmd("=")], .view, group: true),
         item(.smallerIcons, "Smaller Icons", [cmd("-")], .view),
-        item(.showTransfers, "Show Transfers", [cmd("j", .shift)], .view),
+        item(.showTransfers, "Show Tasks", [cmd("j", .shift)], .view),
     ]
 
     static let go: [CommandSpec] = [

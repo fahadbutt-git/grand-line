@@ -1,0 +1,79 @@
+#!/bin/bash
+# grandline:summary=Drive the notch panel: run a widget now, open or close the panel, reload its files
+# iceberg trigger NAME...   runs widgets that have signal = true (by file name, without .toml);
+#                           a stream widget starts its script again
+# iceberg toggle | open | close | reload | settings
+# iceberg schema            prints where iceberg.schema.json is, for editors
+# A trigger reaches a running Iceberg as a distributed notification, so the
+# panel is not opened or brought forward; when Iceberg is not running it is
+# started with iceberg://trigger/NAME. While the panel is closed the widget
+# runs as it next opens (or at once, with updates = "always").
+# Exit status: 0 done, 2 usage, 1 Iceberg could not be reached.
+source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
+
+NOTIFICATION="com.grandline.iceberg.trigger"
+
+usage() {
+  echo "usage: iceberg trigger NAME... | toggle | open | close | reload | settings | schema" >&2
+  exit 2
+}
+
+# A widget's name as Iceberg uses it: the file name without .toml or .json,
+# lower case, spaces as dashes.
+widget_id() {
+  local name="${1##*/}"
+  name="${name%.toml}"
+  name="${name%.json}"
+  printf '%s' "$name" | tr '[:upper:]' '[:lower:]' | tr ' ' '-'
+}
+
+iceberg_running() {
+  pgrep -xq Iceberg 2>/dev/null
+}
+
+# Posts the trigger as a distributed notification, delivered at once.
+post_trigger() {
+  osascript -l JavaScript - "$NOTIFICATION" "$1" <<'EOF' >/dev/null 2>&1
+ObjC.import('Foundation');
+function run(argv) {
+  $.NSDistributedNotificationCenter.defaultCenter
+    .postNotificationNameObjectUserInfoDeliverImmediately(argv[0], argv[1], $.NSDictionary.dictionary, true);
+}
+EOF
+}
+
+open_url() {
+  open -g "iceberg://$1" 2>/dev/null || { echo "Iceberg could not be reached (is it installed?)" >&2; exit 1; }
+}
+
+case "${1:-}" in
+  trigger)
+    shift
+    [[ $# -gt 0 ]] || usage
+    for name in "$@"; do
+      id="$(widget_id "$name")"
+      [[ "$id" =~ ^[a-z0-9._-]+$ ]] || { echo "iceberg: \"$name\" is not a widget name (letters, digits, . _ -)" >&2; exit 2; }
+      if iceberg_running && post_trigger "$id"; then
+        continue
+      fi
+      open_url "trigger/$id"
+    done
+    ;;
+  toggle|open|close|reload|settings)
+    open_url "$1"
+    ;;
+  schema)
+    for f in "$GRAND_LINE_LINK/apps/iceberg/Resources/Iceberg/iceberg.schema.json" \
+             "/Applications/Iceberg.app/Contents/Resources/iceberg.schema.json"; do
+      [[ -f "$f" ]] && { printf '%s\n' "$f"; exit 0; }
+    done
+    echo "iceberg.schema.json was not found" >&2
+    exit 1
+    ;;
+  -h|--help|help)
+    sed -n '3,10p' "$0" | sed 's/^# \{0,1\}//'
+    ;;
+  *)
+    usage
+    ;;
+esac

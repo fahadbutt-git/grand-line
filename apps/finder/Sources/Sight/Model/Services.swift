@@ -26,6 +26,12 @@ final class Services {
     let aliases = AliasProvider()
     let processes = ProcessProvider()
     let saved = SavedSearchProvider()
+    /// "selection": actions on what is selected in Nexus or Finder.
+    let selection = SelectionProvider()
+    /// `:` Maccy's history, read only.
+    let clipboardHistory = ClipboardHistoryProvider()
+    /// Executables in ~/.config/grand-line/sight/scripts that print rows.
+    let scripts = ScriptCommandsProvider()
 
     private(set) var engine: SearchEngine
     /// Sources, result counts and web engines from Settings.
@@ -75,6 +81,9 @@ final class Services {
             unreadable: { await names.unreadable() }
         )
         let sources = preferences.sources
+        // Keyword providers and script commands, for the `/` list.
+        var keywords: [(keyword: String, title: String)] = external.map { (keyword: $0.config.keyword, title: $0.config.title) }
+        keywords += scripts.providers.map { (keyword: $0.script.name, title: "Script: " + $0.script.name) }
         var providers: [any LaunchProvider] = [
             RecentsProvider(usage: usage),
             CalculatorProvider(rates: rates, arithmetic: sources.isEnabled(.calculator), conversions: sources.isEnabled(.units)),
@@ -83,13 +92,16 @@ final class Services {
             DefineProvider(lookup: { DictionaryLookup.define($0) }),
             snippets, symbols, bookmarks, web, files, saved,
             WindowsProvider(), PathProvider(),
-            ReminderProvider(paths: paths), ShellProvider(paths: paths), ClipboardProvider(),
-            PrefixListProvider(keywords: external.map { (keyword: $0.config.keyword, title: $0.config.title) }),
+            ReminderProvider(paths: paths), ShellProvider(paths: paths), ClipboardProvider(), clipboardHistory,
+            selection, scripts,
+            PrefixListProvider(keywords: keywords),
             FallbackProvider(fallbacks: preferences.fallbacks),
+            FallbackCommandsProvider(paths: paths),
         ]
         // Sources turned off in Settings, Sources.
         providers = providers.filter { sources.runs(providerID: $0.id) }
         providers += external.map { $0 as any LaunchProvider }
+        providers += scripts.providers.map { $0 as any LaunchProvider }
         return SearchEngine(providers: providers, ranker: Ranker(usage: usage, aliases: aliases.aliases))
     }
 
@@ -100,16 +112,20 @@ final class Services {
         let catalogs = [apps, keybindings, snippets, bookmarks]
         let symbols = self.symbols
         let commands = self.commands, web = self.web, saved = self.saved, menu = self.menu, paths = self.paths
+        let scripts = self.scripts
         Task.detached(priority: .utility) {
             for catalog in catalogs { catalog.reload() }
             if symbols.catalog.count == 0 { symbols.reload() }
             commands.reload()
+            let before = scripts.providers.map(\.script)
+            scripts.reload()
+            let scriptsChanged = scripts.providers.map(\.script) != before
             web.reload()
             saved.reload()
             await menu.reload()
             let table = AliasTable.parse((try? String(contentsOfFile: paths.aliases, encoding: .utf8)) ?? "")
             let configs = ExternalProviderConfig.parse((try? String(contentsOfFile: paths.externalProviders, encoding: .utf8)) ?? "")
-            await MainActor.run { self.apply(aliases: table, external: configs) }
+            await MainActor.run { self.apply(aliases: table, external: configs, scriptsChanged: scriptsChanged) }
         }
         let rates = self.rates
         Task.detached(priority: .utility) {
@@ -117,8 +133,8 @@ final class Services {
         }
     }
 
-    private func apply(aliases table: AliasTable, external configs: [ExternalProviderConfig]) {
-        let changed = table != aliases.aliases || configs != external.map(\.config)
+    private func apply(aliases table: AliasTable, external configs: [ExternalProviderConfig], scriptsChanged: Bool) {
+        let changed = scriptsChanged || table != aliases.aliases || configs != external.map(\.config)
         aliases.set(table)
         external = configs.map { ExternalProvider($0) }
         if changed { engine = makeEngine() }
@@ -127,14 +143,38 @@ final class Services {
     /// What the window needs fresh each time it opens: the running apps, the
     /// front app's menus and the menu's ticks.
     func windowWillOpen(frontApp: NSRunningApplication?) {
+        names.warm()
         processes.set(RunningApps.list())
         reloadSources()
+        readSelection(frontApp: frontApp)
+        let history = clipboardHistory
+        Task.detached(priority: .utility) { history.reload() }
         let menuItems = self.menuItems
         guard let frontApp, frontApp.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
         let pid = frontApp.processIdentifier
         let name = frontApp.localizedName ?? "App"
         Task.detached(priority: .userInitiated) {
             menuItems.replace(MenuBarReader.results(pid: pid, app: name))
+        }
+    }
+
+    /// What "selection" acts on, read as lib/bin-common.sh's finder_selection
+    /// does: Nexus's state file when Nexus was in front, else Finder's
+    /// selection through AppleScript (in the background; it may ask for
+    /// Automation the first time).
+    private func readSelection(frontApp: NSRunningApplication?) {
+        let selection = self.selection
+        switch frontApp?.bundleIdentifier {
+        case ActionPerformer.nexus:
+            selection.set(SelectionProvider.readNexus(paths.nexusSelection), from: "Nexus")
+        case "com.apple.finder":
+            selection.set([], from: "Finder")
+            Task.detached(priority: .userInitiated) {
+                let output = try? await ShellRunner().run("/usr/bin/osascript", ["-e", SelectionProvider.finderScript], timeout: 3)
+                selection.set(SelectionProvider.parse(output?.stdout ?? ""), from: "Finder")
+            }
+        default:
+            selection.set([], from: "")
         }
     }
 }

@@ -40,7 +40,7 @@ struct PreviewPane: View {
         guard let entry = item.archiveEntry, !item.isFolder, case .archive(let archive, _) = location else {
             return item.isInArchive ? nil : item.url
         }
-        return await Task.detached { try? Archive.preview(entry, from: archive) }.value
+        return await Task.detached { try? Archive.preview(entry, from: archive, in: Archive.TemporaryFolder.pane) }.value
     }
 }
 

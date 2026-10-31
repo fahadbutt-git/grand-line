@@ -129,7 +129,7 @@ final class MediaAdapter {
         guard !stopped else { return }
         quickExits = seconds < 10 ? quickExits + 1 : 0
         if quickExits >= 3 {
-            Log.info("Now Playing adapter keeps exiting; using the Spotify and Music notices instead")
+            Log.info("Now Playing adapter keeps exiting")
             let giveUp = onGiveUp
             MainActor.assumeIsolated { giveUp() }
             return

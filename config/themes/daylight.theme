@@ -1,4 +1,5 @@
 # Daylight, Apple's neutral light appearance (as in Finder). Every app that has colours takes them from this file.
+FORMAT=1
 LABEL="Daylight"
 MODE=light
 ACCENT=4

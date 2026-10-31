@@ -87,4 +87,11 @@ final class Once<Value>: @unchecked Sendable {
         lock.unlock()
         pending?.resume(returning: value)
     }
+
+    /// Whether it has already been resumed.
+    var isDone: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return continuation == nil
+    }
 }

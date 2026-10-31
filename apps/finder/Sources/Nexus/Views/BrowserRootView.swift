@@ -44,6 +44,10 @@ struct BrowserRootView: View {
             .background(palette.background)
         }
         .background(palette.panel)
+        .sheet(isPresented: Binding(get: { !model.batchRenameItems.isEmpty },
+                                    set: { if !$0 { model.batchRenameItems = [] } })) {
+            BatchRenameSheet(model: model, items: model.batchRenameItems, palette: palette)
+        }
         .environment(\.colorScheme, theme.theme.isDark ? .dark : .light)
         .ignoresSafeArea()
     }

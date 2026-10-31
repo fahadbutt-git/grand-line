@@ -73,17 +73,53 @@ public struct ConfigIssue: Equatable, Sendable, CustomStringConvertible {
     public var line: Int?
     public var message: String
     public var severity: Severity
+    /// What to change, in plain words, for the Problems list.
+    public var fix: String?
 
-    public init(file: String, line: Int? = nil, message: String, severity: Severity = .error) {
+    public init(file: String, line: Int? = nil, message: String, severity: Severity = .error, fix: String? = nil) {
         self.file = file
         self.line = line
         self.message = message
         self.severity = severity
+        self.fix = fix
     }
 
     public var description: String {
         let place = line.map { "\(file), line \($0)" } ?? file
         return "\(place): \(message)"
+    }
+
+    /// `file:line`, as editors and the Problems list show it.
+    public var location: String {
+        line.map { "\(file):\($0)" } ?? file
+    }
+}
+
+/// When a widget's command may run.
+public enum WidgetUpdates: String, Equatable, Sendable {
+    /// Only while the panel is open, plus one refresh as it opens (the default).
+    case whenShown = "when_shown"
+    /// Also while the panel is closed, so the value is current when it opens.
+    case always
+}
+
+/// How a widget gets its output.
+public enum WidgetMode: Equatable, Sendable, CustomStringConvertible {
+    /// Runs on its `refresh` schedule and shows the output.
+    case poll(RefreshPolicy)
+    /// Runs when `iceberg trigger NAME` is called, and as the panel opens
+    /// (or on its `refresh` schedule when one is set).
+    case signal(RefreshPolicy)
+    /// Keeps running; every line it prints is an update.
+    case stream
+
+    public var description: String {
+        switch self {
+        case .poll(let p): return "runs \(p.description)"
+        case .signal(.onOpen): return "runs on a signal and on open"
+        case .signal(let p): return "runs on a signal and \(p.description)"
+        case .stream: return "streams"
+        }
     }
 }
 
@@ -98,6 +134,13 @@ public struct WidgetConfig: Equatable, Sendable, Identifiable {
     public var timeout: TimeInterval
     public var order: Int
     public var enabled: Bool
+    /// Runs when `iceberg trigger NAME` (or `iceberg://trigger/NAME`) asks.
+    public var signal: Bool
+    /// A long-running command that prints one line (often JSON) per update.
+    public var stream: Bool
+    public var updates: WidgetUpdates
+    /// Runs during Low Power Mode and around sleep too.
+    public var always: Bool
     /// The file it came from, for messages and as the command's working folder.
     public var file: URL?
 
@@ -108,7 +151,8 @@ public struct WidgetConfig: Equatable, Sendable, Identifiable {
     public init(id: String, title: String, icon: String = WidgetConfig.defaultIcon, command: String,
                 refresh: RefreshPolicy = .onOpen, click: String? = nil,
                 timeout: TimeInterval = WidgetConfig.defaultTimeout, order: Int = 0,
-                enabled: Bool = true, file: URL? = nil) {
+                enabled: Bool = true, signal: Bool = false, stream: Bool = false,
+                updates: WidgetUpdates = .whenShown, always: Bool = false, file: URL? = nil) {
         self.id = id
         self.title = title
         self.icon = icon
@@ -118,12 +162,20 @@ public struct WidgetConfig: Equatable, Sendable, Identifiable {
         self.timeout = timeout
         self.order = order
         self.enabled = enabled
+        self.signal = signal
+        self.stream = stream
+        self.updates = updates
+        self.always = always
         self.file = file
     }
 
-    static let knownKeys = ["title", "icon", "command", "refresh", "click", "timeout", "order", "enabled"]
-    static let aliases = ["symbol": "icon", "sf_symbol": "icon", "on_click": "click", "click_command": "click",
-                          "interval": "refresh", "update_freq": "refresh", "script": "command"]
+    public var mode: WidgetMode {
+        if stream { return .stream }
+        return signal ? .signal(refresh) : .poll(refresh)
+    }
+
+    /// True when it may run while the panel is closed.
+    public var runsWhileClosed: Bool { updates == .always }
 
     /// The widget's id: the file name without its extension, lower case, with
     /// spaces turned into dashes.
@@ -135,32 +187,52 @@ public struct WidgetConfig: Equatable, Sendable, Identifiable {
     /// Parses one file's contents. Never throws: everything wrong is in the issues.
     public static func parse(_ data: Data, fileName: String, file: URL? = nil) -> (WidgetConfig?, [ConfigIssue]) {
         guard let text = String(data: data, encoding: .utf8) else {
-            return (nil, [ConfigIssue(file: fileName, message: "the file is not UTF-8 text")])
+            return (nil, [ConfigIssue(file: fileName, message: "the file is not UTF-8 text",
+                                      fix: "Save the file as UTF-8 text (any plain-text editor does).")])
         }
         let ext = (fileName as NSString).pathExtension.lowercased()
         var table: [String: TOMLValue]
+        var lines: [String: Int] = [:]
         if ext == "json" {
             do {
                 guard case .object(let object) = try JSONValue.parse(data) else {
-                    return (nil, [ConfigIssue(file: fileName, message: "the file must hold one JSON object { ... }")])
+                    return (nil, [ConfigIssue(file: fileName, message: "the file must hold one JSON object { ... }",
+                                              fix: "Put the keys inside one pair of braces: { \"command\": \"date\" }")])
                 }
                 table = [:]
                 for (key, value) in object {
                     if let v = value.tomlValue { table[key] = v }
                 }
+                lines = JSONKeyLines.lines(in: text)
             } catch {
-                return (nil, [ConfigIssue(file: fileName, message: "not valid JSON (\(jsonErrorSummary(error)))")])
+                return (nil, [ConfigIssue(file: fileName, message: "not valid JSON (\(jsonErrorSummary(error)))",
+                                          fix: "Check the quotes, commas and braces; a JSON checker names the exact spot.")])
             }
         } else {
             do {
-                table = try TOML.parse(text)
+                let document = try TOML.parseDocument(text)
+                table = document.values
+                lines = document.lines
             } catch let error as TOMLError {
-                return (nil, [ConfigIssue(file: fileName, line: error.line, message: error.message)])
+                return (nil, [ConfigIssue(file: fileName, line: error.line, message: error.message,
+                                          fix: syntaxFix(for: error))])
             } catch {
                 return (nil, [ConfigIssue(file: fileName, message: "\(error)")])
             }
         }
-        return validate(table, fileName: fileName, file: file)
+        return validate(table, lines: lines, fileName: fileName, file: file)
+    }
+
+    /// A plain fix for a TOML syntax error.
+    public static func syntaxFix(for error: TOMLError) -> String {
+        let m = error.message
+        if m.contains("needs quotes") || m.contains("not closed with \"") || m.contains("not closed with '") {
+            return "Put text in double quotes on one line, like: title = \"Disk\""
+        }
+        if m.contains("appears twice") { return "Keep one of the two lines." }
+        if m.contains("list") { return "Close the list with ] and put commas between its items." }
+        if m.contains("expected \"=\"") { return "Write one key = value per line." }
+        return "Each line is key = value, with text in double quotes; see the README for examples."
     }
 
     static func jsonErrorSummary(_ error: Error) -> String {
@@ -172,45 +244,44 @@ public struct WidgetConfig: Equatable, Sendable, Identifiable {
         return "unreadable"
     }
 
-    static func validate(_ raw: [String: TOMLValue], fileName: String, file: URL?) -> (WidgetConfig?, [ConfigIssue]) {
-        var issues: [ConfigIssue] = []
-        func warn(_ m: String) { issues.append(ConfigIssue(file: fileName, message: m, severity: .warning)) }
-        func error(_ m: String) { issues.append(ConfigIssue(file: fileName, message: m, severity: .error)) }
-
-        var table: [String: TOMLValue] = [:]
-        for key in raw.keys.sorted() {
-            let value = raw[key]!
-            let name = aliases[key] ?? key
-            if knownKeys.contains(name) {
-                if table[name] != nil { warn("\"\(key)\" repeats \"\(name)\"; the first one is used"); continue }
-                table[name] = value
-            } else if let guess = closest(to: key, in: knownKeys) {
-                warn("unknown key \"\(key)\" (did you mean \"\(guess)\"?)")
-            } else {
-                warn("unknown key \"\(key)\" is ignored")
-            }
+    static func validate(_ raw: [String: TOMLValue], lines rawLines: [String: Int] = [:], fileName: String, file: URL?) -> (WidgetConfig?, [ConfigIssue]) {
+        let checked = ConfigSchema.widget.check(raw, lines: rawLines, fileName: fileName)
+        var issues = checked.issues
+        let table = checked.values
+        let lines = checked.lines
+        func warn(_ key: String, _ m: String, fix: String? = nil) {
+            issues.append(ConfigIssue(file: fileName, line: lines[key], message: m, severity: .warning, fix: fix))
         }
-
+        func error(_ key: String, _ m: String, fix: String? = nil) {
+            issues.append(ConfigIssue(file: fileName, line: lines[key], message: m, severity: .error, fix: fix))
+        }
         func text(_ key: String) -> String? {
-            guard let v = table[key] else { return nil }
-            guard case .string(let s) = v else { error("\"\(key)\" must be text in quotes, not \(v.kindName)"); return nil }
-            return s
+            if case .string(let s)? = table[key] { return s }
+            return nil
+        }
+        func flag(_ key: String) -> Bool? {
+            if case .bool(let b)? = table[key] { return b }
+            return nil
         }
 
         let id = Self.id(forFileName: fileName)
         let command = text("command")?.trimmingCharacters(in: .whitespacesAndNewlines)
-        if table["command"] == nil { error("\"command\" is missing: the shell command whose output is shown") }
-        else if command?.isEmpty == true { error("\"command\" is empty") }
+        if command?.isEmpty == true {
+            error("command", "\"command\" is empty", fix: "Write the shell command to run, like: command = \"date +%H:%M\"")
+        }
 
         var title = text("title")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if title.isEmpty {
-            if table["title"] == nil { warn("\"title\" is missing; using \"\(id)\"") }
+            if raw.keys.contains(where: { ConfigSchema.widget.key(named: $0)?.name == "title" }) == false {
+                warn("title", "\"title\" is missing; using \"\(id)\"", fix: "Add a line like: title = \"\(id.capitalized)\"")
+            }
             title = id
         }
 
         var icon = text("icon")?.trimmingCharacters(in: .whitespaces) ?? defaultIcon
         if icon.isEmpty || !icon.allSatisfy({ $0.isASCII && ($0.isLowercase || $0.isNumber || $0 == ".") }) {
-            warn("\"\(icon)\" is not an SF Symbol name (like \"cloud.sun\"); using \"\(defaultIcon)\"")
+            warn("icon", "\"\(icon)\" is not an SF Symbol name (like \"cloud.sun\"); using \"\(defaultIcon)\"",
+                 fix: "Use a name from the SF Symbols app, in lower case with dots, like icon = \"cloud.sun\"")
             icon = defaultIcon
         }
 
@@ -218,9 +289,13 @@ public struct WidgetConfig: Equatable, Sendable, Identifiable {
         if let v = table["refresh"] {
             if let parsed = RefreshPolicy.parse(v) {
                 refresh = parsed.0
-                if parsed.clamped { warn("refresh is raised to \(Int(RefreshPolicy.minimumInterval)) seconds, the shortest allowed") }
+                if parsed.clamped {
+                    warn("refresh", "refresh is raised to \(Int(RefreshPolicy.minimumInterval)) seconds, the shortest allowed",
+                         fix: "Use refresh = \(Int(RefreshPolicy.minimumInterval)) or more, or signal = true to run only when asked.")
+                }
             } else {
-                warn("refresh must be seconds (300), a duration (\"5m\") or \"on open\"; using \"on open\"")
+                warn("refresh", "refresh must be seconds (300), a duration (\"5m\") or \"on open\"; using \"on open\"",
+                     fix: "Write it like refresh = \"5m\" or refresh = \"on open\".")
             }
         }
 
@@ -228,35 +303,41 @@ public struct WidgetConfig: Equatable, Sendable, Identifiable {
         let click = (clickText?.isEmpty ?? true) ? nil : clickText
 
         var timeout = defaultTimeout
-        if let v = table["timeout"] {
-            let seconds: Double?
-            switch v {
-            case .integer(let n): seconds = Double(n)
-            case .float(let d): seconds = d
-            case .string(let s): seconds = RefreshPolicy.parseDuration(s.lowercased())
-            default: seconds = nil
-            }
-            if let s = seconds, s.isFinite {
-                timeout = min(max(s, timeoutRange.lowerBound), timeoutRange.upperBound)
-                if timeout != s { warn("timeout is kept between 1 and 120 seconds; using \(Int(timeout))") }
-            } else {
-                warn("timeout must be a number of seconds; using \(Int(defaultTimeout))")
-            }
+        switch table["timeout"] {
+        case .integer(let n)?: timeout = Double(n)
+        case .float(let d)?: timeout = d
+        default: break
         }
 
         var order = 0
-        if let v = table["order"] {
-            if case .integer(let n) = v { order = n } else { warn("order must be a whole number") }
-        }
+        if case .integer(let n)? = table["order"] { order = n }
+        let enabled = flag("enabled") ?? true
+        var signal = flag("signal") ?? false
+        let stream = flag("stream") ?? false
+        let always = flag("always") ?? false
+        let updates = text("updates").flatMap(WidgetUpdates.init(rawValue:)) ?? .whenShown
 
-        var enabled = true
-        if let v = table["enabled"] {
-            if case .bool(let b) = v { enabled = b } else { warn("enabled must be true or false") }
+        if stream {
+            if signal {
+                warn("signal", "signal is ignored: a stream widget updates itself; `iceberg trigger` restarts it",
+                     fix: "Remove signal = true, or remove stream = true to run the command once per signal.")
+                signal = false
+            }
+            if table["refresh"] != nil {
+                warn("refresh", "refresh is ignored for a stream widget, which prints a line whenever it has news",
+                     fix: "Remove the refresh line, or remove stream = true to run the command on a schedule.")
+                refresh = .onOpen
+            }
+            if table["timeout"] != nil {
+                warn("timeout", "timeout does not apply to a stream widget, which keeps running",
+                     fix: "Remove the timeout line.")
+            }
         }
 
         if issues.contains(where: { $0.severity == .error }) { return (nil, issues) }
         let config = WidgetConfig(id: id, title: title, icon: icon, command: command ?? "", refresh: refresh,
-                                  click: click, timeout: timeout, order: order, enabled: enabled, file: file)
+                                  click: click, timeout: timeout, order: order, enabled: enabled,
+                                  signal: signal, stream: stream, updates: updates, always: always, file: file)
         return (config, issues)
     }
 

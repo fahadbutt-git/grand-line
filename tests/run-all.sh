@@ -124,33 +124,36 @@ check "every native helper has a matching source file" bash -c '
   done
   exit $bad'
 
-check "every theme has its background and all fields" bash -c '
+# A theme's keys are read through the checker (lib/templates.sh), so a light
+# variant that EXTENDS its dark sibling is checked with what it inherits.
+check "theme check: every shipped theme passes the format 1 checker" bin/theme check
+
+check "every theme has its own FORMAT=1, its background and all fields" bash -c '
+  source lib/templates.sh
   bad=0
   for t in config/themes/*.theme; do
+    grep -qx "FORMAT=1" "$t" || { echo "$t: no FORMAT=1 line of its own"; bad=1; }
+    r="$(theme_resolve "$t" 2>/dev/null)" || { echo "$t: does not resolve"; bad=1; continue; }
+    get() { printf "%s\n" "$r" | sed -n "s/^$1=//p" | tr -d \"; }
     for k in LABEL MODE ACCENT ACCENT_HEX BACKGROUND TERM_BG TERM_FG TERM_CURSOR TERM_SELECTION MUTED BG_LIGHTER BG_DARKER PALETTE HIGHLIGHT NVIM \
              ICON_STYLE KIND_STYLE KIND_FOLDER KIND_DOCUMENT KIND_PDF KIND_PRESENTATION KIND_SPREADSHEET KIND_IMAGE KIND_VIDEO KIND_CODE KIND_ARCHIVE KIND_TEXT; do
-      grep -q "^$k=" "$t" || { echo "$t: no $k"; bad=1; }
+      printf "%s\n" "$r" | grep -q "^$k=" || { echo "$t: no $k"; bad=1; }
     done
-    grep -qE "^ICON_STYLE=(line|solid|mono)$" "$t" || { echo "$t: ICON_STYLE must be line, solid or mono"; bad=1; }
-    grep -qE "^KIND_STYLE=(tag|dot|solid|text)$" "$t" || { echo "$t: KIND_STYLE must be tag, dot, solid or text"; bad=1; }
-    for k in $(grep -oE "^(TERM_[A-Z]+|ACCENT_HEX|MUTED|BG_[A-Z]+|HIGHLIGHT|SIDEBAR|FIELD|LINE|NOTCH_[A-Z]+|ICON_(TILE|INK|ACCENT|SOFT|FILES|SEARCH|NOTCH)|KIND_[A-Z]+)=" "$t" | tr -d =); do
-      [[ "$k" == KIND_STYLE ]] && continue
-      grep -qE "^$k=[0-9a-fA-F]{6}$" "$t" || { echo "$t: $k is not a six-digit hex colour"; bad=1; }
-    done
-    fam=$(sed -n "s/^FAMILY=//p" "$t")
+    # The app icon reader (tools/make-icons.py) reads the file itself, so the style stays in every file.
+    grep -qE "^ICON_STYLE=(line|solid|mono)$" "$t" || { echo "$t: ICON_STYLE must be in the file itself"; bad=1; }
+    fam=$(get FAMILY)
     if [[ -n "$fam" ]]; then
       [[ "${t##*/}" == "$fam-dark.theme" || "${t##*/}" == "$fam-light.theme" ]] || { echo "$t: FAMILY=$fam needs the file named $fam-dark or $fam-light"; bad=1; }
       [[ -f "config/themes/$fam-dark.theme" && -f "config/themes/$fam-light.theme" ]] || { echo "$t: family $fam needs both a dark and a light file"; bad=1; }
     fi
-    [[ "$(sed -n "s/^PALETTE=//p" "$t" | tr -d \" | wc -w | tr -d " ")" == 16 ]] || { echo "$t: PALETTE needs 16 colours"; bad=1; }
-    nv=$(sed -n "s/^NVIM=//p" "$t")
+    nv=$(get NVIM)
     grep -q "\"$nv\"" config/nvim/lua/plugins/theme.lua || { echo "$t: Neovim scheme $nv missing from config/nvim/lua/plugins/theme.lua"; bad=1; }
-    bg=$(sed -n "s/^BACKGROUND=//p" "$t")
+    bg=$(get BACKGROUND)
     [[ -f "backgrounds/$bg" ]] || { echo "$t: backgrounds/$bg missing"; bad=1; }
   done; exit $bad'
 
 check "light themes: every terminal colour reads at 4.5:1 on the background" python3 -c '
-import glob, re, sys
+import glob, subprocess, sys
 def lum(h):
     c = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
     c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
@@ -158,9 +161,13 @@ def lum(h):
 def ratio(a, b):
     hi, lo = sorted((lum(a), lum(b)), reverse=True)
     return (hi + 0.05) / (lo + 0.05)
+def resolved(path):
+    out = subprocess.run(["bash", "-c", "source lib/templates.sh && theme_resolve \"$1\"", "_", path],
+                         capture_output=True, text=True, check=True).stdout
+    return {k: v.strip("\"") for k, v in (line.split("=", 1) for line in out.splitlines() if "=" in line)}
 bad = 0
 for path in sorted(glob.glob("config/themes/*.theme")):
-    t = dict(re.findall(r"^([A-Z_0-9]+)=\"?([^\"\n]*)\"?", open(path).read(), re.M))
+    t = resolved(path)
     bg = t["TERM_BG"]
     colours = [("TERM_FG", t["TERM_FG"])]
     if t["MODE"] == "light":

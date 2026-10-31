@@ -1,4 +1,5 @@
 # Apple's own dark greys and system colours. Every app that has colours takes them from this file.
+FORMAT=1
 LABEL="Graphite"
 MODE=dark
 ACCENT=-1

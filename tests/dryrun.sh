@@ -75,7 +75,8 @@ fi
 rm -rf "$tmp/brew"
 
 # --list and --only work
-sandbox --list | grep -qx artcraft || { echo "--list does not show the artcraft step"; fail=1; }
+# grep -q would stop reading early, and under pipefail the writer's SIGPIPE fails the line.
+sandbox --list | grep -x artcraft >/dev/null || { echo "--list does not show the artcraft step"; fail=1; }
 sandbox --dry-run --only folders > "$tmp/only.txt" 2>&1
 if grep -q "brew bundle" "$tmp/only.txt" || ! grep -q "== folders ==" "$tmp/only.txt"; then
   echo "--only folders ran the wrong steps"; fail=1

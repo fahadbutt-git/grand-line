@@ -26,17 +26,77 @@ final class PanelHost: ObservableObject {
     /// Opens the Settings window (set by the app delegate).
     var openSettings: (@MainActor () -> Void)?
 
+    /// The keyboard shortcut that opens or closes the panel (`toggle_shortcut`).
+    let hotKey: HotKey
+    /// Why the shortcut could not be registered, for Settings.
+    @Published private(set) var hotKeyProblem: String?
+    /// When iceberg.toml was last read (hot reload), for Settings.
+    @Published private(set) var lastSettingsReload: Date?
+
     private var made: [String: NotchWidget] = [:]
     private var openPanels = 0
-    private var watcher: FileWatcher?
+    private var configWatcher: ConfigWatcher?
+    private var fallbackWatchers: [FileWatcher] = []
+    private var triggerObserver: DistributedObserver?
+
+    /// The distributed notification `iceberg trigger NAME` posts; its object is the widget's name.
+    static let triggerNotification = "com.grandline.iceberg.trigger"
 
     init(paths: IcebergPaths, theme: ThemeStore) {
         self.paths = paths
         self.theme = theme
         self.user = UserWidgets(paths: paths, theme: theme)
         self.events = SharedEventStore()
+        self.hotKey = HotKey()
         reloadSettings()
-        watcher = FileWatcher(paths: [paths.settingsFile]) { [weak self] in self?.reloadSettings() }
+        watchConfig()
+        triggerObserver = DistributedObserver(Self.triggerNotification) { [weak self] note in
+            guard let name = note.object as? String, !name.isEmpty else { return }
+            self?.user.trigger(name)
+        }
+    }
+
+    /// Hot reload: iceberg.toml, the widget files and their scripts are read
+    /// again when saved, with no restart.
+    private func watchConfig() {
+        if let watcher = ConfigWatcher(folder: paths.configFolder, onChange: { [weak self] changed, rescan in
+            self?.configChanged(changed, rescan: rescan)
+        }) {
+            configWatcher = watcher
+            return
+        }
+        Log.info("FSEvents would not watch \(paths.configFolder.path); watching the folders instead")
+        fallbackWatchers = [
+            FileWatcher(paths: [paths.settingsFile]) { [weak self] in self?.reloadSettings() },
+            FileWatcher(paths: [paths.widgetsFolder]) { [weak self] in self?.user.reload() },
+        ]
+    }
+
+    /// Sorts the saved files: iceberg.toml reloads the settings, files in
+    /// widgets/ reload the widgets (and re-run those whose script changed).
+    func configChanged(_ changed: [String], rescan: Bool) {
+        let settingsName = paths.settingsFile.lastPathComponent
+        let widgetsName = paths.widgetsFolder.lastPathComponent
+        var settingsChanged = rescan
+        var widgetsChanged = rescan
+        var names: [String] = []
+        for path in changed {
+            let url = URL(fileURLWithPath: path)
+            let name = url.lastPathComponent
+            let parent = url.deletingLastPathComponent().lastPathComponent
+            if name == settingsName && parent != widgetsName {
+                settingsChanged = true
+            } else if parent == widgetsName {
+                widgetsChanged = true
+                names.append(name)
+            } else if name == widgetsName || name == paths.configFolder.lastPathComponent {
+                // The folder itself was made, moved or replaced.
+                settingsChanged = true
+                widgetsChanged = true
+            }
+        }
+        if settingsChanged { reloadSettings() }
+        if widgetsChanged { user.filesChanged(names) }
     }
 
     var nowPlaying: NowPlayingWidget? { builtins.first { $0.id == "now-playing" } as? NowPlayingWidget }
@@ -62,9 +122,13 @@ final class PanelHost: ObservableObject {
         let newLayout = PanelLayout(settings: loaded)
         let layoutChanged = loaded.externalDisplays != settings.externalDisplays || loaded.liveActivity != settings.liveActivity
             || newLayout.builtins != layout.builtins
+        let shortcutChanged = loaded.toggleShortcut != settings.toggleShortcut || lastSettingsReload == nil
         settings = loaded
+        lastSettingsReload = Date()
         if newLayout != layout { layout = newLayout }
         LoginItem.apply(loaded.launchAtLogin)
+        user.setMaxConcurrent(loaded.maxConcurrent)
+        if shortcutChanged { hotKeyProblem = hotKey.register(loaded.toggleShortcut) }
         let context = WidgetContext(theme: theme, events: events, settings: loaded,
                                     availabilityChanged: { [weak self] in self?.objectWillChange.send() })
         let wanted = newLayout.builtins
@@ -103,6 +167,11 @@ final class PanelHost: ObservableObject {
     func save(_ newLayout: PanelLayout) -> String? {
         save("panel", newLayout.value)
     }
+
+    /// Settings records a new shortcut: the current one must not fire meanwhile.
+    func suspendShortcut() { hotKey.suspend() }
+
+    func resumeShortcut() { hotKeyProblem = hotKey.resume() }
 
     func reloadEverything() {
         theme.reload()

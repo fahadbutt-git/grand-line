@@ -50,7 +50,7 @@ public struct ThemeFamily: Sendable, Equatable, Identifiable {
 }
 
 /// Lists the themes in config/themes as families, read the way ThemeKit and
-/// `theme list` read them.
+/// `theme list` read them (EXTENDS followed, defaults filled).
 public enum ThemeCatalog {
     /// The order of the cards: the paired families, Graphite and Daylight,
     /// then the single themes. Anything else follows by name.
@@ -63,7 +63,10 @@ public enum ThemeCatalog {
         let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
         var read: [(name: String, values: [String: String])] = []
         for file in files where file.pathExtension == "theme" {
-            if let values = ThemeFile.read(file) { read.append((file.deletingPathExtension().lastPathComponent, values)) }
+            // Checked and with its EXTENDS parents, as ThemeLocation loads it.
+            if let source = ThemeSource.resolve(url: file) {
+                read.append((file.deletingPathExtension().lastPathComponent, ThemeSpec.validate(source).values))
+            }
         }
         if read.isEmpty {
             read = [("graphite", BuiltInThemes.graphite), ("daylight", BuiltInThemes.daylight)]

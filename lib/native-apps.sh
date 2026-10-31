@@ -139,8 +139,9 @@ install_app_bundle() {
       [[ -z "$lib" || "$lib" == \#* ]] && continue
       [[ -f "$out/lib$lib.dylib" ]] || { warn "The build made no lib$lib.dylib for $name."; rm -rf "$new"; return 1; }
       wrap_framework "$out/lib$lib.dylib" "$fw" "$id.$fw" "$new/Contents/Frameworks/$fw.framework"
-      if have codesign && ! sign_code "$new/Contents/Frameworks/$fw.framework/Versions/A"; then
-        warn "Could not sign $fw for $name."; rm -rf "$new"; return 1
+      if have codesign && ! sign_code "$new/Contents/Frameworks/$fw.framework/Versions/A" \
+        && ! { [[ ! -e "$app" ]] && sign_code_adhoc "$new/Contents/Frameworks/$fw.framework/Versions/A"; }; then
+        warn "Could not sign $fw for $name: $SIGN_ERROR"; rm -rf "$new"; return 1
       fi
     done < "$dir/frameworks.tsv"
   fi
@@ -149,8 +150,15 @@ install_app_bundle() {
   have xattr && xattr -cr "$new" 2>/dev/null
   if have codesign; then
     local why
+    SIGN_ADHOC_FALLBACK=0
     if ! sign_code "$new" "$dir/Entitlements/$product.entitlements" "$id"; then
-      signing_lock; warn "Could not sign $name. The installed copy is kept."; rm -rf "$new"; return 1
+      local first="$SIGN_ERROR"
+      # A first install still gets a working app, signed ad hoc for now.
+      if [[ -e "$app" ]] || ! sign_code_adhoc "$new" "$dir/Entitlements/$product.entitlements"; then
+        signing_lock; warn "Could not sign $name ($first). The installed copy is kept."; rm -rf "$new"; return 1
+      fi
+      SIGN_ADHOC_FALLBACK=1
+      warn "Signed $name ad hoc, since the local signing identity could not sign it: $first"
     fi
     signing_lock
     if ! why="$(signing_check "$new")"; then

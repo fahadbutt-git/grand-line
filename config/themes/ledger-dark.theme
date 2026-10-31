@@ -1,4 +1,5 @@
 # Ledger dark. Quiet slate blue with muted kind colours. Every app that has colours takes them from this file.
+FORMAT=1
 LABEL="Ledger Dark"
 FAMILY=ledger
 MODE=dark

@@ -1,4 +1,5 @@
 # Lantern dark. Warm lamplight amber on brown greys. Every app that has colours takes them from this file.
+FORMAT=1
 LABEL="Lantern Dark"
 FAMILY=lantern
 MODE=dark

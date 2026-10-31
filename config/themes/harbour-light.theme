@@ -1,8 +1,8 @@
-# Harbour light. Clear harbour blue on cool greys. Every app that has colours takes them from this file.
+# Harbour light. Clear harbour blue on cool greys. Extends harbour-dark for the accent, family, editor scheme and kind style, with colours of its own.
+FORMAT=1
+EXTENDS=harbour-dark
 LABEL="Harbour Light"
-FAMILY=harbour
 MODE=light
-ACCENT=4
 BACKGROUND=daylight.jpg
 TERM_BG=ffffff
 TERM_FG=1c1d20
@@ -17,12 +17,10 @@ HIGHLIGHT=1d79ba
 SIDEBAR=f4f5f6
 FIELD=eef0f2
 LINE=e2e3e6
-NVIM=vscode
 ICON_STYLE=line
 ICON_SEARCH=c93a2e
 ICON_TILE=ffffff
 ICON_INK=1c1d20
-KIND_STYLE=tag
 KIND_FOLDER=1f7fc4
 KIND_DOCUMENT=3f5fe0
 KIND_PDF=c93a2e

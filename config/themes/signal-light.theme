@@ -1,8 +1,8 @@
-# Signal light. Near black with one signal colour per app. Every app that has colours takes them from this file.
+# Signal light. Near black with one signal colour per app. Extends signal-dark for the accent, family, editor scheme and kind style, with colours of its own.
+FORMAT=1
+EXTENDS=signal-dark
 LABEL="Signal Light"
-FAMILY=signal
 MODE=light
-ACCENT=3
 BACKGROUND=daylight.jpg
 TERM_BG=ffffff
 TERM_FG=1c1d20
@@ -17,12 +17,10 @@ HIGHLIGHT=0f8577
 SIDEBAR=f4f5f6
 FIELD=eef0f2
 LINE=e2e3e6
-NVIM=vscode
 ICON_STYLE=mono
 ICON_FILES=0f8577
 ICON_SEARCH=6e4bc9
 ICON_NOTCH=c4482a
-KIND_STYLE=tag
 KIND_FOLDER=1f7fc4
 KIND_DOCUMENT=3f5fe0
 KIND_PDF=c93a2e

@@ -3,32 +3,37 @@ import BrowserKit
 import FileKit
 
 /// New folder, duplicate, rename, alias, compress, Trash and Put Back, tags,
-/// undo and redo, Add to Sidebar. Everything goes through FileKit, so each step can be undone (R8, R21).
+/// undo and redo, Add to Sidebar. Everything goes through FileKit as a task
+/// (`Services.tasks`), so each step shows in the tasks popover, can be
+/// cancelled, and can be undone (R8, R21).
 extension BrowserModel {
     var selectedOnDisk: [URL] { focused.selectedItems.filter { !$0.isInArchive }.map(\.url) }
 
-    /// Runs file work in order, then refreshes the Undo title and selects the result.
-    func runOperation(_ title: String, _ body: @escaping (FileOperations) async throws -> [URL]) {
-        let operations = services.operations
+    /// Runs file work as a task after the others, then selects what it made.
+    /// A cancelled task says nothing; a failed one says why.
+    func runOperation(_ kind: FileOperationKind?, _ title: String, failure: String,
+                      _ body: @escaping @Sendable (FileOperations) async throws -> [URL]) {
+        let services = self.services
         let pane = focused
-        Task { [weak self] in
+        Task {
             do {
-                let made = try await body(operations)
-                self?.services.refreshUndo()
+                let made = try await services.run(kind, title, body)
                 if !made.isEmpty, let folder = pane.location.folderURL {
                     pane.go(.folder(folder), select: made)
                 }
+            } catch is CancellationError {
+                pane.reload()
             } catch {
-                self?.services.refreshUndo()
-                Prompt.problem(title, error)
+                Prompt.problem(failure, error)
             }
+            services.refreshUndo()
         }
     }
 
     func newFolder(withSelection: Bool) {
         guard let folder = focused.location.folderURL else { return }
         let items = withSelection ? selectedOnDisk : []
-        runOperation("The folder could not be made.") { operations in
+        runOperation(.newFolder, "New folder in \(folder.lastPathComponent)", failure: "The folder could not be made.") { operations in
             let made = try await operations.newFolder(in: folder, named: withSelection ? "New Folder With Items" : "untitled folder")
             if !items.isEmpty { _ = try await operations.move(items, to: made) }
             return [made]
@@ -46,7 +51,20 @@ extension BrowserModel {
 
     func duplicate() {
         let items = selectedOnDisk
-        runOperation("The items could not be duplicated.") { try await $0.duplicate(items) }
+        runOperation(.duplicate, TaskTitles.title(.duplicate, items), failure: "The items could not be duplicated.") {
+            try await $0.duplicate(items)
+        }
+    }
+
+    /// F2 or File › Rename: one item is renamed in place; several open Rename
+    /// N Items, as in Finder.
+    func beginRename() {
+        let items = selectedOnDisk
+        if items.count > 1 {
+            batchRenameItems = items
+        } else {
+            renameRequest += 1
+        }
     }
 
     func rename(_ item: FileItem, to name: String) {
@@ -60,9 +78,18 @@ extension BrowserModel {
                message: "The file may open in a different app.",
                action: newExtension.isEmpty ? "Remove" : "Use .\(newExtension)"
            ) { return }
-        runOperation("The item could not be renamed.") { operations in
-            let renamed = try await operations.rename(item.url, to: name)
-            return [renamed]
+        let url = item.url
+        runOperation(.rename, "Rename \(item.name)", failure: "The item could not be renamed.") { operations in
+            [try await operations.rename(url, to: name)]
+        }
+    }
+
+    /// Rename N Items: every name at once, undone at once.
+    func renameItems(_ rows: [BatchRename.Row]) {
+        let pairs = rows.filter(\.changes).map { (item: $0.item, name: $0.new) }
+        guard !pairs.isEmpty else { return }
+        runOperation(.renameItems, "Rename \(ItemFormat.count(pairs.count))", failure: "The items could not be renamed.") { operations in
+            try await operations.renameItems(pairs)
         }
     }
 
@@ -83,17 +110,16 @@ extension BrowserModel {
         focused.go(.folder(original.deletingLastPathComponent()), select: [original])
     }
 
+    /// Compress runs as a task; Undo moves the archive to the Trash.
     func compress() {
-        guard let plan = CompressPlan.make(for: selectedOnDisk) else { return }
-        let pane = focused
-        Task {
-            do {
-                let result = try await ProcessRunner.run(plan.command)
-                if !result.succeeded { Prompt.problem("Compressing failed. " + result.errorText) }
-                if let folder = pane.location.folderURL { pane.go(.folder(folder), select: [plan.destination]) }
-            } catch {
-                Prompt.problem("Compressing failed.", error)
-            }
+        let items = selectedOnDisk
+        guard let plan = CompressPlan.make(for: items) else { return }
+        runOperation(.compress, TaskTitles.title(.compress, items), failure: "Compressing failed.") { operations in
+            try Task.checkCancellation()
+            let result = try await ProcessRunner.run(plan.command)
+            guard result.succeeded else { throw TaskProblem(result.errorText) }
+            await operations.recordCreated([plan.destination], kind: .compress)
+            return [plan.destination]
         }
     }
 
@@ -101,29 +127,28 @@ extension BrowserModel {
         let items = selectedOnDisk
         guard !items.isEmpty else { return }
         let services = self.services
-        runOperation("The items could not be moved to the Trash.") { operations in
+        runOperation(.trash, TaskTitles.title(.trash, items), failure: "The items could not be moved to the Trash.") { operations in
             let trashed = try await operations.moveToTrash(items)
-            await MainActor.run { services.noteTrashed(items, to: trashed) }
+            await MainActor.run { services.noteTrashed(Array(items.prefix(trashed.count)), to: trashed) }
             return []
         }
     }
 
-    /// Put Back: each item returns to its folder under its old name.
+    /// Put Back: each item returns to its folder under its old name, in one
+    /// step that Undo reverses.
     func putBack() {
         let items = selectedOnDisk
         let ledger = services.trashLedger
         let services = self.services
-        runOperation("The items could not be put back.") { operations in
-            for item in items {
-                guard let place = ledger.destination(of: item) else { continue }
-                let moved = try await operations.move([item], to: place.folder)
-                if let back = moved.first, back.lastPathComponent != place.name,
-                   !FileManager.default.fileExists(atPath: place.folder.appendingPathComponent(place.name).path) {
-                    _ = try await operations.rename(back, to: place.name)
-                }
-                await MainActor.run { services.notePutBack(item) }
-            }
-            return []
+        let entries = items.compactMap { item -> (item: URL, original: URL)? in
+            guard let place = ledger.destination(of: item) else { return nil }
+            return (item: item, original: place.folder.appendingPathComponent(place.name))
+        }
+        guard !entries.isEmpty else { return }
+        runOperation(.putBack, TaskTitles.title(.putBack, entries.map { $0.item }), failure: "The items could not be put back.") { operations in
+            let back = try await operations.putBack(entries)
+            await MainActor.run { for entry in entries { services.notePutBack(entry.item) } }
+            return back
         }
     }
 
@@ -140,30 +165,41 @@ extension BrowserModel {
         focused.reload()
     }
 
-    func undo() {
-        let operations = services.operations
+    /// Undo and Redo wait their turn behind running tasks, so they never
+    /// reverse something half done.
+    func undo(steps: Int = 1) {
+        let services = self.services
         let pane = focused
-        Task { [weak self] in
+        let title = steps == 1 ? (services.undoTitle ?? "Undo") : "Undo \(steps) steps"
+        Task {
             do {
-                _ = try await operations.undo()
+                _ = try await services.run(nil, title) { operations in
+                    _ = try await operations.undo(steps: steps)
+                    return []
+                }
+            } catch is CancellationError {
             } catch {
                 Prompt.problem("Undo failed.", error)
             }
-            self?.services.refreshUndo()
+            services.refreshUndo()
             pane.reload()
         }
     }
 
     func redo() {
-        let operations = services.operations
+        let services = self.services
         let pane = focused
-        Task { [weak self] in
+        Task {
             do {
-                _ = try await operations.redo()
+                _ = try await services.run(nil, services.redoTitle ?? "Redo") { operations in
+                    _ = try await operations.redo()
+                    return []
+                }
+            } catch is CancellationError {
             } catch {
                 Prompt.problem("Redo failed.", error)
             }
-            self?.services.refreshUndo()
+            services.refreshUndo()
             pane.reload()
         }
     }
@@ -231,7 +267,8 @@ extension BrowserModel {
             message: "These are .DS_Store and ._ files that macOS leaves on drives and shares. Undo puts them back.",
             action: "Move to Trash"
         ) else { return }
-        runOperation("The files could not be moved to the Trash.") { operations in
+        runOperation(.trash, "Move \(ItemFormat.count(found.count, "clutter file")) to the Trash",
+                     failure: "The files could not be moved to the Trash.") { operations in
             _ = try await Clutter.clean(in: folder, using: operations)
             return []
         }

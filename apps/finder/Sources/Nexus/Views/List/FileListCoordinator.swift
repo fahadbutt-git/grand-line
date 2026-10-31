@@ -41,7 +41,10 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
         let displayChanged = display != self.display
         self.display = display
         if table.rowHeight != display.rowHeight { table.rowHeight = display.rowHeight }
-        if ids != shownIDs || cut != shownCut || themeChanged || displayChanged {
+        let columns = ListColumn.shown(pane.state.settings.columns, flat: pane.state.isFlat).map(FileColumn.init)
+        let columnsChanged = table.tableColumns.map(\.identifier) != columns.map(\.identifier)
+        if columnsChanged { FileTableSetup.apply(columns, to: table) }
+        if ids != shownIDs || cut != shownCut || themeChanged || displayChanged || columnsChanged {
             let scrollToTop = shownIDs.isEmpty || ids.first != shownIDs.first && ids.count != shownIDs.count
             shownIDs = ids
             shownCut = cut
@@ -102,9 +105,18 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
             badge: pane.badges[item.id],
             isCut: shownCut.contains(item.url.standardizedFileURL.path),
             theme: theme,
-            display: display ?? FileCellView.Display()
+            display: display ?? FileCellView.Display(),
+            place: column == .path ? place(of: item) : ""
         ))
         return cell
+    }
+
+    /// Where an item is: below the flat view's folder, else its own folder.
+    private func place(of item: FileItem) -> String {
+        if pane.state.isFlat, let folder = pane.location.folderURL {
+            return FlatListing.relativeFolder(of: item.path, under: folder.path)
+        }
+        return PathSegments.editableText(for: item.url.deletingLastPathComponent(), home: model.services.paths.home)
     }
 
     func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
@@ -155,6 +167,11 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
         let shortcut = Shortcut.from(keyCode: event.keyCode, characters: event.charactersIgnoringModifiers ?? "",
                                      modifiers: Self.modifiers(event.modifierFlags))
         guard let shortcut else { return false }
+        // Escape clears the omnibar's filter, as it does in the field.
+        if shortcut == Shortcut(.escape), !pane.state.filter.isEmpty {
+            model.clearFilter(in: pane)
+            return true
+        }
         let context = model.context
         if let found = KeyMap.command(for: shortcut, inArchive: context.inArchive, inTrash: context.inTrash) {
             let command = NexusPreferencesStore.shared.current.returnKey.command(found, for: shortcut)

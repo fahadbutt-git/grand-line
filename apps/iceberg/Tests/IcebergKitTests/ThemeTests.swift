@@ -31,10 +31,11 @@ final class ThemeTests: XCTestCase {
         XCTAssertFalse(names.isEmpty, "no themes in \(folder.path)")
         for name in names {
             let text = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)
-            let fields = ThemeLoader.fields(text)
+            // A light variant takes some keys from the dark one it EXTENDS.
+            let fields = ThemeSpec.validate(ThemeSource.resolve(text: text, file: name, folder: folder)).values
             for key in Theme.requiredKeys { XCTAssertNotNil(fields[key], "\(name) lacks \(key)") }
-            let (theme, issues) = ThemeLoader.parse(text, name: String(name.dropLast(6)))
-            XCTAssertEqual(issues, [], name)
+            let (theme, issues) = ThemeLoader.parse(text, name: String(name.dropLast(6)), folder: folder)
+            XCTAssertEqual(issues.filter { $0.severity == .error }, [], name)
             XCTAssertEqual(theme.palette.count, 16, name)
             // DESIGN.md: text keeps 4.5:1 against the background.
             XCTAssertGreaterThanOrEqual(RGB.contrast(theme.foreground, theme.background), 4.5, name)

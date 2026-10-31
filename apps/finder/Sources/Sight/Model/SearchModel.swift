@@ -2,13 +2,9 @@ import AppKit
 import LauncherKit
 import QueryKit
 
-/// The action panel (Command+K): the selected row's actions, or a list of apps for Open With.
-struct ActionPanelState: Equatable {
-    var title: String
-    var actions: [LaunchAction]
-    var selected: Int
-    var result: LaunchResult
-}
+/// The action panel (Command+K): the selected row's actions, the buffer's,
+/// or a list of apps for Open With. Its keys are LauncherKit's ActionPanelModel.
+typealias ActionPanelState = ActionPanelModel
 
 /// Everything the search window shows, and what each key does.
 @MainActor
@@ -16,6 +12,10 @@ final class SearchModel: ObservableObject {
     @Published private(set) var text = ""
     @Published private(set) var list = ResultList()
     @Published private(set) var chips: [String] = []
+    /// The prefix or keyword in use, shown as a chip at the start of the field.
+    @Published private(set) var scopeChip: String?
+    /// Files collected with Command+B, shown as chips under the field.
+    @Published private(set) var buffer = FileBuffer()
     @Published private(set) var status = ""
     @Published var actionPanel: ActionPanelState?
     @Published private(set) var gate = ConfirmationGate()
@@ -30,10 +30,23 @@ final class SearchModel: ObservableObject {
     private var reopeningForFailure = false
     private var task: Task<Void, Never>?
     private var query = LaunchQuery(raw: "")
+    /// Keeps the top row still while the query grows.
+    private var hold = TopRowHold()
 
     init(services: Services) {
         self.services = services
         self.performer = ActionPerformer(paths: services.paths)
+        // The first searches after launch may be answered by the local copy
+        // while the service connects; its fuller answer refines the list.
+        services.names.onLateAnswer { [weak self] in
+            Task { @MainActor in self?.refreshForLateFiles() }
+        }
+    }
+
+    /// Searches again when files may be missing from what is shown, keeping the top row.
+    private func refreshForLateFiles() {
+        guard actionPanel == nil, !gate.isConfirming, !text.isEmpty, !query.isPath, query.prefix == nil || query.prefix == .files || query.prefix == .exact else { return }
+        refresh()
     }
 
     // MARK: Searching
@@ -47,9 +60,10 @@ final class SearchModel: ObservableObject {
         let engine = services.engine
         let plan = engine.plan(newText)
         query = plan.query
+        scopeChip = plan.chip
         chips = plan.query.prefix == .files ? QueryChips.describe(QueryParser.parse(plan.query.term)) : []
         let started = Date()
-        list.replace(with: engine.instantGroups(plan), limitScale: plan.limitScale, topHit: plan.topHit)
+        list.replace(with: engine.instantGroups(plan, hold: &hold), limitScale: plan.limitScale, topHit: plan.topHit)
         status = statusText(milliseconds: Int(Date().timeIntervalSince(started) * 1000))
         readSettingsIfShown()
         task?.cancel()
@@ -82,6 +96,7 @@ final class SearchModel: ObservableObject {
     /// Returns false to let the key reach the text field.
     func handle(_ command: KeyCommand) -> Bool {
         if actionPanel != nil, handlePanel(command) { return true }
+        if actionPanel != nil, command == .toggleBuffer { return true }
         if gate.isConfirming, command != .primary, command != .escape { gate.cancel() }
         switch command {
         case .moveUp: list.moveSelection(by: -1)
@@ -100,8 +115,11 @@ final class SearchModel: ObservableObject {
         case .copy:
             guard let row = list.selected else { return false }
             performer.copy(copyText(row))
+        case .toggleBuffer:
+            guard let row = list.selected, buffer.toggle(row) else { NSSound.beep(); return true }
         case .shortcut(let shortcut):
-            guard let row = list.selected, let action = row.actions.first(where: { $0.shortcut == shortcut }) else { return false }
+            // Every action the panel would list, so Copy name (⇧⌘N) works without opening it.
+            guard let row = list.selected, let action = ActionPanel.actions(for: row).first(where: { $0.shortcut == shortcut }) else { return false }
             run(action, on: row)
         }
         return true
@@ -109,26 +127,34 @@ final class SearchModel: ObservableObject {
 
     private func handlePanel(_ command: KeyCommand) -> Bool {
         guard var panel = actionPanel else { return false }
-        switch command {
-        case .moveUp: panel.selected = max(0, panel.selected - 1)
-        case .moveDown: panel.selected = min(panel.actions.count - 1, panel.selected + 1)
-        case .primary:
-            guard panel.actions.indices.contains(panel.selected) else { return true }
-            let action = panel.actions[panel.selected]
-            actionPanel = nil
-            run(action, on: panel.result)
+        let outcome = panel.handle(command, gate: &gate)
+        switch outcome {
+        case .handled:
+            actionPanel = panel
             return true
-        case .actions:
+        case .close:
             actionPanel = nil
             return true
-        case .escape:
-            escape()
+        case .run(let action):
+            actionPanel = nil
+            run(action, on: panel.result, confirmed: true, files: panel.files)
             return true
-        default:
+        case .passThrough:
             return false
         }
+    }
+
+    /// Clicking an action in the panel: as Return on it.
+    func choosePanelAction(at index: Int) {
+        guard var panel = actionPanel, panel.actions.indices.contains(index) else { return }
+        panel.selected = index
         actionPanel = panel
-        return true
+        _ = handlePanel(.primary)
+    }
+
+    /// Takes one file out of the buffer (its chip's button).
+    func removeFromBuffer(_ path: String) {
+        buffer.remove(path)
     }
 
     private func escape() {
@@ -157,9 +183,18 @@ final class SearchModel: ObservableObject {
         return row.previewPath ?? row.title
     }
 
+    /// The buffer's actions while it holds files, else every action of the selected row.
     private func openActionPanel() {
-        guard let row = list.selected, !row.actions.isEmpty else { return }
-        actionPanel = ActionPanelState(title: row.title, actions: row.actions, selected: 0, result: row)
+        gate.cancel()
+        if !buffer.isEmpty {
+            let holder = LaunchResult(id: "buffer", title: buffer.title, icon: .symbol("tray.full"), section: .files, actions: [])
+            actionPanel = ActionPanelState(title: buffer.title, actions: buffer.actions, result: holder, files: buffer.paths)
+            return
+        }
+        guard let row = list.selected else { return }
+        let actions = ActionPanel.actions(for: row)
+        guard !actions.isEmpty else { return }
+        actionPanel = ActionPanelState(title: row.title, actions: actions, result: row)
     }
 
     // MARK: Running
@@ -173,10 +208,25 @@ final class SearchModel: ObservableObject {
         run(row.actions[index], on: row)
     }
 
-    func run(_ action: LaunchAction, on row: LaunchResult) {
-        guard gate.shouldRun(action, on: row.id) else { return }
+    /// - Parameters:
+    ///   - confirmed: the action panel already asked its question.
+    ///   - files: the buffer's files when the action came from the buffer's panel.
+    func run(_ action: LaunchAction, on row: LaunchResult, confirmed: Bool = false, files: [String] = []) {
+        guard confirmed || gate.shouldRun(action, on: row.id) else { return }
         if row.providerID == SettingsActionsProvider.providerID, runSetting(action, on: row) { return }
         switch action.command {
+        case .buffer(let paths):
+            buffer.toggle(paths: paths)
+            return
+        case .clearBuffer:
+            buffer.clear()
+            return
+        case .script(let path, let value):
+            choose(script: path, value: value)
+            return
+        case .files(.quickLook, let paths) where paths.count == 1 && row.previewPath == paths[0]:
+            previewOpen.toggle()
+            return
         case .toggleFavourite:
             services.usage.toggleFavourite(row)
             refresh()
@@ -188,15 +238,42 @@ final class SearchModel: ObservableObject {
             setText(next, fromField: false)
             return
         case .openWith(let path):
-            actionPanel = ActionPanelState(title: "Open with", actions: performer.openWithActions(path), selected: 0, result: row)
+            actionPanel = ActionPanelState(title: "Open with", actions: performer.openWithActions(path), result: row)
             return
         default:
             break
         }
-        services.usage.record(row, query: query)
+        // The buffer and the selection are not rows to come back to.
+        if row.id != "buffer", row.providerID != SelectionProvider.providerID {
+            services.usage.record(row, query: query)
+        }
         if let path = row.previewPath { services.names.noteOpened(path) }
+        // Alfred empties the buffer once something was done with it.
+        if !files.isEmpty, action.closesWindow, files == buffer.paths { buffer.clear() }
         if action.closesWindow { hide() }
         performer.perform(action.command)
+    }
+
+    // MARK: Script commands
+
+    /// Runs the script again with the chosen value: its new rows replace the
+    /// list (the query goes back to "name "), or it asks to close the window.
+    private func choose(script path: String, value: String) {
+        guard let provider = services.scripts.provider(path: path) else { return NSSound.beep() }
+        status = "Running \(provider.script.name)…"
+        Task { [weak self] in
+            let reply = await provider.choose(value)
+            guard let self else { return }
+            switch reply {
+            case .close:
+                self.hide()
+                self.setText("", fromField: false)
+            case .rows:
+                self.setText(provider.script.name + " ", fromField: false)
+            case .failed(let why):
+                self.status = why
+            }
+        }
     }
 
     // MARK: Settings

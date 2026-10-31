@@ -1,18 +1,21 @@
 import AppKit
+import ArchiveKit
 import BrowserKit
 import FileKit
 import IndexKit
 import IndexService
 
-/// What every window shares: file operations and their undo, sizes, recents,
-/// the name index, stored view settings, workspaces, saved searches and the
-/// Open With table.
+/// What every window shares: file operations, the task engine that runs them
+/// and their undo, sizes, recents, the name index, stored view settings,
+/// workspaces, saved searches and the Open With table.
 @MainActor
 final class Services: ObservableObject {
     static let shared = Services()
 
     let paths = AppPaths()
-    let operations = FileOperations()
+    let operations: FileOperations
+    /// Every file operation runs here as a task: in order, cancellable, with progress.
+    let tasks: FileTaskQueue
     let folderSizes = FolderSize()
     let recents = Recents()
     /// File names, from the Grand Line Index service Sight shares.
@@ -30,11 +33,16 @@ final class Services: ObservableObject {
     @Published private(set) var transfers = TransferList()
     @Published private(set) var undoTitle: String?
     @Published private(set) var redoTitle: String?
+    /// What Undo can reverse, newest first, for the tasks popover.
+    @Published private(set) var undoHistory: [OperationRecord] = []
     @Published private(set) var sidebarHidden: SidebarHidden
     private(set) var trashLedger: TrashLedger
     private(set) var drives: [GoogleDrive]
 
     private init() {
+        let operations = FileOperations()
+        self.operations = operations
+        tasks = FileTaskQueue(operations: operations)
         index = SharedIndexClient(home: paths.home.path)
         selectionFile = SelectionFile(url: paths.selectionFile)
         workspaces = WorkspaceStore(folder: paths.workspaces)
@@ -46,6 +54,9 @@ final class Services: ObservableObject {
         sidebarHidden = JSONFile<SidebarHidden>(paths.sidebarHidden).read() ?? SidebarHidden()
         drives = GoogleDrive.accounts(home: paths.home)
         trashLedger.prune { FileManager.default.fileExists(atPath: $0) }
+        // Saved searches from before scopes and columns were kept: written
+        // once in the new form, each with the home folder it always used.
+        if savedSearches.isLegacy { try? savedSearches.write(to: paths.savedSearches) }
     }
 
     func start() {
@@ -56,6 +67,15 @@ final class Services: ObservableObject {
         Task { [weak self] in
             for await step in progress { self?.transfers.apply(step) }
         }
+        let events = tasks.events
+        Task { [weak self] in
+            for await event in events {
+                self?.transfers.apply(event)
+                if event.state.isDone { self?.refreshUndo() }
+            }
+        }
+        // Quick Look's copies of archive items from an earlier run (security note L2).
+        Task.detached(priority: .utility) { Archive.TemporaryFolder.cleanAtLaunch() }
         theme.start()
         sidebar.start()
     }
@@ -159,9 +179,29 @@ final class Services: ObservableObject {
         Task { [weak self] in
             let undo = await operations.undoKind
             let redo = await operations.redoKind
+            let history = await operations.history
             self?.undoTitle = undo.map { "Undo " + $0.rawValue }
             self?.redoTitle = redo.map { "Redo " + $0.rawValue }
+            self?.undoHistory = history
         }
+    }
+
+    // MARK: Tasks
+
+    /// Runs file work as a task after the others; returns what it made.
+    func run(_ kind: FileOperationKind?, _ title: String,
+             _ body: @escaping @Sendable (FileOperations) async throws -> [URL]) async throws -> [URL] {
+        try await tasks.run(kind, title: title, body: body)
+    }
+
+    func cancelTask(_ id: FileTaskID) {
+        transfers.markCancelling(id)
+        let tasks = self.tasks
+        Task { await tasks.cancel(id) }
+    }
+
+    func clearEndedTasks() {
+        transfers.clearEnded()
     }
 
     // MARK: Opening

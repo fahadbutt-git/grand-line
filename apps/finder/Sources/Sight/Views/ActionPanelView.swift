@@ -7,6 +7,13 @@ import ThemeKit
 struct ActionPanelView: View {
     let state: ActionPanelState
     let theme: Theme
+    var onChoose: (Int) -> Void = { _ in }
+
+    /// "Copy name" → "copy-name", the row's accessibility identifier.
+    static func slug(_ title: String) -> String {
+        let words = title.lowercased().split { !$0.isLetter && !$0.isNumber }
+        return words.joined(separator: "-")
+    }
 
     static let titleHeight: CGFloat = 24
     static let rowHeight: CGFloat = 26
@@ -30,7 +37,13 @@ struct ActionPanelView: View {
                 ScrollView(.vertical) {
                     VStack(spacing: 0) {
                         ForEach(Array(state.actions.enumerated()), id: \.offset) { index, action in
-                            row(action, index: index).id(index)
+                            row(action, index: index)
+                                .id(index)
+                                .contentShape(Rectangle())
+                                .onTapGesture { onChoose(index) }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityIdentifier("action." + Self.slug(action.title))
+                                .accessibilityAddTraits(.isButton)
                         }
                     }
                 }

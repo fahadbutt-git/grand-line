@@ -7,7 +7,8 @@ enum FilesJourneys {
     static let homeName = "journeyhome"
 
     static var all: [Journey] {
-        [navigation, views, sorting, fileOperations, tabsAndGo, lookAndTag, search, searchFromTrash]
+        [navigation, views, sorting, fileOperations, tabsAndGo, lookAndTag, search, searchFromTrash,
+         omnibar, tasksAndRename, flatAndSaved]
     }
 
     static func journey(_ name: String, _ summary: String, _ steps: [Step]) -> Journey {
@@ -307,10 +308,20 @@ enum FilesJourneys {
             },
             step("tag Red (Ctrl+1), then remove tags (Ctrl+0)") { ctx in
                 try ctx.selectRow("conj notes.txt")
+                // Control+1 to 7 can belong to Mission Control (Switch to
+                // Desktop N); then the menu does what the key could not.
                 try ctx.key("ctrl+1")
-                try ctx.wait("the Red tag on disk") { ctx.tags(folder + "/conj notes.txt").contains("Red") }
+                if (try? ctx.wait("the Red tag on disk", timeout: 3) { ctx.tags(folder + "/conj notes.txt").contains("Red") }) == nil {
+                    ctx.note("Control+1 did not reach Nexus (taken by the system?); used File > Tags > Red")
+                    try ctx.menu(["File", "Tags", "Red"])
+                    try ctx.wait("the Red tag on disk") { ctx.tags(folder + "/conj notes.txt").contains("Red") }
+                }
                 try ctx.key("ctrl+0")
-                try ctx.wait("no tags on disk") { ctx.tags(folder + "/conj notes.txt").isEmpty }
+                if (try? ctx.wait("no tags on disk", timeout: 3) { ctx.tags(folder + "/conj notes.txt").isEmpty }) == nil {
+                    ctx.note("Control+0 did not reach Nexus; used File > Tags > Remove Tags")
+                    try ctx.menu(["File", "Tags", "Remove Tags"])
+                    try ctx.wait("no tags on disk") { ctx.tags(folder + "/conj notes.txt").isEmpty }
+                }
             },
         ])
     }
@@ -403,6 +414,185 @@ enum FilesJourneys {
                 try ctx.wait("list rows") { !ctx.rows().isEmpty }
             },
             step("Esc ends the search, back in the Trash") { ctx in try ctx.endSearch(returningTo: "Trash", alternatives: [".Trash"]) },
+        ])
+    }
+
+    /// The path bar's field as one keyboard target: a filter as you type,
+    /// a path with Tab completion, `?` search and `>` commands, while
+    /// Shift+Cmd+G and Cmd+F keep their Finder meaning.
+    static var omnibar: Journey {
+        let folder = "Documents/Projects/Conj Flap"
+        return journey("files-omnibar", "Option+Cmd+G filters as you type, Tab completes a path, ?search, >command", [
+            step("go to Conj Flap") { ctx in try ctx.goToFolder("~/" + folder, expect: "Conj Flap") },
+            step("Option+Cmd+G filters the folder as you type") { ctx in
+                try ctx.key("cmd+opt+g")
+                try ctx.wait("the field") { ctx.isEditingText() }
+                ctx.type("notes")
+                try ctx.wait("only the matching row") { ctx.rows() == ["conj notes.txt"] }
+                try ctx.check(ctx.omnibarBadge() == "Filter", "the field does not say it filters (\"\(ctx.omnibarBadge())\")")
+            },
+            step("Return keeps the filter and its bar; Esc clears it") { ctx in
+                try ctx.key("return")
+                try ctx.wait("the keys back in the list") { !ctx.isEditingText() }
+                try ctx.wait("the filter bar") { ctx.browserSnapshot()?.identified(ctx.app.id("filter")) != nil }
+                try ctx.check(ctx.rows() == ["conj notes.txt"], "the filter went away on Return: \(ctx.rows())")
+                try ctx.key("escape")
+                try ctx.wait("every row back") { ctx.status() == ctx.visibleCount(in: folder) }
+                try ctx.check(ctx.browserSnapshot()?.identified(ctx.app.id("filter")) == nil, "the filter bar stayed after Esc")
+            },
+            step("Shift+Cmd+G: Tab completes a path, Return goes there") { ctx in
+                try ctx.key("cmd+shift+g")
+                try ctx.wait("the path field") { ctx.isEditingText() }
+                try ctx.key("cmd+a")
+                ctx.type("~/Documents/Proj")
+                try ctx.key("tab")
+                try ctx.wait("Tab to complete Projects") { ctx.focusedValue() == "~/Documents/Projects/" }
+                try ctx.key("return")
+                try ctx.waitTitle("Projects")
+            },
+            step("?conj in the field searches, with the search field's scopes") { ctx in
+                try ctx.key("cmd+shift+g")
+                try ctx.wait("the path field") { ctx.isEditingText() }
+                try ctx.key("cmd+a")
+                ctx.type("?conj")
+                try ctx.waitTitle("Search: conj")
+                try ctx.check(ctx.omnibarBadge() == "Search", "the field does not say it searches (\"\(ctx.omnibarBadge())\")")
+                let snap = ctx.snapshot(try ctx.mainWindow())
+                try ctx.check(ctx.chip(snap, "home", "Home") != nil, "no scope chips for a search from the field; chips: \(ctx.chipTexts(snap))")
+                try ctx.key("escape")
+                try ctx.waitTitle("Projects")
+            },
+            step(">as columns runs the command") { ctx in
+                try ctx.key("cmd+shift+g")
+                try ctx.wait("the path field") { ctx.isEditingText() }
+                try ctx.key("cmd+a")
+                ctx.type(">as columns")
+                try ctx.check(ctx.omnibarBadge() == "Command", "the field does not say it runs a command")
+                try ctx.key("return")
+                try ctx.wait("the columns view") { ctx.showsItems(names: ["Conj Flap", "Lid Repair"], mode: "columns") }
+                try ctx.key("cmd+2")
+            },
+            step("Cmd+F is still the search field") { ctx in
+                try ctx.startSearch("lid")
+                try ctx.endSearch(returningTo: "Projects")
+            },
+        ])
+    }
+
+    /// The task engine: copies ask about taken names once, tasks show in the
+    /// toolbar's popover with the undo history, and Rename N Items is one task.
+    static var tasksAndRename: Journey {
+        let ops = "Documents/Journey Ops"
+        let batch = ops + "/Batch"
+        return journey("files-tasks-rename", "conflict sheet, tasks popover, undo history, Rename N Items", [
+            step("make a folder with a taken name, and photos to rename") { ctx in
+                try ctx.writeFixture(ops + "/Dest/notes.txt", "already here")
+                for n in 1...3 { try ctx.writeFixture(batch + "/IMG_\(n).jpg", "photo \(n)") }
+                try ctx.goToFolder("~/" + ops, expect: "Journey Ops")
+            },
+            step("paste over a taken name asks, Keep Both keeps both") { ctx in
+                try ctx.selectRow("notes.txt")
+                try ctx.key("cmd+c")
+                try ctx.openRow("Dest")
+                try ctx.key("cmd+v")
+                var keep: Node?
+                try ctx.wait("the conflict sheet") {
+                    keep = ctx.anyNode { $0.role == "AXButton" && $0.text == "Keep Both" }
+                    return keep != nil
+                }
+                try ctx.check(ctx.anyNode { $0.role == "AXButton" && $0.text == "Replace" } != nil, "the sheet has no Replace")
+                try ctx.click(keep!)
+                try ctx.wait("both on disk") { ctx.exists(ops + "/Dest/notes 2.txt") }
+                try ctx.check(ctx.contents(ops + "/Dest/notes.txt") == "already here", "Keep Both changed the item already there")
+            },
+            step("the tasks popover lists the copy and its undo") { ctx in
+                try ctx.key("cmd+shift+j")
+                var undo: Node?
+                do {
+                    try ctx.wait("the tasks popover", timeout: 5) {
+                        undo = ctx.anyNode { $0.role == "AXButton" && $0.text == "Undo" }
+                        return undo != nil
+                    }
+                } catch {
+                    throw StepSkip("the tasks popover is not reachable through Accessibility here")
+                }
+                try ctx.check(ctx.anyNode { $0.text.hasPrefix("Copy notes.txt to Dest") } != nil, "the popover does not list the copy")
+                try ctx.click(undo!)
+                try ctx.wait("the copy undone from the popover") { !ctx.exists(ops + "/Dest/notes 2.txt") }
+                try ctx.key("escape")
+            },
+            step("F2 with several items opens Rename N Items") { ctx in
+                try ctx.goToFolder("~/" + batch, expect: "Batch")
+                try ctx.wait("the photos") { ctx.rows().count == 3 }
+                try ctx.key("cmd+a")
+                try ctx.key("f2")
+                var find: Node?
+                try ctx.wait("the Rename sheet") {
+                    find = ctx.anyNode { $0.identifier == ctx.app.id("rename.find") }
+                    return find != nil
+                }
+                try ctx.click(find!)
+                ctx.type("IMG_")
+                guard let replace = ctx.anyNode({ $0.identifier == ctx.app.id("rename.replace") }) else {
+                    throw StepFailure("no Replace with field in the sheet")
+                }
+                try ctx.click(replace)
+                ctx.type("Trip ")
+                try ctx.wait("the preview to show the new names") { ctx.anyNode { $0.text == "Trip 1.jpg" } != nil }
+                guard let apply = ctx.anyNode({ $0.identifier == ctx.app.id("rename.apply") }) else {
+                    throw StepFailure("no Rename button in the sheet")
+                }
+                try ctx.click(apply)
+                try ctx.wait("every photo renamed on disk") { ctx.listing(batch).sorted() == ["Trip 1.jpg", "Trip 2.jpg", "Trip 3.jpg"] }
+            },
+            step("one Undo puts every name back") { ctx in
+                try ctx.key("cmd+z")
+                try ctx.wait("the old names back") { ctx.listing(batch).sorted() == ["IMG_1.jpg", "IMG_2.jpg", "IMG_3.jpg"] }
+            },
+        ])
+    }
+
+    /// Flat view from the shared index, and a saved search that keeps its scope.
+    static var flatAndSaved: Journey {
+        let folder = "Documents/Projects/Conj Flap"
+        return journey("files-flat-saved", "flat view with a Where column, a saved search with its scope in the sidebar", [
+            step("go to Conj Flap") { ctx in try ctx.goToFolder("~/" + folder, expect: "Conj Flap") },
+            step("Control+Option+Cmd+F lists the subfolders' items too") { ctx in
+                try ctx.key("ctrl+opt+cmd+f")
+                try ctx.wait("items from Drafts/v1 and Drafts/v2", timeout: 15) {
+                    let rows = ctx.rows(all: true)
+                    return rows.contains("conj draft v1.docx") && rows.contains("conj draft v2.docx")
+                }
+                try ctx.check(ctx.browserSnapshot()?.identified(ctx.app.id("flat")) != nil, "the path bar does not show the flat view")
+                if ctx.anyNode({ $0.text == "Where" }) == nil { ctx.note("no Where column header found") }
+                try ctx.check(ctx.title() == "Conj Flap", "flat view changed the window's folder")
+            },
+            step("the same keys show the folder alone again") { ctx in
+                try ctx.key("ctrl+opt+cmd+f")
+                try ctx.wait("only the folder's own items") { !ctx.rows(all: true).contains("conj draft v1.docx") && ctx.status() == ctx.visibleCount(in: folder) }
+            },
+            step("save a search over the home folder") { ctx in
+                try ctx.startSearch("conj")
+                try ctx.clickChip("home", "Home")
+                try ctx.menu(["File", "Save Search…"])
+                try ctx.wait("the name field") { ctx.isEditingText() }
+                try ctx.key("cmd+a")
+                ctx.type("Conj everywhere")
+                try ctx.key("return")
+                let file = ".config/grand-line/nexus/saved-searches.tsv"
+                try ctx.wait("the saved search on disk with its scope") {
+                    (ctx.contents(file) ?? "").contains("Conj everywhere\tconj\thome")
+                }
+                try ctx.endSearch(returningTo: "Conj Flap")
+            },
+            step("the sidebar runs it with its scope") { ctx in
+                try ctx.goSidebar("Conj everywhere", titles: ["Search: conj"])
+                try ctx.wait("the Home chip chosen") {
+                    guard let snap = ctx.browserSnapshot(), let chip = ctx.chip(snap, "home", "Home") else { return false }
+                    return chip.allText.joined().contains("Home") || chip.text == "Home"
+                }
+                try ctx.wait("results", timeout: 20) { !ctx.rows().isEmpty }
+            },
         ])
     }
 
@@ -608,14 +798,39 @@ extension Ctx {
         browserSnapshot()?.rowNames().first { $0.name == name }?.node
     }
 
+    /// Selects a row by clicking it. A row already selected is left alone: a
+    /// click on a selected row's name starts renaming it, as in Finder.
     func selectRow(_ name: String) throws {
         var node: Node?
         try wait("a row named \"\(name)\"") {
             node = rowNode(name)
             return node != nil
         }
-        try click(node!)
-        try wait("\"\(name)\" selected") { (self.browserSnapshot().flatMap(FilesJourneys.statusNode)?.text ?? "").contains("selected") }
+        if !(isRowSelected(name) && selectedRowCount() == 1) {
+            try click(node!)
+        }
+        try wait("\"\(name)\" selected") {
+            self.isRowSelected(name)
+                || (self.browserSnapshot().flatMap(FilesJourneys.statusNode)?.text ?? "").contains("selected")
+        }
+        // A slow second click may have started renaming: leave the name as it was.
+        if isEditingText(), focusedValue() == name { try key("escape") }
+    }
+
+    /// Whether the table row showing `name` reports itself selected (AXSelected).
+    func isRowSelected(_ name: String) -> Bool {
+        guard let snap = browserSnapshot() else { return false }
+        for (index, node) in snap.nodes.enumerated() where node.role == "AXRow" {
+            if snap.descendants(of: index).contains(where: { $0.text == name }) {
+                return (node.element.attribute("AXSelected") as? Bool) == true
+            }
+        }
+        return false
+    }
+
+    func selectedRowCount() -> Int {
+        guard let snap = browserSnapshot() else { return 0 }
+        return snap.nodes.filter { $0.role == "AXRow" && ($0.element.attribute("AXSelected") as? Bool) == true }.count
     }
 
     func openRow(_ name: String) throws {
@@ -709,6 +924,34 @@ extension Ctx {
         note("\(combo) did not switch tabs; clicked the tab")
         try click(tab)
         try waitTitle(title)
+    }
+
+    /// A node in any of the app's windows: sheets, alerts and popovers included.
+    func anyNode(_ test: (Node) -> Bool) -> Node? {
+        for window in windows() {
+            if let found = snapshot(window).nodes.first(where: test) { return found }
+        }
+        return nil
+    }
+
+    /// The text of the field that has the keys.
+    func focusedValue() -> String {
+        ax.element("AXFocusedUIElement")?.string("AXValue") ?? ""
+    }
+
+    /// What the omnibar says it is doing: Go, Filter, Search or Command.
+    func omnibarBadge() -> String {
+        browserSnapshot()?.identified(app.id("omnibar.mode"))?.text ?? ""
+    }
+
+    func writeFixture(_ relative: String, _ text: String) throws {
+        let target = url(relative)
+        try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(text.utf8).write(to: target)
+    }
+
+    func contents(_ relative: String) -> String? {
+        (try? Data(contentsOf: url(relative))).map { String(decoding: $0, as: UTF8.self) }
     }
 
     func tabCount() -> Int {

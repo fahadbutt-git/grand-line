@@ -21,6 +21,8 @@ public enum KeyCommand: Sendable, Equatable {
     case togglePreview
     /// Command+C with nothing selected in the field: copy the row's path or text.
     case copy
+    /// Command+B: put the selected file in the file buffer, or take it out.
+    case toggleBuffer
     /// Command+Shift+C, Command+O and other shortcuts an action lists.
     case shortcut(KeyShortcut)
 
@@ -46,6 +48,7 @@ public enum KeyCommand: Sendable, Equatable {
             case "k": return .actions
             case "y": return .togglePreview
             case "c": return .copy
+            case "b": return .toggleBuffer
             case "1", "2", "3", "4", "5", "6", "7", "8", "9": return .runRow(Int(key.characters)!)
             // Editing keys stay with the text field.
             case "a", "v", "x", "z": return nil

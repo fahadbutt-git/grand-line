@@ -1,12 +1,14 @@
 import AppKit
 
 /// The notch app (role "notch"): the panel opens from its URL commands and on
-/// hover, shows only the sections turned on, has settings if it has them, and
-/// follows the theme. Without a notch (CI) it sits as a pill at the top.
+/// hover, shows only the sections turned on, has settings if it has them,
+/// follows the theme, runs a signal widget when `iceberg trigger` asks, and
+/// takes saved config files without a restart. Without a notch (CI) it sits
+/// as a pill at the top.
 enum NotchJourneys {
     static let role = "notch"
 
-    static var all: [Journey] { [panel, settings, theme] }
+    static var all: [Journey] { [panel, settings, theme, signal, reload] }
 
     static func journey(_ name: String, _ summary: String, _ steps: [Step]) -> Journey {
         Journey(name, role: role, summary: summary, waitsForWindow: false,
@@ -31,7 +33,7 @@ enum NotchJourneys {
             step("open (scheme://open)") { ctx in
                 try ctx.notchURL("open")
                 try ctx.wait("the panel to open") { ctx.isNotchOpen() }
-                try ctx.wait("the Journey widget's output", timeout: 10) { ctx.notchTexts().contains("journey-ok") }
+                try ctx.wait("the Journey widget's output", timeout: 10) { ctx.notchTexts().contains { $0.contains("journey-ok") } }
             },
             step("only the sections turned on are shown") { ctx in
                 let texts = ctx.notchTexts()
@@ -89,7 +91,7 @@ enum NotchJourneys {
             step("open the panel in the dark theme") { ctx in
                 try ctx.notchURL("open")
                 try ctx.wait("the panel to open") { ctx.isNotchOpen() }
-                try ctx.wait("its widgets", timeout: 10) { ctx.notchTexts().contains("journey-ok") }
+                try ctx.wait("its widgets", timeout: 10) { ctx.notchTexts().contains { $0.contains("journey-ok") } }
             },
             step("switch to the light theme", layout: false) { ctx in
                 guard Capture.canRecordScreen else { throw StepSkip("no Screen Recording permission, so colours cannot be compared") }
@@ -127,7 +129,150 @@ enum NotchJourneys {
     }
 }
 
+extension NotchJourneys {
+    /// A widget with `signal = true` that shows the contents of a file, so a
+    /// step can change the file and then send the signal. The file is kept
+    /// outside the config folder, where hot reload would run the widget by itself.
+    static var signal: Journey {
+        journey("notch-signal", "a signal widget runs when `iceberg trigger` or scheme://trigger asks, open or closed", [
+            step("add a signal widget and put it in the panel (iceberg.toml saved in place)") { ctx in
+                try ctx.writeHomeFile("signal-value.txt", "signal-1\n")
+                try ctx.writeWidgetFile("signal.toml", """
+                title = "Signal"
+                icon = "bolt"
+                command = 'cat "$HOME/signal-value.txt"'
+                signal = true
+                """)
+                try ctx.editSettings { $0.replacingOccurrences(of: "panel = [\"battery\", \"journey\"]",
+                                                                 with: "panel = [\"battery\", \"journey\", \"signal\"]") }
+                try ctx.notchURL("open")
+                try ctx.wait("the panel to open") { ctx.isNotchOpen() }
+                try ctx.wait("the Signal widget's first value", timeout: 10) { ctx.notchTexts().contains { $0.contains("signal-1") } }
+            },
+            step("iceberg trigger runs it while the panel is open") { ctx in
+                let pid = ctx.pid
+                try ctx.writeHomeFile("signal-value.txt", "signal-2\n")
+                Input.pause(0.5)
+                try ctx.check(ctx.notchTexts().contains { $0.contains("signal-1") }, "the widget ran before it was triggered")
+                try ctx.icebergCommand(["trigger", "signal"])
+                try ctx.wait("the triggered value", timeout: 6) { ctx.notchTexts().contains { $0.contains("signal-2") } }
+                try ctx.check(ctx.pid == pid && ctx.running?.isTerminated == false, "Iceberg restarted")
+            },
+            step("a trigger while closed runs it as the panel next opens") { ctx in
+                try ctx.notchURL("close")
+                try ctx.wait("the panel to close") { !ctx.isNotchOpen() }
+                try ctx.writeHomeFile("signal-value.txt", "signal-3\n")
+                try ctx.icebergCommand(["trigger", "signal"])
+                try ctx.notchURL("open")
+                try ctx.wait("the panel to open") { ctx.isNotchOpen() }
+                try ctx.wait("the value from the trigger", timeout: 6) { ctx.notchTexts().contains { $0.contains("signal-3") } }
+            },
+            step("scheme://trigger/NAME works too") { ctx in
+                try ctx.writeHomeFile("signal-value.txt", "signal-4\n")
+                try ctx.notchURL("trigger/signal")
+                try ctx.wait("the value from the URL", timeout: 6) { ctx.notchTexts().contains { $0.contains("signal-4") } }
+                try ctx.notchURL("close")
+            },
+        ])
+    }
+
+    /// Hot reload: widget files and iceberg.toml saved while the panel is open.
+    static var reload: Journey {
+        journey("notch-reload", "saving a widget file or iceberg.toml updates the open panel without a restart", [
+            step("open the panel") { ctx in
+                try ctx.notchURL("open")
+                try ctx.wait("the panel to open") { ctx.isNotchOpen() }
+                try ctx.wait("the Journey widget's output", timeout: 10) { ctx.notchTexts().contains { $0.contains("journey-ok") } }
+            },
+            step("a widget file saved in place reloads it") { ctx in
+                let pid = ctx.pid
+                try ctx.writeWidgetFile("journey.toml", """
+                title = "Journey"
+                icon = "checkmark.circle"
+                command = "echo journey-reloaded"
+                refresh = "on open"
+                """, inPlace: true)
+                try ctx.wait("the new command's output", timeout: 6) { ctx.notchTexts().contains { $0.contains("journey-reloaded") } }
+                try ctx.check(ctx.pid == pid && ctx.running?.isTerminated == false, "Iceberg restarted")
+            },
+            step("a save with a mistake keeps the last good version") { ctx in
+                try ctx.writeWidgetFile("journey.toml", "title = \"Journey\"\ncommand = \"echo broken\n", inPlace: true)
+                Input.pause(1.5)
+                let texts = ctx.notchTexts()
+                try ctx.check(texts.contains("Journey") && texts.contains("journey-reloaded"),
+                              "the widget went away while its file had a mistake; shown: \(texts)")
+            },
+            step("fixing the file applies at once") { ctx in
+                try ctx.writeWidgetFile("journey.toml", """
+                title = "Journey"
+                icon = "checkmark.circle"
+                command = "echo journey-ok"
+                refresh = "on open"
+                """, inPlace: true)
+                try ctx.wait("the fixed command's output", timeout: 6) { ctx.notchTexts().contains { $0.contains("journey-ok") } }
+            },
+            step("a new widget file and iceberg.toml saved in place show it") { ctx in
+                try ctx.writeWidgetFile("second.toml", """
+                title = "Second"
+                icon = "2.circle"
+                command = "echo second-ok"
+                """)
+                Input.pause(0.5)
+                try ctx.check(!ctx.notchTexts().contains { $0.contains("second-ok") }, "a widget not in panel = [...] is shown")
+                try ctx.editSettings { $0.replacingOccurrences(of: "panel = [\"battery\", \"journey\"]",
+                                                                 with: "panel = [\"battery\", \"journey\", \"second\"]") }
+                try ctx.wait("the new widget in the open panel", timeout: 6) { ctx.notchTexts().contains { $0.contains("second-ok") } }
+                try ctx.notchURL("close")
+            },
+        ])
+    }
+}
+
 extension Ctx {
+    var icebergFolder: URL { home.appendingPathComponent(".config/grand-line/iceberg") }
+
+    /// Writes a file in the widgets folder. In place keeps the same file (as
+    /// nano or `echo >` do); otherwise it is replaced (as most editors do).
+    func writeWidgetFile(_ name: String, _ text: String, inPlace: Bool = false) throws {
+        let url = icebergFolder.appendingPathComponent("widgets/\(name)")
+        try write(url, text, inPlace: inPlace)
+    }
+
+    /// Writes a file in the fixture home.
+    func writeHomeFile(_ name: String, _ text: String) throws {
+        try text.write(to: home.appendingPathComponent(name), atomically: true, encoding: .utf8)
+    }
+
+    /// Changes iceberg.toml in place.
+    func editSettings(_ change: (String) -> String) throws {
+        let url = icebergFolder.appendingPathComponent("iceberg.toml")
+        let before = try String(contentsOf: url, encoding: .utf8)
+        let after = change(before)
+        try check(after != before, "the change to iceberg.toml did not apply; it reads:\n\(before)")
+        try write(url, after, inPlace: true)
+    }
+
+    private func write(_ url: URL, _ text: String, inPlace: Bool) throws {
+        if inPlace, FileManager.default.fileExists(atPath: url.path) {
+            let handle = try FileHandle(forWritingTo: url)
+            try handle.truncate(atOffset: 0)
+            try handle.write(contentsOf: Data(text.utf8))
+            try handle.close()
+        } else {
+            try text.write(to: url, atomically: true, encoding: .utf8)
+        }
+    }
+
+    /// Runs the package's `iceberg` command (bin/iceberg) from this checkout.
+    func icebergCommand(_ args: [String]) throws {
+        guard let fixture = options.fixtureScript else { throw StepFailure("no --fixture-script, so bin/iceberg cannot be found") }
+        let repo = fixture.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let script = repo.appendingPathComponent("bin/iceberg")
+        guard FileManager.default.fileExists(atPath: script.path) else { throw StepFailure("\(script.path) is missing") }
+        let result = Shell.run("/bin/bash", [script.path] + args, timeout: 20)
+        try check(result.status == 0, "iceberg \(args.joined(separator: " ")) failed (\(result.status)): \(result.output)")
+    }
+
     func notchURL(_ command: String) throws {
         guard let scheme = app.urlScheme else { throw StepFailure("apps.tsv names no URL scheme for \(app.name)") }
         try openApp(["\(scheme)://\(command)"], background: true)

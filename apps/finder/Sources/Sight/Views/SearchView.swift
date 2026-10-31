@@ -14,6 +14,9 @@ struct SearchView: View {
             HStack(alignment: .top, spacing: 0) {
                 VStack(spacing: 0) {
                     FieldRow(model: model, theme: theme)
+                    if !model.buffer.isEmpty {
+                        BufferRow(model: model, theme: theme)
+                    }
                     if !model.chips.isEmpty {
                         ChipsRow(chips: model.chips, theme: theme)
                     }
@@ -37,7 +40,7 @@ struct SearchView: View {
             .background(Color(theme.background))
             .overlay(alignment: .bottomTrailing) {
                 if let panel = model.actionPanel {
-                    ActionPanelView(state: panel, theme: theme)
+                    ActionPanelView(state: panel, theme: theme, onChoose: { model.choosePanelAction(at: $0) })
                         .padding(.trailing, 10)
                         .padding(.bottom, 36)
                 }
@@ -58,15 +61,74 @@ struct FieldRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: model.text.first.flatMap { Prefix(rawValue: String($0)) }?.symbol ?? "magnifyingglass")
+            Image(systemName: "magnifyingglass")
                 .font(.system(size: 15))
                 .foregroundStyle(Color(theme.dim))
                 .frame(width: 22)
+            if let chip = model.scopeChip {
+                // The prefix or keyword in use: "Files", "Clipboard", "Commands".
+                Text(chip)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color(theme.text))
+                    .lineLimit(1)
+                    .padding(.horizontal, 7)
+                    .frame(height: 20)
+                    .background(RoundedRectangle(cornerRadius: 5).fill(Color(theme.chip)))
+                    .fixedSize()
+                    .accessibilityIdentifier("sight.scope")
+            }
             SearchField(model: model, theme: theme)
                 .frame(height: 22)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
+        .overlay(alignment: .bottom) { Rectangle().fill(Color(theme.line)).frame(height: 1) }
+    }
+}
+
+/// The file buffer (Command+B): a chip per file; Command+K acts on all of them.
+struct BufferRow: View {
+    @ObservedObject var model: SearchModel
+    let theme: Theme
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "tray.full")
+                .foregroundStyle(Color(theme.dim))
+            ScrollView(.horizontal) {
+                HStack(spacing: 6) {
+                    ForEach(model.buffer.chips) { chip in
+                        HStack(spacing: 4) {
+                            Text(chip.name)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .frame(maxWidth: 160)
+                            Button {
+                                model.removeFromBuffer(chip.path)
+                            } label: {
+                                Image(systemName: "xmark").font(.system(size: 8, weight: .bold))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Remove \(chip.name) from the buffer")
+                        }
+                        .foregroundStyle(Color(theme.text))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(RoundedRectangle(cornerRadius: 5).fill(Color(theme.chip)))
+                        .help(chip.path)
+                    }
+                }
+            }
+            .scrollIndicators(.never)
+            Text("⌘K acts on \(model.buffer.count == 1 ? "it" : "all \(model.buffer.count)")")
+                .foregroundStyle(Color(theme.dim))
+                .lineLimit(1)
+                .fixedSize()
+        }
+        .font(.system(size: 11))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .accessibilityIdentifier("sight.buffer")
         .overlay(alignment: .bottom) { Rectangle().fill(Color(theme.line)).frame(height: 1) }
     }
 }

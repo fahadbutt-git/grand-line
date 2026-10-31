@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://grand-line.local/iceberg/iceberg.schema.json",
+  "title": "Iceberg settings (iceberg.toml)",
+  "description": "Iceberg's settings file, ~/.config/grand-line/iceberg/iceberg.toml. Widget files in the widgets folder follow #/$defs/widget. Iceberg checks both on every load and lists problems in Settings; unknown keys are warned about there, so editors flag them too.",
+  "type": "object",
+  "properties": {
+    "panel": {
+      "description": "What the panel shows, in order: built-in items (date, now-playing, today, reminders, battery) and widget file names without .toml.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": [
+        "date",
+        "now-playing",
+        "today"
+      ]
+    },
+    "open_on": {
+      "description": "Open the panel when the pointer rests on the notch, or when it is clicked.",
+      "type": "string",
+      "enum": [
+        "hover",
+        "click"
+      ],
+      "default": "hover"
+    },
+    "hover_delay": {
+      "description": "Seconds the pointer rests on the notch before the panel opens.",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 3,
+      "default": 0.12
+    },
+    "close_delay": {
+      "description": "Seconds after the pointer leaves before the panel closes.",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 3,
+      "default": 0.35
+    },
+    "toggle_shortcut": {
+      "description": "A keyboard shortcut that opens or closes the panel from any app: ctrl, option, cmd or shift and a key, joined with +. An empty text turns it off.",
+      "type": "string",
+      "pattern": "^$|^(none|off)$|^((ctrl|control|ctl|opt|option|alt|cmd|command|super|meta|shift)\\+)+[^+]+$",
+      "default": "ctrl+option+cmd+n"
+    },
+    "external_displays": {
+      "description": "Displays without a notch: nothing, or a pill at the top centre.",
+      "type": "string",
+      "enum": [
+        "none",
+        "pill"
+      ],
+      "default": "none"
+    },
+    "live_activity": {
+      "description": "Artwork and playing bars beside the closed notch while music plays.",
+      "type": "boolean",
+      "default": true
+    },
+    "menu_bar_icon": {
+      "description": "Iceberg's item in the menu bar.",
+      "type": "boolean",
+      "default": true
+    },
+    "launch_at_login": {
+      "description": "Open Iceberg when you log in.",
+      "type": "boolean",
+      "default": true
+    },
+    "max_concurrent": {
+      "description": "The most widget commands that run at the same moment (and the most streams). Values outside 1 to 16 are brought into range.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16,
+      "default": 4
+    },
+    "builtin": {
+      "description": "The older way to choose built-in items; panel replaces it.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "now-playing",
+          "today",
+          "reminders",
+          "battery"
+        ]
+      },
+      "deprecated": true
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "widget": {
+      "title": "Iceberg widget file",
+      "description": "A file in ~/.config/grand-line/iceberg/widgets/ (TOML or JSON). Interval widgets use refresh, signal widgets signal = true, stream widgets stream = true.",
+      "type": "object",
+      "properties": {
+        "command": {
+          "description": "The shell command whose output is shown. It runs with /bin/sh in the widgets folder. Its output is one line of text, or one line of JSON: text, alt, tooltip, class, percentage, icon, color.",
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "description": "The label. Defaults to the file name.",
+          "type": "string"
+        },
+        "icon": {
+          "description": "An SF Symbol name.",
+          "type": "string",
+          "pattern": "^[a-z0-9.]+$",
+          "default": "square.dashed"
+        },
+        "refresh": {
+          "description": "How often it runs: seconds (5 at the fewest), a duration such as \"30s\", \"5m\" or \"1h\", or \"on open\".",
+          "anyOf": [
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": "on open"
+        },
+        "signal": {
+          "description": "Runs when `iceberg trigger NAME` is called (and once as the panel opens).",
+          "type": "boolean",
+          "default": false
+        },
+        "stream": {
+          "description": "The command keeps running and prints one line per update.",
+          "type": "boolean",
+          "default": false
+        },
+        "updates": {
+          "description": "\"when_shown\" runs it only while the panel is open, plus once as it opens; \"always\" keeps it current while the panel is closed.",
+          "type": "string",
+          "enum": [
+            "when_shown",
+            "always"
+          ],
+          "default": "when_shown"
+        },
+        "always": {
+          "description": "Keep running during Low Power Mode and around sleep.",
+          "type": "boolean",
+          "default": false
+        },
+        "click": {
+          "description": "Run when the widget is clicked, then the widget refreshes.",
+          "type": "string"
+        },
+        "timeout": {
+          "description": "Seconds before a stuck command and everything it started are stopped (1 to 120; values outside are brought into range).",
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 120
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": 10
+        },
+        "order": {
+          "description": "Only for files from before panel: the position, lowest first.",
+          "type": "integer",
+          "default": 0
+        },
+        "enabled": {
+          "description": "false keeps it off, whatever Settings says.",
+          "type": "boolean",
+          "default": true
+        },
+        "script": {
+          "$ref": "#/$defs/widget/properties/command",
+          "description": "Same as command."
+        },
+        "exec": {
+          "$ref": "#/$defs/widget/properties/command",
+          "description": "Same as command."
+        },
+        "symbol": {
+          "$ref": "#/$defs/widget/properties/icon",
+          "description": "Same as icon."
+        },
+        "sf_symbol": {
+          "$ref": "#/$defs/widget/properties/icon",
+          "description": "Same as icon."
+        },
+        "interval": {
+          "$ref": "#/$defs/widget/properties/refresh",
+          "description": "Same as refresh."
+        },
+        "update_freq": {
+          "$ref": "#/$defs/widget/properties/refresh",
+          "description": "Same as refresh."
+        },
+        "on_click": {
+          "$ref": "#/$defs/widget/properties/click",
+          "description": "Same as click."
+        },
+        "on-click": {
+          "$ref": "#/$defs/widget/properties/click",
+          "description": "Same as click."
+        },
+        "click_command": {
+          "$ref": "#/$defs/widget/properties/click",
+          "description": "Same as click."
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -36,7 +36,7 @@ final class ActionPerformer {
             guard Keystrokes.allowed() else { return }
             inFrontApp { if !Keystrokes.press(shortcut) { NSSound.beep() } }
         case .moveTo(let path):
-            moveAsking(paths.expand(path))
+            moveAsking([paths.expand(path)])
         case .airDrop(let path):
             NSSharingService(named: .sendViaAirDrop)?.perform(withItems: [URL(fileURLWithPath: paths.expand(path))])
         case .run(let executable, let arguments):
@@ -50,8 +50,58 @@ final class ActionPerformer {
         case .lookUp(let word):
             let encoded = word.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? word
             if let url = URL(string: "dict://" + encoded) { NSWorkspace.shared.open(url) }
-        case .openWith, .quickLook, .setQuery, .toggleFavourite:
+        case .files(let verb, let list):
+            files(verb, list.map(paths.expand))
+        case .createFile(let path):
+            createFile(paths.expand(path))
+        case .openWith, .quickLook, .setQuery, .toggleFavourite, .buffer, .clearBuffer, .script:
             break // handled by the window
+        }
+    }
+
+    /// One action on several files (the buffer, the selection, or one row).
+    func files(_ verb: FileVerb, _ list: [String]) {
+        let urls = list.map { URL(fileURLWithPath: $0) }
+        guard !urls.isEmpty else { return }
+        switch verb {
+        case .open:
+            for path in list { self.open(path) }
+        case .reveal:
+            NSWorkspace.shared.activateFileViewerSelecting(urls)
+        case .copyFiles:
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.writeObjects(urls.map { $0 as NSURL })
+        case .moveTo:
+            moveAsking(list)
+        case .airDrop:
+            NSSharingService(named: .sendViaAirDrop)?.perform(withItems: urls)
+        case .trash:
+            // To the Trash, where Put Back works. Nothing here deletes a file.
+            var failed = false
+            for url in urls {
+                do { try FileManager.default.trashItem(at: url, resultingItemURL: nil) } catch { failed = true }
+            }
+            if failed { NSSound.beep() }
+        case .quickLook:
+            launch("/usr/bin/qlmanage", ["-p"] + list)
+        }
+    }
+
+    /// An empty file, never over one that exists; then shown in Nexus.
+    func createFile(_ path: String) {
+        let folder = (path as NSString).deletingLastPathComponent
+        let manager = FileManager.default
+        guard !manager.fileExists(atPath: path) else {
+            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+            return NSSound.beep()
+        }
+        do {
+            try manager.createDirectory(atPath: folder, withIntermediateDirectories: true)
+            guard manager.createFile(atPath: path, contents: Data()) else { return NSSound.beep() }
+            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+        } catch {
+            NSSound.beep()
         }
     }
 
@@ -117,18 +167,23 @@ final class ActionPerformer {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
     }
 
-    /// Asks for a folder and moves the item there; an item of the same name is never replaced.
-    func moveAsking(_ path: String) {
+    /// Asks for a folder and moves the items there; an item of the same name is never replaced.
+    func moveAsking(_ list: [String]) {
+        guard let first = list.first else { return }
         NSApp.activate()
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.prompt = "Move here"
-        panel.directoryURL = URL(fileURLWithPath: (path as NSString).deletingLastPathComponent)
+        panel.directoryURL = URL(fileURLWithPath: (first as NSString).deletingLastPathComponent)
         guard panel.runModal() == .OK, let folder = panel.url else { return }
-        let destination = folder.appendingPathComponent((path as NSString).lastPathComponent)
-        guard !FileManager.default.fileExists(atPath: destination.path) else { return NSSound.beep() }
-        do { try FileManager.default.moveItem(at: URL(fileURLWithPath: path), to: destination) } catch { NSSound.beep() }
+        var failed = false
+        for path in list {
+            let destination = folder.appendingPathComponent((path as NSString).lastPathComponent)
+            if FileManager.default.fileExists(atPath: destination.path) { failed = true; continue }
+            do { try FileManager.default.moveItem(at: URL(fileURLWithPath: path), to: destination) } catch { failed = true }
+        }
+        if failed { NSSound.beep() }
     }
 
     /// The apps that can open a file, for Open With.

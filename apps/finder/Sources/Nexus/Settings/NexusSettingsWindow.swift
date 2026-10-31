@@ -21,11 +21,29 @@ final class NexusSettingsWindow {
     static var indexProvider: @MainActor () -> (any IndexStatusProviding)? = { Services.shared.index }
 
     private var controller: SettingsWindowController?
+    private var escapeMonitor: Any?
 
     func show(pane: String? = nil) {
         let controller = self.controller ?? make()
         self.controller = controller
         controller.show(pane: pane)
+        watchEscape()
+    }
+
+    /// Escape closes Settings, as in every macOS settings window, unless a
+    /// field is being edited (then Escape is the field's). Cmd+W and the close
+    /// button close it through the menu and the window itself.
+    private func watchEscape() {
+        guard escapeMonitor == nil else { return }
+        escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            MainActor.assumeIsolated {
+                guard event.keyCode == 53, event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty,
+                      let window = NexusSettingsWindow.shared.controller?.window, window.isKeyWindow,
+                      !(window.firstResponder is NSText) else { return event }
+                window.performClose(nil)
+                return nil
+            }
+        }
     }
 
     private func make() -> SettingsWindowController {

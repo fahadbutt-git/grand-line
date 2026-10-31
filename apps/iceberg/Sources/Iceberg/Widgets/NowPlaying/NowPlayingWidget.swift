@@ -6,8 +6,14 @@ import IcebergKit
 /// with artwork and play, pause, next and previous.
 ///
 /// This is the one widget that keeps working while the panel is closed, so
-/// the closed notch can show the artwork. It still uses no timer: updates are
-/// pushed by the adapter, or by Spotify and Music themselves in the fallback.
+/// the closed notch can show the artwork. Updates are pushed by the adapter,
+/// or by Spotify and Music themselves in the fallback.
+///
+/// The adapter rests on a private macOS framework that an update can break,
+/// so it is checked at launch and every few minutes. When it fails, Music
+/// and Spotify are asked with AppleScript and followed through their change
+/// notices; Settings says which source is in use, and what to do when
+/// neither works.
 @MainActor
 final class NowPlayingWidget: ObservableObject, NotchWidget {
     let id = "now-playing"
@@ -19,27 +25,112 @@ final class NowPlayingWidget: ObservableObject, NotchWidget {
     /// The cover's strongest colour, for the closed notch's bars; nil for a
     /// grey cover or none.
     @Published private(set) var artworkTint: RGB?
+    /// Which source is in use and why, for Settings.
+    @Published private(set) var health: MediaHealth
+    @Published private(set) var checking = false
 
+    private let location: MediaAdapter.Location?
     private var adapter: MediaAdapter?
-    private var observers: [NSObjectProtocol] = []
+    private var playerObservers: [DistributedObserver] = []
+    private var checkTimer: Timer?
+    private var stopped = false
 
     init(context: WidgetContext) {
-        if let location = MediaAdapter.bundled() {
-            let adapter = MediaAdapter(location: location,
-                                       onLine: { [weak self] line in self?.handle(line: line) },
-                                       onGiveUp: { [weak self] in self?.useNotifications() })
-            self.adapter = adapter
-            adapter.start()
-        } else {
-            Log.info("Now Playing adapter not bundled; using the Spotify and Music notices")
-            useNotifications()
+        location = MediaAdapter.bundled()
+        health = MediaHealth(adapterBundled: location != nil)
+        if location == nil {
+            Log.info("Now Playing adapter not bundled; asking Music and Spotify instead")
         }
+        applySource()
+        checkHealth()
+        armCheckTimer()
     }
 
     func makeView() -> AnyView { AnyView(NowPlayingView(model: self)) }
 
     /// True while something is playing, for the closed notch's live activity.
     var isPlaying: Bool { state.hasMedia && state.isPlaying }
+
+    func panelWillOpen() {
+        // One refresh on open in the fallback; the adapter pushes by itself.
+        if health.source != .adapter { askPlayers() }
+        if health.checkDue(at: Date()) { checkHealth() }
+    }
+
+    // MARK: Source
+
+    /// Starts the source the health says to use and stops the other.
+    private func applySource() {
+        guard !stopped else { return }
+        if health.source == .adapter, let location {
+            stopFallback()
+            guard adapter == nil else { return }
+            let adapter = MediaAdapter(location: location,
+                                       onLine: { [weak self] line in self?.handle(line: line) },
+                                       onGiveUp: { [weak self] in self?.adapterGaveUp() })
+            self.adapter = adapter
+            adapter.start()
+        } else {
+            if adapter != nil {
+                adapter?.stop()
+                adapter = nil
+                update(to: NowPlayingState())
+            }
+            startFallback()
+        }
+    }
+
+    private func adapterGaveUp() {
+        Log.info("Now Playing adapter keeps exiting; asking Music and Spotify instead")
+        adapter = nil
+        health.streamGaveUp = true
+        applySource()
+    }
+
+    /// Runs the adapter's own test. At launch, every few minutes, and from
+    /// Settings' Check again.
+    func checkHealth() {
+        guard let location, !checking else { return }
+        checking = true
+        let command = ["/usr/bin/perl", location.script.path, location.framework.path, "test"]
+            .map(Self.shellQuoted).joined(separator: " ")
+        DispatchQueue.global(qos: .utility).async {
+            let result = CommandRunner().run(command, timeout: 6)
+            let check = AdapterCheck.evaluate(exitCode: result.exitCode, stderr: result.stderr,
+                                              timedOut: result.timedOut, launchError: result.launchError)
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { [weak self] in self?.finishedCheck(check) }
+            }
+        }
+    }
+
+    private func finishedCheck(_ check: AdapterCheck) {
+        checking = false
+        let before = health.source
+        health.record(check, at: Date())
+        if case .broken(let why) = check { Log.info("Now Playing adapter check failed: \(why)") }
+        // In the fallback, ask now so Settings shows whether AppleScript works.
+        if health.source != .adapter && health.appleScript == .unused { askPlayers() }
+        if health.source != before {
+            Log.info("Now Playing source: \(health.summary)")
+        }
+        applySource()
+    }
+
+    private func armCheckTimer() {
+        checkTimer?.invalidate()
+        guard location != nil else { return }
+        let t = Timer(timeInterval: MediaHealth.checkInterval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.checkHealth() }
+        }
+        t.tolerance = 60
+        RunLoop.main.add(t, forMode: .common)
+        checkTimer = t
+    }
+
+    static func shellQuoted(_ s: String) -> String {
+        "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
 
     private func handle(line: String) {
         var next = state
@@ -61,36 +152,71 @@ final class NowPlayingWidget: ObservableObject, NotchWidget {
         if next != state { state = next }
     }
 
-    /// The fallback: Spotify's and Music's own change notices.
-    private func useNotifications() {
-        adapter?.stop()
-        adapter = nil
-        guard observers.isEmpty else { return }
-        let center = DistributedNotificationCenter.default()
-        for name in [PlayerNotification.spotify, PlayerNotification.music] {
-            let token = center.addObserver(forName: Notification.Name(name), object: nil, queue: .main) { [weak self] note in
-                guard let bundle = PlayerNotification.bundleIdentifier(forNotification: note.name.rawValue) else { return }
-                let info = (note.userInfo as? [String: Any]) ?? [:]
-                let payload = PlayerNotification.payload(bundleIdentifier: bundle, info: info)
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    var next = self.state
-                    // A pause from one app should not clear what the other plays.
-                    if payload.isEmpty, self.state.bundleIdentifier != bundle { return }
-                    next.apply(payload: payload, diff: false)
-                    self.update(to: next)
-                }
+    // MARK: The fallback
+
+    /// Spotify's and Music's own change notices, and one question to each
+    /// that is running.
+    private func startFallback() {
+        if playerObservers.isEmpty {
+            for name in [PlayerNotification.spotify, PlayerNotification.music] {
+                playerObservers.append(DistributedObserver(name) { [weak self] note in
+                    self?.playerNotice(note)
+                })
             }
-            observers.append(token)
         }
+        askPlayers()
+    }
+
+    private func stopFallback() {
+        playerObservers = []
+    }
+
+    private func playerNotice(_ note: Notification) {
+        guard let bundle = PlayerNotification.bundleIdentifier(forNotification: note.name.rawValue) else { return }
+        let info = (note.userInfo as? [String: Any]) ?? [:]
+        let payload = PlayerNotification.payload(bundleIdentifier: bundle, info: info)
+        var next = state
+        // A pause from one app should not clear what the other plays.
+        if payload.isEmpty, state.bundleIdentifier != bundle { return }
+        next.apply(payload: payload, diff: false)
+        update(to: next)
+    }
+
+    /// Asks Music and Spotify, if running, what they play (never opens them).
+    private func askPlayers() {
+        var found: [[String: JSONValue]] = []
+        var status: AppleScriptStatus?
+        for player in AppleScriptNowPlaying.players {
+            guard !NSRunningApplication.runningApplications(withBundleIdentifier: player.bundleIdentifier).isEmpty else { continue }
+            var error: NSDictionary?
+            let result = NSAppleScript(source: AppleScriptNowPlaying.script(for: player))?.executeAndReturnError(&error)
+            let number = error?[NSAppleScript.errorNumber] as? Int
+            let message = error?[NSAppleScript.errorMessage] as? String
+            let this = AppleScriptStatus.from(errorNumber: number, message: message)
+            if status == nil || this != .working { status = this }
+            if let text = result?.stringValue, let payload = AppleScriptNowPlaying.payload(from: text, player: player), !payload.isEmpty {
+                found.append(payload)
+            }
+        }
+        if let status, status != health.appleScript {
+            health.appleScript = status
+            Log.info("Now Playing through AppleScript: \(health.summary)")
+        }
+        guard health.source != .adapter else { return }
+        // What plays wins over what is paused.
+        let best = found.first { $0["playing"] == .bool(true) } ?? found.first
+        var next = NowPlayingState()
+        if let best { next.apply(payload: best, diff: false) }
+        update(to: next)
     }
 
     func shutDown() {
+        stopped = true
+        checkTimer?.invalidate()
+        checkTimer = nil
         adapter?.stop()
         adapter = nil
-        let center = DistributedNotificationCenter.default()
-        for token in observers { center.removeObserver(token) }
-        observers = []
+        stopFallback()
     }
 
     /// The cover drawn small, then its strongest hue (once per track).

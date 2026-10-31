@@ -41,6 +41,7 @@ public final class SettingsActionsProvider: InstantProvider, @unchecked Sendable
     public let title = "Settings"
     public let symbol = "switch.2"
     public let prefix: Prefix? = nil
+    public let extraPrefixes: [Prefix] = [.settings]
     public let inGlobalSearch = true
 
     let paths: GrandLinePaths
@@ -136,7 +137,7 @@ public final class SettingsActionsProvider: InstantProvider, @unchecked Sendable
         if failure == nil {
             let read = currentState
             if let key = job.expectedKey, let want = job.expectedValue, let got = read?.values[key], got != want {
-                failure = SettingFailure("macOS did not make the change", permission: job.permission)
+                failure = SettingFailure("macOS did not make the change", permission: job.permission, refused: false)
             } else if let want = job.expectedVolume, let got = read?.volume, got != want {
                 failure = SettingFailure("The volume is \(got)%, not \(want)%")
             }
@@ -211,7 +212,7 @@ public final class SettingsActionsProvider: InstantProvider, @unchecked Sendable
     // MARK: Rows
 
     public func instantResults(for query: LaunchQuery) -> [LaunchResult] {
-        guard query.prefix == nil, !query.isPath, !query.term.isEmpty else { return [] }
+        guard query.prefix == nil || query.prefix == .settings, !query.isPath, !query.term.isEmpty else { return [] }
         let matches = SettingsActions.parse(query.term)
         guard !matches.isEmpty else { return [] }
         let (state, phases) = locked { (self.state, self.phases) }
@@ -224,6 +225,8 @@ public final class SettingsActionsProvider: InstantProvider, @unchecked Sendable
     }
 
     static let soundPane = SettingsActions.byKey["mute"]
+
+    static let qualityBase = 10_000
 
     public static func row(_ match: SettingsActions.Match, state: SettingsState?, phases: [String: SettingPhase], paths: GrandLinePaths) -> LaunchResult? {
         let id = SettingsActions.rowID(match.request)
@@ -308,7 +311,8 @@ public final class SettingsActionsProvider: InstantProvider, @unchecked Sendable
         case .failed(let failure)?:
             title = name + ": not changed"
             subtitle = failure.message
-            accessory = "Failed"
+            // Why, in a word or two: the permission macOS refused, else "Failed".
+            accessory = failure.state
             var retry = primary
             retry.title = "Try again"
             if let permission = failure.permission {
@@ -332,9 +336,11 @@ public final class SettingsActionsProvider: InstantProvider, @unchecked Sendable
             accessory: accessory,
             actions: actions,
             providerID: providerID,
+            // Above fzf's scores of other rows in the same tier (a pane of the same
+            // name), and in the parser's own order among themselves.
             match: match.exact
-                ? MatchInfo(alias: .exact, title: .exact, quality: match.order)
-                : MatchInfo(title: .prefix, quality: match.order)
+                ? MatchInfo(alias: .exact, title: .exact, quality: Self.qualityBase + match.order)
+                : MatchInfo(title: .prefix, quality: Self.qualityBase + match.order)
         )
     }
 

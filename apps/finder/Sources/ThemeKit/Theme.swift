@@ -43,9 +43,20 @@ public struct Theme: Sendable, Equatable {
     public let icon: IconTheme
     /// Row density, when the theme sets UI_DENSITY; otherwise each app's own choice.
     public let density: Density?
+    /// Type, radii, spacing and motion (FONT_*, RADIUS_*, SPACING_UNIT, UI_MOTION).
+    public let tokens: ThemeTokens
+    /// What the checker found in the theme file (`theme check` prints the same).
+    public let issues: [ThemeDiagnostic]
+
+    /// A theme file read with its EXTENDS parents: the checker fills its
+    /// defaults and reports its problems in `issues`.
+    public init(name: String, source: ThemeSource) {
+        let checked = ThemeSpec.validate(source)
+        self.init(name: name, values: checked.values, issues: checked.diagnostics)
+    }
 
     /// Missing keys come from the built-in theme of the same mode.
-    public init(name: String, values: [String: String]) {
+    public init(name: String, values: [String: String], issues: [ThemeDiagnostic] = []) {
         let mode = values["MODE"]?.lowercased()
         let base = mode == "light" ? BuiltInThemes.daylight : BuiltInThemes.graphite
         func color(_ key: String) -> ThemeColor? {
@@ -92,6 +103,8 @@ public struct Theme: Sendable, Equatable {
         self.palette = palette
         self.kinds = ThemeKinds(values: values, palette: palette, accent: accent, dim: dim)
         self.density = values[Density.themeKey].flatMap { Density(rawValue: $0.lowercased()) }
+        self.tokens = ThemeTokens(values: values)
+        self.issues = issues
         // The icon falls back to this theme's own background and text, never another theme's.
         self.icon = IconTheme(values: values.merging(
             ["MODE": isDark ? "dark" : "light", "TERM_BG": background.hex, "TERM_FG": rawText.hex,

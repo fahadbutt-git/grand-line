@@ -7,6 +7,7 @@ public final class MenuProvider: InstantProvider, @unchecked Sendable {
     public let title = "Grand Line menu"
     public let symbol = "menubar.rectangle"
     public let prefix: Prefix? = nil
+    public let extraPrefixes: [Prefix] = [.shell]
     public let inGlobalSearch = true
     let paths: GrandLinePaths
     let runner: ShellRunner

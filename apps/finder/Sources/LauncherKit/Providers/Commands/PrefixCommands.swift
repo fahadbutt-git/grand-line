@@ -1,11 +1,14 @@
 import Foundation
 
-/// `!` a new reminder: "call Smith in 20 min", "pay rent 2h", "submit at 3pm".
+/// "remind …" a new reminder: "remind call Smith in 20 min", "remind pay rent
+/// 2h", "remind submit at 3pm". (It was the `!` prefix, which is now windows.)
 public struct ReminderProvider: InstantProvider {
     public let id = "reminder"
     public let title = "Reminder"
     public let symbol = "bell"
-    public let prefix: Prefix? = .reminder
+    public let prefix: Prefix? = nil
+    public let keyword: String? = "remind"
+    public let routesBareKeyword = true
     public let inGlobalSearch = false
     let paths: GrandLinePaths
     let now: @Sendable () -> Date
@@ -73,7 +76,8 @@ public struct ReminderProvider: InstantProvider {
     }
 }
 
-/// `>` runs a shell command in its own terminal window, through in-window.
+/// `>` runs a shell command in its own terminal window, through in-window,
+/// beside the Grand Line commands and script commands that match.
 public struct ShellProvider: InstantProvider {
     public let id = "shell"
     public let title = "Shell"
@@ -105,7 +109,8 @@ public struct ShellProvider: InstantProvider {
     }
 }
 
-/// `$` shows Maccy's clipboard history by pressing Maccy's own pop-up shortcut.
+/// `$` shows Maccy's own window by pressing its pop-up shortcut (`:` lists its
+/// history inside Sight, ClipboardHistoryProvider).
 /// That is Maccy's default, ⇧⌘C: setup leaves it as it is
 /// (steps/10-macos-defaults.sh), and Caps + Ctrl + V sends the same keys.
 public struct ClipboardProvider: InstantProvider {
@@ -137,7 +142,7 @@ public struct ClipboardProvider: InstantProvider {
     }
 }
 
-/// `/` lists the prefixes and the keyword providers. Return types the prefix.
+/// `/` alone lists the prefixes and the keyword providers. Return types the prefix.
 public struct PrefixListProvider: InstantProvider {
     public let id = "prefixes"
     public let title = "Prefixes"
@@ -157,8 +162,9 @@ public struct PrefixListProvider: InstantProvider {
                 title: prefix.title,
                 icon: .symbol(prefix.symbol),
                 section: .system,
-                accessory: prefix.rawValue,
-                actions: [LaunchAction.complete(prefix.rawValue, title: "Use")],
+                keywords: prefix.triggers + [prefix.chip],
+                accessory: prefix.triggers.joined(separator: " "),
+                actions: [LaunchAction.complete(prefix.completion, title: "Use")],
                 providerID: id
             )
         }

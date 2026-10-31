@@ -10,6 +10,35 @@ public enum ConflictPolicy: Sendable, Equatable {
     case skip
 }
 
+/// The answers to a task's conflicts: one policy for every name, with
+/// exceptions by name (the conflict sheet's per-item answers before Apply to All).
+public struct ConflictResolution: Sendable, Equatable {
+    public var fallback: ConflictPolicy
+    public var byName: [String: ConflictPolicy]
+
+    public init(_ fallback: ConflictPolicy = .keepBoth, byName: [String: ConflictPolicy] = [:]) {
+        self.fallback = fallback
+        self.byName = byName
+    }
+
+    public func policy(for name: String) -> ConflictPolicy {
+        byName[name] ?? fallback
+    }
+}
+
+/// An item whose name is already taken at the destination.
+public struct FileConflict: Sendable, Equatable {
+    public let source: URL
+    public let existing: URL
+
+    public init(source: URL, existing: URL) {
+        self.source = source
+        self.existing = existing
+    }
+
+    public var name: String { source.lastPathComponent }
+}
+
 public enum FileOperationKind: String, Sendable, Equatable {
     case copy = "Copy"
     case move = "Move"
@@ -17,6 +46,11 @@ public enum FileOperationKind: String, Sendable, Equatable {
     case rename = "Rename"
     case newFolder = "New Folder"
     case trash = "Move to Trash"
+    /// Rename N Items: several renames done and undone as one.
+    case renameItems = "Rename Items"
+    case compress = "Compress"
+    case extract = "Extract"
+    case putBack = "Put Back"
 }
 
 public struct OperationProgress: Sendable, Equatable {
@@ -53,4 +87,6 @@ public enum FileOperationError: Error, Equatable {
     case invalidName(String)
     case nameTaken(String)
     case missing(URL)
+    /// Two items of a batch rename would get the same name.
+    case duplicateNames([String])
 }
