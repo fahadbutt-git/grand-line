@@ -63,8 +63,6 @@ Ghostty with Omarchy's shell tools, set up in `config/zsh/grand-line.zsh`, `conf
 | `~/Pictures/Screenshots` | Screenshots and recordings | Keeps the Desktop clear |
 | Inside the Docker VM | Containers and their data | Removed with `colima delete` when no longer needed |
 
-Research follows the Drive layout: each paper has one folder under `01 Research` (by status: `_Active`, `_Under-Review`, `_Published` and so on), and one-off Claude work goes to `Claude Projects`.
-
 ## Building
 
 As in Omarchy: mise for language versions, uv for Python packages, Docker, lazygit, lazydocker and btop, with Neovim and LazyVim as the editor and Claude Code or Codex beside it (`tdl`).
@@ -87,7 +85,7 @@ As in Omarchy: mise for language versions, uv for Python packages, Docker, lazyg
 
 For the homelab: Tailscale joins this Mac to a private network with your NAS and servers. `nmap`, `mtr`, `iperf3` and `wakeonlan` find, trace, speed-test and wake machines. `fip server 8080` forwards a server's port to this Mac, `dip 8080` stops it, and `lip` lists them. `iso2sd image.iso disk4` writes an image to an SD card or USB stick, and refuses internal disks.
 
-Building native Mac apps (such as the search app) needs Xcode from the App Store. Install it when that work starts. It is about 15 GB.
+Setup builds the package's own apps with Apple's command line tools. Xcode (about 15 GB, from the App Store) is needed only to run their tests on this Mac or to use its editor.
 
 ## Downloads
 
@@ -228,8 +226,6 @@ Once installed, Log Pose opens folders and every "Show in Finder", and Byakugan 
 | An R package | Add a line to `config/grand-line/r-packages.txt`, then `--only r-packages` |
 | A native helper | Add `tools/name.swift`. Setup builds it into `~/.grand-line/.build` |
 | A setup step | Add `steps/NN-name.sh` with a function `step_name`. Steps run in file-name order |
-
-The future search app takes over Caps + Space by changing that one line in `tools/bindings.py` and turning off Spotlight's own shortcut in System Settings, Keyboard Shortcuts.
 
 ## Your own additions
 

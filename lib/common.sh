@@ -99,7 +99,6 @@ append_once() {
   run_sh "printf '%s\n' $(printf '%q' "$line") >> $(printf '%q' "$file")"
 }
 
-# Read the bundle identifier of an installed app, e.g. "WordCraft" or "Preview".
 # Tells macOS about an app copied into place, so it can be a default app
 # straight away instead of after its first launch.
 LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister

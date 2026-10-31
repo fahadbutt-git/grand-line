@@ -45,7 +45,8 @@ macOS requires these clicks from you. Work down the list once.
    ~/.config/grand-line/denden/widgets/ (see apps/denden/README.md).
 
 7. Byakugan and Log Pose (search and files)
-   Press Command + Space. Allow Byakugan in System Settings, Privacy and
+   After the restart at the end of this list, Command + Space opens
+   Byakugan (until then, its menu bar icon does). Allow Byakugan in System Settings, Privacy and
    Security, Accessibility, so it can search menus and paste. Folders and
    "Show in Finder" now open in Log Pose; the first Empty Trash asks to
    let it tell Finder. To go back to Spotlight or Finder: Caps + Ctrl + O,
@@ -98,7 +99,7 @@ macOS requires these clicks from you. Work down the list once.
 
 16. Install by hand (not available through Homebrew)
     VoiceStudio.
-    Microsoft Defender, only if Western or hospital IT requires it.
+    Microsoft Defender, only if your school or hospital IT requires it.
 
 17. Keep this package in sync with GitHub
     In Terminal: gh auth login
@@ -131,6 +132,7 @@ EOF
     open -a "AeroSpace" 2>/dev/null
     open -a "Maccy" 2>/dev/null
     open -a "Espanso" 2>/dev/null
+    open -a "Den Den" 2>/dev/null
   fi
   mark_done checklist
   ok "Checklist saved to Documents (it opens now)"

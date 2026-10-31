@@ -30,7 +30,7 @@ build_native_apps() {
 build_app_folder() {
   local dir="$1" stamp product name id agent
   stamp="$GRAND_LINE_STATE/built-$(basename "$dir")"
-  if [[ -f "$stamp" ]] && [[ -z "$(find "$dir" -path "$dir/.build" -prune -o \( -name '*.swift' -o -name '*.tsv' -o -name '*.plist' -o -path '*/Resources/*' \) -newer "$stamp" -print -quit)" ]]; then
+  if [[ -f "$stamp" ]] && [[ -z "$(find "$dir" -path "$dir/.build" -prune -o \( -name '*.swift' -o -name '*.[chm]' -o -name '*.tsv' -o -name '*.plist' -o -path '*/Resources/*' \) -newer "$stamp" -print -quit)" ]]; then
     return 0
   fi
   build_and_install "$dir" || return 1
@@ -93,8 +93,7 @@ install_app_bundle() {
   if [[ -e "$app" && "${GRAND_LINE_APPS_SCRATCH:-0}" == 1 ]]; then rm -rf "$app"
   elif [[ -e "$app" ]]; then move_to_trash "$app"; fi
   mv "$new" "$app"
-  local lsreg=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
-  [[ -x "$lsreg" ]] && "$lsreg" -f "$app" >/dev/null 2>&1
+  [[ -x "$LSREGISTER" ]] && "$LSREGISTER" -f "$app" >/dev/null 2>&1
   ok "Installed $name"
 }
 

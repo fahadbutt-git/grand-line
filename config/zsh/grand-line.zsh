@@ -47,9 +47,9 @@ alias gcam='git commit -a -m'
 alias gcad='git commit -a --amend'
 alias lzg='lazygit'
 
-# lp [folder]: open this folder (or another) in Log Pose, or Finder if it is
-# switched back. Folders open in whichever app setup made the folder viewer.
-lp() { open "${1:-.}"; }
+# lp [folder]: open this folder (or another) in Log Pose, or Finder if Log
+# Pose is not installed.
+lp() { open -b com.grandline.logpose "${1:-.}" 2>/dev/null || open "${1:-.}"; }
 
 # ga branch: a new branch in its own folder beside this one (a git worktree),
 # so two pieces of work never share a checkout. gd, run inside that folder,
@@ -80,7 +80,7 @@ alias lzd='lazydocker'
 # dip port...       stop forwarding those ports
 # lip               list forwarded ports
 fip() { local h="$1"; shift; for p in "$@"; do ssh -f -N -L "$p:localhost:$p" "$h" && echo "localhost:$p -> $h:$p"; done; }
-dip() { for p in "$@"; do pkill -f "ssh -f -N -L $p:localhost:$p" && echo "stopped $p"; done; }
+dip() { for p in "$@"; do pkill -f "ssh -f -N -L $p:localhost:$p( |\$)" && echo "stopped $p"; done; }
 lip() { pgrep -lf "ssh -f -N -L" || echo "no ports forwarded"; }
 
 # iso2sd image.iso disk4: write an image to an SD card or USB stick.

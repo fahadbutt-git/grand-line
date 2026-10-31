@@ -62,6 +62,13 @@ jobs:
             grep -E "error:|failed|XCTAssert" test.log | head -60 | sed "s/^/::error title=$APP test::/"; exit 1
           fi
           echo "::notice title=$APP tests::$(grep -Eo 'Executed [0-9]+ tests?, with [0-9]+ failures?' test.log | tail -1)"
+          # The new Mac has only the command line tools, so build with them too.
+          if [ -d /Library/Developer/CommandLineTools ]; then
+            if ! DEVELOPER_DIR=/Library/Developer/CommandLineTools swift build -c release 2>&1 | tee clt.log; then
+              grep -E "error:" clt.log | head -20 | sed "s/^/::error title=$APP command line tools::/"; exit 1
+            fi
+            echo "::notice title=$APP::builds with the command line tools alone"
+          fi
           # The app bundles, made exactly as setup makes them (lib/native-apps.sh).
           cd "$GITHUB_WORKSPACE"
           export GRAND_LINE_APPS_DEST="$RUNNER_TEMP/apps" REPO_DIR="$GITHUB_WORKSPACE" DRY_RUN=0

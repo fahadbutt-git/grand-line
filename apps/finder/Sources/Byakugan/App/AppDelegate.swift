@@ -1,5 +1,6 @@
 import AppKit
 import LaunchKit
+import ServiceManagement
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -14,7 +15,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel = PanelController(services: services)
         if HotkeySetting.takesCommandSpace() {
             hotKey = HotKey(keyCode: HotKey.space, modifiers: HotKey.command) { [weak self] in self?.panel.toggle() }
+            if hotKey == nil { explainBusyShortcut() }
         }
+        startAtLogin()
         statusItem = makeStatusItem()
         services.start()
         saveTimer = Timer.scheduledTimer(withTimeInterval: 1_800, repeats: true) { [weak self] _ in
@@ -46,4 +49,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showPanel() { panel.show() }
     @objc private func reload() { services.reloadSources(force: true) }
+
+    /// Byakugan must be running for Command + Space to work, so it starts at login.
+    private func startAtLogin() {
+        guard SMAppService.mainApp.status != .enabled else { return }
+        try? SMAppService.mainApp.register()
+    }
+
+    /// macOS applies the switch from Spotlight's shortcut at the next login.
+    private func explainBusyShortcut() {
+        let alert = NSAlert()
+        alert.messageText = "Command + Space still opens Spotlight"
+        alert.informativeText = "Restart the Mac or log out and in once, and Command + Space opens Byakugan. Its menu bar icon opens it until then."
+        alert.runModal()
+    }
 }
