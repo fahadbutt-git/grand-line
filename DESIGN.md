@@ -8,7 +8,7 @@ Apple's own type for every letter and number. The one exception is a few termina
 
 - **Interface text: SF Pro**, the macOS system font, in every window, menu, panel and notice. Apps use the system font API (SwiftUI `.body`, `.callout` and so on), never a hard-coded family. The pop-up menus use it by name (`SFProText-Regular`, installed by the `font-sf-pro` cask).
 - **Code and terminal: SF Mono** (the `font-sf-mono` cask), and nowhere else. File paths in app windows are interface text, so they use SF Pro too. The one exception: the terminal falls back to Symbols Nerd Font Mono (the `font-symbols-only-nerd-font` cask) for the file and git icons eza and starship draw, which SF Mono does not have. That font holds icons only, no letters, so every word on screen is still SF.
-- **Icons: SF Symbols** in every app built for the package. No icon fonts or image icons in app windows.
+- **Icons: SF Symbols** for every interface icon (buttons, sidebar, menus, chips). No icon fonts. The apps and files themselves keep the icons and thumbnails macOS draws for them, as in Finder and Spotlight, because that is how you recognise them.
 - One size scale: 11 (labels, shortcuts), 13 (rows), 15 to 17 (inputs and titles). Numbers that line up in columns use tabular figures.
 
 ## Colour
