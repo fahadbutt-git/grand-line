@@ -52,7 +52,9 @@ final class Services: ObservableObject {
         let file = paths.nameIndex
         Task {
             // Searchable while it builds; saved along the way and when done.
-            if await index.count == 0 || !(await index.isComplete) { await index.build(savingTo: file, every: 30) }
+            let count = await index.count
+            let complete = await index.isComplete
+            if count == 0 || !complete { await index.build(savingTo: file, every: 30) }
             await index.startWatching()
         }
         let progress = operations.progress

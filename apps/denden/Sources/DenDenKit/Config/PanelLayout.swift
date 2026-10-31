@@ -100,7 +100,7 @@ public struct PanelLayout: Equatable, Sendable {
 
     /// One place up (-1) or down (+1) among the names in `visible`.
     public mutating func move(_ id: String, by offset: Int, among visible: [String]) {
-        let shown = visible.filter { enabled.contains($0) }
+        let shown = enabled.filter { visible.contains($0) }
         guard let at = shown.firstIndex(of: id) else { return }
         let to = at + offset
         guard to >= 0, to < shown.count else { return }
