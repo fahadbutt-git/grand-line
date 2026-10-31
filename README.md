@@ -41,7 +41,7 @@ Ghostty with Omarchy's shell tools, set up in `config/zsh/mac-setup.zsh`, `confi
 | Ctrl + R | Searches your command history as you type |
 | `ls`, `lt`, `lsa` | Lists files with icons, as a tree, or including hidden files (eza) |
 | `rg word`, `fd name` | Searches inside files, or for files by name |
-| `compress folder`, `decompress file` | Makes a .tar.gz, or opens any archive (.zip, .tar.gz, .7z, .rar) |
+| `compress folder`, `decompress file` | Makes a .tar.gz, or opens any archive (.zip, .tar.gz, .7z, .rar) with macOS's own tar |
 | `tdl` | Splits the window: terminal on the left, Claude Code on the right (`tdl codex` for Codex) |
 | Caps + Option + Return | Opens a terminal inside a lasting tmux session |
 | Ctrl + Space, then ? | Lists every tmux key: Option + Return splits, Option + Escape closes a pane |
@@ -151,7 +151,7 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + Ctrl + B | Bluetooth menu |
 | Caps + Ctrl + W | Wi-Fi settings |
 | Caps + Ctrl + S | Share with AirDrop |
-| Caps + Ctrl + T | Activity Monitor |
+| Caps + Ctrl + T | What is using the Mac (btop) |
 | Caps + Ctrl + H | Hardware menu |
 | Caps + Ctrl + O | Toggle menu |
 | Caps + Ctrl + C | Capture menu |

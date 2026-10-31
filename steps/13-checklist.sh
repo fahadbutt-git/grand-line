@@ -19,7 +19,8 @@ macOS requires these clicks from you. Work down the list once.
 
 3. Maccy (clipboard history)
    Open Maccy, allow Accessibility, and in its settings turn on
-   "Launch at login".
+   "Launch at login". Leave Spotlight's own clipboard off: it keeps
+   about 10 items for 8 hours, Maccy keeps everything and searches it.
 
 4. Espanso (text shortcuts such as ;date and ;sig)
    Open Espanso and allow Accessibility when asked.
@@ -28,6 +29,8 @@ macOS requires these clicks from you. Work down the list once.
    Handy: open it, allow Microphone and Accessibility, let it download
    its speech model, then in its settings click the shortcut box and
    press Caps + Ctrl + X. Hold that to dictate, release to type it out.
+   Leave Apple's dictation off (System Settings, Keyboard) so the two
+   never listen at once.
    Meetily: open it, allow Microphone and Screen and System Audio
    Recording (that is how it hears the other side of a call), and let
    it download its model. Start it at the beginning of each meeting.

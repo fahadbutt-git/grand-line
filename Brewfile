@@ -5,9 +5,8 @@
 
 tap "nikitabobko/tap"
 
-# Command line tools (git and Swift come with Apple's command line tools)
+# Command line tools (git, Swift and jq come with macOS and its command line tools)
 brew "gh"               # GitHub, for keeping this package in sync
-brew "jq"               # reads JSON in setup and the Bluetooth menu
 brew "duti"             # sets default apps per file type
 brew "choose-gui"       # the pop-up menu behind every Omarchy-style menu
 brew "blueutil"         # Bluetooth menu (Caps + Ctrl + B)
@@ -74,9 +73,9 @@ cask "zoom"
 cask "discord"
 
 # Media. Converting and compressing use the transcode shortcuts, and macOS
-# opens .zip itself, so no separate converter or archive apps.
+# opens every archive itself (decompress in the terminal), so no separate
+# converter or archive apps.
 cask "iina"                 # plays every video format; FilmCraft is for editing
-brew "sevenzip"             # 7zz: opens .7z and .rar (see decompress in the terminal)
 
 # Browser, terminal and music
 cask "google-chrome"

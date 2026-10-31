@@ -118,7 +118,7 @@ BINDINGS += [
     ("b", ["control"], "System", "Bluetooth menu", cmd("bluetooth")),
     ("w", ["control"], "System", "Wi-Fi settings", sh("open 'x-apple.systempreferences:com.apple.wifi-settings-extension'")),
     ("s", ["control"], "System", "Share with AirDrop", sh("open -a AirDrop")),
-    ("t", ["control"], "System", "Activity Monitor", app("Activity Monitor")),
+    ("t", ["control"], "System", "What is using the Mac (btop)", sh("open -na Ghostty --args -e /opt/homebrew/bin/btop")),
     ("h", ["control"], "System", "Hardware menu", cmd("menu Hardware")),
     ("o", ["control"], "System", "Toggle menu", cmd("menu Toggle")),
     ("c", ["control"], "Capture", "Capture menu", cmd("menu Capture")),

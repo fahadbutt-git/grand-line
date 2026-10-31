@@ -89,6 +89,9 @@ done
 [[ -L "$HOME/.config/nvim" ]] && pass "Neovim uses the package's LazyVim setup" || fail "Neovim config is not linked"
 git config --global --get-all include.path | grep -q "config/git/config" && pass "git defaults included" || fail "git defaults not included"
 
+command -v jq >/dev/null && pass "jq (built into macOS)" || fail "jq is missing (needs macOS 15 or later)"
+tar --version 2>/dev/null | grep -q libarchive && pass "tar opens .7z and .rar (libarchive)" || fail "tar is not libarchive"
+
 echo "System settings"
 [[ "$(defaults read NSGlobalDomain KeyRepeat 2>/dev/null)" == 2 ]] && pass "fast key repeat" || fail "key repeat not set"
 [[ "$(defaults read com.apple.screencapture location 2>/dev/null)" == "$SCREENSHOTS_DIR" ]] \

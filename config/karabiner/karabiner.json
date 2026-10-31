@@ -1566,7 +1566,7 @@
         },
         "to": [
          {
-          "shell_command": "open -a 'Activity Monitor'"
+          "shell_command": "open -na Ghostty --args -e /opt/homebrew/bin/btop"
          }
         ]
        },

@@ -81,7 +81,7 @@ Caps + Ctrl + M	System	Next audio output	$HOME/.mac-setup/bin/audio next
 Caps + Ctrl + B	System	Bluetooth menu	$HOME/.mac-setup/bin/bluetooth
 Caps + Ctrl + W	System	Wi-Fi settings	open 'x-apple.systempreferences:com.apple.wifi-settings-extension'
 Caps + Ctrl + S	System	Share with AirDrop	open -a AirDrop
-Caps + Ctrl + T	System	Activity Monitor	open -a 'Activity Monitor'
+Caps + Ctrl + T	System	What is using the Mac (btop)	open -na Ghostty --args -e /opt/homebrew/bin/btop
 Caps + Ctrl + H	System	Hardware menu	$HOME/.mac-setup/bin/menu Hardware
 Caps + Ctrl + O	System	Toggle menu	$HOME/.mac-setup/bin/menu Toggle
 Caps + Ctrl + C	Capture	Capture menu	$HOME/.mac-setup/bin/menu Capture

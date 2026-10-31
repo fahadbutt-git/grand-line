@@ -34,12 +34,17 @@ jobs:
       - run: bash --version | head -1 && /bin/bash tests/run-all.sh
 
   full-install:
-    name: Full install on a clean Mac
+    name: Full install on a clean Mac (${{ matrix.image }})
     # macOS minutes are limited on private repositories, so this runs on
     # request (Actions tab, "Run workflow") and weekly.
     if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full_install)
     needs: checks
-    runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        # xcode-27 is GitHub's macOS 27 image, the version the new Mac runs.
+        image: [xcode-27, macos-26]
+    runs-on: ${{ matrix.image }}
     timeout-minutes: 120
     env:
       MAC_SETUP_HOME: ${{ github.workspace }}

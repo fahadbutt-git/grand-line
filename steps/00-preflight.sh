@@ -16,6 +16,10 @@ step_preflight() {
   version="$(sw_vers -productVersion 2>/dev/null || echo unknown)"
   info "macOS $version on $arch"
   [[ "$arch" == arm64 ]] || warn "Built for Apple silicon. Some apps may differ on $arch."
+  if [[ "${version%%.*}" =~ ^[0-9]+$ && "${version%%.*}" -lt 15 ]]; then
+    err "macOS 15 or later is needed (this Mac has $version). Update macOS first."
+    return 1
+  fi
 
   [[ "$DRY_RUN" == 1 ]] && return 0
 
