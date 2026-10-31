@@ -61,7 +61,7 @@ cat > "$HOME/.mac-setup/bin/menu" <<EOF
 echo "menu \$*" > "$tmp/ran"
 EOF
 chmod +x "$HOME/.mac-setup/bin/menu"
-rm -f "$tmp/ran"; answers "Caps + Escape   ·   System menu (lock, sleep, restart, shut down)"
+rm -f "$tmp/ran"; answers "Super + Escape   ·   System menu (lock, sleep, restart, shut down)"
 KEYBINDINGS_FILE="$ROOT/config/mac-setup/keybindings.tsv" "$ROOT/bin/keybindings"
 [[ "$(cat "$tmp/ran" 2>/dev/null)" == "menu System" ]] && t_ok "shortcut list runs the chosen shortcut" || t_fail "shortcut list did not run it" "$(cat "$tmp/ran" 2>/dev/null)"
 

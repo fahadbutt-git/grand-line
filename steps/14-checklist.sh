@@ -9,7 +9,7 @@ Finish setup
 
 macOS requires these clicks from you. Work down the list once.
 
-1. Karabiner-Elements (Caps Lock layer)
+1. Karabiner-Elements (the Super key, Right Command)
    Open Karabiner-Elements. Allow its driver in System Settings,
    General, Login Items and Extensions, then allow Input Monitoring
    for karabiner_grabber and karabiner_observer when asked.
@@ -28,7 +28,7 @@ macOS requires these clicks from you. Work down the list once.
 5. Dictation and meetings
    Handy: open it, allow Microphone and Accessibility, let it download
    its speech model, then in its settings click the shortcut box and
-   press Caps + Ctrl + X. Hold that to dictate, release to type it out.
+   press Super + Ctrl + X. Hold that to dictate, release to type it out.
    Leave Apple's dictation off (System Settings, Keyboard) so the two
    never listen at once.
    Meetily: open it, allow Microphone and Screen and System Audio
@@ -81,7 +81,7 @@ macOS requires these clicks from you. Work down the list once.
 
 16. Restart the Mac once.
 
-Everyday commands, from Terminal or the Caps Lock menu:
+Everyday commands, from Terminal or the Super menu:
    update          update every app and tool
    keybindings     list every shortcut
    theme pick      change theme and background

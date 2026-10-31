@@ -1,5 +1,5 @@
 # AeroSpace: tiling windows, as in Omarchy.
-# Shortcuts live in Karabiner (Caps Lock layer) and call the aerospace
+# Shortcuts live in Karabiner (the Super key, Right Command) and call the aerospace
 # command, so all keys are defined in one place: tools/bindings.py.
 
 config-version = 2
@@ -49,7 +49,7 @@ run = 'layout floating'
 if.app-id = 'com.apple.finder'
 run = 'layout floating'
 
-# Each kind of app opens on its own workspace, so Caps + number always finds it.
+# Each kind of app opens on its own workspace, so Super + number always finds it.
 #   1 browser   2 terminal and code   3 AI   4 writing   5 research and data
 #   6 notes     7 media               8 free  9 communication
 # Change a number here and it takes effect at once. Delete a block to let

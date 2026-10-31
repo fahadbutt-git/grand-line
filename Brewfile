@@ -9,8 +9,8 @@ tap "nikitabobko/tap"
 brew "gh"               # GitHub, for keeping this package in sync
 brew "duti"             # sets default apps per file type
 brew "choose-gui"       # the pop-up menu behind every Omarchy-style menu
-brew "blueutil"         # Bluetooth menu (Caps + Ctrl + B)
-brew "switchaudio-osx"  # audio output menu (Caps + Ctrl + A, M)
+brew "blueutil"         # Bluetooth menu (Super + Ctrl + B)
+brew "switchaudio-osx"  # audio output menu (Super + Ctrl + A, M)
 
 # Terminal, as in Omarchy (see config/zsh/mac-setup.zsh for the shortcuts)
 brew "eza"              # ls with colour and icons
@@ -26,7 +26,7 @@ brew "rclone"           # Drive from the command line: bulk tidying now, NAS syn
 cask "font-jetbrains-mono-nerd-font"
 
 # Building, as in Omarchy. Docker runs in a Colima VM that starts only when
-# asked (Caps menu, Toggle, Docker), so nothing runs in the background.
+# asked (Super menu, Toggle, Docker), so nothing runs in the background.
 brew "mise"             # language versions per project (node, python, go...)
 brew "uv"               # Python packages and virtual environments
 brew "colima"           # the Linux VM that Docker runs in
@@ -62,8 +62,8 @@ cask "anki"
 cask "plaud"                # the Plaud recorder, for in-person conversations
 
 # Voice, all on the Mac (nothing leaves it)
-cask "handy"                # dictation into any app: hold Caps + Ctrl + X, as Voxtype in Omarchy
-cask "meetily"              # records and transcribes online meetings (both sides), Caps + Ctrl + Option + M
+cask "handy"                # dictation into any app: hold Super + Ctrl + X, as Voxtype in Omarchy
+cask "meetily"              # records and transcribes online meetings (both sides), Super + Ctrl + Option + M
 
 # Office fallback (the ArtCraft apps are installed by the artcraft step)
 cask "libreoffice"

@@ -75,7 +75,7 @@ jobs:
       - name: Run 2, setup again must succeed and change nothing
         run: |
           /bin/bash setup.sh --ci --skip r-packages 2>&1 | tee run2.log
-          if grep -E "Linked |Backed up |moved to the Trash|Installed [A-Z]|Caps Lock shortcuts updated" run2.log; then
+          if grep -E "Linked |Backed up |moved to the Trash|Installed [A-Z]|Keyboard shortcuts updated" run2.log; then
             echo "::error title=repeat::The second run changed things (lines above)"; exit 1
           fi
       - name: R packages

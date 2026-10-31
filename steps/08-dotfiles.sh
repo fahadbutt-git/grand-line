@@ -66,6 +66,6 @@ step_dotfiles() {
     run_sh "printf '%s\n' $sum > $(printf '%q' "$sum_file")"
     # Karabiner reads the file on change, but a restart covers the first install.
     run_sh "launchctl kickstart -k gui/\$(id -u)/org.pqrs.service.agent.karabiner_console_user_server 2>/dev/null || true"
-    ok "Caps Lock shortcuts updated"
+    ok "Keyboard shortcuts updated"
   fi
 }

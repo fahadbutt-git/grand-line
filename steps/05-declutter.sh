@@ -2,7 +2,7 @@
 # Removes the apps Apple preinstalls that the package replaces, and starts the
 # Dock with only what you use. Everything goes to the Trash, so it can be put
 # back. Apple's system apps (Mail, Photos, Music...) are part of the sealed
-# system and cannot be removed; the Dock and the Caps menus keep them out of
+# system and cannot be removed; the Dock and the Super menus keep them out of
 # the way instead.
 
 # App              replaced by
