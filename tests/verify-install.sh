@@ -82,6 +82,13 @@ while IFS=$'\t' read -r app exts _; do
   else fail ".$ext has no default app"; fi
 done < "$ROOT/config/mac-setup/default-apps.tsv"
 
+echo "Preinstalled apps the package replaces"
+for app in Pages Numbers Keynote iMovie GarageBand; do
+  [[ -d "/Applications/$app.app" ]] && fail "$app is still installed" || pass "$app removed"
+done
+[[ -L "$HOME/.config/nvim" ]] && pass "Neovim uses the package's LazyVim setup" || fail "Neovim config is not linked"
+git config --global --get-all include.path | grep -q "config/git/config" && pass "git defaults included" || fail "git defaults not included"
+
 echo "System settings"
 [[ "$(defaults read NSGlobalDomain KeyRepeat 2>/dev/null)" == 2 ]] && pass "fast key repeat" || fail "key repeat not set"
 [[ "$(defaults read com.apple.screencapture location 2>/dev/null)" == "$SCREENSHOTS_DIR" ]] \

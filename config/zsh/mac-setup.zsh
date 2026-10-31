@@ -27,6 +27,11 @@ fi
 # Language versions per project (mise), as in Omarchy
 command -v mise >/dev/null && eval "$(mise activate zsh)"
 
+# Editor and agents, as in Omarchy: n opens Neovim, cx opens Claude Code
+export EDITOR=nvim VISUAL=nvim
+alias n='nvim'
+alias cx='claude'
+
 # Git and Docker shortcuts, as in Omarchy
 alias g='git'
 alias gcm='git commit -m'

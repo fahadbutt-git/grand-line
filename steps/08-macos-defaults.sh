@@ -29,14 +29,44 @@ step_macos_defaults() {
   run defaults write com.apple.screencapture location -string "$SCREENSHOTS_DIR"
   run defaults write com.apple.screencapture type -string png
 
-  # Dock: hidden, no recent apps
+  # Dock: hidden, no recent apps, and appears at once instead of after a pause
   run defaults write com.apple.dock autohide -bool true
+  run defaults write com.apple.dock autohide-delay -float 0
+  run defaults write com.apple.dock autohide-time-modifier -float 0.15
   run defaults write com.apple.dock show-recents -bool false
   run defaults write com.apple.dock tilesize -int 48
 
-  # Recommended by AeroSpace for tiling to work well
+  # Faster: no window-opening animation, quick sheets and Mission Control,
+  # no Finder animations
+  run defaults write NSGlobalDomain NSAutomaticWindowAnimationsEnabled -bool false
+  run defaults write NSGlobalDomain NSWindowResizeTime -float 0.001
+  run defaults write com.apple.dock expose-animation-duration -float 0.1
+  run defaults write com.apple.finder DisableAllAnimations -bool true
+
+  # Keyboard first, as in Omarchy: Tab moves through every control in dialogs
+  run defaults write NSGlobalDomain AppleKeyboardUIMode -int 3
+
+  # No surprises: hot corners off (a new Mac opens Quick Note from the
+  # bottom-right corner), clicking the wallpaper does not hide every window,
+  # Time Machine does not ask about every new disk, no .DS_Store on USB drives
+  local corner
+  for corner in tl tr bl br; do run defaults write com.apple.dock "wvous-$corner-corner" -int 1; done
+  run defaults write com.apple.WindowManager EnableStandardClickToShowDesktop -bool false
+  run defaults write com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool true
+  run defaults write com.apple.desktopservices DSDontWriteUSBStores -bool true
+
+  # Screenshots without the drop shadow
+  run defaults write com.apple.screencapture disable-shadow -bool true
+
+  # Recommended by AeroSpace for tiling to work well: Spaces span displays
+  # and keep their order, and macOS's own window tiling is off so the two
+  # never fight over the same window
   run defaults write com.apple.spaces spans-displays -bool true
   run defaults write com.apple.dock expose-group-apps -bool true
+  run defaults write com.apple.dock mru-spaces -bool false
+  run defaults write com.apple.WindowManager EnableTilingByEdgeDrag -bool false
+  run defaults write com.apple.WindowManager EnableTopTilingByEdgeDrag -bool false
+  run defaults write com.apple.WindowManager EnableTilingOptionAccelerator -bool false
 
   # Dark mode needs an Automation permission prompt, which nobody can answer
   # on an unattended test machine.

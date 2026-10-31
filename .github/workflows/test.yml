@@ -60,11 +60,6 @@ jobs:
             types=$(plutil -convert json -o - "$app/Contents/Info.plist" | jq -c '[.CFBundleDocumentTypes[]? | (.CFBundleTypeExtensions // []) + (.LSItemContentTypes // [])] | flatten')
             echo "::notice title=filetypes $(basename "$app")::id $(defaults read "$app/Contents/Info" CFBundleIdentifier) declares $types"
           done
-      - name: Default app diagnostics
-        if: always()
-        run: |
-          echo "::notice title=handlers::$(defaults read com.apple.LaunchServices/com.apple.launchservices.secure LSHandlers 2>&1 | tr -s ' \n' ' ' | cut -c1-900)"
-          echo "::notice title=docx now::$(duti -x docx 2>&1 | head -1), pdf $(duti -x pdf 2>&1 | head -1), mp4 $(duti -x mp4 2>&1 | head -1)"
       - name: Check the installed machine
         run: /bin/bash tests/verify-install.sh --ci
       - name: Run 2, setup again must succeed and change nothing

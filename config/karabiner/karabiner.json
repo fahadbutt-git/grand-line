@@ -400,6 +400,78 @@
          }
         ],
         "from": {
+         "key_code": "x",
+         "modifiers": {
+          "mandatory": [
+           "control",
+           "shift"
+          ]
+         }
+        },
+        "to": [
+         {
+          "shell_command": "$HOME/.mac-setup/bin/capture text"
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "m",
+         "modifiers": {
+          "mandatory": [
+           "control",
+           "option"
+          ]
+         }
+        },
+        "to": [
+         {
+          "shell_command": "open -a 'Meetily'"
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "m",
+         "modifiers": {
+          "mandatory": [
+           "control",
+           "shift"
+          ]
+         }
+        },
+        "to": [
+         {
+          "shell_command": "$HOME/.mac-setup/bin/toggle mic"
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
          "key_code": "t",
          "modifiers": {
           "mandatory": [
@@ -1577,7 +1649,7 @@
          }
         ],
         "from": {
-         "key_code": "x",
+         "key_code": "period",
          "modifiers": {
           "mandatory": [
            "control"
@@ -1586,7 +1658,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/capture text"
+          "shell_command": "$HOME/.mac-setup/bin/menu Transcode"
          }
         ]
        },
@@ -1600,16 +1672,21 @@
          }
         ],
         "from": {
-         "key_code": "period",
+         "key_code": "v",
          "modifiers": {
           "mandatory": [
-           "control"
+           "option"
           ]
          }
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/menu Transcode"
+          "key_code": "v",
+          "modifiers": [
+           "command",
+           "option",
+           "shift"
+          ]
          }
         ]
        },
@@ -1637,6 +1714,29 @@
            "command",
            "shift"
           ]
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "x",
+         "modifiers": {
+          "mandatory": [
+           "control"
+          ]
+         }
+        },
+        "to": [
+         {
+          "key_code": "f18"
          }
         ]
        },
@@ -2235,6 +2335,69 @@
         "to": [
          {
           "shell_command": "open -a 'Ghostty'"
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "c"
+        },
+        "to": [
+         {
+          "key_code": "c",
+          "modifiers": [
+           "command"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "x"
+        },
+        "to": [
+         {
+          "key_code": "x",
+          "modifiers": [
+           "command"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "v"
+        },
+        "to": [
+         {
+          "key_code": "v",
+          "modifiers": [
+           "command"
+          ]
          }
         ]
        }

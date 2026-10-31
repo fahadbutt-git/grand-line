@@ -25,6 +25,10 @@ Toggle/Keep the Mac awake	toggle awake
 Toggle/Dark and light mode	toggle dark
 Toggle/Hidden files in Finder	toggle hidden
 Toggle/Menu bar	toggle menubar
+Toggle/Dock	toggle dock
+Toggle/Wi-Fi	toggle wifi
+Toggle/Bluetooth	toggle bluetooth
+Toggle/Microphone mute	toggle mic
 Toggle/Docker (start or stop)	toggle docker
 Toggle/Window tiling on or off	aerospace enable toggle
 Style/Pick a theme	theme pick

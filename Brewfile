@@ -36,7 +36,8 @@ brew "docker-credential-helper"  # keeps registry logins in the Keychain
 brew "lazygit"          # git in the terminal (lzg)
 brew "lazydocker"       # containers in the terminal (lzd)
 brew "btop"             # what is using the CPU, memory and disk
-cask "zed"              # code editor (open source, fast, Claude agent built in)
+brew "neovim"           # the editor: LazyVim, as in Omarchy (config/nvim)
+brew "tree-sitter-cli"  # code highlighting parsers for Neovim
 
 # AI
 cask "claude"
@@ -54,7 +55,11 @@ cask "notion"
 cask "r-app"
 cask "rstudio"
 cask "anki"
-cask "plaud"
+cask "plaud"                # the Plaud recorder, for in-person conversations
+
+# Voice, all on the Mac (nothing leaves it)
+cask "handy"                # dictation into any app: hold Caps + Ctrl + X, as Voxtype in Omarchy
+cask "meetily"              # records and transcribes online meetings (both sides), Caps + Ctrl + Option + M
 
 # Office fallback (the ArtCraft apps are installed by the artcraft step)
 cask "libreoffice"

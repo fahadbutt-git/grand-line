@@ -85,13 +85,20 @@ Caps + Ctrl + T	System	Activity Monitor	open -a 'Activity Monitor'
 Caps + Ctrl + H	System	Hardware menu	$HOME/.mac-setup/bin/menu Hardware
 Caps + Ctrl + O	System	Toggle menu	$HOME/.mac-setup/bin/menu Toggle
 Caps + Ctrl + C	Capture	Capture menu	$HOME/.mac-setup/bin/menu Capture
-Caps + Ctrl + X	Capture	Copy text from a screen area	$HOME/.mac-setup/bin/capture text
+Caps + Ctrl + Shift + X	Capture	Copy text from a screen area	$HOME/.mac-setup/bin/capture text
 Caps + Ctrl + .	Capture	Transcode menu (video, images, PDF)	$HOME/.mac-setup/bin/menu Transcode
+Caps + C	Clipboard	Copy	
+Caps + X	Clipboard	Cut	
+Caps + V	Clipboard	Paste	
+Caps + Option + V	Clipboard	Paste as plain text (no formatting)	
 Caps + Ctrl + V	Clipboard	Clipboard history (Maccy)	
+Caps + Ctrl + X	Voice	Dictate: hold, speak, release (Handy)	
+Caps + Ctrl + Option + M	Voice	Record and transcribe a meeting (Meetily)	open -a 'Meetily'
 Caps + Ctrl + E	Clipboard	Emoji and symbols	
 Caps + Ctrl + I	Toggles	Keep the Mac awake	$HOME/.mac-setup/bin/toggle awake
 Caps + Ctrl + N	Toggles	Dark and light mode	$HOME/.mac-setup/bin/toggle dark
 Caps + Shift + Space	Toggles	Hide or show the menu bar	$HOME/.mac-setup/bin/toggle menubar
+Caps + Ctrl + Shift + M	Toggles	Mute or unmute the microphone	$HOME/.mac-setup/bin/toggle mic
 Caps + Ctrl + R	Reminders	Set a reminder	$HOME/.mac-setup/bin/reminder
 Caps + Ctrl + Option + T	Notices	Show the time	$HOME/.mac-setup/bin/notice time
 Caps + Ctrl + Option + B	Notices	Show the battery	$HOME/.mac-setup/bin/notice battery

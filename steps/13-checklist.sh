@@ -24,46 +24,54 @@ macOS requires these clicks from you. Work down the list once.
 4. Espanso (text shortcuts such as ;date and ;sig)
    Open Espanso and allow Accessibility when asked.
 
-5. Downloads sorting
+5. Dictation and meetings
+   Handy: open it, allow Microphone and Accessibility, let it download
+   its speech model, then in its settings click the shortcut box and
+   press Caps + Ctrl + X. Hold that to dictate, release to type it out.
+   Meetily: open it, allow Microphone and Screen and System Audio
+   Recording (that is how it hears the other side of a call), and let
+   it download its model. Start it at the beginning of each meeting.
+
+6. Downloads sorting
    The first time a file lands in Downloads, macOS asks whether
    bash may use the Downloads folder. Click Allow.
 
-6. Notifications from the shortcuts
+7. Notifications from the shortcuts
    In Terminal run:  osascript -e 'display notification "test"'
    Then allow Script Editor in System Settings, Notifications.
 
-7. Google Drive
+8. Google Drive
    Sign in. In Drive settings, under My Drive syncing options,
    choose "Mirror files" (needed for full-text search on the Mac).
 
-8. Screen capture and text capture
+9. Screen capture and text capture
    The first time you use the capture menu, allow Screen Recording
    for karabiner_console_user_server when macOS asks.
 
-9. Sign in to your apps
-   Chrome, Claude, ChatGPT, Gemini, Notion, WhatsApp, Zoom,
-   Discord, Spotify, Plaud, Citrix and Horizon.
+10. Sign in to your apps
+    Chrome, Claude, ChatGPT, Gemini, Notion, WhatsApp, Zoom,
+    Discord, Spotify, Plaud, Citrix and Horizon.
 
-10. Keep start-up light
+11. Keep start-up light
     In Spotify and Discord settings, turn off "Open at login".
     Then review System Settings, General, Login Items and turn off
     anything you do not need at start-up. In System Settings, Menu Bar,
     turn off the icons you do not need to see.
 
-11. Install by hand (not available through Homebrew)
+12. Install by hand (not available through Homebrew)
     VoiceStudio.
     Microsoft Defender, only if Western or hospital IT requires it.
 
-12. Keep this package in sync with GitHub
+13. Keep this package in sync with GitHub
     In Terminal: gh auth login
 
-13. Google Drive from Terminal (optional, for bulk tidying and the NAS)
+14. Google Drive from Terminal (optional, for bulk tidying and the NAS)
     In Terminal: rclone config, choose "drive", and follow the prompts.
 
-14. Xcode, only when you start building Mac apps
+15. Xcode, only when you start building Mac apps
     Install it from the App Store (about 15 GB).
 
-15. Restart the Mac once.
+16. Restart the Mac once.
 
 Everyday commands, from Terminal or the Caps Lock menu:
    update          update every app and tool

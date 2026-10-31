@@ -45,6 +45,9 @@ expect ".pdf all"
 expect "bin/theme set graphite"
 expect "mac-setup.downloads.plist and load it"
 expect "espanso/match/mac-setup.yml"
+expect "ln -s $ROOT/config/nvim $tmp/home/.config/nvim"
+expect "defaults write com.apple.dock persistent-apps -array"
+expect "mru-spaces -bool false"
 expect "Setup finished."
 
 if [[ -n "$(ls -A "$tmp/home")" ]]; then

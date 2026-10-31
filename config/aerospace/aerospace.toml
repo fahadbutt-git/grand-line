@@ -48,3 +48,89 @@ run = 'layout floating'
 [[on-window-detected]]
 if.app-id = 'com.apple.finder'
 run = 'layout floating'
+
+# Each kind of app opens on its own workspace, so Caps + number always finds it.
+#   1 browser   2 terminal and code   3 AI   4 writing   5 research and data
+#   6 notes     7 media               8 free  9 communication
+# Change a number here and it takes effect at once. Delete a block to let
+# that app open wherever you are.
+
+[[on-window-detected]]
+if.app-id = 'com.google.Chrome'
+run = 'move-node-to-workspace 1'
+
+[[on-window-detected]]
+if.app-id = 'com.mitchellh.ghostty'
+run = 'move-node-to-workspace 2'
+
+[[on-window-detected]]
+if.app-id = 'com.anthropic.claudefordesktop'
+run = 'move-node-to-workspace 3'
+
+[[on-window-detected]]
+if.app-id = 'com.openai.chat'
+run = 'move-node-to-workspace 3'
+
+[[on-window-detected]]
+if.app-id = 'com.google.GeminiMacOS'
+run = 'move-node-to-workspace 3'
+
+[[on-window-detected]]
+if.app-id = 'ai.storyteller.wordcraft'
+run = 'move-node-to-workspace 4'
+
+[[on-window-detected]]
+if.app-id = 'ai.storyteller.gridcraft'
+run = 'move-node-to-workspace 4'
+
+[[on-window-detected]]
+if.app-id = 'ai.storyteller.deckcraft'
+run = 'move-node-to-workspace 4'
+
+[[on-window-detected]]
+if.app-id = 'ai.storyteller.pdfcraft'
+run = 'move-node-to-workspace 4'
+
+[[on-window-detected]]
+if.app-id = 'org.libreoffice.script'
+run = 'move-node-to-workspace 4'
+
+[[on-window-detected]]
+if.app-id = 'com.rstudio.desktop'
+run = 'move-node-to-workspace 5'
+
+[[on-window-detected]]
+if.app-id = 'org.R-project.R'
+run = 'move-node-to-workspace 5'
+
+[[on-window-detected]]
+if.app-id = 'notion.id'
+run = 'move-node-to-workspace 6'
+
+[[on-window-detected]]
+if.app-id = 'com.apple.reminders'
+run = 'move-node-to-workspace 6'
+
+[[on-window-detected]]
+if.app-id = 'com.spotify.client'
+run = 'move-node-to-workspace 7'
+
+[[on-window-detected]]
+if.app-id = 'ai.storyteller.filmcraft'
+run = 'move-node-to-workspace 7'
+
+[[on-window-detected]]
+if.app-id = 'com.colliderli.iina'
+run = 'move-node-to-workspace 7'
+
+[[on-window-detected]]
+if.app-id = 'net.whatsapp.WhatsApp'
+run = 'move-node-to-workspace 9'
+
+[[on-window-detected]]
+if.app-id = 'us.zoom.xos'
+run = 'move-node-to-workspace 9'
+
+[[on-window-detected]]
+if.app-id = 'com.hnc.Discord'
+run = 'move-node-to-workspace 9'

@@ -1,5 +1,5 @@
 #!/bin/bash
-# toggle awake | dark | hidden | menubar | docker
+# toggle awake | dark | hidden | menubar | dock | wifi | bluetooth | mic | docker
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 
 case "${1:-}" in
@@ -28,6 +28,36 @@ case "${1:-}" in
   menubar)
     osascript -e 'tell application "System Events" to tell dock preferences to set autohide menu bar to not autohide menu bar'
     ;;
+  wifi)
+    dev="$(networksetup -listallhardwareports | awk '/Wi-Fi/{getline; print $2; exit}')"
+    if networksetup -getairportpower "$dev" | grep -q On; then
+      networksetup -setairportpower "$dev" off; notify "Wi-Fi off"
+    else
+      networksetup -setairportpower "$dev" on; notify "Wi-Fi on"
+    fi
+    ;;
+  bluetooth)
+    if [[ "$(blueutil -p)" == 1 ]]; then blueutil -p 0; notify "Bluetooth off"
+    else blueutil -p 1; notify "Bluetooth on"; fi
+    ;;
+  mic)
+    # Mutes the microphone by setting its input level to zero, and restores it.
+    saved="$MAC_SETUP_STATE/mic-volume"
+    level="$(osascript -e 'input volume of (get volume settings)')"
+    if [[ "$level" -gt 0 ]]; then
+      echo "$level" > "$saved"; osascript -e 'set volume input volume 0'; notify "Microphone muted"
+    else
+      osascript -e "set volume input volume $(cat "$saved" 2>/dev/null || echo 75)"; notify "Microphone on"
+    fi
+    ;;
+  dock)
+    if [[ "$(defaults read com.apple.dock autohide 2>/dev/null)" == 1 ]]; then
+      defaults write com.apple.dock autohide -bool false
+    else
+      defaults write com.apple.dock autohide -bool true
+    fi
+    killall Dock
+    ;;
   docker)
     # Starts or stops the Colima VM that Docker runs in. Starting takes a few
     # seconds, so it runs on its own after the shortcut returns.
@@ -42,5 +72,5 @@ case "${1:-}" in
         || notify "Docker did not start" "Run in Terminal: colima start"
     fi
     ;;
-  *) echo "usage: toggle awake|dark|hidden|menubar|docker" >&2; exit 2 ;;
+  *) echo "usage: toggle awake|dark|hidden|menubar|dock|wifi|bluetooth|mic|docker" >&2; exit 2 ;;
 esac

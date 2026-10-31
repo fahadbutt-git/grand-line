@@ -1,5 +1,6 @@
 #!/bin/bash
-# Update every app and tool: Homebrew apps, ArtCraft apps and this package.
+# Update everything in one go: this package, Homebrew apps and tools,
+# ArtCraft apps, settings, Neovim plugins and mise languages.
 #   update            run here
 #   update --window   open a Terminal window to run it (used by the menu)
 # App Store apps update themselves (System Settings, General, Software Update).
@@ -34,6 +35,10 @@ export HOMEBREW_NO_AUTO_UPDATE=1
 
 echo "== New apps, ArtCraft apps and settings"
 bash "$REPO/setup.sh" --update
+
+echo "== Neovim plugins and language versions"
+command -v nvim >/dev/null && nvim --headless '+Lazy! sync' +qa >/dev/null 2>&1 && echo "Neovim plugins updated"
+command -v mise >/dev/null && mise upgrade --yes >/dev/null 2>&1 && echo "mise languages updated"
 
 notify "Update finished" "Apps and tools are up to date."
 echo "Done."

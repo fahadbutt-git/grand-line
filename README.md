@@ -60,13 +60,15 @@ Research follows the Drive layout: each paper has one folder under `01 Research`
 
 ## Building
 
-As in Omarchy: mise for language versions, uv for Python packages, Docker, lazygit, lazydocker and btop, with Zed as the editor and Claude Code or Codex in the terminal (`tdl`).
+As in Omarchy: mise for language versions, uv for Python packages, Docker, lazygit, lazydocker and btop, with Neovim and LazyVim as the editor and Claude Code or Codex beside it (`tdl`).
 
 | Type | Does |
 | --- | --- |
 | Caps menu, Toggle, Docker | Starts or stops Docker (a Colima VM: 6 cores, 12 GB memory, Rosetta for Intel images). Nothing runs until you start it |
 | `mise use node@22` | Pins a language version for the current project |
 | `uv init`, `uv add pandas` | Starts a Python project and adds packages |
+| `n` | Neovim (LazyVim). Space Space finds a file, Space / searches text, Space g g opens lazygit, Space e the file tree |
+| `cx`, `codex` | Claude Code or Codex in the current folder |
 | `lzg`, `lzd`, `btop` | Git, containers, and system load in the terminal |
 | `g`, `gcm "message"`, `gcam`, `gcad` | git, commit, commit all, amend |
 
@@ -153,13 +155,20 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + Ctrl + H | Hardware menu |
 | Caps + Ctrl + O | Toggle menu |
 | Caps + Ctrl + C | Capture menu |
-| Caps + Ctrl + X | Copy text from a screen area |
+| Caps + Ctrl + Shift + X | Copy text from a screen area |
 | Caps + Ctrl + . | Transcode menu (video, images, PDF) |
+| Caps + C | Copy |
+| Caps + X | Cut |
+| Caps + V | Paste |
+| Caps + Option + V | Paste as plain text (no formatting) |
 | Caps + Ctrl + V | Clipboard history (Maccy) |
 | Caps + Ctrl + E | Emoji and symbols |
+| Caps + Ctrl + X | Dictate: hold, speak, release (Handy) |
+| Caps + Ctrl + Option + M | Record and transcribe a meeting (Meetily) |
 | Caps + Ctrl + I | Keep the Mac awake |
 | Caps + Ctrl + N | Dark and light mode |
 | Caps + Shift + Space | Hide or show the menu bar |
+| Caps + Ctrl + Shift + M | Mute or unmute the microphone |
 | Caps + Ctrl + R | Set a reminder |
 | Caps + Ctrl + Option + T | Show the time |
 | Caps + Ctrl + Option + B | Show the battery |
