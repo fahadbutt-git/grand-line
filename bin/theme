@@ -1,0 +1,96 @@
+#!/bin/bash
+# theme pick                    choose a theme from a menu
+# theme set NAME [--no-wallpaper]
+# theme next-background         cycle through ~/Pictures/Backgrounds
+# theme list
+source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
+
+REPO="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+THEMES="$REPO/config/themes"
+BACKGROUNDS="$BACKGROUNDS_DIR"
+
+set_wallpaper() {
+  local img="$1"
+  [[ -f "$img" ]] || return 1
+  osascript - "$img" <<'EOF' >/dev/null 2>&1
+on run argv
+  tell application "System Events" to tell every desktop to set picture to (POSIX file (item 1 of argv))
+end run
+EOF
+  printf '%s\n' "$img" > "$MAC_SETUP_STATE/background"
+}
+
+apply_theme() {
+  local name="$1" wallpaper="${2:-yes}" file="$THEMES/$1.theme"
+  if [[ ! -f "$file" ]]; then
+    echo "No theme called '$name'. Themes: $(cd "$THEMES" && ls ./*.theme | sed -e 's#^\./##' -e 's/\.theme$//' | tr '\n' ' ')" >&2
+    return 1
+  fi
+  local LABEL MODE ACCENT BACKGROUND TERM_BG TERM_FG TERM_CURSOR TERM_SELECTION
+  # shellcheck source=/dev/null
+  source "$file"
+
+  # Test machines cannot answer macOS's Automation prompt, so they skip it.
+  if [[ -z "${MAC_SETUP_NO_APPLEEVENTS:-}" ]]; then
+    local dark=false; [[ "$MODE" == dark ]] && dark=true
+    osascript -e "tell application \"System Events\" to tell appearance preferences to set dark mode to $dark" >/dev/null 2>&1
+  fi
+
+  if [[ "$ACCENT" == multicolor ]]; then
+    defaults delete -g AppleAccentColor >/dev/null 2>&1
+  else
+    defaults write -g AppleAccentColor -int "$ACCENT"
+  fi
+
+  # ~/.config/ghostty links to the package; theme.conf is listed in .gitignore.
+  [[ -d "$HOME/.config/ghostty" ]] || mkdir -p "$HOME/.config/ghostty"
+  cat > "$HOME/.config/ghostty/theme.conf" <<EOF
+# Written by: theme set $name
+background = $TERM_BG
+foreground = $TERM_FG
+cursor-color = $TERM_CURSOR
+selection-background = $TERM_SELECTION
+EOF
+
+  if [[ "$wallpaper" == yes && -z "${MAC_SETUP_NO_APPLEEVENTS:-}" ]]; then
+    set_wallpaper "$BACKGROUNDS/$BACKGROUND" || set_wallpaper "$REPO/backgrounds/$BACKGROUND"
+  fi
+  printf '%s\n' "$name" > "$MAC_SETUP_STATE/theme"
+  notify "Theme: $LABEL" "Accent colour applies to newly opened windows."
+}
+
+case "${1:-pick}" in
+  list)
+    for f in "$THEMES"/*.theme; do basename "$f" .theme; done
+    ;;
+  set)
+    [[ -n "${2:-}" ]] || { echo "usage: theme set NAME [--no-wallpaper]" >&2; exit 2; }
+    if [[ "${3:-}" == "--no-wallpaper" ]]; then apply_theme "$2" no; else apply_theme "$2" yes; fi
+    ;;
+  pick)
+    current="$(cat "$MAC_SETUP_STATE/theme" 2>/dev/null)"
+    choice="$(for f in "$THEMES"/*.theme; do
+                n="$(basename "$f" .theme)"
+                if [[ "$n" == "$current" ]]; then echo "$n (current)"; else echo "$n"; fi
+              done | pick)" || exit 0
+    [[ -n "$choice" ]] && apply_theme "${choice% (current)}" yes
+    ;;
+  next-background)
+    images=()
+    while IFS= read -r img; do images+=("$img"); done < <(
+      find "$BACKGROUNDS" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.heic' \) | sort)
+    if [[ ${#images[@]} -eq 0 ]]; then
+      notify "No backgrounds" "Add images to $BACKGROUNDS"; exit 1
+    fi
+    current="$(cat "$MAC_SETUP_STATE/background" 2>/dev/null)"
+    next="${images[0]}"
+    for i in "${!images[@]}"; do
+      if [[ "${images[$i]}" == "$current" ]]; then
+        next="${images[$(( (i + 1) % ${#images[@]} ))]}"
+        break
+      fi
+    done
+    set_wallpaper "$next"
+    ;;
+  *) echo "usage: theme pick | set NAME | next-background | list" >&2; exit 2 ;;
+esac

@@ -1,0 +1,6 @@
+#!/bin/bash
+# Test stub: record AppleScript calls instead of running them.
+echo "osascript $*" >> "${STUB_LOG:-/dev/null}"
+# A script given as "-" arrives on stdin; read it so the caller never blocks.
+[[ "${1:-}" == "-" ]] && cat >/dev/null
+exit 0

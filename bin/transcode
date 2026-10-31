@@ -1,0 +1,39 @@
+#!/bin/bash
+# Converts the files selected in Finder. New files are saved beside the originals.
+#   transcode video   compress to 1080p for uploads and submissions
+#   transcode png     convert images (TIFF, HEIC, JPEG) to PNG
+#   transcode jpeg    convert images to JPEG
+#   transcode pdf     shrink PDFs
+# Uses tools built into macOS, plus the pdfshrink helper built by setup.
+source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
+
+mode="${1:-}"
+case "$mode" in video|png|jpeg|pdf) ;; *) echo "usage: transcode video|png|jpeg|pdf [files]" >&2; exit 2 ;; esac
+shift
+
+files=()
+if [[ $# -gt 0 ]]; then
+  files=("$@")
+else
+  while IFS= read -r line; do [[ -n "$line" ]] && files+=("$line"); done < <(finder_selection)
+fi
+if [[ ${#files[@]} -eq 0 ]]; then
+  notify "Transcode" "Select files in Finder first."
+  exit 1
+fi
+
+# Video jobs take minutes, so they keep running after the next shortcut.
+detach_self "$0" "$mode" "${files[@]}"
+
+done_count=0
+for f in "${files[@]}"; do
+  [[ -f "$f" ]] || continue
+  base="${f%.*}"
+  case "$mode" in
+    video) avconvert --preset Preset1920x1080 --source "$f" --output "${base}-1080p.mp4" >/dev/null 2>&1 ;;
+    png)   sips -s format png "$f" --out "${base}.png" >/dev/null ;;
+    jpeg)  sips -s format jpeg -s formatOptions 85 "$f" --out "${base}.jpg" >/dev/null ;;
+    pdf)   pdfshrink "$f" "${base}-small.pdf" ;;
+  esac && done_count=$((done_count + 1))
+done
+notify "Transcode finished" "$done_count of ${#files[@]} files converted."

@@ -1,0 +1,6 @@
+# App name	File extensions it opens	Fallback app (used if the first is missing, or by: default-apps fallback)
+WordCraft	.docx .doc .odt .rtf	LibreOffice
+GridCraft	.xlsx .xls .ods	LibreOffice
+DeckCraft	.pptx .ppt .odp	LibreOffice
+PdfCraft	.pdf	Preview
+FilmCraft	.mp4 .mov .m4v	IINA

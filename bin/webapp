@@ -1,0 +1,10 @@
+#!/bin/bash
+# Open a website in its own app-style Chrome window, as Omarchy's web apps do.
+source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
+
+url="${1:?usage: webapp URL}"
+if [[ -d "/Applications/Google Chrome.app" ]]; then
+  open -na "Google Chrome" --args --app="$url"
+else
+  open "$url"
+fi

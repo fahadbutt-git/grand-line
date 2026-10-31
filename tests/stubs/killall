@@ -1,0 +1,3 @@
+#!/bin/bash
+echo "killall $*" >> "${STUB_LOG:-/dev/null}"
+exit 0

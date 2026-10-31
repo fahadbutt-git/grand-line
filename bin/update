@@ -1,0 +1,39 @@
+#!/bin/bash
+# Update every app and tool: Homebrew apps, ArtCraft apps and this package.
+#   update            run here
+#   update --window   open a Terminal window to run it (used by the menu)
+# App Store apps update themselves (System Settings, General, Software Update).
+source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
+
+REPO="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+
+if [[ "${1:-}" == "--window" ]]; then
+  osascript - "$(readlink -f "$0")" <<'EOF' >/dev/null
+on run argv
+  tell application "Terminal"
+    activate
+    do script quoted form of (item 1 of argv)
+  end tell
+end run
+EOF
+  exit 0
+fi
+
+echo "== Package"
+if git -C "$REPO" remote get-url origin >/dev/null 2>&1; then
+  if [[ -z "$(git -C "$REPO" status --porcelain)" ]]; then
+    git -C "$REPO" pull --ff-only || echo "Could not pull. Your local copy is kept."
+  else
+    echo "You have local changes in $REPO, so the GitHub copy was not pulled."
+  fi
+fi
+
+echo "== Homebrew apps and tools"
+brew update && brew upgrade
+export HOMEBREW_NO_AUTO_UPDATE=1
+
+echo "== New apps, ArtCraft apps and settings"
+bash "$REPO/setup.sh" --update
+
+notify "Update finished" "Apps and tools are up to date."
+echo "Done."

@@ -1,0 +1,9 @@
+#!/bin/bash
+# Test stub for the pop-up menu: prints the menu it was given to $CHOOSE_SEEN
+# and answers with the next line of $CHOOSE_ANSWERS.
+cat >> "${CHOOSE_SEEN:-/dev/null}"
+echo "--" >> "${CHOOSE_SEEN:-/dev/null}"
+answer="$(head -1 "$CHOOSE_ANSWERS")"
+tail -n +2 "$CHOOSE_ANSWERS" > "$CHOOSE_ANSWERS.tmp" && mv "$CHOOSE_ANSWERS.tmp" "$CHOOSE_ANSWERS"
+[[ -z "$answer" ]] && exit 1
+printf '%s\n' "$answer"

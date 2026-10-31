@@ -1,0 +1,20 @@
+#!/bin/bash
+# audio        pick an output device
+# audio next   switch to the next output device
+source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
+
+if ! command -v SwitchAudioSource >/dev/null 2>&1; then
+  open 'x-apple.systempreferences:com.apple.Sound-Settings.extension'
+  exit 0
+fi
+
+if [[ "${1:-}" == next ]]; then
+  SwitchAudioSource -n -t output >/dev/null
+  notify "Audio output" "$(SwitchAudioSource -c -t output)"
+  exit 0
+fi
+
+current="$(SwitchAudioSource -c -t output)"
+device="$(SwitchAudioSource -a -t output | awk -v c="$current" '{ print ($0 == c ? $0 " (current)" : $0) }' | pick)" || exit 0
+device="${device% (current)}"
+[[ -n "$device" ]] && SwitchAudioSource -s "$device" -t output >/dev/null && notify "Audio output" "$device"

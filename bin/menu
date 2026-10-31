@@ -1,0 +1,40 @@
+#!/bin/bash
+# Omarchy-style menu. "menu" shows the top level, "menu Capture" opens a group.
+# Entries come from config/mac-setup/menu.tsv: a path (groups separated by /),
+# a tab, then the command to run.
+source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
+
+MENU_FILE="${MENU_FILE:-$MAC_SETUP_CONFIG/menu.tsv}"
+prefix="${1:-}"
+
+# One pass over the file: the items one level below the prefix, in file
+# order, with groups marked by " ›".
+items="$(awk -F'\t' -v p="$prefix" '
+  /^#/ || NF < 2 { next }
+  {
+    path = $1
+    if (p != "") { if (index(path, p "/") != 1) next; path = substr(path, length(p) + 2) }
+    slash = index(path, "/")
+    item = slash ? substr(path, 1, slash - 1) " ›" : path
+    if (!seen[item]++) print item
+  }' "$MENU_FILE")"
+
+if [[ -z "$items" ]]; then
+  notify "Menu" "Nothing under '${prefix}'. Check $MENU_FILE"
+  exit 1
+fi
+
+choice="$(printf '%s\n' "$items" | pick)" || exit 0
+[[ -z "$choice" ]] && exit 0
+
+if [[ "$choice" == *" ›" ]]; then
+  exec "$0" "${prefix:+$prefix/}${choice% ›}"
+fi
+
+full="${prefix:+$prefix/}$choice"
+cmd="$(awk -F'\t' -v p="$full" '$1 == p { print $2; exit }' "$MENU_FILE")"
+if [[ -z "$cmd" ]]; then
+  notify "Menu" "No command for '$full' in $MENU_FILE"
+  exit 1
+fi
+exec /bin/bash -c "$cmd"

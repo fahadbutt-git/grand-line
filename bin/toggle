@@ -1,0 +1,32 @@
+#!/bin/bash
+# toggle awake | dark | hidden | menubar
+source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
+
+case "${1:-}" in
+  awake)
+    # Run caffeinate as its own background job so later shortcuts cannot stop it.
+    if launchctl list mac-setup.caffeinate >/dev/null 2>&1; then
+      launchctl remove mac-setup.caffeinate
+      notify "Keep awake off" "The Mac can sleep normally."
+    else
+      launchctl submit -l mac-setup.caffeinate -- /usr/bin/caffeinate -dims
+      notify "Keep awake on" "The Mac will not sleep until you turn this off."
+    fi
+    ;;
+  dark)
+    osascript -e 'tell application "System Events" to tell appearance preferences to set dark mode to not dark mode'
+    ;;
+  hidden)
+    if [[ "$(defaults read com.apple.finder AppleShowAllFiles 2>/dev/null)" == 1 ]]; then
+      defaults write com.apple.finder AppleShowAllFiles -bool false; state=off
+    else
+      defaults write com.apple.finder AppleShowAllFiles -bool true; state=on
+    fi
+    killall Finder
+    notify "Hidden files $state"
+    ;;
+  menubar)
+    osascript -e 'tell application "System Events" to tell dock preferences to set autohide menu bar to not autohide menu bar'
+    ;;
+  *) echo "usage: toggle awake|dark|hidden|menubar" >&2; exit 2 ;;
+esac

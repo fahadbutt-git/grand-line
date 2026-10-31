@@ -1,0 +1,3 @@
+#!/bin/bash
+echo "pmset $*" >> "${STUB_LOG:-/dev/null}"
+exit 0

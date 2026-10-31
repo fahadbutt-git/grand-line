@@ -1,0 +1,3 @@
+#!/bin/bash
+# Test stub: pretend to be an Apple silicon Mac.
+case "${1:-}" in -m) echo arm64 ;; *) echo Darwin ;; esac

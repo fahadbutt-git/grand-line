@@ -1,0 +1,34 @@
+#!/bin/bash
+# notice time | battery | weather | disk
+# Weather comes from Open-Meteo (free, no account) for the place set in
+# config/mac-setup/location.
+source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
+
+weather_text() {
+  local lat lon place
+  read -r lat lon place < <(grep -v '^#' "$MAC_SETUP_CONFIG/location" 2>/dev/null | head -1)
+  [[ -z "$lat" ]] && return 1
+  curl -fsS --max-time 6 "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,apparent_temperature,weather_code" \
+    | jq -r --arg place "$place" '
+        def sky: if . == 0 then "clear" elif . <= 3 then "cloudy" elif . <= 48 then "fog"
+                 elif . <= 67 then "rain" elif . <= 77 then "snow" elif . <= 82 then "showers"
+                 elif . <= 86 then "snow showers" else "thunderstorms" end;
+        .current | "\($place): \(.temperature_2m | round)°C, feels \(.apparent_temperature | round)°C, \(.weather_code | sky)"'
+}
+
+case "${1:-time}" in
+  time)
+    notify "$(date '+%I:%M %p' | sed 's/^0//')" "$(date '+%A %e %B %Y' | tr -s ' ')"
+    ;;
+  battery)
+    IFS=$'\t' read -r pct detail < <(pmset -g batt | awk -F'\t' 'NR == 2 { split($2, f, "; "); sub(/ present.*/, "", f[3]); print f[1] "\t" f[2] ", " f[3] }')
+    notify "Battery ${pct:-unknown}" "${detail%, }"
+    ;;
+  weather)
+    notify "Weather" "$(weather_text || echo "Weather is unavailable right now.")"
+    ;;
+  disk)
+    notify "Disk space" "$(df -h "$HOME" | awk 'NR == 2 { print $4 " free" }')"
+    ;;
+  *) echo "usage: notice time|battery|weather|disk" >&2; exit 2 ;;
+esac

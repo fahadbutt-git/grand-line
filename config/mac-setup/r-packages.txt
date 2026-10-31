@@ -1,0 +1,26 @@
+# R packages installed by setup (binary builds from CRAN). One per line.
+# Each line already brings its own dependencies (ggplot2 brings scales, survminer brings ggpubr, cowplot and ggsci,
+# rmarkdown brings knitr, survminer brings survival).
+dplyr
+tidyr
+readr
+purrr
+stringr
+forcats
+lubridate
+ggplot2
+patchwork
+readxl
+writexl
+data.table
+janitor
+survminer
+cmprsk
+MatchIt
+cobalt
+meta
+metafor
+gtsummary
+officer
+flextable
+rmarkdown

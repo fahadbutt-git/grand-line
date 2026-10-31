@@ -1,0 +1,20 @@
+#!/bin/bash
+# Set a reminder in Apple Reminders: asks what, then how many minutes from now.
+source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
+
+what="${1:-$(prompt_text "Remind me to:")}" || exit 0
+[[ -z "$what" ]] && exit 0
+mins="${2:-$(prompt_text "In how many minutes?" "30")}" || exit 0
+if ! [[ "$mins" =~ ^[0-9]+$ ]]; then
+  notify "Reminder not set" "Minutes must be a whole number."
+  exit 1
+fi
+
+osascript - "$what" "$mins" <<'EOF' >/dev/null
+on run argv
+  set theName to item 1 of argv
+  set theDate to (current date) + ((item 2 of argv) as integer) * minutes
+  tell application "Reminders" to make new reminder with properties {name:theName, remind me date:theDate}
+end run
+EOF
+notify "Reminder set" "$what, in $mins minutes"

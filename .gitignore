@@ -1,0 +1,6 @@
+.DS_Store
+.build/
+config/ghostty/theme.conf
+tests/vm-logs/
+*.backup-*
+config/karabiner/automatic_backups/

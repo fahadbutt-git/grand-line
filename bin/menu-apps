@@ -1,0 +1,10 @@
+#!/bin/bash
+# Pick any installed app and open it.
+source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
+
+app="$(
+  find /Applications /System/Applications /System/Applications/Utilities "$HOME/Applications" \
+       -maxdepth 1 -name '*.app' 2>/dev/null \
+    | sed -e 's#.*/##' -e 's/\.app$//' | sort -fu | pick
+)" || exit 0
+[[ -n "$app" ]] && open -a "$app"

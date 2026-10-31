@@ -1,0 +1,4 @@
+{"tag_name":"v0.0.9","assets":[
+ {"name":"deckcraft-windows-arm64.msi","browser_download_url":"https://example.com/a.msi"},
+ {"name":"deckcraft-linux.deb","browser_download_url":"https://example.com/b.deb"}
+]}

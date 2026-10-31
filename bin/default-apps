@@ -1,0 +1,20 @@
+#!/bin/bash
+# default-apps primary    ArtCraft apps open documents, sheets, slides, PDFs and video
+# default-apps fallback   LibreOffice, Preview and IINA open them instead
+# The table is config/mac-setup/default-apps.tsv.
+HERE="$(dirname "$(readlink -f "$0")")/.."
+source "$HERE/lib/bin-common.sh"
+source "$HERE/lib/common.sh"
+source "$HERE/lib/default-apps.sh"
+
+mode="${1:-}"
+case "$mode" in
+  primary|fallback) ;;
+  *) echo "usage: default-apps primary|fallback" >&2; exit 2 ;;
+esac
+if apply_default_apps "$mode" "$HERE/config/mac-setup/default-apps.tsv" >/dev/null 2>&1; then
+  notify "Default apps" "Using the $mode apps now."
+else
+  notify "Default apps" "Some file types could not be changed. Run: default-apps $mode"
+  exit 1
+fi

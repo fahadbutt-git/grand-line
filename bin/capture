@@ -1,0 +1,35 @@
+#!/bin/bash
+# capture area | window | screen | record | text | url
+source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
+
+[[ -d "$SCREENSHOTS_DIR" ]] || mkdir -p "$SCREENSHOTS_DIR"
+file="$SCREENSHOTS_DIR/Screenshot $(date '+%Y-%m-%d at %H.%M.%S').png"
+
+case "${1:-area}" in
+  area)   screencapture -i "$file" ;;
+  window) screencapture -iW "$file" ;;
+  screen) screencapture "$file" ;;
+  record) open -a Screenshot ;;
+  text)
+    tmpdir="$(mktemp -d)"; tmp="$tmpdir/shot.png"
+    trap 'rm -rf "$tmpdir"' EXIT
+    screencapture -i "$tmp" || exit 0
+    [[ -s "$tmp" ]] || exit 0
+    if ! command -v ocr >/dev/null 2>&1; then
+      notify "Text capture" "The text recognition tool is missing. Run: bash ~/mac-setup/setup.sh --only native-tools"
+      exit 1
+    fi
+    text="$(ocr "$tmp")"
+    if [[ -n "$text" ]]; then
+      printf '%s' "$text" | pbcopy
+      notify "Text copied" "$(printf '%s' "$text" | head -c 80)"
+    else
+      notify "Text capture" "No text found in that area."
+    fi
+    ;;
+  url)
+    url="$(osascript -e 'tell application "Google Chrome" to get URL of active tab of front window' 2>/dev/null)"
+    if [[ -n "$url" ]]; then printf '%s' "$url" | pbcopy; notify "URL copied" "$url"; fi
+    ;;
+  *) echo "usage: capture area|window|screen|record|text|url" >&2; exit 2 ;;
+esac

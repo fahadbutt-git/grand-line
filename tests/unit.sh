@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# Behaviour tests for the menus, shortcut list, themes and ArtCraft download
+# choice. Mac-only commands are replaced by the stubs in tests/stubs.
+
+set -uo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+FAIL=0
+t_ok()   { printf '    ok    %s\n' "$1"; }
+t_fail() { printf '    FAIL  %s\n' "$1"; [[ -n "${2:-}" ]] && printf '          %s\n' "$2"; FAIL=1; }
+
+export HOME="$tmp/home"
+export PATH="$ROOT/tests/stubs:$PATH"
+export MAC_SETUP_TEST_PATH="$ROOT/tests/stubs"
+export STUB_LOG="$tmp/stub.log"
+export CHOOSE_ANSWERS="$tmp/answers"
+export CHOOSE_SEEN="$tmp/seen"
+mkdir -p "$HOME/.mac-setup/bin"
+: > "$STUB_LOG"
+
+answers() { printf '%s\n' "$@" > "$CHOOSE_ANSWERS"; : > "$CHOOSE_SEEN"; }
+
+# --- menu: groups, nesting, running the chosen command
+cat > "$tmp/menu.tsv" <<EOF
+# test menu
+Capture/Screenshot of an area	echo area > "$tmp/ran"
+Capture/Deeper/Item	echo deep > "$tmp/ran"
+System/Lock	echo lock > "$tmp/ran"
+EOF
+export MENU_FILE="$tmp/menu.tsv"
+
+answers "Capture ›" "Screenshot of an area"
+"$ROOT/bin/menu"
+if [[ "$(cat "$tmp/ran" 2>/dev/null)" == area ]]; then t_ok "menu opens a group and runs the chosen item"; else t_fail "menu did not run the chosen item"; fi
+if head -2 "$CHOOSE_SEEN" | tr '\n' '|' | grep -q '^Capture ›|System ›|$'; then t_ok "menu lists top-level groups in file order"
+else t_fail "top level shown wrong" "$(head -3 "$CHOOSE_SEEN" | tr '\n' '|')"; fi
+if sed -n '/^--$/,$p' "$CHOOSE_SEEN" | grep -qx "Deeper ›"; then t_ok "menu marks nested groups"; else t_fail "nested group not marked"; fi
+
+rm -f "$tmp/ran"; answers "Deeper ›" "Item"
+"$ROOT/bin/menu" Capture
+[[ "$(cat "$tmp/ran" 2>/dev/null)" == deep ]] && t_ok "menu opens straight into a group by name" || t_fail "direct group open failed"
+
+rm -f "$tmp/ran"; answers ""
+"$ROOT/bin/menu"
+[[ ! -f "$tmp/ran" ]] && t_ok "pressing Escape in the menu runs nothing" || t_fail "Escape still ran something"
+
+answers "x"
+if ! "$ROOT/bin/menu" Nowhere 2>/dev/null; then t_ok "unknown group fails cleanly"; else t_fail "unknown group did not fail"; fi
+unset MENU_FILE
+
+# The real menu file parses and shows its groups
+answers ""
+MENU_FILE="$ROOT/config/mac-setup/menu.tsv" "$ROOT/bin/menu"
+if grep -qx "System ›" "$CHOOSE_SEEN" && grep -qx "Capture ›" "$CHOOSE_SEEN"; then t_ok "real menu.tsv shows its groups"; else t_fail "real menu.tsv failed"; fi
+
+# --- shortcut list
+cat > "$HOME/.mac-setup/bin/menu" <<EOF
+#!/bin/bash
+echo "menu \$*" > "$tmp/ran"
+EOF
+chmod +x "$HOME/.mac-setup/bin/menu"
+rm -f "$tmp/ran"; answers "Caps + Escape   ·   System menu (lock, sleep, restart, shut down)"
+KEYBINDINGS_FILE="$ROOT/config/mac-setup/keybindings.tsv" "$ROOT/bin/keybindings"
+[[ "$(cat "$tmp/ran" 2>/dev/null)" == "menu System" ]] && t_ok "shortcut list runs the chosen shortcut" || t_fail "shortcut list did not run it" "$(cat "$tmp/ran" 2>/dev/null)"
+
+lines="$(KEYBINDINGS_FILE="$ROOT/config/mac-setup/keybindings.tsv" "$ROOT/bin/keybindings" --print | wc -l | tr -d ' ')"
+[[ "$lines" -ge 90 ]] && t_ok "shortcut list prints all $lines shortcuts" || t_fail "shortcut list printed $lines lines"
+
+# --- themes
+"$ROOT/bin/theme" set nord --no-wallpaper >/dev/null 2>&1
+if grep -q "background = 2e3440" "$HOME/.config/ghostty/theme.conf" 2>/dev/null; then t_ok "theme writes terminal colours"; else t_fail "theme did not write terminal colours"; fi
+[[ "$(cat "$HOME/.local/state/mac-setup/theme" 2>/dev/null)" == nord ]] && t_ok "theme remembers the current theme" || t_fail "theme state not saved"
+grep -q "defaults write -g AppleAccentColor -int 4" "$STUB_LOG" && t_ok "theme sets the accent colour" || t_fail "accent colour not set"
+if ! "$ROOT/bin/theme" set nonexistent >/dev/null 2>&1; then t_ok "unknown theme fails cleanly"; else t_fail "unknown theme did not fail"; fi
+
+mkdir -p "$HOME/Pictures/Backgrounds"
+touch "$HOME/Pictures/Backgrounds/a.jpg" "$HOME/Pictures/Backgrounds/b.jpg" "$HOME/Pictures/Backgrounds/c.png"
+echo "$HOME/Pictures/Backgrounds/c.png" > "$HOME/.local/state/mac-setup/background"
+"$ROOT/bin/theme" next-background
+[[ "$(cat "$HOME/.local/state/mac-setup/background")" == "$HOME/Pictures/Backgrounds/a.jpg" ]] \
+  && t_ok "next background wraps around to the first image" || t_fail "next background did not wrap"
+"$ROOT/bin/theme" next-background
+[[ "$(cat "$HOME/.local/state/mac-setup/background")" == "$HOME/Pictures/Backgrounds/b.jpg" ]] \
+  && t_ok "next background advances" || t_fail "next background did not advance"
+
+# --- setup.sh options
+if ! bash "$ROOT/setup.sh" --dry-run --only artcraf >/dev/null 2>&1; then t_ok "setup rejects a misspelled step name"; else t_fail "misspelled step name was accepted"; fi
+steps_listed="$(bash "$ROOT/setup.sh" --list | tr '\n' ' ')"
+steps_files="$(for f in "$ROOT"/steps/[0-9][0-9]-*.sh; do n="$(basename "$f" .sh)"; printf '%s ' "${n#[0-9][0-9]-}"; done)"
+[[ "$steps_listed" == "$steps_files" ]] && t_ok "every step file is a step, in file order" || t_fail "steps differ" "$steps_listed vs $steps_files"
+for f in "$ROOT"/steps/[0-9][0-9]-*.sh; do
+  n="$(basename "$f" .sh)"; n="${n#[0-9][0-9]-}"
+  grep -q "^step_${n//-/_}()" "$f" || t_fail "$(basename "$f") has no function step_${n//-/_}"
+done
+t_ok "every step file defines its step function"
+
+# --- ArtCraft: choosing the right download from a release
+if command -v jq >/dev/null 2>&1; then
+  REPO_DIR="$ROOT"
+  # shellcheck source=lib/common.sh
+  source "$ROOT/lib/common.sh"
+  # shellcheck source=steps/03-artcraft.sh
+  source "$ROOT/steps/03-artcraft.sh"
+  got="$(artcraft_pick_asset < "$ROOT/tests/fixtures/release-mixed.json")"
+  [[ "$got" == "wordcraft-0.4.2-macos-universal.dmg"$'\t'"https://example.com/universal.dmg"$'\t' ]] \
+    && t_ok "ArtCraft: prefers the Apple silicon or universal .dmg" || t_fail "ArtCraft picked: $got"
+  got="$(artcraft_pick_asset < "$ROOT/tests/fixtures/release-zip-only.json")"
+  [[ "$got" == pdfcraft-v0.1.0-aarch64-apple-darwin.zip* ]] \
+    && t_ok "ArtCraft: falls back to the Apple silicon .zip, never Intel" || t_fail "ArtCraft picked: $got"
+  got="$(artcraft_pick_asset < "$ROOT/tests/fixtures/release-other-platforms.json")"
+  [[ "$got" == "wordcraft-macos-arm64.zip"$'\t'"https://example.com/mac.zip"$'\t'"sha256:abc123" ]] \
+    && t_ok "ArtCraft: never picks Windows or Linux Arm builds, and keeps the checksum" || t_fail "ArtCraft picked: $got"
+  got="$(artcraft_pick_asset < "$ROOT/tests/fixtures/release-no-mac.json")"
+  [[ -z "$got" ]] && t_ok "ArtCraft: reports no Mac build instead of guessing" || t_fail "ArtCraft picked: $got"
+else
+  t_fail "jq is not installed, so the ArtCraft tests could not run"
+fi
+
+exit $FAIL

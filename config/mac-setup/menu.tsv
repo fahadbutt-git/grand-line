@@ -1,0 +1,48 @@
+# Main menu (Caps + Option + Space). One entry per line:
+# Group/Item<TAB>command. Groups can nest (A/B/Item). Commands run in bash
+# with the package commands on the PATH. Save, and the menu updates at once.
+Apps/Open an app	menu-apps
+Learn/Shortcut list	keybindings
+Learn/Setup log folder	open "$MAC_SETUP_LOGS"
+Capture/Screenshot of an area	capture area
+Capture/Screenshot of a window	capture window
+Capture/Screenshot of the whole screen	capture screen
+Capture/Record the screen	capture record
+Capture/Copy text from a screen area	capture text
+Capture/Colour picker	open -a 'Digital Color Meter'
+Capture/Copy the browser's current URL	capture url
+Capture/Open the screenshots folder	open "$SCREENSHOTS_DIR"
+Transcode/Compress selected video for upload (1080p)	transcode video
+Transcode/Convert selected images to PNG	transcode png
+Transcode/Convert selected images to JPEG	transcode jpeg
+Transcode/Shrink selected PDFs	transcode pdf
+Toggle/Keep the Mac awake	toggle awake
+Toggle/Dark and light mode	toggle dark
+Toggle/Hidden files in Finder	toggle hidden
+Toggle/Menu bar	toggle menubar
+Toggle/Window tiling on or off	aerospace enable toggle
+Style/Pick a theme	theme pick
+Style/Next background	theme next-background
+Style/Open the backgrounds folder	open "$BACKGROUNDS_DIR"
+Setup/Displays	open 'x-apple.systempreferences:com.apple.Displays-Settings.extension'
+Setup/Keyboard	open 'x-apple.systempreferences:com.apple.Keyboard-Settings.extension'
+Setup/Trackpad	open 'x-apple.systempreferences:com.apple.Trackpad-Settings.extension'
+Setup/Sound	open 'x-apple.systempreferences:com.apple.Sound-Settings.extension'
+Setup/Wi-Fi	open 'x-apple.systempreferences:com.apple.wifi-settings-extension'
+Setup/Bluetooth	open 'x-apple.systempreferences:com.apple.BluetoothSettings'
+Setup/Battery	open 'x-apple.systempreferences:com.apple.Battery-Settings.extension'
+Setup/Privacy and Security	open 'x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension'
+Setup/Edit this menu	open -a TextEdit "$MAC_SETUP_CONFIG/menu.tsv"
+Setup/Edit window tiling settings	open -a TextEdit "$HOME/.aerospace.toml"
+Setup/Default apps: ArtCraft and built-in	default-apps primary
+Setup/Default apps: LibreOffice, Preview, IINA	default-apps fallback
+Hardware/Battery	notice battery
+Hardware/Displays	open 'x-apple.systempreferences:com.apple.Displays-Settings.extension'
+Hardware/System information	open -a 'System Information'
+Hardware/Disk space	notice disk
+Update/Update everything	update --window
+System/Lock	pmset displaysleepnow
+System/Sleep	pmset sleepnow
+System/Log out	osascript -e 'tell application "System Events" to log out'
+System/Restart	osascript -e 'tell application "System Events" to restart'
+System/Shut down	osascript -e 'tell application "System Events" to shut down'

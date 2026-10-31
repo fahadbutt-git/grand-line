@@ -1,0 +1,9 @@
+# Ghostty terminal. Colours come from the active theme (see: theme pick).
+font-size = 14
+window-padding-x = 12
+window-padding-y = 10
+macos-titlebar-style = tabs
+cursor-style = block
+copy-on-select = clipboard
+confirm-close-surface = false
+config-file = ?theme.conf

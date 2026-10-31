@@ -1,0 +1,11 @@
+#!/bin/bash
+# Open My Drive in Finder, or Google Drive on the web if Drive is not set up.
+source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
+
+for dir in "$HOME"/Library/CloudStorage/GoogleDrive-*/"My Drive"; do
+  if [[ -d "$dir" ]]; then
+    open "$dir"
+    exit 0
+  fi
+done
+open "https://drive.google.com"

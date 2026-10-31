@@ -1,0 +1,8 @@
+LABEL="Graphite"
+MODE=dark
+ACCENT=-1
+BACKGROUND=graphite.jpg
+TERM_BG=1c1c1e
+TERM_FG=e5e5e7
+TERM_CURSOR=a1a1a6
+TERM_SELECTION=3a3a3c

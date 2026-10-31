@@ -1,0 +1,3 @@
+#!/bin/bash
+# Test stub: a normal (non-root) user.
+case "${1:-}" in -u) echo 501 ;; *) /usr/bin/id "$@" ;; esac

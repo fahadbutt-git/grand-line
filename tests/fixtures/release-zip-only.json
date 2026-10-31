@@ -1,0 +1,4 @@
+{"tag_name":"v0.1.0","assets":[
+ {"name":"pdfcraft-v0.1.0-aarch64-apple-darwin.zip","browser_download_url":"https://example.com/arm.zip"},
+ {"name":"pdfcraft-v0.1.0-x86_64-apple-darwin.zip","browser_download_url":"https://example.com/intel.zip"}
+]}
