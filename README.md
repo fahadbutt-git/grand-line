@@ -82,6 +82,7 @@ As in Omarchy: mise for language versions, uv for Python packages, Docker, lazyg
 | `duckdb` | SQL straight over CSV or Parquet files: `duckdb -c "select count(*) from 'export.csv'"` |
 | Caps menu, Toggle, Local AI | Starts or stops Ollama for local models (`ollama run llama3.2`). Nothing runs until you start it |
 | `lzg`, `lzd`, `btop` | Git, containers, and system load in the terminal |
+| `lp` | Opens this folder in Log Pose (`lp ~/Drive` for another) |
 | `g`, `gcm "message"`, `gcam`, `gcad` | git, commit, commit all, amend |
 
 For the homelab: Tailscale joins this Mac to a private network with your NAS and servers. `nmap`, `mtr`, `iperf3` and `wakeonlan` find, trace, speed-test and wake machines. `fip server 8080` forwards a server's port to this Mac, `dip 8080` stops it, and `lip` lists them. `iso2sd image.iso disk4` writes an image to an SD card or USB stick, and refuses internal disks.
@@ -148,7 +149,7 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + Option + Return | Terminal in a tmux session |
 | Caps + Shift + Return | Browser (Chrome) |
 | Caps + Option + Shift + B | Private browser window |
-| Caps + Shift + F | Finder |
+| Caps + Shift + F | Files (Log Pose, or Finder if switched back) |
 | Caps + Shift + D | Google Drive folder |
 | Caps + Shift + A | Claude |
 | Caps + Option + Shift + A | ChatGPT |

@@ -100,7 +100,7 @@ BINDINGS += [
     ("return_or_enter", ["option"], "Apps", "Terminal in a tmux session", sh(f"open -na Ghostty --args -e {BREW}/tmux new-session -A -s main")),
     ("return_or_enter", ["shift"], "Apps", "Browser (Chrome)", app("Google Chrome")),
     ("b", ["shift", "option"], "Apps", "Private browser window", sh("open -na 'Google Chrome' --args --incognito")),
-    ("f", ["shift"], "Apps", "Finder", sh("open \"$HOME\"")),
+    ("f", ["shift"], "Apps", "Files (Log Pose, or Finder if switched back)", sh("open \"$HOME\"")),
     ("d", ["shift"], "Apps", "Google Drive folder", cmd("open-drive")),
     ("a", ["shift"], "Apps", "Claude", app("Claude")),
     ("a", ["shift", "option"], "Apps", "ChatGPT", app("ChatGPT")),

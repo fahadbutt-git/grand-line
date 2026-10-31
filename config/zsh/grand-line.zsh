@@ -47,6 +47,10 @@ alias gcam='git commit -a -m'
 alias gcad='git commit -a --amend'
 alias lzg='lazygit'
 
+# lp [folder]: open this folder (or another) in Log Pose, or Finder if it is
+# switched back. Folders open in whichever app setup made the folder viewer.
+lp() { open "${1:-.}"; }
+
 # ga branch: a new branch in its own folder beside this one (a git worktree),
 # so two pieces of work never share a checkout. gd, run inside that folder,
 # removes the folder and the branch, but only when nothing in them would be
