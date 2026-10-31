@@ -43,10 +43,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Build and test
-        working-directory: apps/finder
         run: |
           set -o pipefail
-          if [ ! -f Package.swift ]; then echo "::notice title=finder::no app yet"; exit 0; fi
+          if [ ! -f apps/finder/Package.swift ]; then echo "::notice title=finder::no app yet"; exit 0; fi
+          cd apps/finder
           swift --version | head -1
           if ! swift build 2>&1 | tee build.log; then
             grep -E "error:" build.log | head -40 | sed 's/^/::error title=build::/'; exit 1
