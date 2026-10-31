@@ -1,5 +1,5 @@
 #!/bin/bash
-# toggle awake | dark | hidden | menubar
+# toggle awake | dark | hidden | menubar | docker
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 
 case "${1:-}" in
@@ -28,5 +28,19 @@ case "${1:-}" in
   menubar)
     osascript -e 'tell application "System Events" to tell dock preferences to set autohide menu bar to not autohide menu bar'
     ;;
-  *) echo "usage: toggle awake|dark|hidden|menubar" >&2; exit 2 ;;
+  docker)
+    # Starts or stops the Colima VM that Docker runs in. Starting takes a few
+    # seconds, so it runs on its own after the shortcut returns.
+    if colima status >/dev/null 2>&1; then
+      detach_self "$0" docker
+      colima stop >/dev/null 2>&1 && notify "Docker stopped" "Its memory is free again."
+    else
+      detach_self "$0" docker
+      # Apple's virtualisation, Rosetta for Intel images, and room to build.
+      colima start --vm-type vz --vz-rosetta --cpu 6 --memory 12 --disk 120 >/dev/null 2>&1 \
+        && notify "Docker is running" "Stop it from the same menu when done." \
+        || notify "Docker did not start" "Run in Terminal: colima start"
+    fi
+    ;;
+  *) echo "usage: toggle awake|dark|hidden|menubar|docker" >&2; exit 2 ;;
 esac

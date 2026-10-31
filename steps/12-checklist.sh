@@ -60,7 +60,10 @@ macOS requires these clicks from you. Work down the list once.
 13. Google Drive from Terminal (optional, for bulk tidying and the NAS)
     In Terminal: rclone config, choose "drive", and follow the prompts.
 
-14. Restart the Mac once.
+14. Xcode, only when you start building Mac apps
+    Install it from the App Store (about 15 GB).
+
+15. Restart the Mac once.
 
 Everyday commands, from Terminal or the Caps Lock menu:
    update          update every app and tool

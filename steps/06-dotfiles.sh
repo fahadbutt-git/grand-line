@@ -15,6 +15,25 @@ step_dotfiles() {
   link_into_place "$cfg/starship.toml" "$HOME/.config/starship.toml"
   append_once "source \"$MAC_SETUP_LINK/config/zsh/mac-setup.zsh\"" "$HOME/.zshrc"
 
+  # Git: the package's defaults are included, so ~/.gitconfig stays yours.
+  if ! git config --global --get-all include.path 2>/dev/null | grep -qF "$MAC_SETUP_LINK/config/git/config"; then
+    run git config --global --add include.path "$MAC_SETUP_LINK/config/git/config"
+  fi
+  git config --global user.name >/dev/null 2>&1 || run git config --global user.name "Your Name"
+  git config --global user.email >/dev/null 2>&1 || run git config --global user.email "you@example.com"
+
+  # Docker: find Homebrew's compose and buildx plugins, keep logins in the Keychain.
+  local dcfg="$HOME/.docker/config.json" plug="$BREW_PREFIX/lib/docker/cli-plugins"
+  if [[ "$DRY_RUN" == 1 ]]; then
+    run "point Docker at $plug in $dcfg"
+  elif [[ ! -f "$dcfg" ]]; then
+    mkdir -p "$HOME/.docker"
+    printf '{"cliPluginsExtraDirs": ["%s"], "credsStore": "osxkeychain"}\n' "$plug" > "$dcfg"
+  elif ! grep -qF "$plug" "$dcfg"; then
+    jq --arg p "$plug" '.cliPluginsExtraDirs = ((.cliPluginsExtraDirs // []) + [$p])' "$dcfg" > "$dcfg.new" \
+      && mv "$dcfg.new" "$dcfg"
+  fi
+
   # Espanso: the package's shortcuts are linked, its settings copied once so
   # changes made in Espanso itself are kept.
   local esp="$HOME/Library/Application Support/espanso"

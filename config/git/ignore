@@ -1,0 +1,10 @@
+# Ignored in every repository
+.DS_Store
+.Rhistory
+.RData
+.Rproj.user/
+.venv/
+__pycache__/
+node_modules/
+.env
+.env.local

@@ -24,6 +24,18 @@ if command -v eza >/dev/null; then
   alias lta='lt -a'
 fi
 
+# Language versions per project (mise), as in Omarchy
+command -v mise >/dev/null && eval "$(mise activate zsh)"
+
+# Git and Docker shortcuts, as in Omarchy
+alias g='git'
+alias gcm='git commit -m'
+alias gcam='git commit -a -m'
+alias gcad='git commit -a --amend'
+alias lzg='lazygit'
+alias d='docker'
+alias lzd='lazydocker'
+
 # ff: find a file with a live preview, then print its path
 alias ff="fzf --preview 'head -100 {}'"
 

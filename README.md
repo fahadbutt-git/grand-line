@@ -46,6 +46,32 @@ Ghostty with Omarchy's shell tools, set up in `config/zsh/mac-setup.zsh`, `confi
 | Caps + Option + Return | Opens a terminal inside a lasting tmux session |
 | Ctrl + Space, then ? | Lists every tmux key: Option + Return splits, Option + Escape closes a pane |
 
+## Where files live
+
+| Place | Holds | Why |
+| --- | --- | --- |
+| `~/Drive` (Google Drive, My Drive) | Documents, research, everything to keep | Synced and backed up. Finder windows and the first save dialog in each app open here |
+| `~/Developer` | Code and anything you build | Local and on GitHub. Drive sync corrupts git folders and slows builds |
+| `~/Downloads` | An inbox only | Sorted as files arrive (below), then filed into Drive by you |
+| `~/Pictures/Screenshots` | Screenshots and recordings | Keeps the Desktop clear |
+| Inside the Docker VM | Containers and their data | Removed with `colima delete` when no longer needed |
+
+Research follows the Drive layout: each paper has one folder under `01 Research` (by status: `_Active`, `_Under-Review`, `_Published` and so on), and one-off Claude work goes to `Claude Projects`.
+
+## Building
+
+As in Omarchy: mise for language versions, uv for Python packages, Docker, lazygit, lazydocker and btop, with Zed as the editor and Claude Code or Codex in the terminal (`tdl`).
+
+| Type | Does |
+| --- | --- |
+| Caps menu, Toggle, Docker | Starts or stops Docker (a Colima VM: 6 cores, 12 GB memory, Rosetta for Intel images). Nothing runs until you start it |
+| `mise use node@22` | Pins a language version for the current project |
+| `uv init`, `uv add pandas` | Starts a Python project and adds packages |
+| `lzg`, `lzd`, `btop` | Git, containers, and system load in the terminal |
+| `g`, `gcm "message"`, `gcam`, `gcad` | git, commit, commit all, amend |
+
+Building native Mac apps (such as the search app) needs Xcode from the App Store. Install it when that work starts. It is about 15 GB.
+
 ## Downloads
 
 New files are sorted as they arrive, by the rules in `config/mac-setup/downloads-rules.tsv`. Files from Claude, ChatGPT and Gemini go to `Downloads/AI/<app>`, papers from journal and PubMed sites to `Downloads/Papers`, and everything else by type (Documents, Data, Slides, Images, Video, Installers and so on). Installers go to the Trash after a week, and anything left loose moves to `Downloads/Archive/<year-month>` after 30 days. Nothing is deleted, and every move is logged. The first time it runs, macOS asks whether bash may use Downloads. Allow it.

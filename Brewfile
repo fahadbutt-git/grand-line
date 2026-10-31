@@ -24,6 +24,20 @@ brew "starship"         # the prompt line
 brew "rclone"           # Drive from the command line: bulk tidying now, NAS sync later
 cask "font-jetbrains-mono-nerd-font"
 
+# Building, as in Omarchy. Docker runs in a Colima VM that starts only when
+# asked (Caps menu, Toggle, Docker), so nothing runs in the background.
+brew "mise"             # language versions per project (node, python, go...)
+brew "uv"               # Python packages and virtual environments
+brew "colima"           # the Linux VM that Docker runs in
+brew "docker"           # docker command
+brew "docker-compose"   # docker compose
+brew "docker-buildx"    # docker buildx (multi-platform builds)
+brew "docker-credential-helper"  # keeps registry logins in the Keychain
+brew "lazygit"          # git in the terminal (lzg)
+brew "lazydocker"       # containers in the terminal (lzd)
+brew "btop"             # what is using the CPU, memory and disk
+cask "zed"              # code editor (open source, fast, Claude agent built in)
+
 # AI
 cask "claude"
 cask "claude-code"

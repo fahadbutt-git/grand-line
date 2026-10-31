@@ -12,6 +12,7 @@ MAC_SETUP_LOGS="$HOME/Library/Logs/mac-setup"
 
 SCREENSHOTS_DIR="$HOME/Pictures/Screenshots"
 BACKGROUNDS_DIR="$HOME/Pictures/Backgrounds"
+DRIVE_LINK="$HOME/Drive"                       # link to Google Drive, My Drive
 
 # MAC_SETUP_BREW_PREFIX lets the tests point at a pretend Homebrew, so they
 # behave the same whether or not the test machine has Homebrew.
@@ -25,4 +26,4 @@ fi
 BREW_BIN="$BREW_PREFIX/bin/brew"
 
 export MAC_SETUP_LINK MAC_SETUP_BIN MAC_SETUP_BUILD MAC_SETUP_STATE MAC_SETUP_LOGS
-export SCREENSHOTS_DIR BACKGROUNDS_DIR BREW_PREFIX BREW_BIN
+export SCREENSHOTS_DIR BACKGROUNDS_DIR DRIVE_LINK BREW_PREFIX BREW_BIN

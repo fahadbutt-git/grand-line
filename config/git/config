@@ -1,0 +1,16 @@
+# Git defaults, included from ~/.gitconfig by setup. Your own ~/.gitconfig
+# settings (name, email, anything else) take precedence over these.
+[init]
+  defaultBranch = main
+[pull]
+  rebase = true
+[push]
+  autoSetupRemote = true
+[fetch]
+  prune = true
+[rerere]
+  enabled = true
+[diff]
+  algorithm = histogram
+[core]
+  excludesFile = ~/.mac-setup/config/git/ignore
