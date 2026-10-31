@@ -8,7 +8,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CI=0; [[ "${1:-}" == "--ci" ]] && CI=1
 source "$ROOT/lib/paths.sh"
-export PATH="$BREW_PREFIX/bin:$MAC_SETUP_BIN:$MAC_SETUP_BUILD:$PATH"
+export PATH="$BREW_PREFIX/bin:$GRAND_LINE_BIN:$GRAND_LINE_BUILD:$PATH"
 
 PASS=0; FAIL=0; WARN=0
 GH="${GITHUB_ACTIONS:-}"
@@ -43,21 +43,21 @@ done < <(brew info --cask --json=v2 "${casks[@]}" 2>/dev/null | jq -r '
 echo "ArtCraft apps"
 while IFS=$'\t' read -r app repo _; do
   [[ -z "$app" || "$app" == \#* ]] && continue
-  path="$(cat "$MAC_SETUP_STATE/artcraft/$app.path" 2>/dev/null)"
+  path="$(cat "$GRAND_LINE_STATE/artcraft/$app.path" 2>/dev/null)"
   if [[ -n "$path" && -d "$path" ]]; then pass "$app"
   else note "$app is not installed (check whether $repo has a macOS release yet)"; fi
-done < "$ROOT/config/mac-setup/artcraft.tsv"
+done < "$ROOT/config/grand-line/artcraft.tsv"
 
 echo "Settings and commands"
-for target in "$MAC_SETUP_LINK" "$HOME/.aerospace.toml" "$HOME/.config/ghostty"; do
+for target in "$GRAND_LINE_LINK" "$HOME/.aerospace.toml" "$HOME/.config/ghostty"; do
   if [[ -L "$target" && -e "$target" ]]; then pass "$target"; else fail "$target is not linked"; fi
 done
 cmp -s "$ROOT/config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json" \
   && pass "Karabiner has the current shortcuts" || fail "Karabiner settings differ from the package"
-grep -q "$MAC_SETUP_BIN" "$HOME/.zprofile" && pass "package commands are on the PATH for new shells" || fail ".zprofile does not add the package commands"
-launchctl print "gui/$(id -u)/mac-setup.downloads" >/dev/null 2>&1 \
+grep -q "$GRAND_LINE_BIN" "$HOME/.zprofile" && pass "package commands are on the PATH for new shells" || fail ".zprofile does not add the package commands"
+launchctl print "gui/$(id -u)/grand-line.downloads" >/dev/null 2>&1 \
   && pass "Downloads sorting is loaded" || fail "Downloads sorting is not loaded"
-[[ -L "$HOME/Library/Application Support/espanso/match/mac-setup.yml" ]] \
+[[ -L "$HOME/Library/Application Support/espanso/match/grand-line.yml" ]] \
   && pass "Espanso has the text shortcuts" || fail "Espanso shortcuts are not linked"
 for cmd_path in "$ROOT"/bin/*; do
   name="$(basename "$cmd_path")"
@@ -65,8 +65,8 @@ for cmd_path in "$ROOT"/bin/*; do
 done
 for src in "$ROOT"/tools/*.swift; do
   name="$(basename "$src" .swift)"
-  if [[ -x "$MAC_SETUP_BUILD/$name" ]]; then
-    "$MAC_SETUP_BUILD/$name" >/dev/null 2>&1; [[ $? -eq 1 ]] && pass "helper $name runs" || fail "helper $name does not run"
+  if [[ -x "$GRAND_LINE_BUILD/$name" ]]; then
+    "$GRAND_LINE_BUILD/$name" >/dev/null 2>&1; [[ $? -eq 1 ]] && pass "helper $name runs" || fail "helper $name does not run"
   else
     fail "helper $name was not built"
   fi
@@ -81,7 +81,7 @@ while IFS=$'\t' read -r app exts _; do
   elif [[ -d "/Applications/$app.app" ]]; then fail ".$ext opens in ${handler:-nothing}, but $app is installed and should open it"
   elif [[ -n "$handler" ]]; then note ".$ext opens in $handler because $app is not installed"
   else fail ".$ext has no default app"; fi
-done < "$ROOT/config/mac-setup/default-apps.tsv"
+done < "$ROOT/config/grand-line/default-apps.tsv"
 
 echo "Preinstalled apps the package replaces"
 # shellcheck source=steps/05-declutter.sh

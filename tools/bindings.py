@@ -6,7 +6,7 @@ To add or change a shortcut, edit BINDINGS, then run:
 
 That writes three things, which must not be edited by hand:
   config/karabiner/karabiner.json      the keyboard layer (Karabiner-Elements)
-  config/mac-setup/keybindings.tsv     the searchable list (Caps + K)
+  config/grand-line/keybindings.tsv     the searchable list (Caps + K)
   README.md                            the shortcut table, between its markers
 
     python3 tools/bindings.py --check  exits 1 if any of them is out of date
@@ -17,7 +17,7 @@ import pathlib
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-BIN = "$HOME/.mac-setup/bin"          # the package's commands (see lib/paths.sh)
+BIN = "$HOME/.grand-line/bin"          # the package's commands (see lib/paths.sh)
 BREW = "/opt/homebrew/bin"            # Homebrew on Apple silicon
 AERO = f"{BREW}/aerospace"  # called directly: the fastest path for window keys
 
@@ -263,7 +263,7 @@ def outputs():
     readme_path = ROOT / "README.md"
     return {
         ROOT / "config" / "karabiner" / "karabiner.json": karabiner_json(),
-        ROOT / "config" / "mac-setup" / "keybindings.tsv": keybindings_tsv(),
+        ROOT / "config" / "grand-line" / "keybindings.tsv": keybindings_tsv(),
         readme_path: readme(readme_path.read_text()),
     }
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# mac:summary=Convert or shrink the videos, images and PDFs selected in Finder
+# grandline:summary=Convert or shrink the videos, images and PDFs selected in Finder
 # Converts the files selected in Finder. New files are saved beside the originals.
 #   transcode video   compress to 1080p for uploads and submissions
 #   transcode png     convert images (TIFF, HEIC, JPEG) to PNG

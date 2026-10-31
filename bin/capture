@@ -1,5 +1,5 @@
 #!/bin/bash
-# mac:summary=Take a screenshot or recording, copy text from the screen, or copy the browser's URL
+# grandline:summary=Take a screenshot or recording, copy text from the screen, or copy the browser's URL
 # capture area | window | screen | record | text | url
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 
@@ -17,7 +17,7 @@ case "${1:-area}" in
     screencapture -i "$tmp" || exit 0
     [[ -s "$tmp" ]] || exit 0
     if ! command -v ocr >/dev/null 2>&1; then
-      notify "Text capture" "The text recognition tool is missing. Run: bash ~/mac-setup/setup.sh --only native-tools"
+      notify "Text capture" "The text recognition tool is missing. Run: bash ~/grand-line/setup.sh --only native-tools"
       exit 1
     fi
     text="$(ocr "$tmp")"

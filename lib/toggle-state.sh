@@ -2,16 +2,16 @@
 # The state of each toggle, for the menu's check marks and for bin/toggle.
 # Each check is cheap (one quick command or a file test), because the menu
 # runs all of them before it opens. Where the state cannot be read cheaply,
-# bin/toggle keeps a flag file in ~/.local/state/mac-setup/toggles/, as
+# bin/toggle keeps a flag file in ~/.local/state/grand-line/toggles/, as
 # Omarchy does.
 
-TOGGLE_FLAGS="$HOME/.local/state/mac-setup/toggles"
+TOGGLE_FLAGS="$HOME/.local/state/grand-line/toggles"
 
 # is_on NAME: succeeds when that toggle is on.
 is_on() {
   case "$1" in
-    awake)   launchctl list mac-setup.caffeinate >/dev/null 2>&1 ;;
-    ollama)  launchctl list mac-setup.ollama >/dev/null 2>&1 ;;
+    awake)   launchctl list grand-line.caffeinate >/dev/null 2>&1 ;;
+    ollama)  launchctl list grand-line.ollama >/dev/null 2>&1 ;;
     dark)    [[ "$(defaults read -g AppleInterfaceStyle 2>/dev/null)" == Dark ]] ;;
     hidden)  [[ "$(defaults read com.apple.finder AppleShowAllFiles 2>/dev/null)" == 1 ]] ;;
     desktop-icons) [[ "$(defaults read com.apple.finder CreateDesktop 2>/dev/null)" != 0 ]] ;;
@@ -52,6 +52,6 @@ flag() {
 # theme_is NAME: succeeds when NAME is the current theme.
 theme_is() {
   local current=""
-  read -r current < "$HOME/.local/state/mac-setup/theme" 2>/dev/null
+  read -r current < "$HOME/.local/state/grand-line/theme" 2>/dev/null
   [[ "$current" == "$1" ]]
 }

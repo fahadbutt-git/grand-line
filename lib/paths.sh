@@ -4,20 +4,20 @@
 
 # A stable link to wherever this package lives. Shortcuts and PATH use it,
 # so moving the package only means re-running setup.
-MAC_SETUP_LINK="$HOME/.mac-setup"
-MAC_SETUP_BIN="$MAC_SETUP_LINK/bin"
-MAC_SETUP_BUILD="$MAC_SETUP_LINK/.build"        # compiled helpers (tools/*.swift)
-MAC_SETUP_STATE="$HOME/.local/state/mac-setup"  # remembered theme, ArtCraft versions
-MAC_SETUP_LOGS="$HOME/Library/Logs/mac-setup"
+GRAND_LINE_LINK="$HOME/.grand-line"
+GRAND_LINE_BIN="$GRAND_LINE_LINK/bin"
+GRAND_LINE_BUILD="$GRAND_LINE_LINK/.build"        # compiled helpers (tools/*.swift)
+GRAND_LINE_STATE="$HOME/.local/state/grand-line"  # remembered theme, ArtCraft versions
+GRAND_LINE_LOGS="$HOME/Library/Logs/grand-line"
 
 SCREENSHOTS_DIR="$HOME/Pictures/Screenshots"
 BACKGROUNDS_DIR="$HOME/Pictures/Backgrounds"
 DRIVE_LINK="$HOME/Drive"                       # link to Google Drive, My Drive
 
-# MAC_SETUP_BREW_PREFIX lets the tests point at a pretend Homebrew, so they
+# GRAND_LINE_BREW_PREFIX lets the tests point at a pretend Homebrew, so they
 # behave the same whether or not the test machine has Homebrew.
-if [[ -n "${MAC_SETUP_BREW_PREFIX:-}" ]]; then
-  BREW_PREFIX="$MAC_SETUP_BREW_PREFIX"
+if [[ -n "${GRAND_LINE_BREW_PREFIX:-}" ]]; then
+  BREW_PREFIX="$GRAND_LINE_BREW_PREFIX"
 elif [[ -d /opt/homebrew || "$(uname -m 2>/dev/null)" == arm64 ]]; then
   BREW_PREFIX="/opt/homebrew"
 else
@@ -25,5 +25,5 @@ else
 fi
 BREW_BIN="$BREW_PREFIX/bin/brew"
 
-export MAC_SETUP_LINK MAC_SETUP_BIN MAC_SETUP_BUILD MAC_SETUP_STATE MAC_SETUP_LOGS
+export GRAND_LINE_LINK GRAND_LINE_BIN GRAND_LINE_BUILD GRAND_LINE_STATE GRAND_LINE_LOGS
 export SCREENSHOTS_DIR BACKGROUNDS_DIR DRIVE_LINK BREW_PREFIX BREW_BIN

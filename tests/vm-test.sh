@@ -13,7 +13,7 @@
 
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VM="mac-setup-test"
+VM="grand-line-test"
 IMAGE="ghcr.io/cirruslabs/macos-tahoe-vanilla:latest"
 KEEP=0
 SETUP_ARGS=()
@@ -80,24 +80,24 @@ results=()
 
 say "Run 1: full setup on a fresh Mac (20 to 60 minutes)"
 start=$(date +%s)
-vm "cp -R '$SRC' ~/mac-setup-download && bash ~/mac-setup-download/setup.sh --ci ${SETUP_ARGS[*]-}"
+vm "cp -R '$SRC' ~/grand-line-download && bash ~/grand-line-download/setup.sh --ci ${SETUP_ARGS[*]-}"
 r1=$?; t1=$(( ($(date +%s) - start) / 60 ))
 results+=("Run 1 (fresh install): exit $r1, ${t1} min")
 
 say "Checking the installed Mac"
-vm "bash ~/mac-setup/tests/verify-install.sh --ci"
+vm "bash ~/grand-line/tests/verify-install.sh --ci"
 rv=$?
 results+=("Checks after run 1: exit $rv")
 
 say "Run 2: running setup again must change nothing and succeed"
 start=$(date +%s)
-vm "bash ~/mac-setup/setup.sh --ci ${SETUP_ARGS[*]-}"
+vm "bash ~/grand-line/setup.sh --ci ${SETUP_ARGS[*]-}"
 r2=$?; t2=$(( ($(date +%s) - start) / 60 ))
 results+=("Run 2 (repeat): exit $r2, ${t2} min")
 
 say "Copying the setup logs to tests/vm-logs"
 mkdir -p "$ROOT/tests/vm-logs"
-vm 'cd ~/Library/Logs/mac-setup && tar cf - .' | tar xf - -C "$ROOT/tests/vm-logs" 2>/dev/null
+vm 'cd ~/Library/Logs/grand-line && tar cf - .' | tar xf - -C "$ROOT/tests/vm-logs" 2>/dev/null
 
 say "Result"
 printf '  %s\n' "${results[@]}"

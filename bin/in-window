@@ -1,5 +1,5 @@
 #!/bin/bash
-# mac:summary=Run a command in its own terminal window that waits for a key at the end
+# grandline:summary=Run a command in its own terminal window that waits for a key at the end
 # in-window COMMAND [ARGS...]
 # Opens a Ghostty window (Terminal if Ghostty is missing) that runs the
 # command, then shows "Done" or "Failed (code)" and closes on any key, as
@@ -9,7 +9,7 @@ source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 if [[ "${1:-}" == --run ]]; then
   shift
   # Commands that would run out of sight (app install) stay in this window.
-  export MAC_SETUP_IN_WINDOW=1
+  export GRAND_LINE_IN_WINDOW=1
   "$@"; code=$?
   if [[ "$code" == 0 ]]; then
     printf '\n\033[32m●\033[0m Done. Press any key to close.'

@@ -1,17 +1,17 @@
 #!/bin/bash
-# mac:summary=Open the main menu, or one of its groups (menu Capture)
+# grandline:summary=Open the main menu, or one of its groups (menu Capture)
 # Omarchy-style menu. "menu" shows the top level, "menu Capture" opens a group.
-# Entries come from config/mac-setup/menu.tsv: a path (groups separated by /),
+# Entries come from config/grand-line/menu.tsv: a path (groups separated by /),
 # a tab, then the command to run. Two optional columns follow:
 #   ?TEST   show the entry only when the shell test succeeds
 #   ✓TEST   put a check mark on the entry when the shell test succeeds
 # Tests can use the is_on and theme_is helpers in lib/toggle-state.sh.
-# ~/.config/mac-setup/menu.local.tsv adds your own entries: the same path
+# ~/.config/grand-line/menu.local.tsv adds your own entries: the same path
 # replaces a shipped entry, and "Path<TAB>-" removes it.
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 
-MENU_FILE="${MENU_FILE:-$MAC_SETUP_CONFIG/menu.tsv}"
-MENU_LOCAL="${MENU_LOCAL:-$HOME/.config/mac-setup/menu.local.tsv}"
+MENU_FILE="${MENU_FILE:-$GRAND_LINE_CONFIG/menu.tsv}"
+MENU_LOCAL="${MENU_LOCAL:-$HOME/.config/grand-line/menu.local.tsv}"
 STATE_LIB="$(dirname "$(readlink -f "$0")")/../lib/toggle-state.sh"
 CHECK=" ✓"
 prefix="${1:-}"

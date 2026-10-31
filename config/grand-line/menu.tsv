@@ -4,14 +4,14 @@
 # Two optional columns: ?TEST shows the entry only when TEST succeeds, and
 # ✓TEST puts a check mark on it when TEST succeeds (helpers such as is_on
 # and theme_is are in lib/toggle-state.sh). Your own entries go in
-# ~/.config/mac-setup/menu.local.tsv (see README).
+# ~/.config/grand-line/menu.local.tsv (see README).
 Apps/Open an app	menu-apps
 Install/An app	app install --window
 Remove/An app (its data is kept)	app remove --window
 Files/Sort Downloads now	tidy-downloads
-Files/Recent Downloads moves	open -a TextEdit "$MAC_SETUP_LOGS/downloads.log"
-Files/Edit the Downloads rules	open -a TextEdit "$MAC_SETUP_CONFIG/downloads-rules.tsv"
-Files/Open the setup logs	open "$MAC_SETUP_LOGS"
+Files/Recent Downloads moves	open -a TextEdit "$GRAND_LINE_LOGS/downloads.log"
+Files/Edit the Downloads rules	open -a TextEdit "$GRAND_LINE_CONFIG/downloads-rules.tsv"
+Files/Open the setup logs	open "$GRAND_LINE_LOGS"
 Learn/Shortcut list	keybindings
 Capture/Screenshot of an area	capture area
 Capture/Screenshot of a window	capture window
@@ -51,7 +51,7 @@ Setup/Trackpad	open 'x-apple.systempreferences:com.apple.Trackpad-Settings.exten
 Setup/Sound output	audio
 Setup/Bluetooth devices	bluetooth
 Setup/Privacy and Security	open 'x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension'
-Setup/Edit this menu	open -a TextEdit "$MAC_SETUP_CONFIG/menu.tsv"
+Setup/Edit this menu	open -a TextEdit "$GRAND_LINE_CONFIG/menu.tsv"
 Setup/Edit window tiling settings	open -a TextEdit "$HOME/.aerospace.toml"
 Setup/Default apps: ArtCraft and built-in	default-apps primary
 Setup/Default apps: LibreOffice and Preview	default-apps fallback
@@ -61,8 +61,8 @@ Hardware/Disk space	notice disk
 Hardware/Network speed test	notice speed
 Update/Update everything	update --window
 Update/Run the waiting one-time changes	in-window migrate	?migrate --pending
-Update/Undo the last change	mac undo
-Update/Go back to a saved version	mac restore
+Update/Undo the last change	grandline undo
+Update/Go back to a saved version	grandline restore
 System/Lock	osascript -e 'tell application "System Events" to keystroke "q" using {control down, command down}'
 System/Sleep	pmset sleepnow
 System/Log out	osascript -e 'tell application "System Events" to log out'

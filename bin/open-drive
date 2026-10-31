@@ -1,5 +1,5 @@
 #!/bin/bash
-# mac:summary=Open My Drive in Finder (or Google Drive on the web)
+# grandline:summary=Open My Drive in Finder (or Google Drive on the web)
 # Open My Drive in Finder, or Google Drive on the web if Drive is not set up.
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 

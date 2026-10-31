@@ -21,7 +21,7 @@ check() { local name="$1"; shift; local out; if out="$("$@" 2>&1)"; then pass "$
 SHELL_FILES=()
 while IFS= read -r f; do SHELL_FILES+=("$f"); done < <(
   { ls setup.sh publish.sh lib/*.sh steps/*.sh bin/* tests/*.sh tests/stubs/* \
-       migrations/*.sh config/mac-setup/hooks/*.sample 2>/dev/null; } | sort -u)
+       migrations/*.sh config/grand-line/hooks/*.sample 2>/dev/null; } | sort -u)
 
 echo "Shell scripts"
 for f in "${SHELL_FILES[@]}"; do
@@ -58,10 +58,10 @@ have_tool() {
   return 1
 }
 if have_tool zsh; then
-  check "syntax: config/zsh/mac-setup.zsh" zsh -n config/zsh/mac-setup.zsh
+  check "syntax: config/zsh/grand-line.zsh" zsh -n config/zsh/grand-line.zsh
 fi
 if have_tool tmux; then
-  check "tmux.conf loads" tmux -f config/tmux/tmux.conf -L mac-setup-test start-server \; kill-server
+  check "tmux.conf loads" tmux -f config/tmux/tmux.conf -L grand-line-test start-server \; kill-server
 fi
 
 echo "Config files"
@@ -75,7 +75,7 @@ check "karabiner.json parses" python3 -m json.tool config/karabiner/karabiner.js
 check "generated files are current with tools/bindings.py" python3 tools/bindings.py --check
 
 check "menu.tsv: path and command, then optional ?guard and ✓check columns" bash -c \
-  "grep -v -e '^#' -e '^\$' config/mac-setup/menu.tsv | awk -F'\t' '
+  "grep -v -e '^#' -e '^\$' config/grand-line/menu.tsv | awk -F'\t' '
      NF < 2 || NF > 4 || \$2 == \"\" { print NR\": \"\$0; bad=1; next }
      NF >= 3 && \$3 != \"\" && substr(\$3, 1, 1) != \"?\" { print \"column 3 must start with ?: \"\$0; bad=1 }
      NF == 4 && index(\$4, \"✓\") != 1 { print \"column 4 must start with ✓: \"\$0; bad=1 }
@@ -83,8 +83,8 @@ check "menu.tsv: path and command, then optional ?guard and ✓check columns" ba
 
 check "every package command used by menus and shortcuts exists in bin/" bash -c '
   bad=0
-  names=$( { grep -ohE "\\\$HOME/\.mac-setup/bin/[a-z-]+" config/mac-setup/keybindings.tsv | sed "s#.*/##";
-             grep -v "^#" config/mac-setup/menu.tsv | cut -f2 | cut -d" " -f1; } | sort -u)
+  names=$( { grep -ohE "\\\$HOME/\.grand-line/bin/[a-z-]+" config/grand-line/keybindings.tsv | sed "s#.*/##";
+             grep -v "^#" config/grand-line/menu.tsv | cut -f2 | cut -d" " -f1; } | sort -u)
   for name in $names; do
     [[ -f "bin/$name" ]] && continue
     command -v "$name" >/dev/null 2>&1 && continue
@@ -93,11 +93,11 @@ check "every package command used by menus and shortcuts exists in bin/" bash -c
   done; exit $bad'
 
 check "default-apps.tsv: three tab-separated fields per entry" bash -c \
-  "grep -v '^#' config/mac-setup/default-apps.tsv | awk -F'\t' 'NF != 3 { print NR\": \"\$0; bad=1 } END { exit bad }'"
+  "grep -v '^#' config/grand-line/default-apps.tsv | awk -F'\t' 'NF != 3 { print NR\": \"\$0; bad=1 } END { exit bad }'"
 
 check "every native helper has a matching source file" bash -c '
   bad=0
-  for name in $(grep -ohE "MAC_SETUP_BUILD/[a-z]+|pdfshrink|\bocr\b" bin/* lib/*.sh | sed "s#.*/##" | sort -u); do
+  for name in $(grep -ohE "GRAND_LINE_BUILD/[a-z]+|pdfshrink|\bocr\b" bin/* lib/*.sh | sed "s#.*/##" | sort -u); do
     [[ -f "tools/$name.swift" ]] || { echo "tools/$name.swift missing"; bad=1; }
   done
   exit $bad'
@@ -137,9 +137,9 @@ for path in sorted(glob.glob("config/themes/*.theme")):
             print("%s: %s #%s is %.2f:1 on #%s" % (path, name, c, ratio(c, bg), bg)); bad = 1
 sys.exit(bad)'
 
-check "every bin/ command has a \"# mac:summary=\" line (mac commands lists them)" bash -c '
+check "every bin/ command has a \"# grandline:summary=\" line (grandline commands lists them)" bash -c '
   bad=0
-  for f in bin/*; do grep -q "^# mac:summary=." "$f" || { echo "$f has no summary"; bad=1; }; done
+  for f in bin/*; do grep -q "^# grandline:summary=." "$f" || { echo "$f has no summary"; bad=1; }; done
   exit $bad'
 
 check "migrations are named <unix time>-<slug>.sh" bash -c '
@@ -153,7 +153,7 @@ check "no personal paths or secrets committed" bash -c '
     | grep -v -e "^./tests/run-all.sh:" -e ":/Users/me/\$")"
   [[ -z "$found" ]] || { printf "%s\n" "$found"; exit 1; }'
 
-# Names, emails and places belong in ~/.config/mac-setup/personal.env.
+# Names, emails and places belong in ~/.config/grand-line/personal.env.
 check "no email addresses or home coordinates committed" bash -c '
   found="$(git ls-files -z | xargs -0 grep -nIoE "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.(com|org|net|ca|edu)|^-?[0-9]{1,2}\.[0-9]+ -?[0-9]{1,3}\.[0-9]+ [A-Z]" 2>/dev/null \
     | grep -vE "noreply|example\.(com|org)|@users\.noreply|apps/.*/Tests/")"

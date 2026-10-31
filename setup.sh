@@ -45,7 +45,7 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 export DRY_RUN CI_MODE
-[[ "$CI_MODE" == 1 ]] && export MAC_SETUP_NO_APPLEEVENTS=1
+[[ "$CI_MODE" == 1 ]] && export GRAND_LINE_NO_APPLEEVENTS=1
 
 # Reject misspelled step names instead of silently skipping them.
 for name in ${ONLY//,/ } ${SKIP//,/ }; do
@@ -56,25 +56,25 @@ for name in ${ONLY//,/ } ${SKIP//,/ }; do
 done
 
 # Keep the package in one stable place so the links it creates stay valid.
-MAC_SETUP_HOME="${MAC_SETUP_HOME:-$HOME/mac-setup}"
+GRAND_LINE_HOME="${GRAND_LINE_HOME:-$HOME/grand-line}"
 # The first run copies it there. Later runs from elsewhere (an old download)
 # use the existing copy, so local edits and GitHub updates are never overwritten.
-if [[ "$DRY_RUN" == 0 && "$REPO_DIR" != "$MAC_SETUP_HOME" ]]; then
-  if [[ -f "$MAC_SETUP_HOME/setup.sh" ]]; then
-    info "Using the existing package in $MAC_SETUP_HOME"
-  elif [[ -e "$MAC_SETUP_HOME" ]]; then
-    err "$MAC_SETUP_HOME exists and is not this package. Move it, then run again."
+if [[ "$DRY_RUN" == 0 && "$REPO_DIR" != "$GRAND_LINE_HOME" ]]; then
+  if [[ -f "$GRAND_LINE_HOME/setup.sh" ]]; then
+    info "Using the existing package in $GRAND_LINE_HOME"
+  elif [[ -e "$GRAND_LINE_HOME" ]]; then
+    err "$GRAND_LINE_HOME exists and is not this package. Move it, then run again."
     exit 1
   else
-    info "Copying the package to $MAC_SETUP_HOME"
-    rsync -a --exclude .build "$REPO_DIR/" "$MAC_SETUP_HOME/" || exit 1
+    info "Copying the package to $GRAND_LINE_HOME"
+    rsync -a --exclude .build "$REPO_DIR/" "$GRAND_LINE_HOME/" || exit 1
   fi
-  exec /bin/bash "$MAC_SETUP_HOME/setup.sh" "${ORIGINAL_ARGS[@]+"${ORIGINAL_ARGS[@]}"}"
+  exec /bin/bash "$GRAND_LINE_HOME/setup.sh" "${ORIGINAL_ARGS[@]+"${ORIGINAL_ARGS[@]}"}"
 fi
 
 if [[ "$DRY_RUN" == 0 ]]; then
-  mkdir -p "$MAC_SETUP_LOGS"
-  LOG_FILE="$MAC_SETUP_LOGS/setup-$(date +%Y%m%d-%H%M%S).log"
+  mkdir -p "$GRAND_LINE_LOGS"
+  LOG_FILE="$GRAND_LINE_LOGS/setup-$(date +%Y%m%d-%H%M%S).log"
   exec > >(tee -a "$LOG_FILE") 2>&1
   info "Log: $LOG_FILE"
 fi
@@ -87,7 +87,7 @@ done
 # A fresh install needs none of the one-time changes in migrations/, so they
 # are recorded as done. A Mac set up before migrations existed already has a
 # theme, so its migrations still run (bin/update runs them).
-if [[ ! -d "$MAC_SETUP_STATE/migrations" && ! -f "$MAC_SETUP_STATE/theme" ]]; then
+if [[ ! -d "$GRAND_LINE_STATE/migrations" && ! -f "$GRAND_LINE_STATE/theme" ]]; then
   run "$REPO_DIR/bin/migrate" --mark-all
 fi
 

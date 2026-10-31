@@ -458,7 +458,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'ChatGPT'"
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'ChatGPT'"
          }
         ]
        },
@@ -482,7 +482,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'Gemini'"
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'Gemini'"
          }
         ]
        },
@@ -506,7 +506,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'FineTune'"
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'FineTune'"
          }
         ]
        },
@@ -530,7 +530,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/capture text"
+          "shell_command": "$HOME/.grand-line/bin/capture text"
          }
         ]
        },
@@ -554,7 +554,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'Meetily'"
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'Meetily'"
          }
         ]
        },
@@ -578,7 +578,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/toggle mic"
+          "shell_command": "$HOME/.grand-line/bin/toggle mic"
          }
         ]
        },
@@ -602,7 +602,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/notice reminders"
+          "shell_command": "$HOME/.grand-line/bin/notice reminders"
          }
         ]
        },
@@ -626,7 +626,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/notice time"
+          "shell_command": "$HOME/.grand-line/bin/notice time"
          }
         ]
        },
@@ -650,7 +650,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/notice battery"
+          "shell_command": "$HOME/.grand-line/bin/notice battery"
          }
         ]
        },
@@ -674,7 +674,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/notice weather"
+          "shell_command": "$HOME/.grand-line/bin/notice weather"
          }
         ]
        },
@@ -698,7 +698,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/theme pick"
+          "shell_command": "$HOME/.grand-line/bin/theme pick"
          }
         ]
        },
@@ -721,7 +721,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/menu"
+          "shell_command": "$HOME/.grand-line/bin/menu"
          }
         ]
        },
@@ -1162,7 +1162,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'Google Chrome'"
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'Google Chrome'"
          }
         ]
        },
@@ -1208,7 +1208,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/open-drive"
+          "shell_command": "$HOME/.grand-line/bin/open-drive"
          }
         ]
        },
@@ -1231,7 +1231,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'Claude'"
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'Claude'"
          }
         ]
        },
@@ -1254,7 +1254,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'Notion'"
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'Notion'"
          }
         ]
        },
@@ -1277,7 +1277,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'Reminders'"
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'Reminders'"
          }
         ]
        },
@@ -1300,7 +1300,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'WhatsApp'"
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'WhatsApp'"
          }
         ]
        },
@@ -1323,7 +1323,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'Spotify'"
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'Spotify'"
          }
         ]
        },
@@ -1346,7 +1346,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'RStudio'"
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'RStudio'"
          }
         ]
        },
@@ -1369,7 +1369,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'WordCraft'"
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'WordCraft'"
          }
         ]
        },
@@ -1392,7 +1392,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'GridCraft'"
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'GridCraft'"
          }
         ]
        },
@@ -1415,7 +1415,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'DeckCraft'"
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'DeckCraft'"
          }
         ]
        },
@@ -1438,7 +1438,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'PdfCraft'"
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'PdfCraft'"
          }
         ]
        },
@@ -1461,7 +1461,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'FilmCraft'"
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'FilmCraft'"
          }
         ]
        },
@@ -1484,7 +1484,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'Passwords'"
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'Passwords'"
          }
         ]
        },
@@ -1507,7 +1507,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/webapp 'https://mail.google.com' 'Gmail'"
+          "shell_command": "$HOME/.grand-line/bin/webapp 'https://mail.google.com' 'Gmail'"
          }
         ]
        },
@@ -1530,7 +1530,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/webapp 'https://calendar.google.com' 'Google Calendar'"
+          "shell_command": "$HOME/.grand-line/bin/webapp 'https://calendar.google.com' 'Google Calendar'"
          }
         ]
        },
@@ -1553,7 +1553,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/webapp 'https://pubmed.ncbi.nlm.nih.gov' 'PubMed'"
+          "shell_command": "$HOME/.grand-line/bin/webapp 'https://pubmed.ncbi.nlm.nih.gov' 'PubMed'"
          }
         ]
        },
@@ -1576,7 +1576,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/webapp 'https://www.youtube.com' 'YouTube'"
+          "shell_command": "$HOME/.grand-line/bin/webapp 'https://www.youtube.com' 'YouTube'"
          }
         ]
        },
@@ -1599,7 +1599,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/audio"
+          "shell_command": "$HOME/.grand-line/bin/audio"
          }
         ]
        },
@@ -1622,7 +1622,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/audio next"
+          "shell_command": "$HOME/.grand-line/bin/audio next"
          }
         ]
        },
@@ -1645,7 +1645,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/bluetooth"
+          "shell_command": "$HOME/.grand-line/bin/bluetooth"
          }
         ]
        },
@@ -1737,7 +1737,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/menu Hardware"
+          "shell_command": "$HOME/.grand-line/bin/menu Hardware"
          }
         ]
        },
@@ -1760,7 +1760,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/menu Toggle"
+          "shell_command": "$HOME/.grand-line/bin/menu Toggle"
          }
         ]
        },
@@ -1783,7 +1783,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/menu Capture"
+          "shell_command": "$HOME/.grand-line/bin/menu Capture"
          }
         ]
        },
@@ -1829,7 +1829,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/menu Transcode"
+          "shell_command": "$HOME/.grand-line/bin/menu Transcode"
          }
         ]
        },
@@ -1957,7 +1957,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/toggle awake"
+          "shell_command": "$HOME/.grand-line/bin/toggle awake"
          }
         ]
        },
@@ -1980,7 +1980,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/toggle dark"
+          "shell_command": "$HOME/.grand-line/bin/toggle dark"
          }
         ]
        },
@@ -2003,7 +2003,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/toggle menubar"
+          "shell_command": "$HOME/.grand-line/bin/toggle menubar"
          }
         ]
        },
@@ -2026,7 +2026,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/reminder"
+          "shell_command": "$HOME/.grand-line/bin/reminder"
          }
         ]
        },
@@ -2049,7 +2049,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/theme next-background"
+          "shell_command": "$HOME/.grand-line/bin/theme next-background"
          }
         ]
        },
@@ -2088,7 +2088,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/keybindings"
+          "shell_command": "$HOME/.grand-line/bin/keybindings"
          }
         ]
        },
@@ -2106,7 +2106,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/menu System"
+          "shell_command": "$HOME/.grand-line/bin/menu System"
          }
         ]
        },
@@ -2526,7 +2526,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'Ghostty'"
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'Ghostty'"
          }
         ]
        },

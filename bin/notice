@@ -1,8 +1,8 @@
 #!/bin/bash
-# mac:summary=Show the time, battery, weather, disk space, reminders due or network speed
+# grandline:summary=Show the time, battery, weather, disk space, reminders due or network speed
 # notice time | battery | weather | disk | reminders | speed
 # Weather comes from Open-Meteo (free, no account) for the LOCATION in
-# ~/.config/mac-setup/personal.env ("latitude longitude Place").
+# ~/.config/grand-line/personal.env ("latitude longitude Place").
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 
 weather_text() {

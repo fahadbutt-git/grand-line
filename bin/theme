@@ -1,5 +1,5 @@
 #!/bin/bash
-# mac:summary=Change the theme (terminal, editor, menus, tools, wallpaper) or background
+# grandline:summary=Change the theme (terminal, editor, menus, tools, wallpaper) or background
 # theme pick                    choose a theme from a menu
 # theme set NAME [--no-wallpaper]
 # theme next-background         cycle through ~/Pictures/Backgrounds
@@ -9,9 +9,9 @@ source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 REPO="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 THEMES="$REPO/config/themes"
 BACKGROUNDS="$BACKGROUNDS_DIR"
-CURRENT="$MAC_SETUP_STATE/current"
+CURRENT="$GRAND_LINE_STATE/current"
 THEME_OUT="$CURRENT/theme"                       # rendered templates, read by apps
-USER_TEMPLATES="$HOME/.config/mac-setup/themed"  # your templates win over the package's
+USER_TEMPLATES="$HOME/.config/grand-line/themed"  # your templates win over the package's
 # shellcheck source=lib/templates.sh
 source "$REPO/lib/templates.sh"
 
@@ -23,7 +23,7 @@ on run argv
   tell application "System Events" to tell every desktop to set picture to (POSIX file (item 1 of argv))
 end run
 EOF
-  printf '%s\n' "$img" > "$MAC_SETUP_STATE/background"
+  printf '%s\n' "$img" > "$GRAND_LINE_STATE/background"
 }
 
 # Render every template into a fresh folder, then swap it in whole, so an
@@ -63,11 +63,11 @@ install_theme_outputs() {
   # btop: the theme file always, the setting only if you have not chosen one.
   if [[ -f "$out/btop.theme" ]]; then
     local btop="$HOME/.config/btop"
-    mkdir -p "$btop/themes" && cp "$out/btop.theme" "$btop/themes/mac-setup.theme"
+    mkdir -p "$btop/themes" && cp "$out/btop.theme" "$btop/themes/grand-line.theme"
     if [[ ! -f "$btop/btop.conf" ]] || ! grep -q '^color_theme' "$btop/btop.conf"; then
-      printf 'color_theme = "mac-setup"\n' >> "$btop/btop.conf"
+      printf 'color_theme = "grand-line"\n' >> "$btop/btop.conf"
     elif grep -qE '^color_theme *= *"Default"' "$btop/btop.conf"; then
-      perl -i -pe 's/^color_theme *= *"Default"/color_theme = "mac-setup"/' "$btop/btop.conf"
+      perl -i -pe 's/^color_theme *= *"Default"/color_theme = "grand-line"/' "$btop/btop.conf"
     fi
   fi
 
@@ -80,7 +80,7 @@ install_theme_outputs() {
   # Claude Code lists ~/.claude/themes in /theme and reloads it on change.
   # Choosing it there (once) is left to you.
   if [[ -f "$out/claude.json" && -d "$HOME/.claude" ]]; then
-    mkdir -p "$HOME/.claude/themes" && cp "$out/claude.json" "$HOME/.claude/themes/mac-setup.json"
+    mkdir -p "$HOME/.claude/themes" && cp "$out/claude.json" "$HOME/.claude/themes/grand-line.json"
   fi
 }
 
@@ -95,7 +95,7 @@ apply_theme() {
   source "$file"
 
   # Test machines cannot answer macOS's Automation prompt, so they skip it.
-  if [[ -z "${MAC_SETUP_NO_APPLEEVENTS:-}" ]]; then
+  if [[ -z "${GRAND_LINE_NO_APPLEEVENTS:-}" ]]; then
     local dark=false; [[ "$MODE" == dark ]] && dark=true
     osascript -e "tell application \"System Events\" to tell appearance preferences to set dark mode to $dark" >/dev/null 2>&1
   fi
@@ -109,10 +109,10 @@ apply_theme() {
   render_theme "$name" "$file" || return 1
   install_theme_outputs
 
-  if [[ "$wallpaper" == yes && -z "${MAC_SETUP_NO_APPLEEVENTS:-}" ]]; then
+  if [[ "$wallpaper" == yes && -z "${GRAND_LINE_NO_APPLEEVENTS:-}" ]]; then
     set_wallpaper "$BACKGROUNDS/$BACKGROUND" || set_wallpaper "$REPO/backgrounds/$BACKGROUND"
   fi
-  printf '%s\n' "$name" > "$MAC_SETUP_STATE/theme"
+  printf '%s\n' "$name" > "$GRAND_LINE_STATE/theme"
   notify "Theme: $LABEL" "Accent colour applies to newly opened windows."
   "$REPO/bin/hook" theme-set "$name"
 }
@@ -126,7 +126,7 @@ case "${1:-pick}" in
     if [[ "${3:-}" == "--no-wallpaper" ]]; then apply_theme "$2" no; else apply_theme "$2" yes; fi
     ;;
   pick)
-    current="$(cat "$MAC_SETUP_STATE/theme" 2>/dev/null)"
+    current="$(cat "$GRAND_LINE_STATE/theme" 2>/dev/null)"
     choice="$(for f in "$THEMES"/*.theme; do
                 n="$(basename "$f" .theme)"
                 if [[ "$n" == "$current" ]]; then echo "$n (current)"; else echo "$n"; fi
@@ -140,7 +140,7 @@ case "${1:-pick}" in
     if [[ ${#images[@]} -eq 0 ]]; then
       notify "No backgrounds" "Add images to $BACKGROUNDS"; exit 1
     fi
-    current="$(cat "$MAC_SETUP_STATE/background" 2>/dev/null)"
+    current="$(cat "$GRAND_LINE_STATE/background" 2>/dev/null)"
     next="${images[0]}"
     for i in "${!images[@]}"; do
       if [[ "${images[$i]}" == "$current" ]]; then

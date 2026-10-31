@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# Installs the ArtCraft apps listed in config/mac-setup/artcraft.tsv from their
+# Installs the ArtCraft apps listed in config/grand-line/artcraft.tsv from their
 # latest GitHub releases, all at once. Re-running only downloads newer releases.
 
 # Pick the macOS download from a release's JSON: a .dmg before a .zip, Apple
@@ -38,7 +38,7 @@ artcraft_release_json() {
 # Installs one app. Prints progress. Exit code 0 on success, 2 when the
 # release simply has no Mac build yet (a warning, not a failure), 1 otherwise.
 artcraft_install_one() {
-  local app="$1" repo="$2" state="$MAC_SETUP_STATE/artcraft"
+  local app="$1" repo="$2" state="$GRAND_LINE_STATE/artcraft"
   mkdir -p "$state"
 
   local tag installed_path
@@ -108,7 +108,7 @@ artcraft_install_one() {
     rm -rf "$dest.new"   # only ever a leftover of this package's own copy
     if ditto "$found" "$dest.new" && move_to_trash "$dest" && mv "$dest.new" "$dest"; then
       if [[ "$trusted" == 0 ]]; then
-        xattr -w com.apple.quarantine "0081;$(printf %x "$(date +%s)");mac-setup;" "$dest" 2>/dev/null
+        xattr -w com.apple.quarantine "0081;$(printf %x "$(date +%s)");grand-line;" "$dest" 2>/dev/null
         echo "  ! $app: not notarized by Apple, so macOS will ask before it first opens"
       fi
       [[ -n "$team" ]] && printf '%s\n' "$team" > "$state/$app.team"
@@ -131,7 +131,7 @@ artcraft_install_one() {
 }
 
 step_artcraft() {
-  local list="$REPO_DIR/config/mac-setup/artcraft.tsv"
+  local list="$REPO_DIR/config/grand-line/artcraft.tsv"
   local app repo _role
   if [[ "$DRY_RUN" == 1 ]]; then
     while IFS=$'\t' read -r app repo _role; do

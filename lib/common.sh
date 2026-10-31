@@ -73,14 +73,14 @@ link_into_place() {
 
 # Steps that set your preferences do it once, so a later run (or update)
 # never undoes a change you made yourself. Naming the step runs it again:
-#   bash ~/mac-setup/setup.sh --only macos-defaults
+#   bash ~/grand-line/setup.sh --only macos-defaults
 first_time() {
-  local step="$1" flag="$MAC_SETUP_STATE/done-$1"
+  local step="$1" flag="$GRAND_LINE_STATE/done-$1"
   [[ ! -f "$flag" || ",${ONLY:-}," == *",$step,"* ]]
 }
 mark_done() {
   [[ "$DRY_RUN" == 1 ]] && return 0
-  mkdir -p "$MAC_SETUP_STATE" && touch "$MAC_SETUP_STATE/done-$1"
+  mkdir -p "$GRAND_LINE_STATE" && touch "$GRAND_LINE_STATE/done-$1"
 }
 
 # Move to the Trash, or print the plan in dry-run mode.

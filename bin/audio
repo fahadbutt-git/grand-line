@@ -1,5 +1,5 @@
 #!/bin/bash
-# mac:summary=Pick the sound output, or switch to the next one
+# grandline:summary=Pick the sound output, or switch to the next one
 # audio        pick an output device
 # audio next   switch to the next output device
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"

@@ -1,5 +1,5 @@
 // Shrinks a PDF by recompressing its images, using Apple's PDFKit.
-// Built by setup into ~/.mac-setup/.build/pdfshrink.
+// Built by setup into ~/.grand-line/.build/pdfshrink.
 // Usage: pdfshrink <input.pdf> <output.pdf>
 
 import Foundation

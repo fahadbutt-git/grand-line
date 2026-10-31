@@ -1,5 +1,5 @@
 #!/bin/bash
-# mac:summary=Bring an app's window forward, or open the app if it has none
+# grandline:summary=Bring an app's window forward, or open the app if it has none
 # focus-or-open APP
 # The app shortcuts use this, so pressing one twice never adds windows: an
 # open window is focused (on whatever workspace it is), and only an app with

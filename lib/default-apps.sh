@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# Default app per file type, read from config/mac-setup/default-apps.tsv.
+# Default app per file type, read from config/grand-line/default-apps.tsv.
 # Used by the default-apps setup step and by the default-apps command.
 # Needs lib/common.sh (run, ok, warn, bundle_id_of).
 
@@ -55,7 +55,7 @@ apply_default_apps() {
     # duti can report success while macOS keeps the old app, so read it back.
     # If macOS refused, try again through NSWorkspace (tools/setdefault.swift).
     if [[ "$DRY_RUN" == 0 && "$(default_app_for "${exts%% *}")" != "$app.app" ]]; then
-      local helper="$MAC_SETUP_BUILD/setdefault"
+      local helper="$GRAND_LINE_BUILD/setdefault"
       [[ -x "$helper" ]] && "$helper" "$(app_path_of "$app")" $exts >/dev/null
       # Last resort: write the setting where macOS keeps it, then restart the
       # service that reads it (it starts again by itself).

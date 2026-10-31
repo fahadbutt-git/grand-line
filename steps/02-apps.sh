@@ -7,7 +7,7 @@
 # longer flagged gets the flag back, so macOS asks before it first opens.
 restore_gatekeeper() {
   local app stamp
-  stamp="0081;$(printf %x "$(date +%s)");mac-setup;"
+  stamp="0081;$(printf %x "$(date +%s)");grand-line;"
   for app in /Applications/*.app; do
     xattr -p com.apple.quarantine "$app" >/dev/null 2>&1 && continue
     spctl -a -t exec "$app" >/dev/null 2>&1 && continue

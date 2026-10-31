@@ -31,7 +31,7 @@ step_declutter() {
   fi
 
   # The Dock, once: only on the first run, so your own changes stay.
-  local flag="$MAC_SETUP_STATE/dock-set"
+  local flag="$GRAND_LINE_STATE/dock-set"
   if [[ ! -f "$flag" ]]; then
     run defaults write com.apple.dock persistent-apps -array
     run defaults write com.apple.dock persistent-others -array
@@ -40,7 +40,7 @@ step_declutter() {
       run defaults write com.apple.dock persistent-apps -array-add \
         "<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>$app</string><key>_CFURLStringType</key><integer>0</integer></dict></dict></dict>"
     done
-    run mkdir -p "$MAC_SETUP_STATE"
+    run mkdir -p "$GRAND_LINE_STATE"
     run touch "$flag"
     run_sh "killall Dock 2>/dev/null || true"
   fi

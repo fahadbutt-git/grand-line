@@ -1,5 +1,5 @@
 #!/bin/bash
-# mac:summary=Turn a setting on or off (keep awake, dark mode, Wi-Fi, Docker and more)
+# grandline:summary=Turn a setting on or off (keep awake, dark mode, Wi-Fi, Docker and more)
 # toggle awake | dark | hidden | menubar | desktop-icons | dock | wifi | bluetooth | mic | ollama | docker
 # The menu shows each one's state with a check mark (lib/toggle-state.sh).
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
@@ -10,10 +10,10 @@ case "${1:-}" in
   awake)
     # Run caffeinate as its own background job so later shortcuts cannot stop it.
     if is_on awake; then
-      launchctl remove mac-setup.caffeinate
+      launchctl remove grand-line.caffeinate
       notify "Keep awake off" "The Mac can sleep normally."
     else
-      launchctl submit -l mac-setup.caffeinate -- /usr/bin/caffeinate -dims
+      launchctl submit -l grand-line.caffeinate -- /usr/bin/caffeinate -dims
       notify "Keep awake on" "The Mac will not sleep until you turn this off."
     fi
     ;;
@@ -47,7 +47,7 @@ case "${1:-}" in
     ;;
   mic)
     # Mutes the microphone by setting its input level to zero, and restores it.
-    saved="$MAC_SETUP_STATE/mic-volume"
+    saved="$GRAND_LINE_STATE/mic-volume"
     level="$(osascript -e 'input volume of (get volume settings)')"
     [[ "$level" =~ ^[0-9]+$ ]] || { notify "No microphone found"; exit 1; }
     if [[ "$level" -gt 0 ]]; then
@@ -75,9 +75,9 @@ case "${1:-}" in
   ollama)
     # Local AI models. Runs as its own background job until toggled off.
     if is_on ollama; then
-      launchctl remove mac-setup.ollama; notify "Local AI off" "Its memory is free again."
+      launchctl remove grand-line.ollama; notify "Local AI off" "Its memory is free again."
     else
-      launchctl submit -l mac-setup.ollama -- "$BREW_PREFIX/bin/ollama" serve
+      launchctl submit -l grand-line.ollama -- "$BREW_PREFIX/bin/ollama" serve
       notify "Local AI on" "Try in Terminal: ollama run llama3.2"
     fi
     ;;

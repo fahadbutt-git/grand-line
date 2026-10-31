@@ -1,5 +1,5 @@
 # Apps and tools for the new Mac. To add one, add a line here, then run:
-#   bash ~/mac-setup/setup.sh --only apps
+#   bash ~/grand-line/setup.sh --only apps
 # Video compression, image conversion and PDF shrinking use tools built into
 # macOS (avconvert, sips, tools/pdfshrink.swift), so no extra libraries.
 
@@ -13,7 +13,7 @@ brew "choose-gui"       # the pop-up menu behind every Omarchy-style menu
 brew "blueutil"         # Bluetooth menu (Caps + Ctrl + B)
 brew "switchaudio-osx"  # audio output menu (Caps + Ctrl + A, M)
 
-# Terminal, as in Omarchy (see config/zsh/mac-setup.zsh for the shortcuts)
+# Terminal, as in Omarchy (see config/zsh/grand-line.zsh for the shortcuts)
 brew "eza"              # ls with colour and icons
 brew "fzf"              # fuzzy finder: ff, Ctrl+R history
 brew "zoxide"           # cd that remembers folders

@@ -2,14 +2,14 @@
 # Your own shortcuts on top of the package's, kept out of the package so a
 # GitHub update never clashes with them. Sourced by the dotfiles step.
 #
-# ~/.config/mac-setup/bindings.local.tsv, one shortcut per line, the same
-# columns as config/mac-setup/keybindings.tsv:
+# ~/.config/grand-line/bindings.local.tsv, one shortcut per line, the same
+# columns as config/grand-line/keybindings.tsv:
 #   Caps + Shift + Z<TAB>Apps<TAB>Zotero<TAB>open -a Zotero
 #   unbind<TAB>Caps + X
 # A line for keys the package already uses replaces that shortcut.
 
 # shellcheck disable=SC2034  # read by steps/08-dotfiles.sh
-BINDINGS_LOCAL="$HOME/.config/mac-setup/bindings.local.tsv"
+BINDINGS_LOCAL="$HOME/.config/grand-line/bindings.local.tsv"
 
 # karabiner_with_overlay KARABINER_JSON LOCAL_TSV: prints the merged file.
 # Lines whose keys do not start with "Caps" are skipped.

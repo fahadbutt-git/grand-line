@@ -18,8 +18,8 @@ Apple's own type for every letter and number. The one exception is a few termina
 - `TERM_BG`, `TERM_FG` and `TERM_SELECTION` are the background, text and selected-row colours for every surface, not only the terminal.
 - `HIGHLIGHT` marks matches and the focused item. `PALETTE` holds the 16 terminal colours, which terminal tools use.
 - The semantic keys name a role, not a hue: `ACCENT_HEX` (the accent as a colour, beside `ACCENT`, the macOS accent number), `MUTED` (secondary text), `BG_LIGHTER` and `BG_DARKER` (raised and sunken surfaces). Templates use these, so a new theme only fills them in.
-- Each app's colours come from a template in `config/themed/`. `theme set` fills it in with the theme's values into `~/.local/state/mac-setup/current/theme/`, all at once.
-- Apps built for the package read the theme from `~/.local/state/mac-setup/theme` (the theme's name) and the theme file, and follow light or dark mode from it.
+- Each app's colours come from a template in `config/themed/`. `theme set` fills it in with the theme's values into `~/.local/state/grand-line/current/theme/`, all at once.
+- Apps built for the package read the theme from `~/.local/state/grand-line/theme` (the theme's name) and the theme file, and follow light or dark mode from it.
 - Text keeps at least 4.5:1 contrast against its background in every theme, including Daylight, where every terminal colour reads at 4.5:1 on white (the tests check it).
 
 ## Shape and density

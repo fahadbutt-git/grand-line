@@ -1,12 +1,12 @@
 #!/bin/bash
-# mac:summary=Update everything: this package, apps, tools, settings and plugins
+# grandline:summary=Update everything: this package, apps, tools, settings and plugins
 # Update everything in one go: this package, Homebrew apps and tools,
 # ArtCraft apps, settings, one-time changes (migrations), Neovim plugins and
 # mise languages, then your post-update hook.
 #   update            run here
 #   update --window   run it in its own terminal window (used by the menu)
 # One update runs at a time, the Mac stays awake while it runs, and the whole
-# run is saved to ~/Library/Logs/mac-setup/update-<date>.log.
+# run is saved to ~/Library/Logs/grand-line/update-<date>.log.
 # App Store apps update themselves (System Settings, General, Software Update).
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 
@@ -17,7 +17,7 @@ if [[ "${1:-}" == "--window" ]]; then
 fi
 
 # One run at a time. A lock left by a run that no longer exists is taken over.
-LOCK="${TMPDIR:-/tmp}/mac-setup-update.lock"
+LOCK="${TMPDIR:-/tmp}/grand-line-update.lock"
 if ! mkdir "$LOCK" 2>/dev/null; then
   holder="$(cat "$LOCK/pid" 2>/dev/null)"
   if [[ -z "$holder" ]] || kill -0 "$holder" 2>/dev/null; then
@@ -38,8 +38,8 @@ trap 'rm -f "$LOCK/pid"; rmdir "$LOCK" 2>/dev/null' EXIT
 # Stay awake (but let the display sleep) until this run ends.
 caffeinate -i -w "$$" >/dev/null 2>&1 &
 
-mkdir -p "$MAC_SETUP_LOGS"
-LOG="$MAC_SETUP_LOGS/update-$(date +%Y%m%d-%H%M%S).log"
+mkdir -p "$GRAND_LINE_LOGS"
+LOG="$GRAND_LINE_LOGS/update-$(date +%Y%m%d-%H%M%S).log"
 exec > >(tee -a "$LOG") 2>&1
 echo "Log: $LOG"
 
@@ -60,8 +60,8 @@ fi
 
 echo "== Homebrew apps and tools"
 # A record of what was installed before, to compare with or go back to:
-#   brew bundle install --file ~/.local/state/mac-setup/brew-before-update.Brewfile
-brew bundle dump --file "$MAC_SETUP_STATE/brew-before-update.Brewfile" --force >/dev/null 2>&1
+#   brew bundle install --file ~/.local/state/grand-line/brew-before-update.Brewfile
+brew bundle dump --file "$GRAND_LINE_STATE/brew-before-update.Brewfile" --force >/dev/null 2>&1
 if brew update; then
   # Karabiner and AeroSpace keep running their old version until restarted.
   restart="$(brew outdated --quiet 2>/dev/null | sed 's#.*/##' | grep -xE 'karabiner-elements|aerospace' | tr '\n' ' ')"

@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# Installs the R packages listed in config/mac-setup/r-packages.txt.
+# Installs the R packages listed in config/grand-line/r-packages.txt.
 
 step_r_packages() {
   local rscript="" candidate
@@ -8,11 +8,11 @@ step_r_packages() {
     if [[ -n "$candidate" && -x "$candidate" ]]; then rscript="$candidate"; break; fi
   done
   if [[ -z "$rscript" && "$DRY_RUN" == 0 ]]; then
-    warn "R is not installed yet, so R packages were skipped. Run: bash ~/mac-setup/setup.sh --only r-packages"
+    warn "R is not installed yet, so R packages were skipped. Run: bash ~/grand-line/setup.sh --only r-packages"
     return 1
   fi
 
-  local list="$REPO_DIR/config/mac-setup/r-packages.txt"
+  local list="$REPO_DIR/config/grand-line/r-packages.txt"
   local code="pkgs <- setdiff(trimws(readLines('$list')), ''); pkgs <- pkgs[!startsWith(pkgs, '#')]; \
 have <- function(p) nzchar(system.file(package = p)); \
 missing <- pkgs[!vapply(pkgs, have, logical(1))]; \

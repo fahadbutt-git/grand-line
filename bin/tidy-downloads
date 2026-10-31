@@ -1,15 +1,15 @@
 #!/bin/bash
-# mac:summary=Sort the Downloads folder by its rules
-# Sorts the Downloads folder by the rules in config/mac-setup/downloads-rules.tsv.
+# grandline:summary=Sort the Downloads folder by its rules
+# Sorts the Downloads folder by the rules in config/grand-line/downloads-rules.tsv.
 # macOS runs it whenever Downloads changes (see the downloads setup step).
 #   tidy-downloads              sort now
 #   tidy-downloads --dry-run    show what would move, move nothing
 #   tidy-downloads --log        show the last 40 moves
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 
-DL="${MAC_SETUP_DOWNLOADS:-$HOME/Downloads}"
-RULES="${MAC_SETUP_DOWNLOAD_RULES:-$MAC_SETUP_CONFIG/downloads-rules.tsv}"
-LOG="$MAC_SETUP_LOGS/downloads.log"
+DL="${GRAND_LINE_DOWNLOADS:-$HOME/Downloads}"
+RULES="${GRAND_LINE_DOWNLOAD_RULES:-$GRAND_LINE_CONFIG/downloads-rules.tsv}"
+LOG="$GRAND_LINE_LOGS/downloads.log"
 DRY=0
 case "${1:-}" in
   --dry-run) DRY=1 ;;
@@ -21,7 +21,7 @@ esac
 # macOS asks once before a background job may read Downloads. Until it is
 # allowed, say so at most once a day instead of failing quietly.
 if ! ls "$DL" >/dev/null 2>&1; then
-  stamp="$MAC_SETUP_STATE/downloads-access-asked"
+  stamp="$GRAND_LINE_STATE/downloads-access-asked"
   if [[ -z "$(find "$stamp" -mtime -1 2>/dev/null)" ]]; then
     touch "$stamp"
     notify "Downloads sorting needs access" "System Settings, Privacy and Security, Files and Folders: allow downloads-agent to use Downloads."
@@ -30,7 +30,7 @@ if ! ls "$DL" >/dev/null 2>&1; then
 fi
 
 # One run at a time. A lock older than ten minutes is left over from a crash.
-LOCK="${TMPDIR:-/tmp}/mac-setup-downloads.lock"
+LOCK="${TMPDIR:-/tmp}/grand-line-downloads.lock"
 if ! mkdir "$LOCK" 2>/dev/null; then
   [[ -n "$(find "$LOCK" -maxdepth 0 -mmin +10 2>/dev/null)" ]] || exit 0
   rmdir "$LOCK" 2>/dev/null; mkdir "$LOCK" 2>/dev/null || exit 0
@@ -77,7 +77,7 @@ move() {
   while [[ -e "$target" ]]; do target="$dir/$name $n$ext"; n=$((n + 1)); done
   if [[ "$DRY" == 1 ]]; then echo "$base -> ${target#"$DL"/}"; return 0; fi
   mkdir -p "$dir" && mv "$src" "$target" || return 1
-  mkdir -p "$MAC_SETUP_LOGS"
+  mkdir -p "$GRAND_LINE_LOGS"
   printf '%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M')" "$src" "$target" >> "$LOG"
 }
 
@@ -120,7 +120,7 @@ while IFS= read -r -d '' f; do
 done < <(find "$DL" -mindepth 1 -maxdepth 1 -type f -print0)
 }
 sort_loose
-if [[ "$fresh" == 1 && "$DRY" == 0 && -z "${MAC_SETUP_NO_RESCAN:-}" ]]; then
+if [[ "$fresh" == 1 && "$DRY" == 0 && -z "${GRAND_LINE_NO_RESCAN:-}" ]]; then
   sleep 35; now="$(date +%s)"; sort_loose
 fi
 

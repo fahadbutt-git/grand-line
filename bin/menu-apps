@@ -1,5 +1,5 @@
 #!/bin/bash
-# mac:summary=Pick any installed app and open it
+# grandline:summary=Pick any installed app and open it
 # Pick any installed app and open it.
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 

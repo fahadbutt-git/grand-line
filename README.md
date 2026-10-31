@@ -1,4 +1,4 @@
-# Mac setup
+# Grand Line
 
 One command turns a new Mac into a ready workstation: apps, command line tools, the ArtCraft office apps as defaults, an Omarchy-style keyboard layer on Caps Lock, tiling windows, themes and system settings. Running it again only fixes what is missing, so the same command also repairs a Mac.
 
@@ -9,32 +9,32 @@ One command turns a new Mac into a ready workstation: apps, command line tools, 
 3. Open Terminal and run:
 
    ```
-   bash ~/Downloads/mac-setup/setup.sh
+   bash ~/Downloads/grand-line/setup.sh
    ```
 
 4. Type your Mac password once when asked. The rest runs unattended for 30 to 60 minutes.
 5. Work through `Finish setup.txt`, which opens at the end (it is saved in Documents). It lists the clicks macOS insists on (Karabiner and AeroSpace permissions, notifications, Google Drive, app sign-ins).
 
-The first run copies the package to `~/mac-setup`. That copy is the one to edit and keep. Later runs, from anywhere, use it.
+The first run copies the package to `~/grand-line`. That copy is the one to edit and keep. Later runs, from anywhere, use it.
 
 ## Everyday commands
 
 | Command | Does |
 | --- | --- |
-| `update` | Updates every app, tool and this package, then runs any one-time changes and your post-update hook. One run at a time, the Mac stays awake, and the whole run is saved to `~/Library/Logs/mac-setup/update-<date>.log`. It also records what was installed before (`~/.local/state/mac-setup/brew-before-update.Brewfile`) and says when Karabiner-Elements or AeroSpace need a restart. `update --window` runs it in its own terminal window |
+| `update` | Updates every app, tool and this package, then runs any one-time changes and your post-update hook. One run at a time, the Mac stays awake, and the whole run is saved to `~/Library/Logs/grand-line/update-<date>.log`. It also records what was installed before (`~/.local/state/grand-line/brew-before-update.Brewfile`) and says when Karabiner-Elements or AeroSpace need a restart. `update --window` runs it in its own terminal window |
 | `keybindings --print` | Prints every shortcut |
 | `theme pick` | Changes theme (Graphite, Nord, Forest, Daylight): terminal, editor, menus, tmux, btop, lazygit, Claude Code, accent and wallpaper together. Rules in `DESIGN.md` |
-| `mac commands` | Lists every command in the package with what it does |
+| `grandline commands` | Lists every command in the package with what it does |
 | `migrate --pending` | Lists the one-time changes an update has not run yet (`migrate` runs them) |
 | `app install`, `app remove` | Installs or removes an app and updates the Brewfile to match (also in the menu) |
 | `tidy-downloads` | Sorts Downloads now (`--dry-run` shows the plan, `--log` the recent moves) |
 | `default-apps fallback` | LibreOffice and Preview open documents instead of ArtCraft (`primary` switches back). Videos stay in IINA |
-| `bash ~/mac-setup/setup.sh --only artcraft` | Re-runs one step (`--list` shows them) |
-| `bash ~/mac-setup/setup.sh --dry-run` | Shows what setup would do, changes nothing |
+| `bash ~/grand-line/setup.sh --only artcraft` | Re-runs one step (`--list` shows them) |
+| `bash ~/grand-line/setup.sh --dry-run` | Shows what setup would do, changes nothing |
 
 ## The terminal
 
-Ghostty with Omarchy's shell tools, set up in `config/zsh/mac-setup.zsh`, `config/tmux/tmux.conf` and `config/starship.toml`.
+Ghostty with Omarchy's shell tools, set up in `config/zsh/grand-line.zsh`, `config/tmux/tmux.conf` and `config/starship.toml`.
 
 | Type | Does |
 | --- | --- |
@@ -90,13 +90,13 @@ Building native Mac apps (such as the search app) needs Xcode from the App Store
 
 ## Downloads
 
-New files are sorted as they arrive, by the rules in `config/mac-setup/downloads-rules.tsv`. Files from Claude, ChatGPT and Gemini go to `Downloads/AI/<app>`, papers from journal and PubMed sites to `Downloads/Papers`, and everything else by type (Documents, Data, Slides, Images, Video, Installers and so on). Installers go to the Trash after a week, and anything left loose moves to `Downloads/Archive/<year-month>` after 30 days. Nothing is deleted, and every move is logged. The first time it runs, macOS asks whether downloads-agent (the sorter's own small launcher) may use Downloads. Allow it. No other program gets that access.
+New files are sorted as they arrive, by the rules in `config/grand-line/downloads-rules.tsv`. Files from Claude, ChatGPT and Gemini go to `Downloads/AI/<app>`, papers from journal and PubMed sites to `Downloads/Papers`, and everything else by type (Documents, Data, Slides, Images, Video, Installers and so on). Installers go to the Trash after a week, and anything left loose moves to `Downloads/Archive/<year-month>` after 30 days. Nothing is deleted, and every move is logged. The first time it runs, macOS asks whether downloads-agent (the sorter's own small launcher) may use Downloads. Allow it. No other program gets that access.
 
 ## Text shortcuts
 
-Espanso replaces short triggers as you type, in any app: `;date` (October 31, 2026), `;iso` (2026-10-31), `;time` (14:05), `;sig` (your signature), `;br`, `;ty`, `;ci`, `;sd`. Add your own in `config/espanso/match/mac-setup.yml`.
+Espanso replaces short triggers as you type, in any app: `;date` (October 31, 2026), `;iso` (2026-10-31), `;time` (14:05), `;sig` (your signature), `;br`, `;ty`, `;ci`, `;sd`. Add your own in `config/espanso/match/grand-line.yml`.
 
-**Your details.** The first setup asks for your name, email, sign-off, signature and town. They are saved on this Mac only, in `~/.config/mac-setup/personal.env`, and never go in the repo, so the repo can be public. Git, `;br`, `;sig` and the weather notice read them. To change one, edit that file and run `mac update`.
+**Your details.** The first setup asks for your name, email, sign-off, signature and town. They are saved on this Mac only, in `~/.config/grand-line/personal.env`, and never go in the repo, so the repo can be public. Git, `;br`, `;sig` and the weather notice read them. To change one, edit that file and run `grandline update`.
 
 ## The Caps Lock layer
 
@@ -208,28 +208,28 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 
 | To add | Do this |
 | --- | --- |
-| An app | Add a `cask "name"` line to `Brewfile`, then `bash ~/mac-setup/setup.sh --only apps` |
-| An ArtCraft app | Add a line to `config/mac-setup/artcraft.tsv`, then `--only artcraft` |
-| A default app for a file type | Add a line to `config/mac-setup/default-apps.tsv`, then `--only default-apps` |
+| An app | Add a `cask "name"` line to `Brewfile`, then `bash ~/grand-line/setup.sh --only apps` |
+| An ArtCraft app | Add a line to `config/grand-line/artcraft.tsv`, then `--only artcraft` |
+| A default app for a file type | Add a line to `config/grand-line/default-apps.tsv`, then `--only default-apps` |
 | A shortcut | Add a line to `BINDINGS` in `tools/bindings.py`, run `python3 tools/bindings.py`, then `--only dotfiles` |
-| A menu entry | Add a line to `config/mac-setup/menu.tsv`. It works at once. A third column `?test` shows it only when the test succeeds, a fourth `✓test` gives it a check mark (helpers in `lib/toggle-state.sh`) |
-| A command | Add an executable script to `bin/` with a `# mac:summary=` line under the first. It is on the PATH at once, and `mac commands` lists it |
-| A theme | Add `config/themes/name.theme` (copy an existing one), its image to `backgrounds/`, and a `Style/` line to `config/mac-setup/menu.tsv` with `✓theme_is name` |
+| A menu entry | Add a line to `config/grand-line/menu.tsv`. It works at once. A third column `?test` shows it only when the test succeeds, a fourth `✓test` gives it a check mark (helpers in `lib/toggle-state.sh`) |
+| A command | Add an executable script to `bin/` with a `# grandline:summary=` line under the first. It is on the PATH at once, and `grandline commands` lists it |
+| A theme | Add `config/themes/name.theme` (copy an existing one), its image to `backgrounds/`, and a `Style/` line to `config/grand-line/menu.tsv` with `✓theme_is name` |
 | An app that takes theme colours | Add `config/themed/<file>.tpl` with `{{ KEY }}` placeholders, then have `bin/theme` put the rendered file where the app reads it |
 | A one-time change for Macs already set up | Add `migrations/<unix time>-<what>.sh` (`date +%s` gives the time). `update` runs it once on each Mac |
-| An R package | Add a line to `config/mac-setup/r-packages.txt`, then `--only r-packages` |
-| A native helper | Add `tools/name.swift`. Setup builds it into `~/.mac-setup/.build` |
+| An R package | Add a line to `config/grand-line/r-packages.txt`, then `--only r-packages` |
+| A native helper | Add `tools/name.swift`. Setup builds it into `~/.grand-line/.build` |
 | A setup step | Add `steps/NN-name.sh` with a function `step_name`. Steps run in file-name order |
 
 The future search app takes over Caps + Space by changing that one line in `tools/bindings.py` and turning off Spotlight's own shortcut in System Settings, Keyboard Shortcuts.
 
 ## Your own additions
 
-Keep personal changes in `~/.config/mac-setup/`, outside the package, so an update from GitHub never clashes with them.
+Keep personal changes in `~/.config/grand-line/`, outside the package, so an update from GitHub never clashes with them.
 
 | File | Does |
 | --- | --- |
-| `bindings.local.tsv` | Your own Caps Lock shortcuts, in the same four columns as `config/mac-setup/keybindings.tsv` (keys, group, description, command). The same keys replace a shipped shortcut, and `unbind<TAB>Caps + X` removes one. Merged into Karabiner's copy by `bash ~/mac-setup/setup.sh --only dotfiles`, and shown in Caps + K at once |
+| `bindings.local.tsv` | Your own Caps Lock shortcuts, in the same four columns as `config/grand-line/keybindings.tsv` (keys, group, description, command). The same keys replace a shipped shortcut, and `unbind<TAB>Caps + X` removes one. Merged into Karabiner's copy by `bash ~/grand-line/setup.sh --only dotfiles`, and shown in Caps + K at once |
 | `menu.local.tsv` | Your own menu entries, in the same columns as `menu.tsv`. The same path replaces a shipped entry, and `Path<TAB>-` removes it. Works at once |
 | `themed/<file>.tpl` | Your version of a theme template in `config/themed/`, used in its place from the next theme change |
 | `hooks/post-update`, `hooks/theme-set` | Scripts that run after every update, and after every theme change (with the theme's name). Several can go in `hooks/<name>.d/`. Setup copies examples there as `*.sample` files, which never run |
@@ -256,7 +256,7 @@ Run these before installing on a new Mac, and after any change.
 
    Karabiner's keyboard driver cannot load inside a virtual machine, so try the Caps Lock layer on the real Mac.
 
-After setup on any Mac, `bash ~/mac-setup/tests/verify-install.sh` checks every app, link, default app and setting.
+After setup on any Mac, `bash ~/grand-line/tests/verify-install.sh` checks every app, link, default app and setting.
 
 ## What runs in the background
 
@@ -268,23 +268,23 @@ Every run checks that the firewall (in stealth mode) and automatic security upda
 
 ## Changing, saving and going back
 
-Everything is in git and on GitHub, so every change can be undone. The `mac` command looks after it, as `omarchy` does in Omarchy:
+Everything is in git and on GitHub, so every change can be undone. The `grandline` command (or `gl` for short) looks after it, as `omarchy` does in Omarchy:
 
 | Command | Does |
 | --- | --- |
-| `mac history` | The last changes, newest first |
-| `mac undo` | Undoes the last change and applies the result (run it twice to undo the undo) |
-| `mac save "before notch work"` | Marks this moment as a version worth keeping |
-| `mac versions`, `mac restore` | Lists saved versions, or goes back to one (itself undoable) |
-| `mac try start notch`, `mac try keep`, `mac try drop` | Tries a change on the side, then keeps or discards it |
-| `mac check` | Checks every app, link and setting |
-| `mac edit` | Opens the package in Neovim |
+| `grandline history` | The last changes, newest first |
+| `grandline undo` | Undoes the last change and applies the result (run it twice to undo the undo) |
+| `grandline save "before notch work"` | Marks this moment as a version worth keeping |
+| `grandline versions`, `grandline restore` | Lists saved versions, or goes back to one (itself undoable) |
+| `grandline try start notch`, `grandline try keep`, `grandline try drop` | Tries a change on the side, then keeps or discards it |
+| `grandline check` | Checks every app, link and setting |
+| `grandline edit` | Opens the package in Neovim |
 
-Edits made by hand, by Claude Code in `~/mac-setup`, or from the Install and Remove menus are saved as changes the same way. Every change sent to GitHub runs the quick checks there, and the full install test runs every Monday.
+Edits made by hand, by Claude Code in `~/grand-line`, or from the Install and Remove menus are saved as changes the same way. Every change sent to GitHub runs the quick checks there, and the full install test runs every Monday.
 
 ## Running setup again
 
-Setup only fills in what is missing, so it is safe to run any time, and `update` runs it for you. Settings you change yourself are kept: system settings, the Dock and the checklist are applied on the first run only. To apply one again, name its step, for example `bash ~/mac-setup/setup.sh --only macos-defaults`.
+Setup only fills in what is missing, so it is safe to run any time, and `update` runs it for you. Settings you change yourself are kept: system settings, the Dock and the checklist are applied on the first run only. To apply one again, name its step, for example `bash ~/grand-line/setup.sh --only macos-defaults`.
 
 ## Layout
 
@@ -296,7 +296,7 @@ bin/                commands behind the menus and shortcuts
 lib/                shared helpers and paths
 config/             aerospace, karabiner, ghostty, tmux, zsh, starship, nvim, git,
                     espanso, themes, themed (templates filled in by the theme),
-                    and mac-setup (menus, rules, data files, hook samples)
+                    and grand-line (menus, rules, data files, hook samples)
 backgrounds/        theme wallpapers
 migrations/         one-time changes for Macs already set up (bin/migrate)
 tools/              shortcut generator and native helpers (Swift)
@@ -324,6 +324,6 @@ Much of how this package works is adapted from [Omarchy](https://github.com/base
 | A window that waits for a key when a job ends (`bin/in-window`) | `bin/omarchy-show-done` |
 | Focus an open window before opening another (`bin/focus-or-open`, `bin/webapp`) | `bin/omarchy-launch-or-focus`, `bin/omarchy-launch-or-focus-webapp`, `bin/omarchy-launch-webapp` |
 | Install and Remove menus (`bin/app`) | `bin/omarchy-pkg-install`, `bin/omarchy-pkg-remove` |
-| The `mac` command and `# mac:summary=` lines | `bin/omarchy` and its `# omarchy:summary=` lines |
+| The `grandline` command and `# grandline:summary=` lines | `bin/omarchy` and its `# omarchy:summary=` lines |
 | Shell aliases and the `ga`, `gd` worktree functions | `default/bash/aliases`, `default/bash/fns/worktrees` |
 | Git settings | `config/git/config` |

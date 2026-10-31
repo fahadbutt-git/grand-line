@@ -1,12 +1,12 @@
 # shellcheck shell=bash
 # Your own details: name, email, email sign-off and signature, and the place
 # the weather notice reports. They live only on this Mac, in
-# ~/.config/mac-setup/personal.env, never in the repo. Setup asks for them
-# once; edit the file to change them, then run `mac update`.
+# ~/.config/grand-line/personal.env, never in the repo. Setup asks for them
+# once; edit the file to change them, then run `grandline update`.
 #
 # The file is KEY=value lines. In SIGNATURE, \n starts a new line.
 
-PERSONAL_FILE="${MAC_SETUP_PERSONAL:-$HOME/.config/mac-setup/personal.env}"
+PERSONAL_FILE="${GRAND_LINE_PERSONAL:-$HOME/.config/grand-line/personal.env}"
 
 # personal_get KEY: print its value, or nothing.
 personal_get() {
@@ -47,7 +47,7 @@ personal_ask() {
   mkdir -p "$(dirname "$PERSONAL_FILE")"
   ( umask 077
     {
-      echo "# Your details, used by setup only on this Mac. Edit, then run: mac update"
+      echo "# Your details, used by setup only on this Mac. Edit, then run: grandline update"
       echo "NAME=$name"
       echo "EMAIL=$email"
       echo "SIGNOFF=$signoff"

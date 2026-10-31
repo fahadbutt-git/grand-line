@@ -1,9 +1,0 @@
-#!/bin/bash
-# Runs after every theme change, with the theme's name as $1. To use it:
-# copy this file to ~/.config/mac-setup/hooks/theme-set (no .sample), then
-#   chmod +x ~/.config/mac-setup/hooks/theme-set
-# The rendered colours are in ~/.local/state/mac-setup/current/theme/.
-
-theme="$1"
-# Example: keep a note of when the theme last changed.
-printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M')" "$theme" >> "$HOME/.local/state/mac-setup/theme-history"

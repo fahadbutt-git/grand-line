@@ -1,8 +1,8 @@
 #!/bin/bash
 # Runs at the end of every update. To use it: copy this file to
-# ~/.config/mac-setup/hooks/post-update (no .sample), then
-#   chmod +x ~/.config/mac-setup/hooks/post-update
-# Several scripts can also go in ~/.config/mac-setup/hooks/post-update.d/
+# ~/.config/grand-line/hooks/post-update (no .sample), then
+#   chmod +x ~/.config/grand-line/hooks/post-update
+# Several scripts can also go in ~/.config/grand-line/hooks/post-update.d/
 
 # Example: tell yourself the update finished.
 osascript -e 'display notification "Your post-update hook ran" with title "Update"'

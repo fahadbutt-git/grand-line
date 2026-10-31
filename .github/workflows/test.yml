@@ -70,7 +70,7 @@ jobs:
     runs-on: ${{ matrix.image }}
     timeout-minutes: 120
     env:
-      MAC_SETUP_HOME: ${{ github.workspace }}
+      GRAND_LINE_HOME: ${{ github.workspace }}
       HOMEBREW_NO_INSTALL_CLEANUP: 1
     steps:
       - uses: actions/checkout@v5
@@ -104,4 +104,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: setup-logs
-          path: ~/Library/Logs/mac-setup/
+          path: ~/Library/Logs/grand-line/

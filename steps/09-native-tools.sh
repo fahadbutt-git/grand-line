@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Builds the small native helpers in tools/*.swift with Apple's compiler
-# (installed with the command line tools). Output: ~/.mac-setup/.build/<name>.
+# (installed with the command line tools). Output: ~/.grand-line/.build/<name>.
 # To add a helper, drop a new tools/<name>.swift file in; nothing else changes.
 
 step_native_tools() {

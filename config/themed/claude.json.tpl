@@ -1,5 +1,5 @@
 {
-  "name": "Mac setup ({{ LABEL }})",
+  "name": "Grand Line ({{ LABEL }})",
   "base": "{{ MODE }}",
   "overrides": {
     "claude": "#{{ ACCENT_HEX }}",

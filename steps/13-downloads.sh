@@ -3,14 +3,14 @@
 # changes (and hourly, for the age rules) at low priority. No process stays
 # running between sorts.
 
-DOWNLOADS_LABEL="mac-setup.downloads"
+DOWNLOADS_LABEL="grand-line.downloads"
 
 # The launcher built from tools/downloads-agent.swift, or bash if it is missing.
 downloads_program() {
-  if [[ -x "$MAC_SETUP_BUILD/downloads-agent" ]]; then
-    echo "<string>$MAC_SETUP_BUILD/downloads-agent</string><string>run</string>"
+  if [[ -x "$GRAND_LINE_BUILD/downloads-agent" ]]; then
+    echo "<string>$GRAND_LINE_BUILD/downloads-agent</string><string>run</string>"
   else
-    echo "<string>/bin/bash</string><string>$MAC_SETUP_BIN/tidy-downloads</string>"
+    echo "<string>/bin/bash</string><string>$GRAND_LINE_BIN/tidy-downloads</string>"
   fi
 }
 
@@ -60,8 +60,8 @@ step_downloads() {
     sleep 1
   done
   if ! launchctl print "$domain/$DOWNLOADS_LABEL" >/dev/null 2>&1; then
-    warn "Downloads sorting could not start. Run: bash ~/mac-setup/setup.sh --only downloads"
+    warn "Downloads sorting could not start. Run: bash ~/grand-line/setup.sh --only downloads"
     return 1
   fi
-  ok "Downloads sorting on (rules: config/mac-setup/downloads-rules.tsv)"
+  ok "Downloads sorting on (rules: config/grand-line/downloads-rules.tsv)"
 }

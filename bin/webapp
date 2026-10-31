@@ -1,5 +1,5 @@
 #!/bin/bash
-# mac:summary=Open a website as its own app-style window, or focus the one already open
+# grandline:summary=Open a website as its own app-style window, or focus the one already open
 # webapp URL [TITLE]
 # As Omarchy's web apps. With TITLE, a Chrome window whose title contains it
 # is focused instead of opening another (Gmail, YouTube and so on).

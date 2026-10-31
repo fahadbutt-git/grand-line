@@ -1,9 +1,9 @@
 #!/bin/bash
-# mac:summary=Choose ArtCraft or LibreOffice and Preview as the apps that open documents
+# grandline:summary=Choose ArtCraft or LibreOffice and Preview as the apps that open documents
 # default-apps primary    ArtCraft apps open documents, sheets, slides and PDFs
 # default-apps fallback   LibreOffice and Preview open them instead
 # Videos open in IINA either way.
-# The table is config/mac-setup/default-apps.tsv.
+# The table is config/grand-line/default-apps.tsv.
 HERE="$(dirname "$(readlink -f "$0")")/.."
 source "$HERE/lib/bin-common.sh"
 source "$HERE/lib/common.sh"
@@ -14,8 +14,8 @@ case "$mode" in
   primary|fallback) ;;
   *) echo "usage: default-apps primary|fallback" >&2; exit 2 ;;
 esac
-printf '%s\n' "$mode" > "$MAC_SETUP_STATE/default-apps-mode"   # update keeps this choice
-if apply_default_apps "$mode" "$HERE/config/mac-setup/default-apps.tsv" >/dev/null 2>&1; then
+printf '%s\n' "$mode" > "$GRAND_LINE_STATE/default-apps-mode"   # update keeps this choice
+if apply_default_apps "$mode" "$HERE/config/grand-line/default-apps.tsv" >/dev/null 2>&1; then
   notify "Default apps" "Using the $mode apps now."
 else
   notify "Default apps" "Some file types could not be changed. Run: default-apps $mode"

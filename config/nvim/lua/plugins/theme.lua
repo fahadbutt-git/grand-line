@@ -8,8 +8,8 @@ local function read_lines(path)
   f:close()
   return scheme, mode
 end
-local scheme, mode = read_lines("~/.local/state/mac-setup/current/theme/nvim-theme")
-if not scheme then scheme, mode = read_lines("~/.local/state/mac-setup/nvim-theme") end
+local scheme, mode = read_lines("~/.local/state/grand-line/current/theme/nvim-theme")
+if not scheme then scheme, mode = read_lines("~/.local/state/grand-line/nvim-theme") end
 scheme = scheme or "vscode"
 mode = mode or "dark"
 

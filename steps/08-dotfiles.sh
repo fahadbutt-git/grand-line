@@ -9,19 +9,19 @@ step_dotfiles() {
   local cfg="$REPO_DIR/config"
 
   # One link to the package. Shortcuts and the PATH go through it.
-  link_into_place "$REPO_DIR" "$MAC_SETUP_LINK"
-  append_once "export PATH=\"$MAC_SETUP_BIN:$MAC_SETUP_BUILD:\$PATH\"" "$HOME/.zprofile"
+  link_into_place "$REPO_DIR" "$GRAND_LINE_LINK"
+  append_once "export PATH=\"$GRAND_LINE_BIN:$GRAND_LINE_BUILD:\$PATH\"" "$HOME/.zprofile"
 
   link_into_place "$cfg/aerospace/aerospace.toml" "$HOME/.aerospace.toml"
   link_into_place "$cfg/ghostty" "$HOME/.config/ghostty"
   link_into_place "$cfg/tmux" "$HOME/.config/tmux"
   link_into_place "$cfg/starship.toml" "$HOME/.config/starship.toml"
   link_into_place "$cfg/nvim" "$HOME/.config/nvim"
-  append_once "source \"$MAC_SETUP_LINK/config/zsh/mac-setup.zsh\"" "$HOME/.zshrc"
+  append_once "source \"$GRAND_LINE_LINK/config/zsh/grand-line.zsh\"" "$HOME/.zshrc"
 
   # Git: the package's defaults are included, so ~/.gitconfig stays yours.
-  if ! git config --global --get-all include.path 2>/dev/null | grep -qF "$MAC_SETUP_LINK/config/git/config"; then
-    run git config --global --add include.path "$MAC_SETUP_LINK/config/git/config"
+  if ! git config --global --get-all include.path 2>/dev/null | grep -qF "$GRAND_LINE_LINK/config/git/config"; then
+    run git config --global --add include.path "$GRAND_LINE_LINK/config/git/config"
   fi
   # Your name and email from personal.env, only where git has none yet.
   local who
@@ -46,7 +46,7 @@ step_dotfiles() {
   # changes made in Espanso itself are kept.
   local esp="$HOME/Library/Application Support/espanso"
   run mkdir -p "$esp/match" "$esp/config"
-  link_into_place "$cfg/espanso/match/mac-setup.yml" "$esp/match/mac-setup.yml"
+  link_into_place "$cfg/espanso/match/grand-line.yml" "$esp/match/grand-line.yml"
   # Your sign-off and signature, written from personal.env.
   if [[ "$DRY_RUN" == 1 ]]; then run "write your email shortcuts to $esp/match/personal.yml"
   else personal_espanso "$esp/match/personal.yml"; fi
@@ -67,7 +67,7 @@ step_dotfiles() {
   # Your own shortcuts (lib/overlay.sh) are merged into the copy here, so the
   # package's generated file stays as tools/bindings.py wrote it.
   local kdir="$HOME/.config/karabiner" kfile="$cfg/karabiner/karabiner.json"
-  local sum_file="$MAC_SETUP_STATE/karabiner.sha" sum merged=""
+  local sum_file="$GRAND_LINE_STATE/karabiner.sha" sum merged=""
   if [[ -f "$BINDINGS_LOCAL" ]]; then
     if [[ "$DRY_RUN" == 1 ]]; then
       run "merge $BINDINGS_LOCAL into the Caps Lock shortcuts"
@@ -86,7 +86,7 @@ step_dotfiles() {
     run mkdir -p "$kdir"
     [[ -f "$kdir/karabiner.json" ]] && backup_path "$kdir/karabiner.json"
     run cp "$kfile" "$kdir/karabiner.json"
-    run mkdir -p "$MAC_SETUP_STATE"
+    run mkdir -p "$GRAND_LINE_STATE"
     run_sh "printf '%s\n' $sum > $(printf '%q' "$sum_file")"
     # Karabiner reads the file on change, but a restart covers the first install.
     run_sh "launchctl kickstart -k gui/\$(id -u)/org.pqrs.service.agent.karabiner_console_user_server 2>/dev/null || true"
@@ -96,10 +96,10 @@ step_dotfiles() {
 
   # Example hooks (bin/hook), copied on the first setup only, so one you
   # delete stays deleted, and never over your own.
-  local hooks="$HOME/.config/mac-setup/hooks" sample
+  local hooks="$HOME/.config/grand-line/hooks" sample
   [[ -d "$hooks" ]] || run mkdir -p "$hooks"
   if first_time hook-samples; then
-    for sample in "$cfg"/mac-setup/hooks/*.sample; do
+    for sample in "$cfg"/grand-line/hooks/*.sample; do
       [[ -e "$hooks/${sample##*/}" ]] || run cp "$sample" "$hooks/${sample##*/}"
     done
     mark_done hook-samples

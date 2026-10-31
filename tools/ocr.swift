@@ -1,5 +1,5 @@
 // Prints the text found in an image, using Apple's on-device Vision framework.
-// Built by setup into ~/.mac-setup/.build/ocr.  Usage: ocr <image file>
+// Built by setup into ~/.grand-line/.build/ocr.  Usage: ocr <image file>
 
 import AppKit
 import Foundation

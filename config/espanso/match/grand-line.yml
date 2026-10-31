@@ -13,7 +13,7 @@ matches:
     vars: [{ name: t, type: date, params: { format: "%H:%M" } }]
 
   # Email. ;br and ;sig use your own name and signature, so setup writes them
-  # from ~/.config/mac-setup/personal.env into personal.yml beside this file.
+  # from ~/.config/grand-line/personal.env into personal.yml beside this file.
   - trigger: ";ty"
     replace: "Thank you for your time and consideration."
 
