@@ -2,6 +2,7 @@
 # Builds the small native helpers in tools/*.swift with Apple's compiler
 # (installed with the command line tools). Output: ~/.grand-line/.build/<name>.
 # To add a helper, drop a new tools/<name>.swift file in; nothing else changes.
+# Then builds the package's own apps in apps/*/ (lib/native-apps.sh).
 
 step_native_tools() {
   if ! have swiftc && [[ "$DRY_RUN" == 0 ]]; then
@@ -22,5 +23,8 @@ step_native_tools() {
       warn "Could not build $name"; failed=1
     fi
   done
+  # shellcheck source=lib/native-apps.sh
+  source "$REPO_DIR/lib/native-apps.sh"
+  build_native_apps || failed=1
   return "$failed"
 }

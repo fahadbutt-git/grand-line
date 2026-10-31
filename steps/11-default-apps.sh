@@ -10,5 +10,11 @@ step_default_apps() {
   source "$REPO_DIR/lib/default-apps.sh"
   # Keep whichever set you last chose (default-apps primary or fallback).
   local mode; mode="$(cat "$GRAND_LINE_STATE/default-apps-mode" 2>/dev/null || echo primary)"
-  apply_default_apps "$mode" "$REPO_DIR/config/grand-line/default-apps.tsv"
+  local status=0
+  apply_default_apps "$mode" "$REPO_DIR/config/grand-line/default-apps.tsv" || status=1
+  # Log Pose for folders and Byakugan for Command + Space, once installed.
+  # shellcheck source=lib/takeover.sh
+  source "$REPO_DIR/lib/takeover.sh"
+  apply_takeovers
+  return "$status"
 }

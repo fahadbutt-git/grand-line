@@ -390,4 +390,50 @@ rm -f "$PERSONAL_FILE"
 out="$("$ROOT/bin/gl" commands 2>&1)"
 grep -q "^grandline " <<<"$out" && ! grep -q "^gl " <<<"$out" && t_ok "gl runs grandline, and the command list shows it once" || t_fail "gl" "$out"
 
+# --- the package's own apps: built, wrapped in a bundle, old copy to the Trash
+apps_root="$tmp/apps-repo"; mkdir -p "$apps_root/apps/demo/Sources" "$apps_root/apps/demo/Info" "$apps_root/apps/demo/Resources/Demo" "$tmp/bin-apps" "$tmp/Applications"
+printf 'Demo\tDemo App\tcom.example.demo\tyes\n# comment\n' > "$apps_root/apps/demo/apps.tsv"
+echo '// app' > "$apps_root/apps/demo/Sources/main.swift"
+printf '<key>NSAppleEventsUsageDescription</key><string>Opens folders.</string>\n' > "$apps_root/apps/demo/Info/Demo.plist"
+echo icon > "$apps_root/apps/demo/Resources/Demo/AppIcon.icns"
+cat > "$tmp/bin-apps/swift" <<'EOF'
+#!/bin/bash
+echo "swift $*" >> "$STUB_LOG"
+dir="${@: -1}"; mkdir -p "$dir/.build/release"
+printf '#!/bin/sh\necho built\n' > "$dir/.build/release/Demo"; chmod +x "$dir/.build/release/Demo"
+EOF
+printf '#!/bin/bash\necho "codesign $*" >> "$STUB_LOG"\n' > "$tmp/bin-apps/codesign"; chmod +x "$tmp/bin-apps/"*
+(
+  export PATH="$tmp/bin-apps:$PATH" REPO_DIR="$apps_root" DRY_RUN=0 GRAND_LINE_APPS_DEST="$tmp/Applications"
+  source "$ROOT/lib/common.sh"; source "$ROOT/lib/native-apps.sh"
+  build_native_apps >/dev/null 2>&1 || exit 1
+  app="$tmp/Applications/Demo App.app"
+  [[ -x "$app/Contents/MacOS/Demo" && -f "$app/Contents/Resources/AppIcon.icns" ]] || exit 2
+  grep -q '<key>CFBundleIdentifier</key><string>com.example.demo</string>' "$app/Contents/Info.plist" || exit 3
+  grep -q 'LSUIElement' "$app/Contents/Info.plist" && grep -q NSAppleEventsUsageDescription "$app/Contents/Info.plist" || exit 4
+  : > "$STUB_LOG"; build_native_apps >/dev/null 2>&1
+  grep -q "^swift " "$STUB_LOG" && exit 5          # nothing changed, so no rebuild
+  sleep 1; touch "$apps_root/apps/demo/Sources/main.swift"; build_native_apps >/dev/null 2>&1
+  compgen -G "$HOME/.Trash/Demo App*" >/dev/null || exit 6  # the old copy went to the Trash
+  [[ -x "$app/Contents/MacOS/Demo" ]] || exit 7
+) && t_ok "own apps are built, bundled, signed, rebuilt only on change, old copy trashed" || t_fail "native apps (step $?)"
+
+# --- Log Pose and Byakugan take over Finder and Spotlight, and switch back
+(
+  export GRAND_LINE_APPS_DEST="$tmp/Applications" GRAND_LINE_STATE="$HOME/.local/state/grand-line"
+  mkdir -p "$tmp/Applications/Log Pose.app" "$tmp/Applications/Byakugan.app"
+  source "$ROOT/lib/default-apps.sh"; source "$ROOT/lib/takeover.sh"; source "$ROOT/lib/toggle-state.sh"
+  [[ "$(takeover_mode files)" == on && "$(takeover_mode search)" == on ]] || exit 1   # on by default
+  : > "$STUB_LOG"; takeover_files on
+  grep -q "defaults write -g NSFileViewer -string com.grandline.logpose" "$STUB_LOG" && grep -q "public.folder.*com.grandline.logpose" "$STUB_LOG" || exit 2
+  : > "$STUB_LOG"; takeover_files off
+  grep -q "defaults delete -g NSFileViewer" "$STUB_LOG" && grep -q "public.folder.*com.apple.finder" "$STUB_LOG" || exit 3
+  ! is_on files || exit 4
+  : > "$STUB_LOG"; takeover_search on
+  grep -q "AppleSymbolicHotKeys -dict-add 64 <dict><key>enabled</key><false/>" "$STUB_LOG" && grep -q "com.grandline.byakugan TakesCommandSpace -bool true" "$STUB_LOG" || exit 5
+  : > "$STUB_LOG"; takeover_search off
+  grep -q "<key>enabled</key><true/>" "$STUB_LOG" && grep -q "TakesCommandSpace -bool false" "$STUB_LOG" || exit 6
+  rmdir "$tmp/Applications/Log Pose.app"; ! takeover_files on || exit 7   # nothing to switch to
+) && t_ok "Log Pose and Byakugan take over Finder and Spotlight by default, and switch back" || t_fail "takeover (step $?)"
+
 exit $FAIL

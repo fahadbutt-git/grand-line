@@ -37,6 +37,8 @@ Toggle/Bluetooth	toggle bluetooth	?command -v blueutil	✓is_on bluetooth
 Toggle/Microphone muted	toggle mic		✓is_on mic-muted
 Toggle/Docker	toggle docker	?command -v colima	✓is_on docker
 Toggle/Local AI (Ollama)	toggle ollama	?command -v ollama	✓is_on ollama
+Toggle/Log Pose opens folders (off: Finder)	toggle files	?test -d "/Applications/Log Pose.app"	✓is_on files
+Toggle/Byakugan on Command + Space (off: Spotlight)	toggle search	?test -d /Applications/Byakugan.app	✓is_on search
 Toggle/Window tiling on or off	aerospace enable toggle
 Style/Graphite	theme set graphite		✓theme_is graphite
 Style/Nord	theme set nord		✓theme_is nord

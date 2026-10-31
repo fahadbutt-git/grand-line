@@ -53,7 +53,7 @@ ARROWS = [("left_arrow", "left"), ("down_arrow", "down"), ("up_arrow", "up"), ("
 # (key, extra modifiers held with Caps Lock, group, description, action)
 BINDINGS = [
     # Menus
-    ("spacebar", [], "Menus", "Search (Spotlight until the search app ships)", key("spacebar", "command")),
+    ("spacebar", [], "Menus", "Search (Byakugan, or Spotlight if switched back)", key("spacebar", "command")),
     ("spacebar", ["option"], "Menus", "Main menu", cmd("menu")),
     ("k", [], "Menus", "Shortcut list (type to filter, Return runs it)", cmd("keybindings")),
     ("escape", [], "Menus", "System menu (lock, sleep, restart, shut down)", cmd("menu System")),

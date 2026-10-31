@@ -106,7 +106,7 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 
 | Keys | Action |
 | --- | --- |
-| Caps + Space | Search (Spotlight until the search app ships) |
+| Caps + Space | Search (Byakugan, or Spotlight if switched back) |
 | Caps + Option + Space | Main menu |
 | Caps + K | Shortcut list (type to filter, Return runs it) |
 | Caps + Escape | System menu (lock, sleep, restart, shut down) |
@@ -203,6 +203,12 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + Ctrl + Space | Next background |
 
 <!-- shortcuts:end -->
+
+## The package's own apps
+
+Log Pose (files), Byakugan (search) and Den Den (the notch) are built on this Mac from `apps/`, by the native-tools step, and installed in `/Applications`. Each app folder is a Swift package with an `apps.tsv` that names what it makes (product, app name, bundle id, and whether it lives in the menu bar only). Setup rebuilds an app only when its sources change, and the old copy goes to the Trash.
+
+Once installed, Log Pose opens folders and every "Show in Finder", and Byakugan answers Command + Space (so Caps + Space too). Both switch back from the Toggle menu, or with `toggle files` and `toggle search`, and the choice is kept across updates.
 
 ## How to add things
 
