@@ -83,6 +83,75 @@ jobs:
               || { echo "::error title=$APP bundle::$(basename "$app") is not a valid signed app"; exit 1; }
           done
 
+  journeys:
+    name: User journeys, every app driven like a person (macOS 27)
+    runs-on: xcode-27
+    # Hard stop; each step and the driver have their own, shorter limits.
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build the app bundles and the journey driver
+        id: build
+        timeout-minutes: 25
+        run: |
+          set -o pipefail
+          APPS_OUT="$RUNNER_TEMP/apps" RESULTS="$RUNNER_TEMP/journeys"
+          printf 'APPS_OUT=%s\nRESULTS=%s\n' "$APPS_OUT" "$RESULTS" >> "$GITHUB_ENV"
+          export GRAND_LINE_APPS_DEST="$APPS_OUT" REPO_DIR="$GITHUB_WORKSPACE" DRY_RUN=0
+          mkdir -p "$APPS_OUT" "$RESULTS"
+          # The app folders come from the journeys' own list of apps.
+          for folder in $(grep -v '^#' tests/journeys/apps.tsv | cut -f2 | sort -u); do
+            if ! bash -c 'source lib/common.sh && source lib/native-apps.sh && build_and_install "$1"' _ "$folder" 2>&1 | tee build.log; then
+              echo "::error title=journeys build $folder::$(grep -E 'error:' build.log | head -20 | awk 'BEGIN{ORS="%0A"} {gsub(/%/,"%25"); print}')"; exit 1
+            fi
+          done
+          ls "$APPS_OUT"
+          if ! swift build -c release --package-path tests/journeys 2>&1 | tee driver.log; then
+            echo "::error title=journey driver build::$(grep -E 'error:' driver.log | head -20 | awk 'BEGIN{ORS="%0A"} {gsub(/%/,"%25"); print}')"; exit 1
+          fi
+          echo "DRIVER=$(swift build -c release --package-path tests/journeys --show-bin-path)/journeys" >> "$GITHUB_ENV"
+      - name: Allow the driver to use Accessibility and record the screen
+        timeout-minutes: 5
+        run: |
+          bash tests/journeys/grant-tcc.sh "$DRIVER"
+          if "$DRIVER" --check-permissions; then
+            echo "::notice title=journeys permissions::Accessibility and Screen Recording granted"
+          else
+            echo "::warning title=journeys permissions::$("$DRIVER" --check-permissions | tr '\n' ' '); the journeys report what this stops"
+          fi
+      - name: "Journeys: the files app"
+        if: always() && steps.build.outcome == 'success'
+        timeout-minutes: 15
+        run: >-
+          "$DRIVER" --apps "$APPS_OUT" --fixture-script tests/journeys/make-fixture.sh
+          --out "$RESULTS" --only files --github --total-timeout 840
+      - name: "Journeys: the launcher"
+        if: always() && steps.build.outcome == 'success'
+        timeout-minutes: 15
+        run: >-
+          "$DRIVER" --apps "$APPS_OUT" --fixture-script tests/journeys/make-fixture.sh
+          --out "$RESULTS" --only launcher --github --total-timeout 840
+      - name: "Journeys: the notch app"
+        if: always() && steps.build.outcome == 'success'
+        timeout-minutes: 10
+        run: >-
+          "$DRIVER" --apps "$APPS_OUT" --fixture-script tests/journeys/make-fixture.sh
+          --out "$RESULTS" --only notch --github --total-timeout 540
+      - name: Zip the screenshots
+        if: always()
+        run: |
+          [ -d "$RESULTS" ] || exit 0
+          # The fixture homes are rebuilt each run; only the pictures and results are kept.
+          rm -rf "$RESULTS/homes"
+          cd "$(dirname "$RESULTS")" && zip -qr journeys.zip "$(basename "$RESULTS")"
+      - name: Keep the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: journey-screenshots
+          path: ${{ runner.temp }}/journeys.zip
+          if-no-files-found: ignore
+
   full-install:
     name: Full install on a clean Mac (${{ matrix.image }})
     # macOS minutes are limited on private repositories, so this runs on

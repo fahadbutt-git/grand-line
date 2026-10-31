@@ -51,6 +51,11 @@ struct PaneView: View {
                     Text(emptyText).font(.system(size: 13)).foregroundStyle(palette.faint)
                 }
             }
+            // Always the whole area under the toolbar, whatever the view inside
+            // measures: a view with no height of its own would otherwise shrink
+            // the pane to nothing and pull the toolbar down to the middle.
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .accessibilityIdentifier("logpose.pane")
         }
         .background(isFocused || !showsHeader ? palette.background : palette.panel.opacity(0.5))
         .simultaneousGesture(TapGesture().onEnded { model.focus(pane) })
@@ -65,6 +70,10 @@ struct PaneView: View {
         switch model.mode == .panes ? ViewMode.list : model.mode {
         case .icons: IconGridView(model: model, pane: pane, palette: palette, gallery: false)
         case .gallery: GalleryView(model: model, pane: pane, palette: palette)
+        // Columns follow folders; search results, Recents and archives have
+        // none, so they show as a list there, as Finder does.
+        case .columns where pane.location.folderURL == nil:
+            FileListView(model: model, pane: pane, palette: palette, isFocused: isFocused)
         case .columns: ColumnsView(model: model, pane: pane, palette: palette)
         case .list, .panes: FileListView(model: model, pane: pane, palette: palette, isFocused: isFocused)
         }

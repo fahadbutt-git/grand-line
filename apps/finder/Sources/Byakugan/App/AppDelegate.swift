@@ -52,6 +52,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Byakugan must be running for Command + Space to work, so it starts at login.
     private func startAtLogin() {
+        // A test run starts a temporary copy that must not become a login item.
+        guard ProcessInfo.processInfo.environment["GRAND_LINE_JOURNEY"] != "1" else { return }
         guard SMAppService.mainApp.status != .enabled else { return }
         try? SMAppService.mainApp.register()
     }
@@ -60,6 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Shown once, after launch has finished, so whatever started the app
     /// (setup, login) never waits on the dialog.
     private func explainBusyShortcut() {
+        guard ProcessInfo.processInfo.environment["GRAND_LINE_JOURNEY"] != "1" else { return }
         let key = "ExplainedBusyShortcut"
         guard !UserDefaults.standard.bool(forKey: key) else { return }
         UserDefaults.standard.set(true, forKey: key)

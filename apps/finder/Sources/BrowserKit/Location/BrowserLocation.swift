@@ -10,7 +10,11 @@ public enum BrowserLocation: Hashable, Codable, Sendable {
 
     public var title: String {
         switch self {
-        case .folder(let url): return url.path == "/" ? "/" : url.lastPathComponent
+        case .folder(let url):
+            if url.path == "/" { return "/" }
+            // The Trash and other system folders show their Finder names.
+            if url.lastPathComponent == ".Trash" { return "Trash" }
+            return FileManager.default.displayName(atPath: url.path)
         case .archive(let url, let entry): return entry.isEmpty ? url.lastPathComponent : (entry as NSString).lastPathComponent
         case .search(let query, _): return "Search: " + query
         case .recents: return "Recents"

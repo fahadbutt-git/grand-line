@@ -1,0 +1,5 @@
+# The apps the journeys drive. One line per app, so a rename is a one-line change here.
+# role	package folder	product (executable)	app name (.app)	bundle id	url scheme	accessibility id prefix
+files	apps/finder	LogPose	Log Pose	com.grandline.logpose	-	logpose
+launcher	apps/finder	Byakugan	Byakugan	com.grandline.byakugan	-	byakugan
+notch	apps/denden	DenDen	Den Den	com.grandline.denden	denden	denden

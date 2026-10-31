@@ -69,9 +69,10 @@ struct SearchChips: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
                 ForEach(SearchScope.chips(from: model.searchFolder?.path), id: \.self) { chip in
-                    Chip(title: chip.title, symbol: chip.symbol, palette: palette, isOn: chip == scope) {
+                    Chip(title: title(of: chip), symbol: chip.symbol, palette: palette, isOn: chip == scope) {
                         model.focused.replace(.search(query: query, scope: chip))
                     }
+                    .accessibilityIdentifier(identifier(of: chip))
                 }
                 Rectangle().fill(palette.line).frame(width: 1, height: 14)
                 ForEach(model.queryChips(query), id: \.self) { text in
@@ -87,6 +88,22 @@ struct SearchChips: View {
             .padding(.horizontal, 12)
         }
         .frame(height: 30)
+    }
+
+    /// The folder chip by the name Finder shows ("Trash", not ".Trash").
+    private func title(of chip: SearchScope) -> String {
+        guard case .folder(let path) = chip, path != "/" else { return chip.title }
+        if URL(fileURLWithPath: path).standardizedFileURL.path == model.services.paths.trash.standardizedFileURL.path { return "Trash" }
+        return FileManager.default.displayName(atPath: path)
+    }
+
+    private func identifier(of chip: SearchScope) -> String {
+        switch chip {
+        case .folder: return "logpose.scope.folder"
+        case .home: return "logpose.scope.home"
+        case .drive: return "logpose.scope.drive"
+        case .mac: return "logpose.scope.mac"
+        }
     }
 }
 
