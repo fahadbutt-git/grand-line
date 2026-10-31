@@ -145,7 +145,7 @@ private struct ControlButton: View {
     let symbol: String
     let help: String
     let action: @MainActor () -> Void
-    @State private var hovering = false
+    @Local private var hovering = false
 
     var body: some View {
         Button(action: action) {

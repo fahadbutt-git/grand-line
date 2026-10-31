@@ -84,7 +84,7 @@ struct SidebarRow: View {
     let palette: Palette
     let open: () -> Void
     let eject: (URL) -> Void
-    @State private var hovering = false
+    @Local private var hovering = false
 
     var body: some View {
         HStack(spacing: 8) {

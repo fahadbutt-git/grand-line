@@ -9,7 +9,7 @@ struct Thumbnail: View {
     let item: FileItem
     let size: CGFloat
     let palette: Palette
-    @State private var image: NSImage?
+    @Local private var image: NSImage? = nil
 
     var body: some View {
         Group {

@@ -8,9 +8,9 @@ struct InspectorView: View {
     @ObservedObject var model: BrowserModel
     @ObservedObject var pane: PaneModel
     let palette: Palette
-    @State private var summary: SelectionSummary?
-    @State private var tagText = ""
-    @State private var comment = ""
+    @Local private var summary: SelectionSummary? = nil
+    @Local private var tagText = ""
+    @Local private var comment = ""
 
     var body: some View {
         let selection = pane.selectedItems.filter { !$0.isInArchive }

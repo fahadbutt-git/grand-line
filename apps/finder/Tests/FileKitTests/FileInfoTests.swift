@@ -141,7 +141,7 @@ final class FileInfoTests: XCTestCase {
         try await recents.record(two, at: Date(timeIntervalSince1970: 200))
         try await recents.record(one, at: Date(timeIntervalSince1970: 300))
         let list = await recents.list()
-        XCTAssertEqual(list.map(\.path), [one.path, two.path])
+        XCTAssertEqual(list.map(\.path), [one.standardizedFileURL.path, two.standardizedFileURL.path])
         XCTAssertEqual(list.first?.opened, Date(timeIntervalSince1970: 300))
 
         let reloaded = Recents(file: log, limit: 2)
@@ -151,7 +151,7 @@ final class FileInfoTests: XCTestCase {
         try await reloaded.record(try box.file("r/three.txt"))
         let capped = await reloaded.list()
         XCTAssertEqual(capped.count, 2)
-        XCTAssertEqual(capped.last?.path, one.path)
+        XCTAssertEqual(capped.last?.path, one.standardizedFileURL.path)
     }
 
     func testRecentsDropMissingAndClear() async throws {
@@ -162,7 +162,7 @@ final class FileInfoTests: XCTestCase {
         let visible = await recents.list()
         XCTAssertTrue(visible.isEmpty)
         let all = await recents.list(includingMissing: true)
-        XCTAssertEqual(all.map(\.url.path), [file.path])
+        XCTAssertEqual(all.map(\.path), [file.standardizedFileURL.path])
         try await recents.remove(file)
         let removed = await recents.list(includingMissing: true)
         XCTAssertTrue(removed.isEmpty)

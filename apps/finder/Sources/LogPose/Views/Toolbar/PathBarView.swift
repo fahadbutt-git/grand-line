@@ -9,7 +9,7 @@ struct PathBarView: View {
     @ObservedObject var pane: PaneModel
     let palette: Palette
     @FocusState private var focused: Bool
-    @State private var matches: [URL] = []
+    @Local private var matches: [URL] = []
 
     var body: some View {
         Group {

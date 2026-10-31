@@ -54,7 +54,7 @@ final class StressTests: XCTestCase {
             ("notes.docx", "Glaucoma Review Notes.docx"),
             ("budget", nil),
             ("a", nil),
-            ("qzx", nil),
+            ("zzzz", nil),
         ]
         for (query, best) in cases {
             _ = await index.search(query, limit: 50)
@@ -70,7 +70,7 @@ final class StressTests: XCTestCase {
         XCTAssertEqual(budget.count, 50)
         let weak = budget.filter { $0.tier > .wordStart }
         XCTAssertTrue(weak.isEmpty, "weaker matches ranked in: \(weak.prefix(5).map { "\($0.name) \($0.tier)" })")
-        let nothing = await index.search("qzx")
+        let nothing = await index.search("zzzz")  // at most three z in a name, so no match
         XCTAssertTrue(nothing.isEmpty)
     }
 

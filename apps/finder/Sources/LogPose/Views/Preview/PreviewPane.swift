@@ -8,7 +8,7 @@ import SwiftUI
 struct PreviewPane: View {
     @ObservedObject var pane: PaneModel
     let palette: Palette
-    @State private var url: URL?
+    @Local private var url: URL? = nil
 
     var body: some View {
         let selection = pane.selectedItems

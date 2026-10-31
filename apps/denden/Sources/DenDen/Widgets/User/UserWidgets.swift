@@ -180,7 +180,7 @@ private struct UserWidgetChip: View {
     let display: WidgetDisplay?
     let busy: Bool
     let action: @MainActor () -> Void
-    @State private var hovering = false
+    @Local private var hovering = false
 
     var body: some View {
         let tint = theme.color(display?.color)

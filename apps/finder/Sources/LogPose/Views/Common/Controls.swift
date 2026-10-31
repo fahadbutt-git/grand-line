@@ -74,7 +74,7 @@ struct Chip: View {
 struct ResizeHandle: View {
     let palette: Palette
     let onDrag: (Double) -> Void
-    @State private var start: Double?
+    @Local private var start: Double? = nil
     let current: Double
 
     var body: some View {
