@@ -69,7 +69,7 @@ struct Lexer {
                 emit(.or, from: start)
             case "-":
                 index += 1
-                if index < chars.count, !Lexer.isDelimiter(chars[index], comma: false) {
+                if index < chars.count, chars[index] == "(" || !Lexer.isDelimiter(chars[index], comma: false) {
                     emit(.not, from: start)
                 } else {
                     issues.append(QueryIssue(kind: .danglingOperator, message: "Nothing to negate", range: start..<index))
