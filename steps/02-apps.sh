@@ -2,6 +2,20 @@
 # Installs everything in the Brewfile. Apps already in /Applications that
 # Homebrew did not install are left alone instead of failing.
 
+# Some installers switch off macOS's first-open check for their own app. Any
+# app in /Applications that Apple has not approved (notarized) and that is no
+# longer flagged gets the flag back, so macOS asks before it first opens.
+restore_gatekeeper() {
+  local app stamp
+  stamp="0081;$(printf %x "$(date +%s)");mac-setup;"
+  for app in /Applications/*.app; do
+    xattr -p com.apple.quarantine "$app" >/dev/null 2>&1 && continue
+    spctl -a -t exec "$app" >/dev/null 2>&1 && continue
+    xattr -w com.apple.quarantine "$stamp" "$app" 2>/dev/null \
+      && info "$(basename "$app" .app) is not approved by Apple, so macOS will ask before it first opens"
+  done
+}
+
 step_apps() {
   local work effective
   work="$(mktemp -d)"
@@ -51,6 +65,7 @@ step_apps() {
   else
     ok "Every app in the Brewfile is installed"
   fi
+  [[ "$DRY_RUN" == 0 ]] && restore_gatekeeper
   [[ "$DRY_RUN" == 0 ]] && brew cleanup --prune=all -q >/dev/null 2>&1
   rm -rf "$work"
   return "$status"
