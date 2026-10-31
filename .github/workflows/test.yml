@@ -120,7 +120,22 @@ jobs:
         run: /bin/bash tests/verify-install.sh --ci
       - name: Run 2, setup again must succeed and change nothing
         run: |
-          /bin/bash setup.sh --ci --skip r-packages 2>&1 | tee run2.log
+          # Written to a file rather than piped, so a helper that keeps the
+          # output open cannot hold the step. If the run stalls, the last
+          # lines and the processes still going are shown before stopping.
+          /bin/bash setup.sh --ci --skip r-packages > run2.log 2>&1 &
+          pid=$!
+          for _ in $(seq 1 150); do kill -0 "$pid" 2>/dev/null || break; sleep 10; done
+          if kill -0 "$pid" 2>/dev/null; then
+            tail -n 25 run2.log | while IFS= read -r l; do echo "::error title=run 2 stalled::$l"; done
+            ps -axo pid,ppid,etime,command | awk 'NR > 1 && $3 !~ /-/ && $3 !~ /:.*:/' | grep -vE "ps -axo|awk " | tail -n 40 \
+              | while IFS= read -r l; do echo "::error title=still running::$l"; done
+            kill "$pid"; exit 1
+          fi
+          status=0; wait "$pid" || status=$?
+          cat run2.log
+          lsof run2.log 2>/dev/null | tail -n +2 | while IFS= read -r l; do echo "::warning title=holds the output::$l"; done
+          [ "$status" -eq 0 ] || exit "$status"
           if grep -E "Linked |Backed up |moved to the Trash|Installed [A-Z]|Caps Lock shortcuts updated" run2.log; then
             echo "::error title=repeat::The second run changed things (lines above)"; exit 1
           fi
