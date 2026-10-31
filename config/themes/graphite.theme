@@ -1,3 +1,4 @@
+# Apple's own dark greys and system colours. Every app that has colours takes them from this file.
 LABEL="Graphite"
 MODE=dark
 ACCENT=-1
@@ -6,3 +7,6 @@ TERM_BG=1c1c1e
 TERM_FG=e5e5e7
 TERM_CURSOR=a1a1a6
 TERM_SELECTION=3a3a3c
+PALETTE="2c2c2e ff453a 32d74b ffd60a 0a84ff bf5af2 64d2ff e5e5e7 636366 ff6961 30db5b ffd426 409cff da8fff 70d7ff ffffff"
+HIGHLIGHT=409cff
+NVIM=vscode

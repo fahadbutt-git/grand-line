@@ -1,3 +1,4 @@
+# Nord, the arctic palette. Every app that has colours takes them from this file.
 LABEL="Nord"
 MODE=dark
 ACCENT=4
@@ -6,3 +7,6 @@ TERM_BG=2e3440
 TERM_FG=d8dee9
 TERM_CURSOR=88c0d0
 TERM_SELECTION=434c5e
+PALETTE="3b4252 bf616a a3be8c ebcb8b 81a1c1 b48ead 88c0d0 e5e9f0 4c566a bf616a a3be8c ebcb8b 81a1c1 b48ead 8fbcbb eceff4"
+HIGHLIGHT=88c0d0
+NVIM=nord

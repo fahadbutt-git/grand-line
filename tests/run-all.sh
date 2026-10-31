@@ -100,9 +100,12 @@ check "every native helper has a matching source file" bash -c '
 check "every theme has its background and all fields" bash -c '
   bad=0
   for t in config/themes/*.theme; do
-    for k in LABEL MODE ACCENT BACKGROUND TERM_BG TERM_FG TERM_CURSOR TERM_SELECTION; do
+    for k in LABEL MODE ACCENT BACKGROUND TERM_BG TERM_FG TERM_CURSOR TERM_SELECTION PALETTE HIGHLIGHT NVIM; do
       grep -q "^$k=" "$t" || { echo "$t: no $k"; bad=1; }
     done
+    [[ "$(sed -n "s/^PALETTE=//p" "$t" | tr -d \" | wc -w | tr -d " ")" == 16 ]] || { echo "$t: PALETTE needs 16 colours"; bad=1; }
+    nv=$(sed -n "s/^NVIM=//p" "$t")
+    grep -q "\"$nv\"" config/nvim/lua/plugins/theme.lua || { echo "$t: Neovim scheme $nv missing from config/nvim/lua/plugins/theme.lua"; bad=1; }
     bg=$(sed -n "s/^BACKGROUND=//p" "$t")
     [[ -f "backgrounds/$bg" ]] || { echo "$t: backgrounds/$bg missing"; bad=1; }
   done; exit $bad'

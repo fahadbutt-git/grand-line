@@ -26,7 +26,7 @@ apply_theme() {
     echo "No theme called '$name'. Themes: $(cd "$THEMES" && ls ./*.theme | sed -e 's#^\./##' -e 's/\.theme$//' | tr '\n' ' ')" >&2
     return 1
   fi
-  local LABEL MODE ACCENT BACKGROUND TERM_BG TERM_FG TERM_CURSOR TERM_SELECTION
+  local LABEL MODE ACCENT BACKGROUND TERM_BG TERM_FG TERM_CURSOR TERM_SELECTION PALETTE HIGHLIGHT NVIM
   # shellcheck source=/dev/null
   source "$file"
 
@@ -51,6 +51,16 @@ foreground = $TERM_FG
 cursor-color = $TERM_CURSOR
 selection-background = $TERM_SELECTION
 EOF
+  # All 16 terminal colours, so the prompt, tmux, lazygit and every other
+  # terminal tool use the theme's colours instead of Ghostty's defaults.
+  local i=0 c
+  for c in $PALETTE; do echo "palette = $i=#$c"; i=$((i + 1)); done >> "$HOME/.config/ghostty/theme.conf"
+
+  # Neovim reads its matching colour scheme from here when it starts.
+  printf '%s\n%s\n' "$NVIM" "$MODE" > "$MAC_SETUP_STATE/nvim-theme"
+
+  # The pop-up menus: the system font (SF Pro), the theme's colours.
+  printf '%s\n' "-f SFProText-Regular -s 17 -n 12 -w 40 -c $HIGHLIGHT -b $TERM_SELECTION -u -a" > "$MAC_SETUP_STATE/menu-flags"
 
   if [[ "$wallpaper" == yes && -z "${MAC_SETUP_NO_APPLEEVENTS:-}" ]]; then
     set_wallpaper "$BACKGROUNDS/$BACKGROUND" || set_wallpaper "$REPO/backgrounds/$BACKGROUND"

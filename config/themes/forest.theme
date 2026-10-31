@@ -1,8 +1,12 @@
+# Everforest, soft greens. Every app that has colours takes them from this file.
 LABEL="Forest"
 MODE=dark
 ACCENT=3
 BACKGROUND=forest.jpg
-TERM_BG=1e2620
-TERM_FG=dfe6dc
-TERM_CURSOR=8fbf88
-TERM_SELECTION=34443a
+TERM_BG=272e33
+TERM_FG=d3c6aa
+TERM_CURSOR=a7c080
+TERM_SELECTION=414b50
+PALETTE="374145 e67e80 a7c080 dbbc7f 7fbbb3 d699b6 83c092 d3c6aa 4f5b58 e67e80 a7c080 dbbc7f 7fbbb3 d699b6 83c092 d3c6aa"
+HIGHLIGHT=a7c080
+NVIM=everforest

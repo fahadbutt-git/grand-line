@@ -71,6 +71,9 @@ lines="$(KEYBINDINGS_FILE="$ROOT/config/mac-setup/keybindings.tsv" "$ROOT/bin/ke
 # --- themes
 "$ROOT/bin/theme" set nord --no-wallpaper >/dev/null 2>&1
 if grep -q "background = 2e3440" "$HOME/.config/ghostty/theme.conf" 2>/dev/null; then t_ok "theme writes terminal colours"; else t_fail "theme did not write terminal colours"; fi
+grep -q "palette = 15=#eceff4" "$HOME/.config/ghostty/theme.conf" && t_ok "theme writes all 16 terminal colours" || t_fail "theme palette missing"
+[[ "$(head -1 "$HOME/.local/state/mac-setup/nvim-theme" 2>/dev/null)" == nord ]] && t_ok "theme picks the matching Neovim scheme" || t_fail "theme did not set the Neovim scheme"
+grep -q -- "-f SFProText-Regular" "$HOME/.local/state/mac-setup/menu-flags" && t_ok "theme gives the menus the system font and theme colours" || t_fail "menu style not written"
 [[ "$(cat "$HOME/.local/state/mac-setup/theme" 2>/dev/null)" == nord ]] && t_ok "theme remembers the current theme" || t_fail "theme state not saved"
 grep -q "defaults write -g AppleAccentColor -int 4" "$STUB_LOG" && t_ok "theme sets the accent colour" || t_fail "accent colour not set"
 if ! "$ROOT/bin/theme" set nonexistent >/dev/null 2>&1; then t_ok "unknown theme fails cleanly"; else t_fail "unknown theme did not fail"; fi

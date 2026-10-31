@@ -20,6 +20,9 @@ end run
 EOF
 }
 
+# The menus' font and colours, written by the theme command.
+: "${MAC_SETUP_CHOOSE_FLAGS:=$(cat "$MAC_SETUP_STATE/menu-flags" 2>/dev/null)}"
+
 # Pick one line from stdin in the pop-up menu. Prints the choice.
 pick() {
   if command -v choose >/dev/null 2>&1; then

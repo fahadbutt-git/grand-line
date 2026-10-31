@@ -23,7 +23,7 @@ The first run copies the package to `~/mac-setup`. That copy is the one to edit 
 | --- | --- |
 | `update` | Updates every app, tool and this package |
 | `keybindings --print` | Prints every shortcut |
-| `theme pick` | Changes theme (Graphite, Nord, Forest, Paper) |
+| `theme pick` | Changes theme (Graphite, Nord, Forest, Paper): terminal, editor, menus, accent and wallpaper together. Rules in `DESIGN.md` |
 | `app install`, `app remove` | Installs or removes an app and updates the Brewfile to match (also in the menu) |
 | `tidy-downloads` | Sorts Downloads now (`--dry-run` shows the plan, `--log` the recent moves) |
 | `default-apps fallback` | LibreOffice and Preview open documents instead of ArtCraft (`primary` switches back). Videos stay in IINA |
@@ -267,6 +267,7 @@ config/             aerospace, karabiner, ghostty, tmux, zsh, starship, nvim, gi
                     espanso, themes, and mac-setup (menus, rules, data files)
 backgrounds/        theme wallpapers
 tools/              shortcut generator and native helpers (Swift)
+DESIGN.md           the type, colour and layout rules every part follows
 tests/              checks, dry run, VM rehearsal, post-install verification
 .github/workflows/  the GitHub test runs
 publish.sh          first upload of this package to GitHub
