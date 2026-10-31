@@ -1,0 +1,79 @@
+#!/bin/bash
+# One command for looking after this setup, as `omarchy` is in Omarchy.
+# Every change is kept in git (and on GitHub), so any change can be undone.
+#
+#   mac history            the last changes, newest first
+#   mac undo               undo the last change, then apply the result
+#   mac save "label"       mark this moment as a version worth keeping
+#   mac versions           the saved versions
+#   mac restore [label]    go back to a saved version (pick one if no label)
+#   mac try start <name>   try something on the side; main stays untouched
+#   mac try keep           keep the experiment (it becomes part of main)
+#   mac try drop           throw the experiment away, back to main
+#   mac update             update everything (same as: update)
+#   mac check              check every app, link and setting (verify-install)
+#   mac edit               open the package in the editor
+source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
+
+REPO="${MAC_SETUP_REPO:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}"
+git_() { git -C "$REPO" "$@"; }
+apply() { [[ -n "${MAC_SETUP_NO_APPLY:-}" ]] || bash "$REPO/setup.sh" --update; }
+dirty_guard() {
+  if [[ -n "$(git_ status --porcelain)" ]]; then
+    git_ add -A && git_ commit -q -m "${1:-Save local edits}" && echo "Saved your unsaved edits first."
+  fi
+}
+push_() { git_ push -q --follow-tags 2>/dev/null || echo "(Not sent to GitHub now. It will be on the next update.)"; }
+
+case "${1:-}" in
+  history)
+    git_ log --date=format:'%Y-%m-%d %H:%M' --pretty='%ad  %s' -n "${2:-20}"
+    ;;
+  undo)
+    dirty_guard "Save local edits before undo"
+    last="$(git_ log -1 --pretty=%s)"
+    git_ revert --no-edit HEAD >/dev/null || { echo "Could not undo: $last"; exit 1; }
+    echo "Undid: $last"
+    apply && push_
+    ;;
+  save)
+    label="$(printf '%s' "${2:-}" | tr -cs 'A-Za-z0-9-' '-' | sed 's/^-*//; s/-*$//')"
+    [[ -n "$label" ]] || { echo 'usage: mac save "label"'; exit 2; }
+    dirty_guard "Save local edits"
+    git_ tag -a "good-$(date +%Y%m%d)-$label" -m "${2}" && echo "Saved this version as good-$(date +%Y%m%d)-$label"
+    push_
+    ;;
+  versions)
+    git_ tag -l 'good-*' --sort=-creatordate --format='%(refname:short)  %(contents:subject)'
+    ;;
+  restore)
+    tag="${2:-$(git_ tag -l 'good-*' --sort=-creatordate | pick)}" || exit 0
+    [[ -n "$tag" ]] && git_ rev-parse -q --verify "refs/tags/$tag" >/dev/null || { echo "No saved version called $tag. See: mac versions"; exit 1; }
+    dirty_guard "Save local edits before restore"
+    # Restoring is itself a new change, so it can be undone too (mac undo).
+    git_ diff --binary HEAD "$tag" | git_ apply --index --whitespace=nowarn && git_ commit -q -m "Restore $tag" \
+      && echo "Restored $tag. Undo with: mac undo"
+    apply && push_
+    ;;
+  try)
+    case "${2:-}" in
+      start)
+        [[ -n "${3:-}" ]] || { echo "usage: mac try start <name>"; exit 2; }
+        dirty_guard; git_ switch -q -c "try/$3" && echo "Trying \"$3\". Change anything, then: mac try keep, or mac try drop" ;;
+      keep)
+        b="$(git_ branch --show-current)"; [[ "$b" == try/* ]] || { echo "No experiment running."; exit 1; }
+        dirty_guard "Experiment ${b#try/}"
+        git_ switch -q main && git_ merge -q --no-ff "$b" -m "Keep experiment ${b#try/}" && git_ branch -q -d "$b" \
+          && echo "Kept ${b#try/}." && apply && push_ ;;
+      drop)
+        b="$(git_ branch --show-current)"; [[ "$b" == try/* ]] || { echo "No experiment running."; exit 1; }
+        git_ stash -q -u 2>/dev/null; git_ switch -q main && git_ branch -q -D "$b" \
+          && echo "Dropped ${b#try/}. Back to main." && apply ;;
+      *) echo "usage: mac try start <name> | keep | drop"; exit 2 ;;
+    esac
+    ;;
+  update) exec "$REPO/bin/update" "${@:2}" ;;
+  check)  exec bash "$REPO/tests/verify-install.sh" ;;
+  edit)   cd "$REPO" && exec "${EDITOR:-nvim}" . ;;
+  *) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac

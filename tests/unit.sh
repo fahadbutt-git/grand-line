@@ -176,4 +176,21 @@ grep -q '^WordCraft' "$HOME/.mac-setup/config/mac-setup/artcraft.tsv" && t_ok "A
 grep -q "brew uninstall --cask aerospace" "$STUB_LOG" && ! grep -q -- "--zap" "$STUB_LOG" && t_ok "app remove keeps the app's data (no --zap)" || t_fail "app remove deleted data"
 unset MAC_SETUP_DETACHED BREW_CASKS BREW_INSTALLED
 
+# --- mac: history, undo, save, restore and experiments, on a scratch repository
+r="$tmp/repo"; mkdir -p "$r"; git -C "$r" init -q -b main; git -C "$r" config user.email t@t; git -C "$r" config user.name t
+echo one > "$r/a.txt"; git -C "$r" add -A; git -C "$r" commit -q -m "First"
+export MAC_SETUP_REPO="$r" MAC_SETUP_NO_APPLY=1
+"$ROOT/bin/mac" save "known good" >/dev/null
+echo two > "$r/a.txt"; echo new > "$r/b.txt"; git -C "$r" add -A; git -C "$r" commit -q -m "Second"
+"$ROOT/bin/mac" history | grep -q "Second" && t_ok "mac history lists changes" || t_fail "mac history"
+"$ROOT/bin/mac" undo >/dev/null; [[ "$(cat "$r/a.txt")" == one && ! -e "$r/b.txt" ]] && t_ok "mac undo reverses the last change" || t_fail "mac undo"
+"$ROOT/bin/mac" undo >/dev/null; [[ "$(cat "$r/a.txt")" == two ]] && t_ok "mac undo can undo an undo" || t_fail "mac undo of undo"
+tag="$(git -C "$r" tag -l 'good-*' | head -1)"
+"$ROOT/bin/mac" restore "$tag" >/dev/null; [[ "$(cat "$r/a.txt")" == one && ! -e "$r/b.txt" ]] && t_ok "mac restore returns to a saved version, removing later files" || t_fail "mac restore"
+"$ROOT/bin/mac" try start idea >/dev/null; echo idea > "$r/a.txt"; "$ROOT/bin/mac" try drop >/dev/null
+[[ "$(cat "$r/a.txt")" == one && "$(git -C "$r" branch --show-current)" == main ]] && t_ok "mac try drop throws an experiment away" || t_fail "mac try drop"
+"$ROOT/bin/mac" try start better >/dev/null; echo better > "$r/a.txt"; "$ROOT/bin/mac" try keep >/dev/null
+[[ "$(cat "$r/a.txt")" == better && "$(git -C "$r" branch --show-current)" == main ]] && t_ok "mac try keep keeps an experiment" || t_fail "mac try keep"
+unset MAC_SETUP_REPO MAC_SETUP_NO_APPLY
+
 exit $FAIL

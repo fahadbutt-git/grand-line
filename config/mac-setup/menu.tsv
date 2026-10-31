@@ -50,6 +50,8 @@ Hardware/Battery	notice battery
 Hardware/System information	open -a 'System Information'
 Hardware/Disk space	notice disk
 Update/Update everything	update --window
+Update/Undo the last change	mac undo
+Update/Go back to a saved version	mac restore
 System/Lock	osascript -e 'tell application "System Events" to keystroke "q" using {control down, command down}'
 System/Sleep	pmset sleepnow
 System/Log out	osascript -e 'tell application "System Events" to log out'

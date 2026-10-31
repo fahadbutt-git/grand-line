@@ -235,6 +235,22 @@ Kept deliberately small: Karabiner-Elements (keyboard), AeroSpace (windows), Mac
 
 Every run checks that the firewall (in stealth mode) and automatic security updates are on, and warns if FileVault is off. Nothing turns off Gatekeeper or System Integrity Protection. ArtCraft downloads must carry the expected app name, match GitHub's checksum when one is published, and keep the same signing developer on every update. An app that Apple has not notarized is flagged so macOS asks before it first opens. sudo is used only by the steps that need it, then closed. The Downloads permission belongs to the sorter's own launcher, not to bash. Clipboard history ignores Citrix and Horizon, so patient information is not kept. Neovim plugins are pinned, and the GitHub test runs can only read the repository. Nothing is ever deleted: removed apps, old installers and replaced files go to the Trash, and removing an app keeps its data. Apps that Apple has not notarized keep macOS's first-open check, even when their installer removes it. No service listens on the network: Ollama and Docker answer only on this Mac.
 
+## Changing, saving and going back
+
+Everything is in git and on GitHub, so every change can be undone. The `mac` command looks after it, as `omarchy` does in Omarchy:
+
+| Command | Does |
+| --- | --- |
+| `mac history` | The last changes, newest first |
+| `mac undo` | Undoes the last change and applies the result (run it twice to undo the undo) |
+| `mac save "before notch work"` | Marks this moment as a version worth keeping |
+| `mac versions`, `mac restore` | Lists saved versions, or goes back to one (itself undoable) |
+| `mac try start notch`, `mac try keep`, `mac try drop` | Tries a change on the side, then keeps or discards it |
+| `mac check` | Checks every app, link and setting |
+| `mac edit` | Opens the package in Neovim |
+
+Edits made by hand, by Claude Code in `~/mac-setup`, or from the Install and Remove menus are saved as changes the same way. Every change sent to GitHub runs the quick checks there, and the full install test runs every Monday.
+
 ## Running setup again
 
 Setup only fills in what is missing, so it is safe to run any time, and `update` runs it for you. Settings you change yourself are kept: system settings, the Dock and the checklist are applied on the first run only. To apply one again, name its step, for example `bash ~/mac-setup/setup.sh --only macos-defaults`.
