@@ -37,24 +37,35 @@ jobs:
       - run: brew install shellcheck jq tmux
       - run: bash --version | head -1 && /bin/bash tests/run-all.sh
 
-  finder-app:
-    name: Finder app, build and test (macOS 27)
+  apps:
+    name: Apps, build and test (${{ matrix.app }}, macOS 27)
     runs-on: xcode-27
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [finder, denden]
     steps:
       - uses: actions/checkout@v5
       - name: Build and test
+        env:
+          APP: ${{ matrix.app }}
         run: |
           set -o pipefail
-          if [ ! -f apps/finder/Package.swift ]; then echo "::notice title=finder::no app yet"; exit 0; fi
-          cd apps/finder
+          if [ ! -f "apps/$APP/Package.swift" ]; then echo "::notice title=$APP::no app yet"; exit 0; fi
+          cd "apps/$APP"
           swift --version | head -1
           if ! swift build 2>&1 | tee build.log; then
-            grep -E "error:" build.log | head -40 | sed 's/^/::error title=build::/'; exit 1
+            grep -E "error:" build.log | head -40 | sed "s/^/::error title=$APP build::/"; exit 1
           fi
+          grep -E "warning:" build.log | sort -u | head -20 | sed "s/^/::warning title=$APP build::/"
           if ! swift test 2>&1 | tee test.log; then
-            grep -E "error:|failed|XCTAssert" test.log | head -60 | sed 's/^/::error title=test::/'; exit 1
+            grep -E "error:|failed|XCTAssert" test.log | head -60 | sed "s/^/::error title=$APP test::/"; exit 1
           fi
-          echo "::notice title=finder tests::$(grep -Eo 'Executed [0-9]+ tests?, with [0-9]+ failures?' test.log | tail -1)"
+          echo "::notice title=$APP tests::$(grep -Eo 'Executed [0-9]+ tests?, with [0-9]+ failures?' test.log | tail -1)"
+          # The release build setup installs from.
+          if ! swift build -c release 2>&1 | tee release.log; then
+            grep -E "error:" release.log | head -20 | sed "s/^/::error title=$APP release::/"; exit 1
+          fi
 
   full-install:
     name: Full install on a clean Mac (${{ matrix.image }})

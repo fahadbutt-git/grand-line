@@ -83,6 +83,38 @@ while IFS=$'\t' read -r app exts _; do
   else fail ".$ext has no default app"; fi
 done < "$ROOT/config/grand-line/default-apps.tsv"
 
+echo "The package's own apps"
+for list in "$ROOT"/apps/*/apps.tsv; do
+  [[ -f "$list" ]] || continue
+  while IFS=$'\t' read -r _ name id _; do
+    [[ -z "$name" || "$name" == \#* ]] && continue
+    app="/Applications/$name.app"
+    if [[ -d "$app" ]] && [[ "$(defaults read "$app/Contents/Info" CFBundleIdentifier 2>/dev/null)" == "$id" ]]; then
+      pass "$name is installed"
+      codesign --verify "$app" 2>/dev/null && pass "$name is signed" || fail "$name is not signed"
+    else
+      fail "$name was not built and installed"
+    fi
+  done < "$list"
+done
+state="$HOME/.local/state/grand-line"
+if [[ -d "/Applications/Log Pose.app" ]]; then
+  viewer="$(defaults read -g NSFileViewer 2>/dev/null)"
+  if [[ "$(cat "$state/takeover-files" 2>/dev/null || echo on)" == on ]]; then
+    [[ "$viewer" == com.grandline.logpose ]] && pass "Show in Finder opens Log Pose" || fail "Show in Finder opens ${viewer:-Finder}, not Log Pose"
+  else
+    [[ -z "$viewer" ]] && pass "Show in Finder opens Finder (switched back)" || fail "Show in Finder still opens $viewer"
+  fi
+fi
+if [[ -d "/Applications/Byakugan.app" ]]; then
+  spotlight="$(defaults read com.apple.symbolichotkeys AppleSymbolicHotKeys 2>/dev/null | awk '/^ *64 = /,/};/' | sed -nE 's/^ *enabled = ([01]);/\1/p' | head -1)"
+  if [[ "$(cat "$state/takeover-search" 2>/dev/null || echo on)" == on ]]; then
+    [[ "$spotlight" == 0 ]] && pass "Command + Space belongs to Byakugan" || fail "Spotlight still has Command + Space"
+  else
+    [[ "$spotlight" != 0 ]] && pass "Command + Space opens Spotlight (switched back)" || fail "Spotlight's Command + Space is still off"
+  fi
+fi
+
 echo "Preinstalled apps the package replaces"
 # shellcheck source=steps/05-declutter.sh
 source "$ROOT/steps/05-declutter.sh"
