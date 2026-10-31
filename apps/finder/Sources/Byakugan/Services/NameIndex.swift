@@ -28,7 +28,9 @@ final class NameIndex: @unchecked Sendable {
                 ?? FileIndex(roots: [root], exclusions: exclusions, order: order)
             // Searchable at once: a saved index in full, a new one as it fills.
             self?.set(index)
-            if await index.count == 0 || !(await index.isComplete) {
+            let count = await index.count
+            let complete = await index.isComplete
+            if count == 0 || !complete {
                 await index.build(savingTo: snapshot, every: 30)
             }
             await index.startWatching()

@@ -4,7 +4,8 @@ import Foundation
 ///
 /// ```swift
 /// let index = (try? FileIndex.load(from: snapshotURL)) ?? FileIndex(roots: [NSHomeDirectory()])
-/// if await index.count == 0 || !(await index.isComplete) { await index.build(savingTo: snapshotURL) }
+/// let count = await index.count, complete = await index.isComplete
+/// if count == 0 || !complete { await index.build(savingTo: snapshotURL) }
 /// await index.startWatching()
 /// let matches = await index.search("gl rev", limit: 20)
 /// ```
