@@ -45,7 +45,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
                       !self.model.editingPath else { return event }
                 let pane = self.model.focused
                 let modifiers = FileListCoordinator.modifiers(event.modifierFlags)
-                guard FilterEscape.clears(filter: pane.state.filter, typing: window.firstResponder is NSText,
+                guard FilterEscape.clears(filter: pane.state.filter, typing: TextFieldGuard.isTyping(in: window),
                                           modifiers: modifiers, sheetOpen: window.attachedSheet != nil) else { return event }
                 self.model.clearFilter(in: pane)
                 return nil
@@ -59,9 +59,19 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     @objc func performBrowserCommand(_ sender: Any?) {
         guard let item = sender as? NSMenuItem, let raw = item.representedObject as? String,
               let command = BrowserCommand(rawValue: raw) else { return }
-        if TextFieldGuard.forward(command, in: window) { return }
+        let traced = Self.traced.contains(command)
+        if TextFieldGuard.forward(command, in: window) {
+            if traced { NexusLog.note("menu \(command.rawValue): went to the text field being edited") }
+            return
+        }
+        if traced {
+            NexusLog.note("menu \(command.rawValue): to the files (keys with \(TextFieldGuard.describeKeys(in: window)); folder \(model.focused.location.folderURL?.path ?? "none"); \(model.focused.selectedItems.count) selected)")
+        }
         model.perform(command)
     }
+
+    /// Commands whose arrival is logged, for the clipboard's trail in nexus.log.
+    static let traced: Set<BrowserCommand> = [.copy, .cut, .paste, .moveHere]
 
     /// The tab bar's + button, as in Finder.
     override func newWindowForTab(_ sender: Any?) {

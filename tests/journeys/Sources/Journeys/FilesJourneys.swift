@@ -231,13 +231,15 @@ enum FilesJourneys {
                 try ctx.waitTitle("Journey Ops")
             },
             step("copy and paste into a folder") { ctx in
-                try ctx.selectRow("report.pdf")
-                try ctx.key("cmd+c")
-                try ctx.openRow("Journey Folder")
-                try ctx.key("cmd+v")
-                try ctx.wait("the copy on disk") { ctx.exists(ops + "/Journey Folder/report.pdf") }
-                try ctx.wait("the copy in the list") { ctx.rows().contains("report.pdf") }
-                try ctx.check(ctx.exists(ops + "/report.pdf"), "the original went missing after a copy")
+                try ctx.withNexusLog {
+                    try ctx.selectRow("report.pdf")
+                    try ctx.key("cmd+c")
+                    try ctx.openRow("Journey Folder")
+                    try ctx.key("cmd+v")
+                    try ctx.wait("the copy on disk") { ctx.exists(ops + "/Journey Folder/report.pdf") }
+                    try ctx.wait("the copy in the list") { ctx.rows().contains("report.pdf") }
+                    try ctx.check(ctx.exists(ops + "/report.pdf"), "the original went missing after a copy")
+                }
                 try ctx.key("cmd+up")
                 try ctx.waitTitle("Journey Ops")
             },
@@ -515,19 +517,21 @@ enum FilesJourneys {
                 try ctx.goToFolder("~/" + ops, expect: "Journey Ops")
             },
             step("paste over a taken name asks, Keep Both keeps both") { ctx in
-                try ctx.selectRow("notes.txt")
-                try ctx.key("cmd+c")
-                try ctx.openRow("Dest")
-                try ctx.key("cmd+v")
-                var keep: Node?
-                try ctx.wait("the conflict sheet") {
-                    keep = ctx.anyNode { $0.role == "AXButton" && $0.text == "Keep Both" }
-                    return keep != nil
+                try ctx.withNexusLog {
+                    try ctx.selectRow("notes.txt")
+                    try ctx.key("cmd+c")
+                    try ctx.openRow("Dest")
+                    try ctx.key("cmd+v")
+                    var keep: Node?
+                    try ctx.wait("the conflict sheet") {
+                        keep = ctx.anyNode { $0.role == "AXButton" && $0.text == "Keep Both" }
+                        return keep != nil
+                    }
+                    try ctx.check(ctx.anyNode { $0.role == "AXButton" && $0.text == "Replace" } != nil, "the sheet has no Replace")
+                    try ctx.click(keep!)
+                    try ctx.wait("both on disk") { ctx.exists(ops + "/Dest/notes 2.txt") }
+                    try ctx.check(ctx.contents(ops + "/Dest/notes.txt") == "already here", "Keep Both changed the item already there")
                 }
-                try ctx.check(ctx.anyNode { $0.role == "AXButton" && $0.text == "Replace" } != nil, "the sheet has no Replace")
-                try ctx.click(keep!)
-                try ctx.wait("both on disk") { ctx.exists(ops + "/Dest/notes 2.txt") }
-                try ctx.check(ctx.contents(ops + "/Dest/notes.txt") == "already here", "Keep Both changed the item already there")
             },
             step("the tasks popover lists the copy and its undo") { ctx in
                 try ctx.key("cmd+shift+j")
@@ -841,9 +845,13 @@ extension Ctx {
         if !(isRowSelected(name) && selectedRowCount() == 1) {
             try click(node!)
         }
+        // The status bar's "1 of 9 selected" stands in only where rows do not
+        // say they are selected: it also reads so while another row (the
+        // folder Cmd+Up came back from) is still the one selected.
         try wait("\"\(name)\" selected") {
-            self.isRowSelected(name)
-                || (self.browserSnapshot().flatMap(FilesJourneys.statusNode)?.text ?? "").contains("selected")
+            if self.isRowSelected(name) { return true }
+            guard self.selectedRowCount() == 0 else { return false }
+            return (self.browserSnapshot().flatMap(FilesJourneys.statusNode)?.text ?? "").contains("selected")
         }
         // A slow second click may have started renaming: leave the name as it was.
         if isEditingText(), focusedValue() == name { try key("escape") }
@@ -974,6 +982,25 @@ extension Ctx {
     /// What the omnibar says it is doing: Go, Filter, Search or Command.
     func omnibarBadge() -> String {
         browserSnapshot()?.identified(app.id("omnibar.mode"))?.text ?? ""
+    }
+
+    /// Nexus's own trail of clipboard, key and task events (nexus.log in the
+    /// fixture home's Library/Logs/grand-line), last lines first-to-last.
+    func nexusLogTail(_ count: Int = 30) -> String {
+        let file = url("Library/Logs/grand-line/nexus.log")
+        guard let text = contents("Library/Logs/grand-line/nexus.log") else { return "(no log at \(file.path))" }
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: true).suffix(count)
+        return lines.isEmpty ? "(the log is empty)" : lines.joined(separator: "\n")
+    }
+
+    /// Runs a step's work; when it fails, the failure carries the last lines
+    /// of Nexus's log, so a paste that made nothing says how far it got.
+    func withNexusLog(_ body: () throws -> Void) throws {
+        do {
+            try body()
+        } catch let failure as StepFailure {
+            throw StepFailure(failure.message + "\nNexus log, last lines:\n" + nexusLogTail())
+        }
     }
 
     func writeFixture(_ relative: String, _ text: String) throws {

@@ -274,11 +274,34 @@ enum LauncherJourneys {
     static let automationRefused = "Automation not allowed"
 
     static func skipIfAutomationRefused(_ setting: Setting, row: String) throws {
+        if setting.id == "darkmode" {
+            try skipIfAppearanceLocked(setting, row: row, environment: ProcessInfo.processInfo.environment)
+            return
+        }
         guard row.contains(automationRefused) else { return }
         if ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] != nil {
             print("::notice title=\(setting.phrase) not checked::\(automationRefused) for System Events on this Mac; the row reads \"\(row)\"")
         }
         throw StepSkip("\(automationRefused) for System Events on this Mac, so \(setting.phrase) could not be switched; the row reads \"\(row)\"")
+    }
+
+    /// Dark mode on a GitHub runner: with no logged-in person's session behind
+    /// it, macOS there can keep its appearance whatever asks, or refuse System
+    /// Events. Only then, and only in CI, is it a reported skip (a notice with
+    /// the row's words) and the other settings go on; anywhere else, or for
+    /// any other reason, the step fails as it did.
+    static func skipIfAppearanceLocked(_ setting: Setting, row: String, environment: [String: String]) throws {
+        guard environment["GITHUB_ACTIONS"] != nil else { return }
+        let lower = row.lowercased()
+        let kept = lower.contains("macos kept the") && lower.contains("appearance")
+        guard kept || row.contains(automationRefused) else { return }
+        print("::notice title=\(setting.phrase) not checked::\(noticeText(row))")
+        throw StepSkip("macOS on this CI runner did not switch its appearance (\(kept ? "it kept the one it had" : automationRefused + " for System Events")); the row reads \"\(row)\"")
+    }
+
+    /// Text for a workflow command's message: %, CR and LF escaped.
+    static func noticeText(_ text: String) -> String {
+        text.replacingOccurrences(of: "%", with: "%25").replacingOccurrences(of: "\r", with: "%0D").replacingOccurrences(of: "\n", with: "%0A")
     }
 
     /// "on" or "off" from what a read command printed; nil when it is a number or other value.

@@ -9,6 +9,9 @@ restore_gatekeeper() {
   local app stamp
   stamp="0081;$(printf %x "$(date +%s)");grand-line;"
   for app in /Applications/*.app; do
+    # The package's own apps are built on this Mac, never downloaded: flagging
+    # them would make macOS stop every launch (and setup itself) to ask.
+    case "$(defaults read "$app/Contents/Info" CFBundleIdentifier 2>/dev/null)" in com.grandline.*) continue ;; esac
     xattr -p com.apple.quarantine "$app" >/dev/null 2>&1 && continue
     spctl -a -t exec "$app" >/dev/null 2>&1 && continue
     xattr -w com.apple.quarantine "$stamp" "$app" 2>/dev/null \

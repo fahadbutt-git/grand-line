@@ -18,6 +18,20 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
     private var display: FileCellView.Display?
     private var renameRequest = 0
     private var syncing = false
+    /// The place the rows were last drawn for: leaving it ends a rename.
+    private var shownLocation: BrowserLocation?
+    /// Set while a rename is dropped because the pane went somewhere else.
+    private var discarding = false
+    /// When the pane last went somewhere else, and whether a rename was asked
+    /// for (F2, a new folder): `FileTableView` lets a name be edited then.
+    private var placeChanged = Date.distantPast
+    private(set) var renaming = false
+
+    /// The pane has just gone somewhere else: a click that AppKit still takes
+    /// as a click to edit a name belongs to the place that has gone.
+    var justChangedPlace: Bool {
+        Date().timeIntervalSince(placeChanged) < NSEvent.doubleClickInterval + 0.3
+    }
     private var typeSelect = TypeSelect()
 
     init(model: BrowserModel, pane: PaneModel) {
@@ -44,6 +58,15 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
         let columns = ListColumn.shown(pane.state.settings.columns, flat: pane.state.isFlat).map(FileColumn.init)
         let columnsChanged = table.tableColumns.map(\.identifier) != columns.map(\.identifier)
         if columnsChanged { FileTableSetup.apply(columns, to: table) }
+        // A name being edited when the pane goes somewhere else (a double-click
+        // that opened the folder, Back, Go to Folder) is dropped: its row is
+        // about to show another item, and the editor would otherwise keep the
+        // keys, so Cmd+C and Cmd+V went to it instead of the files.
+        if let shown = shownLocation, shown != pane.location {
+            placeChanged = Date()
+            discardRename()
+        }
+        shownLocation = pane.location
         if ids != shownIDs || cut != shownCut || themeChanged || displayChanged || columnsChanged {
             let scrollToTop = shownIDs.isEmpty || ids.first != shownIDs.first && ids.count != shownIDs.count
             shownIDs = ids
@@ -82,10 +105,23 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
         column.width = ColumnWidth.fitting(names) { Double(($0 as NSString).size(withAttributes: [.font: font]).width) }
     }
 
+    /// Ends a rename without renaming, and gives the keys back to the list.
+    private func discardRename() {
+        guard let table, let window = table.window, let editor = window.firstResponder as? NSText,
+              let field = editor.delegate as? NSTextField, field.isDescendant(of: table) else { return }
+        discarding = true
+        _ = field.abortEditing()
+        discarding = false
+        window.makeFirstResponder(table)
+        NexusLog.note("list: a rename in progress was dropped because the pane changed place")
+    }
+
     func beginRename() {
         guard let table, table.selectedRowIndexes.count == 1, let row = table.selectedRowIndexes.first,
               row < items.count, !items[row].isInArchive else { return }
+        renaming = true
         table.editColumn(0, row: row, with: nil, select: true)
+        renaming = false
     }
 
     // MARK: Data source
@@ -146,7 +182,15 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
     func controlTextDidEndEditing(_ notification: Notification) {
         guard let field = notification.object as? NSTextField, let table else { return }
         let row = table.row(for: field)
-        guard row >= 0, row < items.count else { return }
+        guard !discarding, row >= 0, row < items.count else {
+            // The row has gone (reloaded away): nothing to rename, but the keys
+            // must not stay with an editor that is no longer on screen.
+            DispatchQueue.main.async { [weak table] in
+                guard let table, let window = table.window, !TextFieldGuard.isTyping(in: window) else { return }
+                window.makeFirstResponder(table)
+            }
+            return
+        }
         let allExtensions = NexusPreferencesStore.shared.current.showAllExtensions
         let item = items[row]
         let typed = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -180,7 +224,11 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
                 if shortcut.modifiers.isEmpty || shortcut.modifiers == [.shift] { return false }
             default: break
             }
-            if model.isEnabled(command) { model.perform(command) } else { NSSound.beep() }
+            let enabled = model.isEnabled(command)
+            if BrowserWindowController.traced.contains(command) {
+                NexusLog.note("list key \(shortcut): \(command.rawValue)\(enabled ? "" : " is not available here")")
+            }
+            if enabled { model.perform(command) } else { NSSound.beep() }
             return true
         }
         if shortcut.modifiers.isEmpty, case .character(let text) = shortcut.key, let index = typeSelect.type(text, names: items.map(\.name)) {

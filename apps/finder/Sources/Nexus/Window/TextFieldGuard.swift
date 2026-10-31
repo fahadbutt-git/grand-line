@@ -6,8 +6,34 @@ import BrowserKit
 /// All, Undo and Redo go to the text, and file commands on typing keys wait.
 @MainActor
 enum TextFieldGuard {
+    /// The text being typed in, when the keys are with a live editor
+    /// (`TextFocus`). A field editor left behind by a field that has gone does
+    /// not count: the keys then belong to the files.
     static func editor(in window: NSWindow?) -> NSText? {
-        window?.firstResponder as? NSText
+        guard let window, let text = window.firstResponder as? NSText else { return nil }
+        let field: NSView? = text.isFieldEditor ? (text.delegate as? NSView) : nil
+        let live = TextFocus.isLive(
+            editorInWindow: text.window === window,
+            editorInView: text.superview != nil,
+            fieldOnScreen: field.map { $0.window === window && !$0.isHiddenOrHasHiddenAncestor }
+        )
+        return live ? text : nil
+    }
+
+    /// A field on screen is being typed in.
+    static func isTyping(in window: NSWindow?) -> Bool {
+        editor(in: window) != nil
+    }
+
+    /// The first responder by kind, for the log: "FileTableView", "text field
+    /// (live)", "text field left behind by a closed field".
+    static func describeKeys(in window: NSWindow?) -> String {
+        guard let window else { return "no window" }
+        guard let responder = window.firstResponder else { return "nothing" }
+        if responder is NSText {
+            return isTyping(in: window) ? "a text field being edited" : "a text editor left behind by a closed field"
+        }
+        return String(describing: type(of: responder))
     }
 
     /// Runs a text command on the field being edited. False when no field is

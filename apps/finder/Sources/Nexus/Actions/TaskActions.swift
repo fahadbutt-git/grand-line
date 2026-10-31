@@ -67,11 +67,16 @@ enum ConflictPrompt {
         alert.window.setAccessibilityIdentifier("nexus.conflict")
         let response: NSApplication.ModalResponse
         if let window, window.isVisible, window.attachedSheet == nil {
+            NexusLog.note("conflict: asking about \(conflict.name) in a sheet on the window (\(remaining) more after it)")
             response = await alert.beginSheetModal(for: window)
         } else {
+            // No window to hang a sheet on (closed, hidden, or a sheet already
+            // open): the question is a dialog of its own instead.
+            NexusLog.note("conflict: asking about \(conflict.name) in a dialog (\(window == nil ? "no window" : "the window has a sheet or is hidden"))")
             response = alert.runModal()
         }
         let all = alert.suppressionButton?.state == .on
+        NexusLog.note("conflict: answer \(response.rawValue)\(all ? ", for all" : "")")
         switch response {
         case .alertFirstButtonReturn: return ConflictAnswer(.keepBoth, applyToAll: all)
         case .alertSecondButtonReturn: return ConflictAnswer(.replace, applyToAll: all)

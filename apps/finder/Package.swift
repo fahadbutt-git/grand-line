@@ -54,7 +54,9 @@ let package = Package(
         .target(
             name: "BrowserKit",
             dependencies: ["QueryKit", "IndexKit", "FileKit", "ArchiveKit", "LaunchKit"],
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v5)],
+            // SystemPasteboard: files on NSPasteboard.
+            linkerSettings: [.linkedFramework("AppKit")]
         ),
         .executableTarget(
             name: "Nexus",

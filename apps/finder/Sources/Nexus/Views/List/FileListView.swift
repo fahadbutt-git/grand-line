@@ -63,8 +63,7 @@ struct FileListView: NSViewRepresentable {
     /// A field on screen is being typed in. A field editor left behind by a
     /// field that has gone (no longer in the window) does not count.
     static func isTyping(in window: NSWindow) -> Bool {
-        guard let text = window.firstResponder as? NSText else { return false }
-        return text.window === window && text.superview != nil
+        TextFieldGuard.isTyping(in: window)
     }
 
     static func dismantleNSView(_ scroll: NSScrollView, coordinator: FileListCoordinator) {

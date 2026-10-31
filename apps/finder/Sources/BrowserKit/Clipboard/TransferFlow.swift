@@ -20,12 +20,27 @@ public enum TransferFlow {
     ) async throws -> Outcome {
         guard !items.isEmpty else { return .done([]) }
         let conflicts = FileOperations.conflicts(items, in: folder)
-        guard let resolution = await ConflictQuestions.resolve(conflicts, ask: ask) else { return .stopped }
         let kind: FileOperationKind = moving ? .move : .copy
-        let made = try await queue.run(kind, title: TaskTitles.title(kind, items, to: folder)) { operations in
-            if moving { return try await operations.move(items, to: folder, resolution: resolution) }
-            return try await operations.copy(items, to: folder, resolution: resolution)
+        let title = TaskTitles.title(kind, items, to: folder)
+        let taken: String = conflicts.isEmpty ? "" : " (" + NexusLog.names(conflicts.map(\.existing)) + "), asking"
+        NexusLog.note("\(title): \(conflicts.count) taken name(s)" + taken)
+        guard let resolution = await ConflictQuestions.resolve(conflicts, ask: ask) else {
+            NexusLog.note("\(title): stopped at the conflict question, nothing ran")
+            return .stopped
         }
-        return .done(made)
+        do {
+            let made = try await queue.run(kind, title: title) { operations in
+                if moving { return try await operations.move(items, to: folder, resolution: resolution) }
+                return try await operations.copy(items, to: folder, resolution: resolution)
+            }
+            NexusLog.note("\(title): made \(made.isEmpty ? "nothing" : NexusLog.names(made))")
+            return .done(made)
+        } catch is CancellationError {
+            NexusLog.note("\(title): cancelled")
+            throw CancellationError()
+        } catch {
+            NexusLog.note("\(title): failed: \(FileTaskQueue.describe(error))")
+            throw error
+        }
     }
 }

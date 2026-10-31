@@ -46,9 +46,14 @@ final class PasteFlowTests: XCTestCase {
         defer { temp.remove() }
         let notes = try temp.file("Ops/notes.txt", "mine")
         let target = try temp.folder("Ops/Dest")
-        // What the pasteboard hands back for a file: a reference URL.
+        // What the pasteboard can hand back for a file: a reference URL. Some
+        // macOS versions (27 among them) give the path URL here instead, and
+        // then there is nothing for this test to show.
         let reference = try XCTUnwrap((notes as NSURL).fileReferenceURL())
-        XCTAssertNotEqual(reference.lastPathComponent, "notes.txt")
+        if reference.lastPathComponent == notes.lastPathComponent
+            || reference.standardizedFileURL.path == notes.standardizedFileURL.path {
+            throw XCTSkip("this macOS gives the path URL for a file reference URL (\(reference.absoluteString))")
+        }
 
         var clipboard = FileClipboard()
         clipboard.copy([notes], changeCount: 1)

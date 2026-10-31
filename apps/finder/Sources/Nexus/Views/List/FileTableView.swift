@@ -11,6 +11,21 @@ final class FileTableView: NSTableView {
         super.keyDown(with: event)
     }
 
+    /// A double-click opens; it never starts renaming the name it landed on.
+    /// The second click lands on the row the first one selected, which AppKit
+    /// takes as a click to edit its name; the folder then opened under the
+    /// editor, which kept the keys, so Cmd+V pasted into a name that was no
+    /// longer there. A slow click on a selected row, F2 and a new folder still
+    /// rename.
+    override func validateProposedFirstResponder(_ responder: NSResponder, for event: NSEvent?) -> Bool {
+        if responder is NSTextField, let coordinator, !coordinator.renaming {
+            // clickCount is only there on mouse events (it raises on others).
+            if let event, event.type == .leftMouseDown || event.type == .leftMouseUp, event.clickCount > 1 { return false }
+            if coordinator.justChangedPlace { return false }
+        }
+        return super.validateProposedFirstResponder(responder, for: event)
+    }
+
     override func menu(for event: NSEvent) -> NSMenu? {
         let row = self.row(at: convert(event.locationInWindow, from: nil))
         return coordinator?.menu(forRow: row)

@@ -60,6 +60,9 @@ final class Services: ObservableObject {
     }
 
     func start() {
+        // Clipboard and task events, for a paste that made nothing (nexus.log).
+        NexusLog.start(file: NexusLog.file(home: paths.home))
+        NexusLog.note("Nexus started (macOS \(ProcessInfo.processInfo.operatingSystemVersionString))")
         // The service keeps the index current; this only connects (or, while
         // it is out of reach, reads its snapshot).
         index.start()
@@ -70,6 +73,7 @@ final class Services: ObservableObject {
         let events = tasks.events
         Task { [weak self] in
             for await event in events {
+                NexusLog.note("task \(event.id.value) \(Services.describe(event.state)): \(event.title)")
                 self?.transfers.apply(event)
                 if event.state.isDone { self?.refreshUndo() }
             }
@@ -187,6 +191,17 @@ final class Services: ObservableObject {
     }
 
     // MARK: Tasks
+
+    /// A task's state for the log: "queued", "started", "finished (1 item)".
+    nonisolated static func describe(_ state: FileTaskState) -> String {
+        switch state {
+        case .queued: return "queued"
+        case .running: return "started"
+        case .finished(let items): return "finished (\(items) item\(items == 1 ? "" : "s"))"
+        case .failed(let why): return "failed (\(why))"
+        case .cancelled: return "cancelled"
+        }
+    }
 
     /// Runs file work as a task after the others; returns what it made.
     func run(_ kind: FileOperationKind?, _ title: String,

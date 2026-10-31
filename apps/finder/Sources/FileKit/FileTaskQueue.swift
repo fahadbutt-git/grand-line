@@ -155,7 +155,7 @@ public actor FileTaskQueue {
         continuation.yield(FileTaskEvent(id: id, kind: kind, title: title, state: state))
     }
 
-    static func describe(_ error: Error) -> String {
+    public static func describe(_ error: Error) -> String {
         if let error = error as? FileOperationError {
             switch error {
             case .intoItself(let url): return "\(url.lastPathComponent) cannot go inside itself."

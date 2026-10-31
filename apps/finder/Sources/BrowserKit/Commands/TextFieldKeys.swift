@@ -33,3 +33,15 @@ public extension Shortcut {
         }
     }
 }
+
+/// Whether a text editor that has the keys is really being typed in. A field
+/// editor can stay the window's first responder after its field has gone (the
+/// path bar's field closed by Return, a row's name reloaded away mid-rename):
+/// Cut, Copy, Paste and Select All sent to it went nowhere, so Cmd+C and Cmd+V
+/// never reached the files. Only an editor in the window, in a view, whose
+/// field (for a field editor) is still on screen in that window, counts.
+public enum TextFocus {
+    public static func isLive(editorInWindow: Bool, editorInView: Bool, fieldOnScreen: Bool?) -> Bool {
+        editorInWindow && editorInView && (fieldOnScreen ?? true)
+    }
+}

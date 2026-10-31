@@ -23,6 +23,9 @@ public struct FileClipboard: Equatable, Sendable {
 
     public init() {}
 
+    /// The pasteboard's change count right after Nexus's own cut or copy.
+    public var ownChangeCount: Int? { mode == .cut ? cutChangeCount : copyChangeCount }
+
     /// `changeCount` is the pasteboard's right after the copy wrote to it:
     /// while it stays the same, a paste takes these items as they were
     /// copied, without reading them back from the pasteboard.

@@ -2,33 +2,33 @@ import AppKit
 import BrowserKit
 
 /// Copy, real cut (R8) and paste, through the system pasteboard so files also
-/// paste into other apps.
+/// paste into other apps. The steps are BrowserKit's `ClipboardFlow`, the same
+/// path the tests drive, and each one leaves a line in nexus.log.
 extension BrowserModel {
     func copy() {
-        let urls = selectedOnDisk
-        guard !urls.isEmpty else { return }
-        FilePasteboard.write(urls, to: .general)
-        services.clipboard.copy(urls, changeCount: NSPasteboard.general.changeCount)
+        let pasteboard = SystemPasteboard.access(.general)
+        if !ClipboardFlow.copy(ClipboardFlow.items(in: focused.state), clipboard: &services.clipboard, pasteboard: pasteboard) {
+            NSSound.beep()
+        }
     }
 
     func cut() {
-        let urls = selectedOnDisk
-        guard !urls.isEmpty else { return }
-        FilePasteboard.write(urls, to: .general)
-        services.clipboard.cut(urls, changeCount: NSPasteboard.general.changeCount)
+        let pasteboard = SystemPasteboard.access(.general)
+        if !ClipboardFlow.copy(ClipboardFlow.items(in: focused.state), cut: true, clipboard: &services.clipboard, pasteboard: pasteboard) {
+            NSSound.beep()
+        }
     }
 
     func paste(forceMove: Bool) {
-        guard let folder = focused.location.folderURL else { return }
-        let board = NSPasteboard.general
-        guard let plan = services.clipboard.plan(
-            reading: { FilePasteboard.read(board) }, changeCount: board.changeCount, forceMove: forceMove
-        ) else {
+        let pane = focused
+        let folder = pane.location.folderURL
+        guard let plan = ClipboardFlow.paste(into: folder, clipboard: &services.clipboard,
+                                             pasteboard: SystemPasteboard.access(.general), forceMove: forceMove),
+              let folder else {
             NSSound.beep()
             return
         }
-        services.clipboard.didPaste(plan)
-        transfer(plan.items, to: folder, moving: plan.moves, select: focused)
+        transfer(plan.items, to: folder, moving: plan.moves, select: pane)
     }
 
     func copyPath() {
@@ -38,14 +38,13 @@ extension BrowserModel {
     }
 }
 
+/// Files on a pasteboard (drops read the dragging pasteboard this way).
 enum FilePasteboard {
     static func write(_ urls: [URL], to board: NSPasteboard) {
-        board.clearContents()
-        board.writeObjects(urls.map { $0 as NSURL })
+        SystemPasteboard.write(urls, to: board)
     }
 
     static func read(_ board: NSPasteboard) -> [URL] {
-        let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
-        return (board.readObjects(forClasses: [NSURL.self], options: options) as? [URL]) ?? []
+        SystemPasteboard.read(board)
     }
 }
