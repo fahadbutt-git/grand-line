@@ -26,7 +26,7 @@ struct ItemInteraction: ViewModifier {
         let flags = NSEvent.modifierFlags
         pane.updateSelection { selection, order in
             if flags.contains(.command) {
-                selection.toggle(item.id)
+                selection.toggle(item.id, in: order)
             } else if flags.contains(.shift) {
                 selection.extend(to: item.id, in: order)
             } else {

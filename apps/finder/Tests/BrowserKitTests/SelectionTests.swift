@@ -10,8 +10,9 @@ final class SelectionTests: XCTestCase {
         XCTAssertEqual(selection.ordered(in: order), ["b"])
         selection.toggle("d")
         XCTAssertEqual(selection.ordered(in: order), ["b", "d"])
-        selection.toggle("b")
+        selection.toggle("b", in: order)
         XCTAssertEqual(selection.ordered(in: order), ["d"])
+        XCTAssertEqual(selection.anchor, "d", "deselecting moves the anchor to what is still selected")
         selection.extend(to: "a", in: order)
         XCTAssertEqual(selection.ordered(in: order), ["a", "b", "c", "d"])
     }

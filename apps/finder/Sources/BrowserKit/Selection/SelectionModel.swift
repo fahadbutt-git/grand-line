@@ -37,15 +37,25 @@ public struct SelectionModel: Equatable, Sendable {
         cursor = first
     }
 
-    /// Cmd+click.
-    public mutating func toggle(_ id: String) {
-        if selected.contains(id) {
-            selected.remove(id)
-        } else {
-            selected.insert(id)
-        }
-        anchor = id
+    /// Cmd+click. Deselecting moves the anchor to the nearest item still
+    /// selected (when `order` is given), so a later Shift+click ranges from
+    /// the selection, as in Finder.
+    public mutating func toggle(_ id: String, in order: [String] = []) {
         cursor = id
+        guard selected.contains(id) else {
+            selected.insert(id)
+            anchor = id
+            return
+        }
+        selected.remove(id)
+        guard let at = order.firstIndex(of: id) else {
+            if anchor == id { anchor = nil }
+            return
+        }
+        let nearest = order.indices
+            .filter { selected.contains(order[$0]) }
+            .min { abs($0 - at) < abs($1 - at) }
+        anchor = nearest.map { order[$0] }
     }
 
     /// Shift+click: everything from the anchor to here.
