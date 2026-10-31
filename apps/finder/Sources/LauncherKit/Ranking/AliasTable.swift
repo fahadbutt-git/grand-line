@@ -1,6 +1,6 @@
 import Foundation
 
-/// Your own short names for results, from ~/.config/grand-line/byakugan/aliases.tsv:
+/// Your own short names for results, from ~/.config/grand-line/sight/aliases.tsv:
 /// alias TAB target, where the target is a result id (app:/Applications/Safari.app),
 /// a URL or a path. Typing an alias in full puts its target on top.
 public struct AliasTable: Sendable, Equatable {

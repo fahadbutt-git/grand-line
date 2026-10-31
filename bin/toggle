@@ -2,9 +2,9 @@
 # grandline:summary=Turn a setting on or off (keep awake, dark mode, Wi-Fi, Docker and more)
 # toggle NAME [on|off]   flips NAME, or sets it; a setting already as asked is left alone
 #   NAME: awake | dark | hidden | menubar | desktop-icons | dock | wifi | bluetooth | dnd
-#         mute | mic | ollama | docker | files (Log Pose or Finder) | search (Byakugan or Spotlight)
+#         mute | mic | ollama | docker | files (Nexus or Finder) | search (Sight or Spotlight)
 # toggle volume N|up|down   sets the output volume (0 to 100) or moves it by 10
-# toggle status [NAME...]   prints "NAME on|off" per setting and "volume N" (Byakugan reads it)
+# toggle status [NAME...]   prints "NAME on|off" per setting and "volume N" (Sight reads it)
 # The menu shows each one's state with a check mark (lib/toggle-state.sh).
 # Exit status: 0 done, 2 usage, and the codes of fail() in lib/bin-common.sh.
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
@@ -185,7 +185,7 @@ case "$name" in
     source "$(dirname "$(readlink -f "$0")")/../lib/default-apps.sh"
     # shellcheck source=lib/takeover.sh
     source "$(dirname "$(readlink -f "$0")")/../lib/takeover.sh"
-    if [[ "$name" == files ]]; then app="Log Pose" was=Finder; else app=Byakugan was=Spotlight; fi
+    if [[ "$name" == files ]]; then app="Nexus" was=Finder; else app=Sight was=Spotlight; fi
     if [[ "$want" == off ]]; then
       "takeover_$name" off && say "$was is back" "Switch to $app again from the same menu."
     else

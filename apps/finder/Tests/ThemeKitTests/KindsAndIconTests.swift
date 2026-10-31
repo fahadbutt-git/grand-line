@@ -46,7 +46,7 @@ final class KindsAndIconTests: XCTestCase {
 
     func testIconFallsBackToItsOwnTheme() {
         let theme = Theme(name: "mine", values: ["MODE": "dark", "TERM_BG": "202020", "TERM_FG": "dddddd", "ACCENT_HEX": "ff9f0a"])
-        let palette = theme.icon.palette(for: .logPose)
+        let palette = theme.icon.palette(for: .nexus)
         XCTAssertEqual(palette.tile.hex, "202020")
         XCTAssertEqual(palette.ink.hex, "dddddd")
         XCTAssertEqual(palette.accent.hex, "ff9f0a")

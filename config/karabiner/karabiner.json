@@ -506,7 +506,7 @@
         },
         "to": [
          {
-          "shell_command": "open -g denden://toggle"
+          "shell_command": "open -g iceberg://toggle"
          }
         ]
        },

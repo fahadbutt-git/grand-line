@@ -1,8 +1,8 @@
 import Foundation
 
-/// Put Back (R21) for items Log Pose moved to the Trash: where each one came from.
+/// Put Back (R21) for items Nexus moved to the Trash: where each one came from.
 /// Undo covers the last operations; the ledger lasts across launches. Kept in
-/// Application Support/Log Pose/trash-ledger.json.
+/// Application Support/Nexus/trash-ledger.json.
 public struct TrashLedger: Codable, Equatable, Sendable {
     /// Path in the Trash to the original path.
     public private(set) var entries: [String: String] = [:]

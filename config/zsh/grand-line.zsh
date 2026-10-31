@@ -47,9 +47,10 @@ alias gcam='git commit -a -m'
 alias gcad='git commit -a --amend'
 alias lzg='lazygit'
 
-# lp [folder]: open this folder (or another) in Log Pose, or Finder if Log
-# Pose is not installed.
-lp() { open -b com.grandline.logpose "${1:-.}" 2>/dev/null || open "${1:-.}"; }
+# nx [folder]: open this folder (or another) in Nexus, or Finder if Nexus
+# is not installed. lp, its earlier name, still works for now.
+nx() { open -b com.grandline.nexus "${1:-.}" 2>/dev/null || open "${1:-.}"; }
+alias lp='nx'
 
 # ga branch: a new branch in its own folder beside this one (a git worktree),
 # so two pieces of work never share a checkout. gd, run inside that folder,

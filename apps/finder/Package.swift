@@ -12,12 +12,12 @@ let package = Package(
         .library(name: "ThemeKit", targets: ["ThemeKit"]),
         .library(name: "LaunchKit", targets: ["LaunchKit"]),
         .library(name: "BrowserKit", targets: ["BrowserKit"]),
-        .executable(name: "LogPose", targets: ["LogPose"]),
+        .executable(name: "Nexus", targets: ["Nexus"]),
         .library(name: "LauncherKit", targets: ["LauncherKit"]),
-        .executable(name: "Byakugan", targets: ["Byakugan"]),
+        .executable(name: "Sight", targets: ["Sight"]),
     ],
     dependencies: [
-        // The app icons, shared with Den Den.
+        // The app icons, shared with Iceberg.
         .package(path: "../icons"),
     ],
     targets: [
@@ -33,7 +33,7 @@ let package = Package(
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .executableTarget(
-            name: "LogPose",
+            name: "Nexus",
             dependencies: ["BrowserKit", "QueryKit", "IndexKit", "FileKit", "ArchiveKit", "ThemeKit", "LaunchKit",
                            .product(name: "AppIcon", package: "icons")],
             swiftSettings: [.swiftLanguageMode(.v5)],
@@ -45,7 +45,7 @@ let package = Package(
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .executableTarget(
-            name: "Byakugan",
+            name: "Sight",
             dependencies: ["LauncherKit", "IndexKit", "QueryKit", "ThemeKit", "LaunchKit",
                            .product(name: "AppIcon", package: "icons")],
             swiftSettings: [.swiftLanguageMode(.v5)],

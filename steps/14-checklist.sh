@@ -38,19 +38,19 @@ macOS requires these clicks from you. Work down the list once.
    Recording (that is how it hears the other side of a call), and let
    it download its model. Start it at the beginning of each meeting.
 
-6. The notch (Den Den)
+6. The notch (Iceberg)
    Hover over the notch once. Allow Calendars and Reminders when asked so
    it can show your day. Google calendars appear once they are added in
    System Settings, Internet Accounts. Add your own widgets in
-   ~/.config/grand-line/denden/widgets/ (see apps/denden/README.md).
+   ~/.config/grand-line/iceberg/widgets/ (see apps/iceberg/README.md).
 
-7. Byakugan and Log Pose (search and files)
+7. Sight and Nexus (search and files)
    After the restart at the end of this list, Command + Space opens
-   Byakugan (until then, its menu bar icon does). Allow Byakugan in System Settings, Privacy and
+   Sight (until then, its menu bar icon does). Allow Sight in System Settings, Privacy and
    Security, Accessibility, so it can search menus and paste. Folders and
-   "Show in Finder" now open in Log Pose; the first Empty Trash asks to
+   "Show in Finder" now open in Nexus; the first Empty Trash asks to
    let it tell Finder. To go back to Spotlight or Finder: Caps + Ctrl + O,
-   then the Byakugan or Log Pose toggle.
+   then the Sight or Nexus toggle.
 
 8. Volume for each app (FineTune)
    Open FineTune and allow audio access when asked. Its menu bar icon
@@ -96,7 +96,9 @@ macOS requires these clicks from you. Work down the list once.
 15. Keep start-up light
     In Spotify and Discord settings, turn off "Open at login".
     Then review System Settings, General, Login Items and turn off
-    anything you do not need at start-up. In System Settings, Menu Bar,
+    anything you do not need at start-up. An app listed there that is no
+    longer installed (such as one of this package's apps under an earlier
+    name) is removed with the minus button. In System Settings, Menu Bar,
     turn off the icons you do not need to see.
 
 16. Install by hand (not available through Homebrew)
@@ -134,7 +136,7 @@ EOF
     open -a "AeroSpace" 2>/dev/null
     open -a "Maccy" 2>/dev/null
     open -a "Espanso" 2>/dev/null
-    open -a "Den Den" 2>/dev/null
+    open -a "Iceberg" 2>/dev/null
   fi
   mark_done checklist
   ok "Checklist saved to Documents (it opens now)"

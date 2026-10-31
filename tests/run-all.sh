@@ -176,7 +176,7 @@ check "migrations are named <unix time>-<slug>.sh" bash -c '
   exit $bad'
 
 # /Users/me/ is the placeholder home that examples and tests use.
-check "every # grandline:arg line is valid JSON (Byakugan reads them)" python3 -c '
+check "every # grandline:arg line is valid JSON (Sight reads them)" python3 -c '
 import glob, json, re, sys
 def ok(line):
     m = re.match(r"# grandline:arg[1-3]=(\{.*\})\s*$", line)

@@ -31,7 +31,7 @@ public struct ShellRunner: Sendable {
     /// The bash arguments that run a menu line the way bin/menu does: with
     /// bin-common.sh sourced, so its PATH and variables are set.
     public static func bashArguments(for line: String, paths: GrandLinePaths = GrandLinePaths()) -> [String] {
-        ["-c", "source \"$1\" 2>/dev/null; shift; eval \"$1\"", "byakugan", paths.commonShell, line]
+        ["-c", "source \"$1\" 2>/dev/null; shift; eval \"$1\"", "sight", paths.commonShell, line]
     }
 
     final class Box: @unchecked Sendable {

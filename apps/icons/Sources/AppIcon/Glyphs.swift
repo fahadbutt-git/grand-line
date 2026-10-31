@@ -41,15 +41,15 @@ public struct IconMark: Sendable, Hashable {
 
 /// The three apps' glyphs. Original, generic shapes.
 public enum IconGlyph: String, Sendable, CaseIterable {
-    case logPose, byakugan, denDen
+    case nexus, sight, iceberg
 
     /// The theme key for this app's own colour. Named for the app's job,
     /// not its name: files, search, notch.
     public var themeKey: String {
         switch self {
-        case .logPose: return "ICON_FILES"
-        case .byakugan: return "ICON_SEARCH"
-        case .denDen: return "ICON_NOTCH"
+        case .nexus: return "ICON_FILES"
+        case .sight: return "ICON_SEARCH"
+        case .iceberg: return "ICON_NOTCH"
         }
     }
 
@@ -57,11 +57,11 @@ public enum IconGlyph: String, Sendable, CaseIterable {
     /// `IconGlyphs.detailSize`, so the icon still reads at 16 and 32.
     public func marks(pixels: Double = IconGlyphs.canvas) -> [IconMark] {
         switch self {
-        case .logPose: return IconGlyphs.logPose
-        case .byakugan:
-            return pixels >= IconGlyphs.detailSize ? IconGlyphs.byakugan + IconGlyphs.byakuganDetail + IconGlyphs.byakuganTop
-                                                   : IconGlyphs.byakugan + IconGlyphs.byakuganTop
-        case .denDen: return IconGlyphs.denDen
+        case .nexus: return IconGlyphs.nexus
+        case .sight:
+            return pixels >= IconGlyphs.detailSize ? IconGlyphs.sight + IconGlyphs.sightDetail + IconGlyphs.sightTop
+                                                   : IconGlyphs.sight + IconGlyphs.sightTop
+        case .iceberg: return IconGlyphs.iceberg
         }
     }
 }
@@ -78,8 +78,8 @@ public enum IconGlyphs {
         IconMark(.rrect, .tile, [100, 100, 824, 824, 185]),
     ]
 
-    /// Log Pose: a sailing ship seen from the side, with a pennant.
-    public static let logPose: [IconMark] = [
+    /// Nexus: a sailing ship seen from the side, with a pennant.
+    public static let nexus: [IconMark] = [
         IconMark(.segment, .soft, [236, 742, 788, 742, 16]),
         IconMark(.polygon, .accent, [232, 612, 792, 612, 714, 712, 310, 712]),
         IconMark(.segment, .ink, [512, 236, 512, 612, 22]),
@@ -88,11 +88,11 @@ public enum IconGlyphs {
         IconMark(.polygon, .accent, [520, 220, 520, 268, 606, 244]),
     ]
 
-    /// Byakugan: the back of an eye as an ophthalmoscope shows it. The
+    /// Sight: the back of an eye as an ophthalmoscope shows it. The
     /// optic disc to one side, the superior and inferior arcades (veins, with
     /// thinner, lighter arteries inside them) leaving the disc and curving
     /// around the macula, and the bright fovea at its centre.
-    public static let byakugan: [IconMark] = [
+    public static let sight: [IconMark] = [
         IconMark(.disc, .accent, [512, 512, 300]),
         IconMark(.disc, .vessel, [420, 520, 64]),
         IconMark(.arc, .deep, [450, 560, 230, 20, 200, 332]),
@@ -101,8 +101,8 @@ public enum IconGlyphs {
         IconMark(.arc, .vessel, [450, 464, 200, 12, 34, 154]),
     ]
 
-    /// Byakugan's smaller branches, drawn from 64 pixels up.
-    public static let byakuganDetail: [IconMark] = [
+    /// Sight's smaller branches, drawn from 64 pixels up.
+    public static let sightDetail: [IconMark] = [
         IconMark(.segment, .deep, [684, 476, 776, 404, 12]),
         IconMark(.segment, .deep, [684, 548, 776, 620, 12]),
         IconMark(.segment, .vessel, [696, 512, 790, 512, 9]),
@@ -114,15 +114,15 @@ public enum IconGlyphs {
         IconMark(.segment, .vessel, [518, 652, 544, 732, 7]),
     ]
 
-    /// Byakugan's optic disc and fovea, drawn over the vessels.
-    public static let byakuganTop: [IconMark] = [
+    /// Sight's optic disc and fovea, drawn over the vessels.
+    public static let sightTop: [IconMark] = [
         IconMark(.ellipse, .pale, [650, 512, 46, 58]),
         IconMark(.disc, .pale, [420, 520, 11]),
     ]
 
-    /// Den Den: an iceberg, a faceted peak above the waterline and the
+    /// Iceberg: an iceberg, its faceted peak above the waterline and the
     /// larger mass faintly below it.
-    public static let denDen: [IconMark] = [
+    public static let iceberg: [IconMark] = [
         IconMark(.polygon, .soft, [282, 596, 770, 596, 834, 690, 724, 800, 432, 812, 236, 700]),
         IconMark(.polygon, .ice, [276, 572, 404, 380, 462, 420, 548, 232, 650, 404, 708, 362, 776, 572]),
         IconMark(.polygon, .accent, [548, 232, 650, 404, 610, 572, 520, 572]),

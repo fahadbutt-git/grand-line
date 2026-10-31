@@ -1,6 +1,6 @@
 import Foundation
 
-/// What macOS asks of the file viewer once Log Pose is NSFileViewer and the
+/// What macOS asks of the file viewer once Nexus is NSFileViewer and the
 /// folder handler: open folders (the 'odoc' event, or application(_:open:)), or
 /// reveal items, the 'misc'/'mvis' event NSWorkspace.activateFileViewerSelecting sends.
 public enum FileViewerRequest: Sendable, Equatable {

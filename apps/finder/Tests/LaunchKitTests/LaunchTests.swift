@@ -61,6 +61,6 @@ final class LaunchTests: XCTestCase {
         XCTAssertFalse(HotkeySetting.takesCommandSpace(defaults))
         defaults.set(true, forKey: HotkeySetting.key)
         XCTAssertTrue(HotkeySetting.takesCommandSpace(defaults))
-        XCTAssertEqual(HotkeySetting.suiteName, "com.grandline.byakugan")
+        XCTAssertEqual(HotkeySetting.suiteName, "com.grandline.sight")
     }
 }

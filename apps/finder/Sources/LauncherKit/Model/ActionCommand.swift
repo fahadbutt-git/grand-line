@@ -2,13 +2,13 @@ import Foundation
 
 /// What an action does. LauncherKit only describes it; the app carries it out.
 public enum ActionCommand: Codable, Hashable, Sendable {
-    /// A file, folder or URL with its default app. Folders open in Log Pose.
+    /// A file, folder or URL with its default app. Folders open in Nexus.
     case open(String)
     /// A URL in a given app (bundle id), or the default browser when nil.
     case openURL(String, bundleID: String?)
     /// Asks which app to open the file with.
     case openWith(String)
-    /// Shows the item selected in its folder, in Log Pose.
+    /// Shows the item selected in its folder, in Nexus.
     case reveal(String)
     case quickLook(String)
     case copyText(String)

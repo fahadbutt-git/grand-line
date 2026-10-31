@@ -37,13 +37,13 @@ Every theme file holds the keys below (the tests check them). A key marked optio
 | `ACCENT_HEX`, `HIGHLIGHT`, `MUTED` | The accent as a colour, matches and the focused item, secondary text |
 | `BG_LIGHTER`, `BG_DARKER` | Raised surfaces (cards, chips) and sunken ones (the desk behind windows) |
 | `SIDEBAR`, `FIELD`, `LINE` | Optional. The sidebar, text fields and dividers. Missing: `BG_LIGHTER`, then colours mixed from the surface and text |
-| `NOTCH_PANEL`, `NOTCH_CARD`, `NOTCH_LINE` | Optional. Den Den's open panel, its chips and its column dividers. Missing: `TERM_BG`, then `FIELD` or `BG_LIGHTER`, then `LINE`. The part of the panel under the camera, and the closed notch, are always black so they meet the hardware |
-| `KIND_STYLE` | How Log Pose and Byakugan mark a file's kind: `tag` (a tinted tag with the extension), `dot`, `solid` (a filled tag) or `text` (the kind's name in its colour) |
+| `NOTCH_PANEL`, `NOTCH_CARD`, `NOTCH_LINE` | Optional. Iceberg's open panel, its chips and its column dividers. Missing: `TERM_BG`, then `FIELD` or `BG_LIGHTER`, then `LINE`. The part of the panel under the camera, and the closed notch, are always black so they meet the hardware |
+| `KIND_STYLE` | How Nexus and Sight mark a file's kind: `tag` (a tinted tag with the extension), `dot`, `solid` (a filled tag) or `text` (the kind's name in its colour) |
 | `KIND_FOLDER`, `KIND_DOCUMENT`, `KIND_PDF`, `KIND_PRESENTATION`, `KIND_SPREADSHEET`, `KIND_IMAGE`, `KIND_VIDEO`, `KIND_CODE`, `KIND_ARCHIVE`, `KIND_TEXT` | The colour of each kind. Missing: the accent and terminal colours |
 | `ICON_STYLE` | The app icons: `line` (a dark tile, a light glyph and the app's colour as its hot point), `solid` (the app's colour as the tile, a dark glyph) or `mono` (a black tile, the glyph in the app's colour). Missing: `line` |
 | `ICON_TILE`, `ICON_INK` | Optional. The tile (line and mono) and the glyph (line and solid). Missing: a dark tile (the theme's surface when it is dark) and light ink; mono is black, solid ink is near black |
 | `ICON_ACCENT`, `ICON_SOFT` | Optional. Every app's colour, and the quiet fills (the sea, the iceberg under water). Missing: `ACCENT_HEX`, then `HIGHLIGHT`; soft is the tile with a quarter of the accent |
-| `ICON_FILES`, `ICON_SEARCH`, `ICON_NOTCH` | Optional. One app's own colour: the file browser (Log Pose), search (Byakugan, also the warm tone of its eye) and the notch app (Den Den). Missing: `ICON_ACCENT` |
+| `ICON_FILES`, `ICON_SEARCH`, `ICON_NOTCH` | Optional. One app's own colour: the file browser (Nexus), search (Sight, also the warm tone of its eye) and the notch app (Iceberg). Missing: `ICON_ACCENT` |
 
 The icons are original, generic glyphs drawn from one table (`apps/icons`): a sailing ship for the file browser, the back of an eye (optic disc, vessels arching around the macula) for search, and an iceberg for the notch app. They sit on Apple's icon grid (an 824 point tile on a 1024 canvas, corners of 185), use no gradients or shadows, and leave fine detail out at 16 and 32 pixels.
 

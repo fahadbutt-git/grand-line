@@ -43,7 +43,7 @@ public struct Workspace: Codable, Equatable, Sendable {
     }
 }
 
-/// Workspaces as one JSON file each in Application Support/Log Pose/Workspaces.
+/// Workspaces as one JSON file each in Application Support/Nexus/Workspaces.
 public struct WorkspaceStore: Sendable {
     public let folder: URL
 

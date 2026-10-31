@@ -104,18 +104,18 @@ for list in "$ROOT"/apps/*/apps.tsv; do
   done < "$list"
 done
 state="$HOME/.local/state/grand-line"
-if [[ -d "/Applications/Log Pose.app" ]]; then
+if [[ -d "/Applications/Nexus.app" ]]; then
   viewer="$(defaults read -g NSFileViewer 2>/dev/null)"
   if [[ "$(cat "$state/takeover-files" 2>/dev/null || echo on)" == on ]]; then
-    [[ "$viewer" == com.grandline.logpose ]] && pass "Show in Finder opens Log Pose" || fail "Show in Finder opens ${viewer:-Finder}, not Log Pose"
+    [[ "$viewer" == com.grandline.nexus ]] && pass "Show in Finder opens Nexus" || fail "Show in Finder opens ${viewer:-Finder}, not Nexus"
   else
     [[ -z "$viewer" ]] && pass "Show in Finder opens Finder (switched back)" || fail "Show in Finder still opens $viewer"
   fi
 fi
-if [[ -d "/Applications/Byakugan.app" ]]; then
+if [[ -d "/Applications/Sight.app" ]]; then
   spotlight="$(defaults read com.apple.symbolichotkeys AppleSymbolicHotKeys 2>/dev/null | awk '/^ *64 = /,/};/' | sed -nE 's/^ *enabled = ([01]);/\1/p' | head -1)"
   if [[ "$(cat "$state/takeover-search" 2>/dev/null || echo on)" == on ]]; then
-    [[ "$spotlight" == 0 ]] && pass "Command + Space belongs to Byakugan" || fail "Spotlight still has Command + Space"
+    [[ "$spotlight" == 0 ]] && pass "Command + Space belongs to Sight" || fail "Spotlight still has Command + Space"
   else
     [[ "$spotlight" != 0 ]] && pass "Command + Space opens Spotlight (switched back)" || fail "Spotlight's Command + Space is still off"
   fi

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Every action Log Pose has. Each one has a menu item with its shortcut
+/// Every action Nexus has. Each one has a menu item with its shortcut
 /// (menus are how Mac users find shortcuts), listed in `CommandCatalog`.
 public enum BrowserCommand: String, CaseIterable, Codable, Sendable {
     // File

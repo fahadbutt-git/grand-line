@@ -16,7 +16,7 @@ step_default_apps() {
   if first_time default-browser && [[ -d /Applications/Zen.app ]]; then
     run set_default_browser app.zen-browser.zen && ok "Links open in Zen" && mark_done default-browser
   fi
-  # Log Pose for folders and Byakugan for Command + Space, once installed.
+  # Nexus for folders and Sight for Command + Space, once installed.
   # shellcheck source=lib/takeover.sh
   source "$REPO_DIR/lib/takeover.sh"
   apply_takeovers

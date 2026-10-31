@@ -25,8 +25,8 @@ public struct FileHit: Sendable, Equatable {
     public var ext: String { (path as NSString).pathExtension.lowercased() }
 }
 
-/// Rows for files, with every file action: open (folders in Log Pose), show in
-/// Log Pose, Quick Look, open with, copy path or file, move, AirDrop, transcode.
+/// Rows for files, with every file action: open (folders in Nexus), show in
+/// Nexus, Quick Look, open with, copy path or file, move, AirDrop, transcode.
 public enum FileResults {
     /// System Settings › Privacy & Security › Files and Folders.
     public static let filesAndFoldersPane = "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders"
@@ -50,8 +50,8 @@ public enum FileResults {
             if rows.contains(where: { $0.title.hasSuffix(" " + name) }) { continue }
             rows.append(LaunchResult(
                 id: "allow:" + folder,
-                title: "Allow Byakugan to read " + name,
-                subtitle: "macOS is keeping Byakugan out of \(name), so its files are missing here",
+                title: "Allow Sight to read " + name,
+                subtitle: "macOS is keeping Sight out of \(name), so its files are missing here",
                 icon: .symbol("lock"),
                 section: .files,
                 actions: [LaunchAction("Open Privacy Settings", symbol: "gear", .openURL(filesAndFoldersPane, bundleID: nil))],
@@ -104,8 +104,8 @@ public enum FileResults {
     public static func actions(_ hit: FileHit, paths: GrandLinePaths) -> [LaunchAction] {
         let path = hit.path
         var actions: [LaunchAction] = [
-            LaunchAction(hit.isFolder ? "Open in Log Pose" : "Open", symbol: "arrow.up.forward", .open(path)),
-            LaunchAction("Show in Log Pose", symbol: "folder", .reveal(path)),
+            LaunchAction(hit.isFolder ? "Open in Nexus" : "Open", symbol: "arrow.up.forward", .open(path)),
+            LaunchAction("Show in Nexus", symbol: "folder", .reveal(path)),
             LaunchAction("Quick Look", symbol: "eye", shortcut: KeyShortcut("y"), closesWindow: false, .quickLook(path)),
         ]
         if !hit.isFolder { actions.append(LaunchAction("Open with…", symbol: "arrow.up.right.square", shortcut: KeyShortcut("o"), .openWith(path))) }

@@ -1,8 +1,8 @@
 import Foundation
 
-/// ~/.local/state/grand-line/logpose-selection: the selection while Log Pose is
+/// ~/.local/state/grand-line/nexus-selection: the selection while Nexus is
 /// frontmost, one POSIX path per line, rewritten on every change. The package's
-/// scripts (transcode, Byakugan) read it.
+/// scripts (transcode, Sight) read it.
 public struct SelectionFile: Sendable {
     public let url: URL
     private let lastWritten: LastWritten

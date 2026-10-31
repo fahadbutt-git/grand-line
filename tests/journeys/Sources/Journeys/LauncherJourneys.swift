@@ -131,7 +131,7 @@ enum LauncherJourneys {
         Setting(id: "dockautohide", phrase: "dock autohide", mode: .toggle, read: "defaults read com.apple.dock autohide 2>&1"),
         Setting(id: "desktopicons", phrase: "desktop icons", mode: .toggle, read: #"v=$(defaults read com.apple.finder CreateDesktop 2>&1); case "$v" in *exist*) echo 1;; *) echo "$v";; esac"#),
         Setting(id: "menubarautohide", phrase: "menu bar autohide", mode: .toggle, read: "defaults read -g _HIHideMenuBar 2>&1"),
-        Setting(id: "keepawake", phrase: "keep awake", mode: .toggle, read: "pmset -g assertions | grep -i -E 'byakugan|caffeinate' | grep -c -i prevent"),
+        Setting(id: "keepawake", phrase: "keep awake", mode: .toggle, read: "pmset -g assertions | grep -i -E 'sight|caffeinate' | grep -c -i prevent"),
         Setting(id: "lock", phrase: "lock screen", mode: .offerOnly, read: nil),
         Setting(id: "displaysleep", phrase: "sleep display", mode: .offerOnly, read: nil),
         Setting(id: "restart", phrase: "restart", mode: .confirm, read: nil),

@@ -25,7 +25,7 @@ is_on() {
     # Colima's VM does not survive a restart, so the flag counts only when it
     # was set since the Mac last started.
     docker)  [[ -f "$TOGGLE_FLAGS/docker" && "$(< "$TOGGLE_FLAGS/docker")" == "$(boot_time)" ]] ;;
-    # Log Pose and Byakugan, on unless switched back (lib/takeover.sh).
+    # Nexus and Sight, on unless switched back (lib/takeover.sh).
     files|search) [[ "$(cat "$HOME/.local/state/grand-line/takeover-$1" 2>/dev/null || echo on)" == on ]] ;;
     *) return 1 ;;
   esac

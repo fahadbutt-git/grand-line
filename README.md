@@ -82,7 +82,7 @@ As in Omarchy: mise for language versions, uv for Python packages, Docker, lazyg
 | `duckdb` | SQL straight over CSV or Parquet files: `duckdb -c "select count(*) from 'export.csv'"` |
 | Caps menu, Toggle, Local AI | Starts or stops Ollama for local models (`ollama run llama3.2`). Nothing runs until you start it |
 | `lzg`, `lzd`, `btop` | Git, containers, and system load in the terminal |
-| `lp` | Opens this folder in Log Pose (`lp ~/Drive` for another) |
+| `nx` | Opens this folder in Nexus (`nx ~/Drive` for another). `lp` still works for now |
 | `g`, `gcm "message"`, `gcam`, `gcad` | git, commit, commit all, amend |
 
 For the homelab: Tailscale joins this Mac to a private network with your NAS and servers. `nmap`, `mtr`, `iperf3` and `wakeonlan` find, trace, speed-test and wake machines. `fip server 8080` forwards a server's port to this Mac, `dip 8080` stops it, and `lip` lists them. `iso2sd image.iso disk4` writes an image to an SD card or USB stick, and refuses internal disks.
@@ -107,7 +107,7 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 
 | Keys | Action |
 | --- | --- |
-| Caps + Space | Search (Byakugan, or Spotlight if switched back) |
+| Caps + Space | Search (Sight, or Spotlight if switched back) |
 | Caps + Option + Space | Main menu |
 | Caps + K | Shortcut list (type to filter, Return runs it) |
 | Caps + Escape | System menu (lock, sleep, restart, shut down) |
@@ -149,13 +149,13 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + Option + Return | Terminal in a tmux session |
 | Caps + Shift + Return | Browser (Zen) |
 | Caps + Option + Shift + B | Private browser window |
-| Caps + Shift + F | Files (Log Pose, or Finder if switched back) |
+| Caps + Shift + F | Files (Nexus, or Finder if switched back) |
 | Caps + Shift + D | Google Drive folder |
 | Caps + Shift + A | Claude |
 | Caps + Option + Shift + A | ChatGPT |
 | Caps + Ctrl + Shift + A | Gemini |
 | Caps + Shift + N | Notion |
-| Caps + Ctrl + Option + N | Open or close the notch panel (Den Den) |
+| Caps + Ctrl + Option + N | Open or close the notch panel (Iceberg) |
 | Caps + Shift + T | Reminders (tasks) |
 | Caps + Shift + G | WhatsApp |
 | Caps + Shift + M | Spotify |
@@ -208,15 +208,17 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 
 ## The package's own apps
 
-Log Pose (files), Byakugan (search) and Den Den (the notch) are built on this Mac from `apps/`, by the native-tools step, and installed in `/Applications`. Each app folder is a Swift package with an `apps.tsv` that names what it makes (product, app name, bundle id, and whether it lives in the menu bar only). Setup rebuilds an app only when its sources change (or the shared `apps/icons` package does), and the old copy goes to the Trash.
+Nexus (files), Sight (search) and Iceberg (the notch) are built on this Mac from `apps/`, by the native-tools step, and installed in `/Applications`. Each app folder is a Swift package with an `apps.tsv` that names what it makes (product, app name, bundle id, and whether it lives in the menu bar only). Setup rebuilds an app only when its sources change (or the shared `apps/icons` package does), and the old copy goes to the Trash.
+
+Nexus, Sight and Iceberg were formerly Log Pose, Byakugan and Den Den. The first `update` after the rename carries their settings, index and state over (`migrations/1793472900-rename-apps.sh`), and the old apps go to the Trash.
 
 Each app draws its icon in the theme's colours when it starts and whenever the theme changes (the `ICON_*` keys in `DESIGN.md`), for the Dock and for Finder. The bundles also carry a fixed `AppIcon.icns` in Graphite's colours, drawn by `python3 tools/make-icons.py` from the same glyph table (`apps/icons/Sources/AppIcon/Glyphs.swift`), so an app has an icon before it first runs. After changing a glyph, run the script and commit the `.icns` files; `tests/run-all.sh` checks they are sound.
 
-Once installed, Log Pose opens folders and every "Show in Finder", and Byakugan answers Command + Space (so Caps + Space too). Both switch back from the Toggle menu, or with `toggle files` and `toggle search`, and the choice is kept across updates.
+Once installed, Nexus opens folders and every "Show in Finder", and Sight answers Command + Space (so Caps + Space too). Both switch back from the Toggle menu, or with `toggle files` and `toggle search`, and the choice is kept across updates.
 
-### Changing settings from Byakugan
+### Changing settings from Sight
 
-Typing a setting changes it, rather than opening System Settings. The row shows the state it read when the window opened ("Wi-Fi: On, Return turns it off"), Return makes the change, and the row then shows the state read back from the Mac, so a second Return undoes it. Command + Return opens the setting's pane instead. If a change fails, the row says why, and when macOS needs a permission, Return opens that part of Privacy & Security. The window stays open after a change; `defaults write com.grandline.byakugan CloseAfterSettingChange -bool true` closes it instead.
+Typing a setting changes it, rather than opening System Settings. The row shows the state it read when the window opened ("Wi-Fi: On, Return turns it off"), Return makes the change, and the row then shows the state read back from the Mac, so a second Return undoes it. Command + Return opens the setting's pane instead. If a change fails, the row says why, and when macOS needs a permission, Return opens that part of Privacy & Security. The window stays open after a change; `defaults write com.grandline.sight CloseAfterSettingChange -bool true` closes it instead.
 
 | Type | Does |
 | --- | --- |
@@ -233,7 +235,7 @@ Typing a setting changes it, rather than opening System Settings. The row shows 
 | `screenshot`, `record screen`, `ocr` | The Capture menu's tools |
 | `night shift`, `low power`, `brightness` | Open their pane: macOS has no command for Night Shift, Low Power Mode needs an administrator password, and no brightness tool is installed |
 
-These run `toggle` and `power`, the same commands as the Toggle and System menus, so both always agree. The first time, macOS asks to let Byakugan control System Events (dark mode without a theme pair, menu bar hiding, log out, restart, shut down) and, for Lock, to allow Accessibility.
+These run `toggle` and `power`, the same commands as the Toggle and System menus, so both always agree. The first time, macOS asks to let Sight control System Events (dark mode without a theme pair, menu bar hiding, log out, restart, shut down) and, for Lock, to allow Accessibility.
 
 **Do Not Disturb.** macOS has no command for Focus, so it runs two shortcuts you make once in the Shortcuts app. Make a shortcut named `Do Not Disturb On` with the action Set Focus, Turn Do Not Disturb On, Until Turned Off, and one named `Do Not Disturb Off` with Turn Do Not Disturb Off. Other names work too, set as `GRAND_LINE_DND_ON` and `GRAND_LINE_DND_OFF`. Until they exist, the row says which one is missing.
 
@@ -246,7 +248,7 @@ These run `toggle` and `power`, the same commands as the Toggle and System menus
 | A default app for a file type | Add a line to `config/grand-line/default-apps.tsv`, then `--only default-apps` |
 | A shortcut | Add a line to `BINDINGS` in `tools/bindings.py`, run `python3 tools/bindings.py`, then `--only dotfiles` |
 | A menu entry | Add a line to `config/grand-line/menu.tsv`. It works at once. A third column `?test` shows it only when the test succeeds, a fourth `✓test` gives it a check mark (helpers in `lib/toggle-state.sh`) |
-| A command | Add an executable script to `bin/` with a `# grandline:summary=` line under the first. It is on the PATH at once, and `grandline commands` and Byakugan list it. Arguments Byakugan should ask for go in `# grandline:arg1=` lines (up to three), as `{"type":"text"\|"dropdown","placeholder":"…","data":[…],"optional":true}` |
+| A command | Add an executable script to `bin/` with a `# grandline:summary=` line under the first. It is on the PATH at once, and `grandline commands` and Sight list it. Arguments Sight should ask for go in `# grandline:arg1=` lines (up to three), as `{"type":"text"\|"dropdown","placeholder":"…","data":[…],"optional":true}` |
 | A theme | Add `config/themes/name.theme` (copy an existing one), its image to `backgrounds/`, and a `Style/` line to `config/grand-line/menu.tsv` with `✓theme_is name`. For a dark and light pair, name the files `name-dark.theme` and `name-light.theme` with `FAMILY=name` in both |
 | An app that takes theme colours | Add `config/themed/<file>.tpl` with `{{ KEY }}` placeholders, then have `bin/theme` put the rendered file where the app reads it |
 | A one-time change for Macs already set up | Add `migrations/<unix time>-<what>.sh` (`date +%s` gives the time). `update` runs it once on each Mac |
@@ -291,7 +293,7 @@ After setup on any Mac, `bash ~/grand-line/tests/verify-install.sh` checks every
 
 ## What runs in the background
 
-Kept deliberately small: Karabiner-Elements (keyboard), AeroSpace (windows), Maccy (clipboard), Espanso (text shortcuts), Handy (waits for the dictation key), FineTune (per-app volume), Den Den (music, calendar, reminders and your own widgets in the notch) and Google Drive. Docker, local AI (Ollama) and the VPNs run only while you turn them on. Shortcut commands start, act and exit, and long jobs (video compression, keep-awake, app installs) run on their own so they never block the keyboard. The Downloads sorter is not a running process: macOS starts it at low priority when Downloads changes, and once an hour for the age rules. Nothing in the package indexes. The checklist shows how to stop other apps opening at login.
+Kept deliberately small: Karabiner-Elements (keyboard), AeroSpace (windows), Maccy (clipboard), Espanso (text shortcuts), Handy (waits for the dictation key), FineTune (per-app volume), Iceberg (music, calendar, reminders and your own widgets in the notch) and Google Drive. Docker, local AI (Ollama) and the VPNs run only while you turn them on. Shortcut commands start, act and exit, and long jobs (video compression, keep-awake, app installs) run on their own so they never block the keyboard. The Downloads sorter is not a running process: macOS starts it at low priority when Downloads changes, and once an hour for the age rules. Nothing in the package indexes. The checklist shows how to stop other apps opening at login.
 
 ## Security
 

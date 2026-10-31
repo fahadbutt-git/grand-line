@@ -2,7 +2,7 @@
 # grandline:summary=Lock the screen, sleep the display or the Mac, log out, restart or shut down
 # power lock | display-sleep | sleep | logout | restart | shutdown
 # Restart, shut down and log out go through System Events, so apps can still
-# ask to save their work and nothing is forced. Byakugan asks before it runs
+# ask to save their work and nothing is forced. Sight asks before it runs
 # sleep, logout, restart and shutdown.
 # Exit status: 0 done, 2 usage, and the codes of fail() in lib/bin-common.sh.
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"

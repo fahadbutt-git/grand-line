@@ -38,6 +38,7 @@ expect "ln -s $ROOT/config/tmux $tmp/home/.config/tmux"
 expect "config/zsh/grand-line.zsh"
 for src in "$ROOT"/tools/*.swift; do expect "swiftc -O $src"; done
 expect "write the finishing checklist"
+expect "carry the renamed apps' settings and index over"
 expect "ln -s $ROOT/config/ghostty $tmp/home/.config/ghostty"
 expect "ln -s $ROOT/config/starship.toml $tmp/home/.config/starship.toml"
 expect "include.path $tmp/home/.grand-line/config/git/config"

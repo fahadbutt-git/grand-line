@@ -1,11 +1,11 @@
 import Foundation
 
 /// A provider that is any program printing JSON lines, set up in
-/// ~/.config/grand-line/byakugan/providers.tsv:
+/// ~/.config/grand-line/sight/providers.tsv:
 ///
 ///     keyword TAB title TAB command TAB global (yes/no)
 ///
-/// The query is passed as the last argument (and in BYAKUGAN_QUERY). Each output
+/// The query is passed as the last argument (and in SIGHT_QUERY). Each output
 /// line is one row: {"title": …, "subtitle": …, "icon": "SF Symbol", "id": …,
 /// "keywords": […], "accessory": …, "preview": "/path", and one of "open",
 /// "url", "run", "copy", "paste" or "query"}, or "actions": [{"title": …, "open": …}, …].
@@ -121,7 +121,7 @@ public final class ExternalProvider: LaunchProvider, @unchecked Sendable {
     public func results(for query: LaunchQuery) async throws -> [LaunchResult] {
         guard !query.term.isEmpty else { return [] }
         var runner = self.runner
-        runner.environment["BYAKUGAN_QUERY"] = query.term
+        runner.environment["SIGHT_QUERY"] = query.term
         // The command runs through bash, so it may use ~, $HOME and arguments of its own.
         let line = paths.expand(config.command) + " " + ShellQuote.quote(query.term)
         let output = try await runner.run("/bin/bash", ["-c", line], timeout: timeout)

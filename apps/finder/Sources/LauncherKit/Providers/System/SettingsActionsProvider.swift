@@ -34,7 +34,7 @@ public enum SettingStart: Sendable, Equatable {
 /// thread, and redraws the rows from `instantResults` after each step.
 public final class SettingsActionsProvider: InstantProvider, @unchecked Sendable {
     public static let providerID = "settings-actions"
-    /// Byakugan's default (com.grandline.byakugan) that hides the window after a change.
+    /// Sight's default (com.grandline.sight) that hides the window after a change.
     public static let closeAfterChangeKey = "CloseAfterSettingChange"
 
     public let id = SettingsActionsProvider.providerID

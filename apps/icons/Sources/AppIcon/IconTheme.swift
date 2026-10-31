@@ -61,7 +61,7 @@ public struct IconPalette: Sendable, Hashable {
 /// | `ICON_INK` | the glyph (line and solid) | line: TERM_FG of a dark theme, else e5e5e7; solid: 1c1c1e |
 /// | `ICON_ACCENT` | every app's colour | ACCENT_HEX, then HIGHLIGHT |
 /// | `ICON_SOFT` | quiet fills | the tile with 24% of the accent |
-/// | `ICON_FILES`, `ICON_SEARCH`, `ICON_NOTCH` | one app's colour (Log Pose, Byakugan, Den Den) | ICON_ACCENT |
+/// | `ICON_FILES`, `ICON_SEARCH`, `ICON_NOTCH` | one app's colour (Nexus, Sight, Iceberg) | ICON_ACCENT |
 public struct IconTheme: Sendable, Hashable {
     public static let keys = ["ICON_STYLE", "ICON_TILE", "ICON_INK", "ICON_ACCENT", "ICON_SOFT"]
         + IconGlyph.allCases.map(\.themeKey)

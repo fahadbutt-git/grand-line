@@ -170,7 +170,7 @@ final class FileInfoTests: XCTestCase {
         try await recents.clear()
         let cleared = await recents.list(includingMissing: true)
         XCTAssertTrue(cleared.isEmpty)
-        XCTAssertTrue(Recents.defaultFile.path.hasSuffix("Application Support/Log Pose/recents.json"))
+        XCTAssertTrue(Recents.defaultFile.path.hasSuffix("Application Support/Nexus/recents.json"))
     }
 
     func testCanonicalPathsDoNotDependOnTheFileExisting() {

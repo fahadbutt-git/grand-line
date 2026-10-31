@@ -137,10 +137,10 @@ file ".cache/conj-junk.tmp"
 file "Documents/Projects/Conj Flap/node_modules/conj-module/index.js"
 
 # Theme and notch app settings, as setup leaves them.
-mkdir -p .local/state/grand-line .grand-line/config .config/grand-line/denden/widgets
+mkdir -p .local/state/grand-line .grand-line/config .config/grand-line/iceberg/widgets
 cp -R "$repo/config/themes" .grand-line/config/themes
 printf 'graphite\n' > .local/state/grand-line/theme
-cat > .config/grand-line/denden/denden.toml <<'EOF'
+cat > .config/grand-line/iceberg/iceberg.toml <<'EOF'
 # Only the battery and one widget, so the panel shows exactly these sections
 # and nothing asks for calendar or reminders access.
 external_displays = "none"
@@ -151,7 +151,7 @@ live_activity = false
 launch_at_login = false
 builtin = ["battery"]
 EOF
-cat > .config/grand-line/denden/widgets/journey.toml <<'EOF'
+cat > .config/grand-line/iceberg/widgets/journey.toml <<'EOF'
 title = "Journey"
 icon = "checkmark.circle"
 command = "echo journey-ok"

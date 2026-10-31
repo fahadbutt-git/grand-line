@@ -23,13 +23,13 @@ EOF
 }
 
 # say TITLE [TEXT]: a notification, unless the caller shows the outcome
-# itself (Byakugan sets GRAND_LINE_QUIET and reads the exit status).
+# itself (Sight sets GRAND_LINE_QUIET and reads the exit status).
 say() {
   [[ -n "${GRAND_LINE_QUIET:-}" ]] || notify "$@"
 }
 
 # fail CODE REASON: print why a change could not be made, tell the person, and
-# stop. The codes Byakugan reads: 3 Automation permission missing, 4 a tool
+# stop. The codes Sight reads: 3 Automation permission missing, 4 a tool
 # is not installed, 5 Accessibility permission missing, 1 anything else.
 fail() {
   printf '%s\n' "$2"
@@ -82,14 +82,14 @@ end run
 EOF
 }
 
-# Print the POSIX paths of the files selected in Log Pose or Finder, one per line.
-# Log Pose, when it is in front, keeps its selection in a file, one path per
+# Print the POSIX paths of the files selected in Nexus or Finder, one per line.
+# Nexus, when it is in front, keeps its selection in a file, one path per
 # line, so a shortcut can read it without asking the app.
 finder_selection() {
   local front
   front="$(lsappinfo info -only bundleid "$(lsappinfo front 2>/dev/null)" 2>/dev/null)"
-  if [[ "$front" == *com.grandline.logpose* ]]; then
-    cat "$GRAND_LINE_STATE/logpose-selection" 2>/dev/null
+  if [[ "$front" == *com.grandline.nexus* ]]; then
+    cat "$GRAND_LINE_STATE/nexus-selection" 2>/dev/null
     return 0
   fi
   osascript <<'EOF' 2>/dev/null

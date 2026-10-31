@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draws the bundled app icons (AppIcon.icns) for Log Pose, Byakugan and Den Den.
+"""Draws the bundled app icons (AppIcon.icns) for Nexus, Sight and Iceberg.
 
 The apps draw their icons again at run time from the active theme
 (apps/icons). This script draws the same glyphs, read from the table in
@@ -27,9 +27,9 @@ GLYPHS = os.path.join(ROOT, "apps/icons/Sources/AppIcon/Glyphs.swift")
 THEMES = os.path.join(ROOT, "config/themes")
 # glyph table name, theme key, where the .icns goes
 APPS = [
-    ("logPose", "ICON_FILES", "apps/finder/Resources/LogPose/AppIcon.icns", "LogPose"),
-    ("byakugan", "ICON_SEARCH", "apps/finder/Resources/Byakugan/AppIcon.icns", "Byakugan"),
-    ("denDen", "ICON_NOTCH", "apps/denden/Resources/DenDen/AppIcon.icns", "DenDen"),
+    ("nexus", "ICON_FILES", "apps/finder/Resources/Nexus/AppIcon.icns", "Nexus"),
+    ("sight", "ICON_SEARCH", "apps/finder/Resources/Sight/AppIcon.icns", "Sight"),
+    ("iceberg", "ICON_NOTCH", "apps/iceberg/Resources/Iceberg/AppIcon.icns", "Iceberg"),
 ]
 SIZE = 1024
 ICNS_TYPES = [(b"icp4", 16), (b"icp5", 32), (b"ic11", 32), (b"ic12", 64),

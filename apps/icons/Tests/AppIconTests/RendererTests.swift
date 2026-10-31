@@ -11,7 +11,7 @@ final class RendererTests: XCTestCase {
             let big = IconRenderer.cgImage(glyph, palette: IconTheme.bundled.palette(for: glyph), pixels: 1024)
             XCTAssertEqual(big?.width, 1024)
         }
-        XCTAssertTrue(IconRenderer.templateImage(.denDen).isTemplate)
+        XCTAssertTrue(IconRenderer.templateImage(.iceberg).isTemplate)
     }
 }
 #endif

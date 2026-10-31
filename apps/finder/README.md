@@ -41,14 +41,14 @@ try await index.save(to: snapshot)
 
 ## FileKit
 
-File operations and the facts Log Pose shows about files.
+File operations and the facts Nexus shows about files.
 
 - `FileOperations`: copy, move, cut and paste, duplicate, rename, new folder and move to Trash, each undoable by reversing it and redoable after an undo (a new operation ends what Redo can do). Conflicts keep both (`name 2`), replace or skip. Nothing is deleted outright: a replaced item and an undone copy go to the Trash. Progress comes through `progress`, an `AsyncStream`. The Trash is injected, so tests use a folder of their own.
 - `FolderSize`: folder sizes, cached until `invalidate(_:)` receives watcher changes.
 - `VolumeInfo`: mounted volumes with capacity (available includes purgeable space), removable, ejectable and network flags, and `eject`.
 - `SelectionSummary`: total size, kinds, oldest and newest dates, common tags and common parent of a selection.
 - `Clutter`: finds `.DS_Store` and `._` files and moves them to the Trash in one undoable step.
-- `Recents`: Log Pose's own list of opened items in Application Support, newest first, one entry per path.
+- `Recents`: Nexus's own list of opened items in Application Support, newest first, one entry per path.
 - `VersionStack`: groups `v01`, `v02`, `final`, `final2`, `copy`, `(1)` and dated versions of a document under the newest.
 - `GoogleDrive`: finds `~/Library/CloudStorage/GoogleDrive-*` accounts. Dragging out of a drive copies by default.
 
@@ -62,37 +62,37 @@ Reads the active theme (`~/.local/state/grand-line/theme` and `~/.grand-line/con
 
 ## LaunchKit
 
-How macOS hands work to the apps. `FileViewerRequest` reads the open-documents and reveal (`misc`/`mvis`) Apple events that Log Pose receives as the default file viewer. `HotkeySetting` says whether Byakugan should register Command+Space (the `TakesCommandSpace` default).
+How macOS hands work to the apps. `FileViewerRequest` reads the open-documents and reveal (`misc`/`mvis`) Apple events that Nexus receives as the default file viewer. `HotkeySetting` says whether Sight should register Command+Space (the `TakesCommandSpace` default).
 
-## Log Pose
+## Nexus
 
-The file browser, built on the libraries above. `BrowserKit` holds everything that can be tested without a screen; `LogPose` is the thin AppKit and SwiftUI app on top.
+The file browser, built on the libraries above. `BrowserKit` holds everything that can be tested without a screen; `Nexus` is the thin AppKit and SwiftUI app on top.
 
 - Five views per window (Cmd+1 to Cmd+5): icons, list, columns, gallery and panes (1 to 4, Option+Cmd+1 to 4). Tab moves between panes, F5 copies and F6 moves to the next one; from an archive both extract.
-- One view setting everywhere. View > Remember View for This Folder (Ctrl+Cmd+J) stores an exception in `~/Library/Application Support/Log Pose/view-settings.json`, never in `.DS_Store`. Dragging rows sets a manual order for that folder.
-- Every Finder shortcut keeps its Finder meaning (Cmd+T new tab, Cmd+L make alias, the Go menu on Shift+Cmd, Cmd+Shift+Z redo and the rest); Log Pose adds keys only where Finder has none. Return opens, F2 renames, Space is Quick Look, Cmd+Up goes up, and Shift+Cmd+G opens the editable path bar (Tab completes; a bare name finds folders in the name index). Every command is in the menu bar with its shortcut, and the footer shows the keys for where you are. While you type in a field, Cut, Copy, Paste, Select All, Undo and Redo act on the text.
+- One view setting everywhere. View > Remember View for This Folder (Ctrl+Cmd+J) stores an exception in `~/Library/Application Support/Nexus/view-settings.json`, never in `.DS_Store`. Dragging rows sets a manual order for that folder.
+- Every Finder shortcut keeps its Finder meaning (Cmd+T new tab, Cmd+L make alias, the Go menu on Shift+Cmd, Cmd+Shift+Z redo and the rest); Nexus adds keys only where Finder has none. Return opens, F2 renames, Space is Quick Look, Cmd+Up goes up, and Shift+Cmd+G opens the editable path bar (Tab completes; a bare name finds folders in the name index). Every command is in the menu bar with its shortcut, and the footer shows the keys for where you are. While you type in a field, Cut, Copy, Paste, Select All, Undo and Redo act on the text.
 - Cmd+X then Cmd+V moves. Operations run in order through FileKit, with progress in the footer, Undo and Redo. Move to Trash records where items came from, so Put Back (Cmd+Delete in the Trash) works across launches.
-- Search starts in the current folder; chips widen it to home, Drive and the whole Mac. Name matches come from IndexKit at once, content matches from Spotlight. Saved searches live in `~/.config/grand-line/logpose/saved-searches.tsv` (name TAB query) and show in the sidebar.
-- The sidebar lists Places, Active projects, Saved searches and Locations: every mounted volume with its free space and an eject button, each Google Drive, and the Trash. AirDrop sits under Places: clicking it opens the AirDrop window and dropping files on it sends them. File > Add to Sidebar (Ctrl+Cmd+T) adds a folder to Places. Right-click > Remove from Sidebar takes out a place (from `settings.json`); saved searches, built-in items and whole sections are hidden instead (a hidden saved search still works as `@name`), in `~/Library/Application Support/Log Pose/sidebar-hidden.json`, and File > Show All in Sidebar (Ctrl+Option+Cmd+S) brings them back. `~/.config/grand-line/logpose/settings.json` sets `places`, `projectFolders` (whose subfolders are the projects) and `projects`.
-- Open With lists the apps from `default-apps.tsv` first. Log Pose's own tools sit on Control+Option, which Finder leaves free: Ctrl+Option+T opens Ghostty in the folder, Ctrl+Option+A opens Claude Code there, and Ctrl+Option+1 to 5 run `~/.grand-line/bin/transcode` (Tools > Transcode).
-- While Log Pose is frontmost its selection is in `~/.local/state/grand-line/logpose-selection`, one path per line.
+- Search starts in the current folder; chips widen it to home, Drive and the whole Mac. Name matches come from IndexKit at once, content matches from Spotlight. Saved searches live in `~/.config/grand-line/nexus/saved-searches.tsv` (name TAB query) and show in the sidebar.
+- The sidebar lists Places, Active projects, Saved searches and Locations: every mounted volume with its free space and an eject button, each Google Drive, and the Trash. AirDrop sits under Places: clicking it opens the AirDrop window and dropping files on it sends them. File > Add to Sidebar (Ctrl+Cmd+T) adds a folder to Places. Right-click > Remove from Sidebar takes out a place (from `settings.json`); saved searches, built-in items and whole sections are hidden instead (a hidden saved search still works as `@name`), in `~/Library/Application Support/Nexus/sidebar-hidden.json`, and File > Show All in Sidebar (Ctrl+Option+Cmd+S) brings them back. `~/.config/grand-line/nexus/settings.json` sets `places`, `projectFolders` (whose subfolders are the projects) and `projects`.
+- Open With lists the apps from `default-apps.tsv` first. Nexus's own tools sit on Control+Option, which Finder leaves free: Ctrl+Option+T opens Ghostty in the folder, Ctrl+Option+A opens Claude Code there, and Ctrl+Option+1 to 5 run `~/.grand-line/bin/transcode` (Tools > Transcode).
+- While Nexus is frontmost its selection is in `~/.local/state/grand-line/nexus-selection`, one path per line.
 
-Empty Trash asks Finder to empty it, after a confirmation (Opt+Shift+Cmd+Delete skips the question, as in Finder); Log Pose itself never deletes a file.
-Finder's Delete Immediately (Opt+Cmd+Delete) is left out on purpose: nothing in Log Pose deletes a file without the Trash.
+Empty Trash asks Finder to empty it, after a confirmation (Opt+Shift+Cmd+Delete skips the question, as in Finder); Nexus itself never deletes a file.
+Finder's Delete Immediately (Opt+Cmd+Delete) is left out on purpose: nothing in Nexus deletes a file without the Trash.
 Sort By also has Date Last Opened (Spotlight's last-used date), Date Added and Tags, on Finder's Ctrl+Option+Cmd+3, 4 and 8, and Ctrl+Cmd+Up opens the enclosing folder in a new window.
 These keys replace two choices in the original requirements: the editable path bar is on Shift+Cmd+G, not Cmd+L (R5), and Ghostty and Claude Code are on Ctrl+Option+T and A, not Cmd+T and Shift+Cmd+A (R31), so that Finder's own keys keep their meaning.
 
-## Byakugan
+## Sight
 
-The search window that replaces Spotlight and Alfred. `LauncherKit` holds everything that can be tested without a screen; `Byakugan` is the AppKit and SwiftUI app on top of it.
+The search window that replaces Spotlight and Alfred. `LauncherKit` holds everything that can be tested without a screen; `Sight` is the AppKit and SwiftUI app on top of it.
 
 - Providers answer a `LaunchQuery`. Instant providers (`InstantProvider`) answer on the keystroke; the others run concurrently, are cancelled by the next key, and merge in below without stealing the selection (`ResultList.merge`).
 - Rank order is fixed: exact alias, alias prefix, title tier, keyword tier, then learned frecency (`UsageStore`: per query and overall, halving every 7 days). Fallbacks always come last. Sections: Top hit, Answers, Apps, Grand Line, Windows, System, Bookmarks, Snippets, Symbols, Files, Web.
-- Prefixes: `.` files (QueryKit), `=` calculator, `?` web, `%` Zen bookmarks, `<` windows, `!` reminder, `>` shell, `;` snippets, `$` Maccy (presses its own ⇧⌘C, so Accessibility is needed), `:` symbols, `/` prefix list (`~/…` and `/a/b` are paths), `'` exact, `@` saved searches (Log Pose's `saved-searches.tsv`).
+- Prefixes: `.` files (QueryKit), `=` calculator, `?` web, `%` Zen bookmarks, `<` windows, `!` reminder, `>` shell, `;` snippets, `$` Maccy (presses its own ⇧⌘C, so Accessibility is needed), `:` symbols, `/` prefix list (`~/…` and `/a/b` are paths), `'` exact, `@` saved searches (Nexus's `saved-searches.tsv`).
 - File names come from an IndexKit index of the home folder, without `~/Library` (Google Drive in `~/Library/CloudStorage` stays) and with IndexKit's standard exclusions (`.git`, `node_modules`, `.build`, caches, the Trash). Contents and filters go to Spotlight.
 - Grand Line sources: `menu.tsv` and `menu.local.tsv` (guards and checks run in one bash process), `bin/*` summaries and arguments ("reminder buy milk, 30"), `keybindings.tsv` and `bindings.local.tsv`, Espanso match files, apps through `focus-or-open`.
 - Settings actions (`Providers/System/SettingsActions*.swift`): phrases such as "wifi off" or "volume 30" become rows that run `bin/toggle` or `bin/power` with an argument list, through a `CommandRunning` (tests pass a fake). State comes from `toggle status`, read on each window opening and again by name after each change; a change that did not take is a failure. Rows keep stable ids (`setting.wifi`), which are also their accessibility identifiers, with the state as the accessibility value. `ResultList.update` redraws them in place.
-- Settings in `~/.config/grand-line/byakugan/`: `aliases.tsv` (alias TAB result id, URL or path), `quicklinks.tsv` (keyword TAB title TAB URL with %s), `providers.tsv` (keyword TAB title TAB command TAB global yes/no; the command prints JSON lines). State in `~/Library/Application Support/Byakugan/`.
+- Settings in `~/.config/grand-line/sight/`: `aliases.tsv` (alias TAB result id, URL or path), `quicklinks.tsv` (keyword TAB title TAB URL with %s), `providers.tsv` (keyword TAB title TAB command TAB global yes/no; the command prints JSON lines). State in `~/Library/Application Support/Sight/`.
 - Keys: Return, Command+Return, Command+K actions, Command+1…9, Tab completes, Command+Y preview, Escape clears and then closes. Quitting a process asks for a second Return.
 
 ## Tests

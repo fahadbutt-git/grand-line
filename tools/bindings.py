@@ -53,7 +53,7 @@ ARROWS = [("left_arrow", "left"), ("down_arrow", "down"), ("up_arrow", "up"), ("
 # (key, extra modifiers held with Caps Lock, group, description, action)
 BINDINGS = [
     # Menus
-    ("spacebar", [], "Menus", "Search (Byakugan, or Spotlight if switched back)", key("spacebar", "command")),
+    ("spacebar", [], "Menus", "Search (Sight, or Spotlight if switched back)", key("spacebar", "command")),
     ("spacebar", ["option"], "Menus", "Main menu", cmd("menu")),
     ("k", [], "Menus", "Shortcut list (type to filter, Return runs it)", cmd("keybindings")),
     ("escape", [], "Menus", "System menu (lock, sleep, restart, shut down)", cmd("menu System")),
@@ -100,13 +100,13 @@ BINDINGS += [
     ("return_or_enter", ["option"], "Apps", "Terminal in a tmux session", sh(f"open -na Ghostty --args -e {BREW}/tmux new-session -A -s main")),
     ("return_or_enter", ["shift"], "Apps", "Browser (Zen)", app("Zen")),
     ("b", ["shift", "option"], "Apps", "Private browser window", sh("open -na Zen --args --private-window")),
-    ("f", ["shift"], "Apps", "Files (Log Pose, or Finder if switched back)", sh("open \"$HOME\"")),
+    ("f", ["shift"], "Apps", "Files (Nexus, or Finder if switched back)", sh("open \"$HOME\"")),
     ("d", ["shift"], "Apps", "Google Drive folder", cmd("open-drive")),
     ("a", ["shift"], "Apps", "Claude", app("Claude")),
     ("a", ["shift", "option"], "Apps", "ChatGPT", app("ChatGPT")),
     ("a", ["shift", "control"], "Apps", "Gemini", app("Gemini")),
     ("n", ["shift"], "Apps", "Notion", app("Notion")),
-    ("n", ["control", "option"], "Apps", "Open or close the notch panel (Den Den)", sh("open -g denden://toggle")),
+    ("n", ["control", "option"], "Apps", "Open or close the notch panel (Iceberg)", sh("open -g iceberg://toggle")),
     ("t", ["shift"], "Apps", "Reminders (tasks)", app("Reminders")),
     ("g", ["shift"], "Apps", "WhatsApp", app("WhatsApp")),
     ("m", ["shift"], "Apps", "Spotify", app("Spotify")),

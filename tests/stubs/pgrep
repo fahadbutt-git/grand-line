@@ -1,0 +1,6 @@
+#!/bin/bash
+# The running processes are the names listed in the file $STUB_RUNNING, one per
+# line (none when unset). pgrep -x NAME succeeds when NAME is listed.
+echo "pgrep $*" >> "${STUB_LOG:-/dev/null}"
+name="${*: -1}"
+[[ -n "${STUB_RUNNING:-}" ]] && grep -qxF -- "$name" "$STUB_RUNNING" 2>/dev/null

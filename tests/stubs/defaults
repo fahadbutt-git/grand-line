@@ -1,3 +1,12 @@
 #!/bin/bash
 echo "defaults $*" >> "${STUB_LOG:-/dev/null}"
+# With STUB_DEFAULTS set, "export DOMAIN -" and "import DOMAIN -" read and write
+# a pretend domain there (STUB_DEFAULTS/DOMAIN.plist), so a test can check what
+# was copied. A domain never written exports as an empty one, as on a Mac.
+if [[ -n "${STUB_DEFAULTS:-}" && "${3:-}" == - ]]; then
+  case "$1" in
+    export) cat "$STUB_DEFAULTS/$2.plist" 2>/dev/null || printf '<plist version="1.0">\n<dict/>\n</plist>\n' ;;
+    import) mkdir -p "$STUB_DEFAULTS" && cat > "$STUB_DEFAULTS/$2.plist" ;;
+  esac
+fi
 exit 0

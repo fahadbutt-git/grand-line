@@ -37,7 +37,7 @@ enum NotchJourneys {
                 let texts = ctx.notchTexts()
                 try ctx.check(texts.contains("Journey"), "the Journey widget's title is missing; shown: \(texts)")
                 for off in ["Today", "Reminders"] {
-                    try ctx.check(!texts.contains(off), "\"\(off)\" shows although denden.toml leaves it out; shown: \(texts)")
+                    try ctx.check(!texts.contains(off), "\"\(off)\" shows although iceberg.toml leaves it out; shown: \(texts)")
                 }
             },
             step("close (scheme://close)") { ctx in

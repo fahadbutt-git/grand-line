@@ -40,7 +40,7 @@ public enum AppCatalog {
             accessory: "App",
             actions: [
                 LaunchAction("Open", symbol: "arrow.up.forward.app", .run(paths.command("focus-or-open"), arguments: [name])),
-                LaunchAction("Show in Log Pose", symbol: "folder", .reveal(path)),
+                LaunchAction("Show in Nexus", symbol: "folder", .reveal(path)),
                 LaunchAction("Copy path", symbol: "doc.on.clipboard", shortcut: KeyShortcut("c", shift: true), .copyText(path)),
                 LaunchAction("Quick Look", symbol: "eye", shortcut: KeyShortcut("y"), closesWindow: false, .quickLook(path)),
                 .favourite,

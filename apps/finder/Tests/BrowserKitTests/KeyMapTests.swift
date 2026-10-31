@@ -20,7 +20,7 @@ final class KeyMapTests: XCTestCase {
         XCTAssertEqual(KeyMap.command(for: Shortcut(.function(6))), .moveToNextPane)
     }
 
-    /// Log Pose's own tools sit on Control+Option, which Finder leaves free.
+    /// Nexus's own tools sit on Control+Option, which Finder leaves free.
     func testToolKeys() {
         XCTAssertEqual(KeyMap.command(for: Shortcut(.character("t"), [.control, .option])), .openTerminal)
         XCTAssertEqual(KeyMap.command(for: Shortcut(.character("a"), [.control, .option])), .openClaude)
@@ -28,7 +28,7 @@ final class KeyMapTests: XCTestCase {
         XCTAssertEqual(KeyMap.command(for: .command("c", .option)), .copyPath)
     }
 
-    /// The owner's rule: Log Pose never takes a Finder function away, so every
+    /// The owner's rule: Nexus never takes a Finder function away, so every
     /// Finder default shortcut means what it means in Finder.
     func testFinderShortcutsKeepTheirFinderMeaning() {
         func expect(_ shortcut: Shortcut, _ command: BrowserCommand) {

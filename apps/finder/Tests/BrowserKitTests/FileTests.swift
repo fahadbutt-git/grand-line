@@ -120,7 +120,7 @@ final class FileTests: XCTestCase {
     }
 
     func testSelectionFile() throws {
-        let file = SelectionFile(url: temp.url("state/logpose-selection"))
+        let file = SelectionFile(url: temp.url("state/nexus-selection"))
         let zip = URL(fileURLWithPath: "/Users/me/Data.zip")
         file.write([item("a.pdf"), item("b.pdf"), FileItem(url: zip.appendingPathComponent("x"), name: "x", isFolder: false, archiveEntry: "x")])
         XCTAssertEqual(file.read(), ["/Users/me/Documents/a.pdf", "/Users/me/Documents/b.pdf"])

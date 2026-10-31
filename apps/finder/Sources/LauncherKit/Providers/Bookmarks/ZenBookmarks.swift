@@ -61,7 +61,7 @@ public enum ZenBookmarks {
 
     /// Reads a copy of the database, with its write-ahead log, read-only.
     static func readRows(_ database: String, fileManager: FileManager) -> [Row] {
-        let copy = fileManager.temporaryDirectory.appendingPathComponent("byakugan-places-\(UUID().uuidString)")
+        let copy = fileManager.temporaryDirectory.appendingPathComponent("sight-places-\(UUID().uuidString)")
         defer {
             for suffix in ["", "-wal", "-shm"] { try? fileManager.removeItem(atPath: copy.path + suffix) }
         }

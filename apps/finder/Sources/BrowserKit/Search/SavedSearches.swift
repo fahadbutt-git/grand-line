@@ -1,7 +1,7 @@
 import Foundation
 
 /// Saved searches (R18), shown as smart folders in the sidebar and usable as
-/// `@name` in any query. One per line in ~/.config/grand-line/logpose/saved-searches.tsv:
+/// `@name` in any query. One per line in ~/.config/grand-line/nexus/saved-searches.tsv:
 /// name TAB query. Lines starting with # are comments.
 public struct SavedSearches: Equatable, Sendable {
     public private(set) var entries: [(name: String, query: String)]

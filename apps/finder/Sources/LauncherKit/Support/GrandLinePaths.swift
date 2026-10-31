@@ -20,14 +20,14 @@ public struct GrandLinePaths: Sendable, Equatable {
     public var userConfig: String { home + "/.config/grand-line" }
     public var menuLocal: String { userConfig + "/menu.local.tsv" }
     public var bindingsLocal: String { userConfig + "/bindings.local.tsv" }
-    public var savedSearches: String { userConfig + "/logpose/saved-searches.tsv" }
-    /// Byakugan's settings: aliases, quicklinks and external providers.
-    public var settings: String { userConfig + "/byakugan" }
+    public var savedSearches: String { userConfig + "/nexus/saved-searches.tsv" }
+    /// Sight's settings: aliases, quicklinks and external providers.
+    public var settings: String { userConfig + "/sight" }
     public var aliases: String { settings + "/aliases.tsv" }
     public var quicklinks: String { settings + "/quicklinks.tsv" }
     public var externalProviders: String { settings + "/providers.tsv" }
-    /// Byakugan's state: learned ranking, the name index and exchange rates.
-    public var state: String { home + "/Library/Application Support/Byakugan" }
+    /// Sight's state: learned ranking, the name index and exchange rates.
+    public var state: String { home + "/Library/Application Support/Sight" }
     public var usage: String { state + "/usage.json" }
     public var rates: String { state + "/exchange-rates.json" }
     public var index: String { state + "/names.index" }

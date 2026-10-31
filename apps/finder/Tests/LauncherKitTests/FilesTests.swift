@@ -26,7 +26,7 @@ final class FilesTests: XCTestCase {
         XCTAssertEqual(row.accessory, "today")
         XCTAssertEqual(row.match.highlights, [0..<3])
         let titles = row.actions.map(\.title)
-        XCTAssertEqual(Array(titles.prefix(3)), ["Open", "Show in Log Pose", "Quick Look"])
+        XCTAssertEqual(Array(titles.prefix(3)), ["Open", "Show in Nexus", "Quick Look"])
         XCTAssertTrue(titles.contains("Open with…"))
         XCTAssertTrue(titles.contains("Copy path"))
         XCTAssertTrue(titles.contains("Copy file"))
@@ -38,9 +38,9 @@ final class FilesTests: XCTestCase {
                        .run("/Users/me/.grand-line/bin/transcode", arguments: ["pdf", hit.path]))
     }
 
-    func testFoldersOpenInLogPose() {
+    func testFoldersOpenInNexus() {
         let row = FileResults.result(FileHit(path: "/Users/me/Drive", isFolder: true), paths: paths)
-        XCTAssertEqual(row.primary?.title, "Open in Log Pose")
+        XCTAssertEqual(row.primary?.title, "Open in Nexus")
         XCTAssertEqual(row.subtitle, "~")
         XCTAssertFalse(row.actions.contains { $0.title == "Open with…" })
         XCTAssertEqual(FileResults.transcodeModes("mov"), ["video"])
@@ -77,7 +77,7 @@ final class FilesTests: XCTestCase {
             unreadable: { ["/Users/me/Downloads", "/Users/me/Projects/app/secret", "/Users/me/Library/CloudStorage/GoogleDrive-me@example.com"] }
         )
         let rows = try await provider.results(for: LaunchQuery(raw: "conj"))
-        XCTAssertEqual(rows.map(\.title), ["Allow Byakugan to read Downloads", "Allow Byakugan to read Google Drive"])
+        XCTAssertEqual(rows.map(\.title), ["Allow Sight to read Downloads", "Allow Sight to read Google Drive"])
         XCTAssertEqual(rows.first?.primary?.command, .openURL(FileResults.filesAndFoldersPane, bundleID: nil))
         XCTAssertTrue(rows.allSatisfy(\.isFallback), "below every real match")
         let empty = try await provider.results(for: LaunchQuery(raw: ""))

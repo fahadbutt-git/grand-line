@@ -1,10 +1,10 @@
 import Foundation
 
 /// Titles, shortcuts and menus for every command, in menu order. Every Finder
-/// shortcut keeps its Finder meaning; Log Pose only adds keys Finder leaves
+/// shortcut keeps its Finder meaning; Nexus only adds keys Finder leaves
 /// free. Return opens as well as Cmd+O and F2 renames (R4), Cmd+Shift+G opens
 /// the editable path bar with fuzzy folder search (Finder's Go to Folder, R5),
-/// and Log Pose's own tools sit on Control+Option (Ghostty, Claude Code and
+/// and Nexus's own tools sit on Control+Option (Ghostty, Claude Code and
 /// transcoding, R31, R33), which Finder does not use.
 public enum CommandCatalog {
     public static let all: [CommandSpec] = file + edit + view + go + panes + tools
@@ -28,7 +28,7 @@ public enum CommandCatalog {
 
     private static func cmd(_ key: String, _ extra: Shortcut.Modifiers = []) -> Shortcut { .command(key, extra) }
 
-    /// Control+Option, the layer Finder leaves free, for Log Pose's own tools.
+    /// Control+Option, the layer Finder leaves free, for Nexus's own tools.
     /// (Control+Shift+Command+3 and 4 are taken by macOS for screenshots.)
     private static func tool(_ key: String) -> Shortcut { Shortcut(.character(key), [.control, .option]) }
 

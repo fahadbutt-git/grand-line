@@ -1,0 +1,10 @@
+#!/bin/bash
+# Stops NAME: takes it out of the file $STUB_RUNNING (see the pgrep stub).
+echo "pkill $*" >> "${STUB_LOG:-/dev/null}"
+name="${*: -1}"
+if [[ -n "${STUB_RUNNING:-}" && -f "$STUB_RUNNING" ]] && grep -qxF -- "$name" "$STUB_RUNNING"; then
+  grep -vxF -- "$name" "$STUB_RUNNING" > "$STUB_RUNNING.new"
+  mv "$STUB_RUNNING.new" "$STUB_RUNNING"
+  exit 0
+fi
+exit 1

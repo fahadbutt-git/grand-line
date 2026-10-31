@@ -83,7 +83,7 @@ final class SidebarTests: XCTestCase {
 
     func testAddToSidebarAppendsToPlacesOnce() {
         let defaults = SidebarBuilder.defaultPlaces(home: home, drives: [])
-        let added = LogPoseSettings().addingPlace(home.appendingPathComponent("Developer"), current: defaults, home: home)
+        let added = NexusSettings().addingPlace(home.appendingPathComponent("Developer"), current: defaults, home: home)
         XCTAssertEqual(added.places, ["/Applications", "~/Desktop", "~/Documents", "~/Downloads", "~", "~/Developer"])
         let again = added.addingPlace(home.appendingPathComponent("Developer"), current: added.placeURLs(home: home) ?? [], home: home)
         XCTAssertEqual(again, added, "a folder already there is not added twice")
@@ -97,11 +97,11 @@ final class SidebarTests: XCTestCase {
         let groups = SidebarBuilder.build(input)
         let desktop = groups[0].items.first { $0.title == "Desktop" }!
         XCTAssertEqual(desktop.removal, .remove)
-        XCTAssertEqual(groups[1].items[0].removal, .hide, "a saved search is hidden, so @name keeps working in Byakugan")
+        XCTAssertEqual(groups[1].items[0].removal, .hide, "a saved search is hidden, so @name keeps working in Sight")
         XCTAssertEqual(groups[0].items[0].removal, .hide, "Recents is built in, so it is hidden")
         XCTAssertEqual(groups.last!.items[0].removal, .hide)
 
-        let removed = LogPoseSettings().removingPlace(desktop.folder!, current: input.places, home: home)
+        let removed = NexusSettings().removingPlace(desktop.folder!, current: input.places, home: home)
         XCTAssertEqual(removed.places, ["/Applications", "~/Documents", "~/Downloads", "~"])
 
         var hidden = SidebarHidden()
@@ -116,11 +116,11 @@ final class SidebarTests: XCTestCase {
     }
 
     func testActiveProjectsFromSettings() {
-        let settings = LogPoseSettings(projectFolders: ["~/Drive/Projects/Active"], projects: ["~/Developer/cornea-app"])
+        let settings = NexusSettings(projectFolders: ["~/Drive/Projects/Active"], projects: ["~/Developer/cornea-app"])
         let children: (URL) -> [String] = { _ in ["Glaucoma review", ".hidden", "Cornea model"] }
         let projects = settings.projectURLs(home: home, children: children)
         XCTAssertEqual(projects.map(\.lastPathComponent), ["cornea-app", "Cornea model", "Glaucoma review"])
-        XCTAssertNil(LogPoseSettings().placeURLs(home: home))
-        XCTAssertEqual(LogPoseSettings(places: ["~/Downloads"]).placeURLs(home: home)?.first?.path, "/Users/me/Downloads")
+        XCTAssertNil(NexusSettings().placeURLs(home: home))
+        XCTAssertEqual(NexusSettings(places: ["~/Downloads"]).placeURLs(home: home)?.first?.path, "/Users/me/Downloads")
     }
 }

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Log Pose's own list of recently opened items, newest first, one entry per path.
+/// Nexus's own list of recently opened items, newest first, one entry per path.
 /// Kept as JSON in Application Support, so it does not depend on Spotlight.
 public actor Recents {
     public struct Item: Codable, Sendable, Equatable {
@@ -17,7 +17,7 @@ public actor Recents {
     public static var defaultFile: URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
-        return support.appendingPathComponent("Log Pose/recents.json")
+        return support.appendingPathComponent("Nexus/recents.json")
     }
 
     public init(file: URL = Recents.defaultFile, limit: Int = 500) {

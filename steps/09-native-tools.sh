@@ -26,5 +26,16 @@ step_native_tools() {
   # shellcheck source=lib/native-apps.sh
   source "$REPO_DIR/lib/native-apps.sh"
   build_native_apps || failed=1
+  # The apps were renamed. Their files move to the new names right after the
+  # new apps are installed and before anything starts them, so the first launch
+  # finds its settings and index. Every run, so a Mac whose build failed catches
+  # up later; once done it changes nothing.
+  local rename="$REPO_DIR/migrations/1793472900-rename-apps.sh"
+  if [[ "$DRY_RUN" == 1 ]]; then
+    run "carry the renamed apps' settings and index over ($(basename "$rename"))"
+  elif ! GRAND_LINE_REPO="$REPO_DIR" GRAND_LINE_APPS_DEST="$APPS_DEST" /bin/bash "$rename" </dev/null; then
+    warn "Some of the renamed apps' files could not be moved. Setup tries again next run."
+    failed=1
+  fi
   return "$failed"
 }

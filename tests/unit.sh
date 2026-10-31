@@ -379,7 +379,7 @@ flag docker off
 echo forest > "$HOME/.local/state/grand-line/theme"
 theme_is forest && ! theme_is nord && t_ok "theme_is matches only the current theme" || t_fail "theme_is"
 
-# --- toggle: explicit on and off, new settings, and the status Byakugan reads
+# --- toggle: explicit on and off, new settings, and the status Sight reads
 T="$ROOT/bin/toggle"
 : > "$STUB_LOG"; WIFI_POWER=On "$T" wifi off
 grep -q "networksetup -setairportpower en0 off" "$STUB_LOG" && t_ok "toggle wifi off turns Wi-Fi off on the cached device" || t_fail "toggle wifi off" "$(cat "$STUB_LOG")"
@@ -486,28 +486,103 @@ printf '#!/bin/bash\necho "codesign $*" >> "$STUB_LOG"\n' > "$tmp/bin-apps/codes
   [[ -f "$fw/Versions/A/DemoKit" && -L "$fw/DemoKit" ]] && grep -q "com.example.demo.DemoKit" "$fw/Versions/A/Resources/Info.plist" || exit 10
 ) && t_ok "own apps are built, bundled, signed, rebuilt only on change, old copy trashed" || t_fail "native apps (step $?)"
 
-# --- Log Pose and Byakugan take over Finder and Spotlight, and switch back
+# --- Nexus and Sight take over Finder and Spotlight, and switch back
 (
   export GRAND_LINE_APPS_DEST="$tmp/Applications" GRAND_LINE_STATE="$HOME/.local/state/grand-line"
-  mkdir -p "$tmp/Applications/Log Pose.app" "$tmp/Applications/Byakugan.app"
+  mkdir -p "$tmp/Applications/Nexus.app" "$tmp/Applications/Sight.app"
   source "$ROOT/lib/default-apps.sh"; source "$ROOT/lib/takeover.sh"; source "$ROOT/lib/toggle-state.sh"
   [[ "$(takeover_mode files)" == on && "$(takeover_mode search)" == on ]] || exit 1   # on by default
   : > "$STUB_LOG"; takeover_files on
-  grep -q "defaults write -g NSFileViewer -string com.grandline.logpose" "$STUB_LOG" && grep -q "public.folder.*com.grandline.logpose" "$STUB_LOG" || exit 2
+  grep -q "defaults write -g NSFileViewer -string com.grandline.nexus" "$STUB_LOG" && grep -q "public.folder.*com.grandline.nexus" "$STUB_LOG" || exit 2
   : > "$STUB_LOG"; takeover_files off
   grep -q "defaults delete -g NSFileViewer" "$STUB_LOG" && grep -q "public.folder.*com.apple.finder" "$STUB_LOG" || exit 3
   ! is_on files || exit 4
   : > "$STUB_LOG"; takeover_search on
-  grep -q "AppleSymbolicHotKeys -dict-add 64 <dict><key>enabled</key><false/>" "$STUB_LOG" && grep -q "com.grandline.byakugan TakesCommandSpace -bool true" "$STUB_LOG" || exit 5
+  grep -q "AppleSymbolicHotKeys -dict-add 64 <dict><key>enabled</key><false/>" "$STUB_LOG" && grep -q "com.grandline.sight TakesCommandSpace -bool true" "$STUB_LOG" || exit 5
   : > "$STUB_LOG"; takeover_search off
   grep -q "<key>enabled</key><true/>" "$STUB_LOG" && grep -q "TakesCommandSpace -bool false" "$STUB_LOG" || exit 6
-  rmdir "$tmp/Applications/Log Pose.app"; ! takeover_files on || exit 7   # nothing to switch to
-) && t_ok "Log Pose and Byakugan take over Finder and Spotlight by default, and switch back" || t_fail "takeover (step $?)"
+  rmdir "$tmp/Applications/Nexus.app"; ! takeover_files on || exit 7   # nothing to switch to
+) && t_ok "Nexus and Sight take over Finder and Spotlight by default, and switch back" || t_fail "takeover (step $?)"
 
-# --- the selection comes from Log Pose when it is in front
-mkdir -p "$HOME/.local/state/grand-line"; printf '/Users/me/a.pdf\n/Users/me/b c.pdf\n' > "$HOME/.local/state/grand-line/logpose-selection"
-got="$(FRONT_APP=com.grandline.logpose bash -c 'source "$1/lib/bin-common.sh"; finder_selection' _ "$ROOT")"
-[[ "$got" == $'/Users/me/a.pdf\n/Users/me/b c.pdf' ]] && t_ok "the selection comes from Log Pose when it is in front" || t_fail "Log Pose selection" "$got"
+# --- the selection comes from Nexus when it is in front
+mkdir -p "$HOME/.local/state/grand-line"; printf '/Users/me/a.pdf\n/Users/me/b c.pdf\n' > "$HOME/.local/state/grand-line/nexus-selection"
+got="$(FRONT_APP=com.grandline.nexus bash -c 'source "$1/lib/bin-common.sh"; finder_selection' _ "$ROOT")"
+[[ "$got" == $'/Users/me/a.pdf\n/Users/me/b c.pdf' ]] && t_ok "the selection comes from Nexus when it is in front" || t_fail "Nexus selection" "$got"
+
+# --- the rename: Log Pose, Byakugan and Den Den become Nexus, Sight and Iceberg
+rn="$tmp/rename"
+rename_env() {
+  export HOME="$rn/$1" GRAND_LINE_APPS_DEST="$rn/$1/Applications" STUB_DEFAULTS="$rn/$1/defaults" STUB_RUNNING="$rn/$1/running"
+  mkdir -p "$HOME" "$GRAND_LINE_APPS_DEST"
+}
+rename_run() { GRAND_LINE_REPO="$ROOT" bash "$ROOT/migrations/1793472900-rename-apps.sh" > "$rn/out" 2>&1; }
+# logged CMD: the stub log has CMD, allowing a moment for background launches.
+logged() { local _; for _ in 1 2 3 4 5 6 7 8 9 10; do grep -qF -- "$1" "$STUB_LOG" && return 0; sleep 0.2; done; return 1; }
+(
+  rename_env fresh
+  mkdir -p "$GRAND_LINE_APPS_DEST/Nexus.app" "$GRAND_LINE_APPS_DEST/Sight.app" "$GRAND_LINE_APPS_DEST/Iceberg.app"
+  : > "$STUB_LOG"; rename_run || exit 1
+  [[ -z "$(find "$HOME" -mindepth 1 -not -path "$HOME/Applications*" -not -path "$HOME/.local*" -print)" ]] || exit 2
+  [[ -z "$(find "$HOME/.local" -type f 2>/dev/null)" && ! -d "$STUB_DEFAULTS" ]] || exit 3
+  grep -qE '^(defaults (write|import|delete)|pkill|open) ' "$STUB_LOG" && exit 4
+  [[ ! -s "$rn/out" ]] || exit 5
+  exit 0
+) && t_ok "rename migration: a fresh install has nothing to move and nothing changes" || t_fail "rename migration on a fresh install (step $?)" "$(cat "$rn/out" 2>/dev/null)"
+(
+  rename_env old
+  A="$GRAND_LINE_APPS_DEST"; sup="$HOME/Library/Application Support"; cfg="$HOME/.config/grand-line"; st="$HOME/.local/state/grand-line"
+  for app in Nexus Sight Iceberg "Log Pose" Byakugan "Den Den"; do mkdir -p "$A/$app.app/Contents"; done
+  printf 'LogPose\nByakugan\nDenDen\n' > "$STUB_RUNNING"
+  mkdir -p "$sup/Log Pose/Workspaces" "$sup/Byakugan" "$sup/Den Den" "$cfg/logpose" "$cfg/byakugan" "$cfg/denden/widgets" "$st" "$HOME/Library/Logs/grand-line" "$STUB_DEFAULTS"
+  echo index > "$sup/Log Pose/name-index.snapshot"; echo names > "$sup/Byakugan/names.index"; echo usage > "$sup/Byakugan/usage.json"
+  echo '{"places":["~/Drive"]}' > "$cfg/logpose/settings.json"; printf 'g\tgoogle\n' > "$cfg/byakugan/aliases.tsv"
+  printf '# mine\nopen_on = "click"\n' > "$cfg/denden/denden.toml"
+  printf 'command = "echo $GRAND_LINE_DENDEN_THEME"\n' > "$cfg/denden/widgets/theme.toml"
+  printf '/Users/me/a.pdf\n' > "$st/logpose-selection"; echo off > "$st/takeover-files"
+  echo log > "$HOME/Library/Logs/grand-line/denden.log"
+  printf '<dict>\n<key>CloseAfterSettingChange</key><true/>\n<key>TakesCommandSpace</key><true/>\n</dict>\n' > "$STUB_DEFAULTS/com.grandline.byakugan.plist"
+  printf '<dict>\n<key>NSWindow Frame LogPoseBrowser</key><string>0 0 800 600</string>\n</dict>\n' > "$STUB_DEFAULTS/com.grandline.logpose.plist"
+  # setup already gave Sight its takeover setting, which must not stop the copy
+  printf '<dict>\n<key>TakesCommandSpace</key><true/>\n</dict>\n' > "$STUB_DEFAULTS/com.grandline.sight.plist"
+  : > "$STUB_LOG"; rename_run || exit 1
+  for app in "Log Pose" Byakugan "Den Den"; do [[ ! -e "$A/$app.app" && -d "$HOME/.Trash/$app.app" ]] || exit 2; done
+  [[ -d "$A/Nexus.app" && -d "$A/Sight.app" && -d "$A/Iceberg.app" ]] || exit 3
+  [[ "$(cat "$sup/Nexus/name-index.snapshot")" == index && -d "$sup/Nexus/Workspaces" && ! -e "$sup/Log Pose" ]] || exit 4
+  [[ "$(cat "$sup/Sight/names.index")" == names && -f "$sup/Sight/usage.json" && ! -e "$sup/Byakugan" && -d "$sup/Iceberg" ]] || exit 5
+  [[ -f "$cfg/nexus/settings.json" && -f "$cfg/sight/aliases.tsv" && ! -e "$cfg/logpose" && ! -e "$cfg/byakugan" ]] || exit 6
+  [[ "$(head -1 "$cfg/iceberg/iceberg.toml")" == "# mine" && ! -e "$cfg/iceberg/denden.toml" && -f "$cfg/iceberg/widgets/theme.toml" && ! -e "$cfg/denden" ]] || exit 7
+  [[ -f "$st/nexus-selection" && ! -e "$st/logpose-selection" && -f "$HOME/Library/Logs/grand-line/iceberg.log" ]] || exit 8
+  grep -q CloseAfterSettingChange "$STUB_DEFAULTS/com.grandline.sight.plist" || exit 9
+  grep -q 'NSWindow Frame NexusBrowser' "$STUB_DEFAULTS/com.grandline.nexus.plist" && ! grep -q LogPoseBrowser "$STUB_DEFAULTS/com.grandline.nexus.plist" || exit 10
+  grep -qF "defaults write com.grandline.byakugan TakesCommandSpace -bool false" "$STUB_LOG" || exit 11
+  [[ ! -s "$STUB_RUNNING" ]] && grep -qF "pkill -x DenDen" "$STUB_LOG" || exit 12     # the old apps were stopped first
+  # files stay with Finder as chosen; Command + Space goes to Sight
+  grep -qF "defaults delete -g NSFileViewer" "$STUB_LOG" && grep -q "public.folder.*com.apple.finder" "$STUB_LOG" && [[ "$(cat "$st/takeover-files")" == off ]] || exit 13
+  grep -qF "defaults write com.grandline.sight TakesCommandSpace -bool true" "$STUB_LOG" || exit 14
+  grep -q "zen" "$STUB_LOG" && exit 15                                                  # the default browser is left alone
+  logged "open -g -b com.grandline.iceberg" && logged "open -g -b com.grandline.nexus" && logged "open -g -b com.grandline.sight" || exit 16
+  grep -q "widgets/theme.toml" "$rn/out" && grep -q "Login Items still lists Log Pose, Byakugan, Den Den" "$rn/out" || exit 17
+  # Again: nothing left to do, so nothing changes
+  : > "$STUB_LOG"; trash="$(ls "$HOME/.Trash" | wc -l)"; rename_run || exit 18
+  grep -qE '^(defaults (write|import|delete)|pkill|open|mv) ' "$STUB_LOG" && exit 19
+  [[ "$(ls "$HOME/.Trash" | wc -l)" == "$trash" && "$(cat "$sup/Sight/names.index")" == names && ! -s "$rn/out" ]] || exit 20
+  exit 0
+) && t_ok "rename migration: settings, index and state move to the new apps, old apps go to the Trash, takeovers follow, and a second run changes nothing" \
+  || t_fail "rename migration on an existing Mac (step $?)" "$(cat "$rn/out" 2>/dev/null)"
+(
+  rename_env waiting
+  A="$GRAND_LINE_APPS_DEST"; sup="$HOME/Library/Application Support"; cfg="$HOME/.config/grand-line"
+  mkdir -p "$A/Log Pose.app" "$A/Den Den.app" "$A/Iceberg.app" "$sup/Log Pose" "$cfg/denden" "$cfg/iceberg"
+  echo keep > "$cfg/denden/denden.toml"
+  : > "$STUB_LOG"; rename_run || exit 1
+  [[ -d "$A/Log Pose.app" && -d "$sup/Log Pose" && ! -e "$sup/Nexus" ]] || exit 2       # no Nexus yet: Log Pose stays
+  grep -q "Nexus is not installed yet" "$rn/out" || exit 3
+  grep -qF "NSFileViewer" "$STUB_LOG" && exit 4
+  [[ -f "$cfg/denden/denden.toml" && ! -e "$cfg/iceberg/iceberg.toml" ]] || exit 5      # an existing new folder is never overwritten
+  grep -q "Kept both" "$rn/out" || exit 6
+  exit 0
+) && t_ok "rename migration: an old app stays until its replacement is installed, and new folders are never overwritten" \
+  || t_fail "rename migration with a missing new app (step $?)" "$(cat "$rn/out" 2>/dev/null)"
 
 # --- the default browser: links, https and web pages, written for LaunchServices
 (

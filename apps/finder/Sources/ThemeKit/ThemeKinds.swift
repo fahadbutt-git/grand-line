@@ -1,6 +1,6 @@
 import Foundation
 
-/// The kinds of file Log Pose and Byakugan colour, and the KIND_* theme key of each.
+/// The kinds of file Nexus and Sight colour, and the KIND_* theme key of each.
 public enum FileKindName: String, Sendable, CaseIterable {
     case folder, document, pdf, presentation, spreadsheet, image, video, code, archive, text
 

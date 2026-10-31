@@ -1,6 +1,6 @@
 import Foundation
 
-/// What Byakugan learns from what you pick: a decaying score per result, a
+/// What Sight learns from what you pick: a decaying score per result, a
 /// decaying score per result for each query you picked it from, the rows to
 /// show as recents, and your favourites. Saved as JSON in Application Support.
 public final class UsageStore: @unchecked Sendable {

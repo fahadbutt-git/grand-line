@@ -1,6 +1,6 @@
 name: Apps download
 
-# Builds Log Pose, Byakugan and Den Den exactly as setup does and publishes
+# Builds Nexus, Sight and Iceberg exactly as setup does and publishes
 # them as a download on the run's page (signed-in GitHub users only), so
 # they can be tried on any Mac without running setup.
 on:

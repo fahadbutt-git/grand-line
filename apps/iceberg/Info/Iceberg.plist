@@ -1,0 +1,14 @@
+<key>NSCalendarsUsageDescription</key><string>Iceberg shows today's events in the notch.</string>
+<key>NSCalendarsFullAccessUsageDescription</key><string>Iceberg shows today's events in the notch.</string>
+<key>NSRemindersUsageDescription</key><string>Iceberg shows reminders due today and lets you tick them off.</string>
+<key>NSRemindersFullAccessUsageDescription</key><string>Iceberg shows reminders due today and lets you tick them off.</string>
+<key>NSAppleEventsUsageDescription</key><string>Iceberg sends play, pause and skip to Spotify or Music when the system media controls are unavailable.</string>
+<key>NSSupportsAutomaticTermination</key><false/>
+<key>CFBundleURLTypes</key>
+<array>
+  <dict>
+    <key>CFBundleURLName</key><string>com.grandline.iceberg</string>
+    <key>CFBundleURLSchemes</key><array><string>iceberg</string><string>denden</string></array>
+  </dict>
+</array>
+<key>CFBundleIconFile</key><string>AppIcon</string>

@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# Builds the package's own apps (Log Pose, Byakugan, Den Den) from apps/*/
+# Builds the package's own apps (Nexus, Sight, Iceberg) from apps/*/
 # and installs each one in /Applications.
 #
 # Each app folder holds a Swift package and an apps.tsv naming what it makes:

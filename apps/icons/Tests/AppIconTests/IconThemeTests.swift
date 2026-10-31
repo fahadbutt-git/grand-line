@@ -20,7 +20,7 @@ final class IconThemeTests: XCTestCase {
     func testThemeWithoutIconKeysFallsBack() {
         let theme = IconTheme(values: ["MODE": "dark", "TERM_BG": "202020", "TERM_FG": "dddddd", "ACCENT_HEX": "ff9f0a"])
         XCTAssertEqual(theme.style, .line)
-        let p = theme.palette(for: .logPose)
+        let p = theme.palette(for: .nexus)
         XCTAssertEqual(p.tile.hex, "202020")
         XCTAssertEqual(p.ink.hex, "dddddd")
         XCTAssertEqual(p.accent.hex, "ff9f0a")
@@ -28,34 +28,34 @@ final class IconThemeTests: XCTestCase {
     }
 
     func testEmptyThemeStillDraws() {
-        let p = IconTheme(values: [:]).palette(for: .denDen)
+        let p = IconTheme(values: [:]).palette(for: .iceberg)
         XCTAssertEqual(p.tile.hex, "1c1c1e")
         XCTAssertEqual(p.accent, IconTheme.fallbackAccent)
     }
 
     func testLightThemeKeepsADarkTileUnlessTold() {
         let light = IconTheme(values: ["MODE": "light", "TERM_BG": "ffffff", "TERM_FG": "1d1d1f", "ACCENT_HEX": "0a6cd6"])
-        XCTAssertEqual(light.palette(for: .byakugan).tile.hex, "1c1c1e")
+        XCTAssertEqual(light.palette(for: .sight).tile.hex, "1c1c1e")
         let white = IconTheme(values: ["MODE": "light", "ICON_TILE": "ffffff", "ICON_INK": "1d1d1f"])
-        XCTAssertEqual(white.palette(for: .byakugan).tile.hex, "ffffff")
-        XCTAssertEqual(white.palette(for: .byakugan).shade.hex, "1d1d1f")
-        XCTAssertGreaterThan(white.palette(for: .denDen).ice.luminance, 0.2, "the peak is light on a white tile")
+        XCTAssertEqual(white.palette(for: .sight).tile.hex, "ffffff")
+        XCTAssertEqual(white.palette(for: .sight).shade.hex, "1d1d1f")
+        XCTAssertGreaterThan(white.palette(for: .iceberg).ice.luminance, 0.2, "the peak is light on a white tile")
     }
 
     func testPerAppColoursFallBackToTheAccent() {
         let theme = IconTheme(values: ["ICON_ACCENT": "111111", "ICON_SEARCH": "ff0000"])
-        XCTAssertEqual(theme.appColor(.byakugan).hex, "ff0000")
-        XCTAssertEqual(theme.appColor(.logPose).hex, "111111")
-        XCTAssertEqual(theme.appColor(.denDen).hex, "111111")
-        XCTAssertEqual(IconTheme(values: ["HIGHLIGHT": "222222"]).appColor(.logPose).hex, "222222")
+        XCTAssertEqual(theme.appColor(.sight).hex, "ff0000")
+        XCTAssertEqual(theme.appColor(.nexus).hex, "111111")
+        XCTAssertEqual(theme.appColor(.iceberg).hex, "111111")
+        XCTAssertEqual(IconTheme(values: ["HIGHLIGHT": "222222"]).appColor(.nexus).hex, "222222")
     }
 
     func testStyles() {
         let base = ["ICON_FILES": "2cc6b4", "ICON_INK": "101010"]
-        let solid = IconTheme(values: base.merging(["ICON_STYLE": "solid"]) { $1 }).palette(for: .logPose)
+        let solid = IconTheme(values: base.merging(["ICON_STYLE": "solid"]) { $1 }).palette(for: .nexus)
         XCTAssertEqual(solid.tile.hex, "2cc6b4")
         XCTAssertEqual(solid.ink.hex, "101010")
-        let mono = IconTheme(values: base.merging(["ICON_STYLE": "MONO"]) { $1 }).palette(for: .logPose)
+        let mono = IconTheme(values: base.merging(["ICON_STYLE": "MONO"]) { $1 }).palette(for: .nexus)
         XCTAssertEqual(mono.tile.hex, "000000")
         XCTAssertEqual(mono.ink.hex, "2cc6b4")
         XCTAssertEqual(IconTheme(values: ["ICON_STYLE": "sparkly"]).style, .line)
@@ -64,7 +64,7 @@ final class IconThemeTests: XCTestCase {
     func testBadHexIsIgnored() {
         let theme = IconTheme(values: ["ICON_TILE": "nope", "ICON_FILES": "12345"])
         XCTAssertEqual(theme.tile, nil)
-        XCTAssertEqual(theme.apps[.logPose], nil)
+        XCTAssertEqual(theme.apps[.nexus], nil)
     }
 
     func testBundledColoursAreGraphite() throws {
@@ -103,6 +103,6 @@ final class IconThemeTests: XCTestCase {
                 XCTAssertTrue(m.values.allSatisfy { $0 >= 0 && $0 <= 1024 || m.kind == .arc }, "\(glyph) \(m)")
             }
         }
-        XCTAssertLessThan(IconGlyph.byakugan.marks(pixels: 32).count, IconGlyph.byakugan.marks(pixels: 1024).count)
+        XCTAssertLessThan(IconGlyph.sight.marks(pixels: 32).count, IconGlyph.sight.marks(pixels: 1024).count)
     }
 }
