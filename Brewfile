@@ -81,6 +81,7 @@ cask "discord"
 # opens every archive itself (decompress in the terminal), so no separate
 # converter or archive apps.
 cask "iina"                 # plays every video format; FilmCraft is for editing
+cask "finetune"             # volume and mute for each app separately (macOS has none)
 
 # Privacy and the homelab
 cask "protonvpn"            # free VPN with no data cap; open-source, audited apps

@@ -116,6 +116,7 @@ BINDINGS += [
     # System controls
     ("a", ["control"], "System", "Audio output menu", cmd("audio")),
     ("m", ["control"], "System", "Next audio output", cmd("audio next")),
+    ("v", ["control", "option"], "System", "Volume for each app (FineTune)", app("FineTune")),
     ("b", ["control"], "System", "Bluetooth menu", cmd("bluetooth")),
     ("w", ["control"], "System", "Wi-Fi settings", sh("open 'x-apple.systempreferences:com.apple.wifi-settings-extension'")),
     ("s", ["control"], "System", "Share with AirDrop", sh("open -a AirDrop")),

@@ -78,6 +78,7 @@ Caps + Shift + P	Web apps	PubMed	$HOME/.mac-setup/bin/webapp 'https://pubmed.ncb
 Caps + Shift + Y	Web apps	YouTube	$HOME/.mac-setup/bin/webapp 'https://www.youtube.com'
 Caps + Ctrl + A	System	Audio output menu	$HOME/.mac-setup/bin/audio
 Caps + Ctrl + M	System	Next audio output	$HOME/.mac-setup/bin/audio next
+Caps + Ctrl + Option + V	System	Volume for each app (FineTune)	open -a 'FineTune'
 Caps + Ctrl + B	System	Bluetooth menu	$HOME/.mac-setup/bin/bluetooth
 Caps + Ctrl + W	System	Wi-Fi settings	open 'x-apple.systempreferences:com.apple.wifi-settings-extension'
 Caps + Ctrl + S	System	Share with AirDrop	open -a AirDrop

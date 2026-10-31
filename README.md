@@ -155,6 +155,7 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + Shift + Y | YouTube |
 | Caps + Ctrl + A | Audio output menu |
 | Caps + Ctrl + M | Next audio output |
+| Caps + Ctrl + Option + V | Volume for each app (FineTune) |
 | Caps + Ctrl + B | Bluetooth menu |
 | Caps + Ctrl + W | Wi-Fi settings |
 | Caps + Ctrl + S | Share with AirDrop |
