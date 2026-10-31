@@ -46,7 +46,7 @@ if.app-id = 'org.p0deje.Maccy'
 run = 'layout floating'
 
 [[on-window-detected]]
-if.app-id = 'theboringteam.boringnotch'
+if.app-id = 'com.grandline.denden'
 run = 'layout floating'
 
 [[on-window-detected]]

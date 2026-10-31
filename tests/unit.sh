@@ -399,8 +399,10 @@ echo icon > "$apps_root/apps/demo/Resources/Demo/AppIcon.icns"
 cat > "$tmp/bin-apps/swift" <<'EOF'
 #!/bin/bash
 echo "swift $*" >> "$STUB_LOG"
-dir="${@: -1}"; mkdir -p "$dir/.build/release"
+args="$*"; pp="${args#*--package-path }"; dir="${pp%% *}"; mkdir -p "$dir/.build/release"
 printf '#!/bin/sh\necho built\n' > "$dir/.build/release/Demo"; chmod +x "$dir/.build/release/Demo"
+[[ "$args" == *"--product DemoLib"* ]] && echo lib > "$dir/.build/release/libDemoLib.dylib"
+exit 0
 EOF
 printf '#!/bin/bash\necho "codesign $*" >> "$STUB_LOG"\n' > "$tmp/bin-apps/codesign"; chmod +x "$tmp/bin-apps/"*
 (
@@ -416,6 +418,11 @@ printf '#!/bin/bash\necho "codesign $*" >> "$STUB_LOG"\n' > "$tmp/bin-apps/codes
   sleep 1; touch "$apps_root/apps/demo/Sources/main.swift"; build_native_apps >/dev/null 2>&1
   compgen -G "$HOME/.Trash/Demo App*" >/dev/null || exit 6  # the old copy went to the Trash
   [[ -x "$app/Contents/MacOS/Demo" ]] || exit 7
+  sleep 1; printf 'DemoLib\tDemoKit\n' > "$apps_root/apps/demo/frameworks.tsv"; : > "$STUB_LOG"
+  build_native_apps >/dev/null 2>&1 || exit 8
+  grep -q -- "--product DemoLib" "$STUB_LOG" || exit 9
+  fw="$app/Contents/Frameworks/DemoKit.framework"
+  [[ -f "$fw/Versions/A/DemoKit" && -L "$fw/DemoKit" ]] && grep -q "com.example.demo.DemoKit" "$fw/Versions/A/Resources/Info.plist" || exit 10
 ) && t_ok "own apps are built, bundled, signed, rebuilt only on change, old copy trashed" || t_fail "native apps (step $?)"
 
 # --- Log Pose and Byakugan take over Finder and Spotlight, and switch back

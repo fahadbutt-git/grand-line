@@ -106,6 +106,7 @@ BINDINGS += [
     ("a", ["shift", "option"], "Apps", "ChatGPT", app("ChatGPT")),
     ("a", ["shift", "control"], "Apps", "Gemini", app("Gemini")),
     ("n", ["shift"], "Apps", "Notion", app("Notion")),
+    ("n", ["control", "option"], "Apps", "Open or close the notch panel (Den Den)", sh("open -g denden://toggle")),
     ("t", ["shift"], "Apps", "Reminders (tasks)", app("Reminders")),
     ("g", ["shift"], "Apps", "WhatsApp", app("WhatsApp")),
     ("m", ["shift"], "Apps", "Spotify", app("Spotify")),

@@ -154,6 +154,7 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + Option + Shift + A | ChatGPT |
 | Caps + Ctrl + Shift + A | Gemini |
 | Caps + Shift + N | Notion |
+| Caps + Ctrl + Option + N | Open or close the notch panel (Den Den) |
 | Caps + Shift + T | Reminders (tasks) |
 | Caps + Shift + G | WhatsApp |
 | Caps + Shift + M | Spotify |
@@ -266,7 +267,7 @@ After setup on any Mac, `bash ~/grand-line/tests/verify-install.sh` checks every
 
 ## What runs in the background
 
-Kept deliberately small: Karabiner-Elements (keyboard), AeroSpace (windows), Maccy (clipboard), Espanso (text shortcuts), Handy (waits for the dictation key), FineTune (per-app volume), Boring Notch (music, calendar and reminders in the notch) and Google Drive. Docker, local AI (Ollama) and the VPNs run only while you turn them on. Shortcut commands start, act and exit, and long jobs (video compression, keep-awake, app installs) run on their own so they never block the keyboard. The Downloads sorter is not a running process: macOS starts it at low priority when Downloads changes, and once an hour for the age rules. Nothing in the package indexes. The checklist shows how to stop other apps opening at login.
+Kept deliberately small: Karabiner-Elements (keyboard), AeroSpace (windows), Maccy (clipboard), Espanso (text shortcuts), Handy (waits for the dictation key), FineTune (per-app volume), Den Den (music, calendar, reminders and your own widgets in the notch) and Google Drive. Docker, local AI (Ollama) and the VPNs run only while you turn them on. Shortcut commands start, act and exit, and long jobs (video compression, keep-awake, app installs) run on their own so they never block the keyboard. The Downloads sorter is not a running process: macOS starts it at low priority when Downloads changes, and once an hour for the age rules. Nothing in the package indexes. The checklist shows how to stop other apps opening at login.
 
 ## Security
 

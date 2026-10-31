@@ -4,7 +4,6 @@
 # macOS (avconvert, sips, tools/pdfshrink.swift), so no extra libraries.
 
 tap "nikitabobko/tap"
-tap "TheBoredTeam/boring-notch"
 
 # Command line tools (git, Swift and jq come with macOS and its command line tools)
 brew "gh"               # GitHub, for keeping this package in sync
@@ -98,7 +97,6 @@ brew "wakeonlan"        # wake the NAS or a server from sleep
 cask "google-chrome"
 cask "ghostty"
 cask "spotify"
-cask "TheBoredTeam/boring-notch/boring-notch"  # the notch: music controls, calendar, reminders
 
 # Keyboard, windows and clipboard
 cask "karabiner-elements"

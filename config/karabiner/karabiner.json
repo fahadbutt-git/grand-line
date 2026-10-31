@@ -496,6 +496,30 @@
          }
         ],
         "from": {
+         "key_code": "n",
+         "modifiers": {
+          "mandatory": [
+           "control",
+           "option"
+          ]
+         }
+        },
+        "to": [
+         {
+          "shell_command": "open -g denden://toggle"
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
          "key_code": "v",
          "modifiers": {
           "mandatory": [

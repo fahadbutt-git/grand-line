@@ -68,6 +68,7 @@ Caps + Shift + A	Apps	Claude	$HOME/.grand-line/bin/focus-or-open 'Claude'
 Caps + Option + Shift + A	Apps	ChatGPT	$HOME/.grand-line/bin/focus-or-open 'ChatGPT'
 Caps + Ctrl + Shift + A	Apps	Gemini	$HOME/.grand-line/bin/focus-or-open 'Gemini'
 Caps + Shift + N	Apps	Notion	$HOME/.grand-line/bin/focus-or-open 'Notion'
+Caps + Ctrl + Option + N	Apps	Open or close the notch panel (Den Den)	open -g denden://toggle
 Caps + Shift + T	Apps	Reminders (tasks)	$HOME/.grand-line/bin/focus-or-open 'Reminders'
 Caps + Shift + G	Apps	WhatsApp	$HOME/.grand-line/bin/focus-or-open 'WhatsApp'
 Caps + Shift + M	Apps	Spotify	$HOME/.grand-line/bin/focus-or-open 'Spotify'

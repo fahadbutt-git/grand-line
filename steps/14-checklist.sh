@@ -38,10 +38,11 @@ macOS requires these clicks from you. Work down the list once.
    Recording (that is how it hears the other side of a call), and let
    it download its model. Start it at the beginning of each meeting.
 
-6. The notch (Boring Notch)
-   Open Boring Notch. macOS says Apple has not checked it: open System
-   Settings, Privacy and Security, and click Open Anyway. Then allow
-   Calendar and Reminders so the notch can show your day.
+6. The notch (Den Den)
+   Hover over the notch once. Allow Calendars and Reminders when asked so
+   it can show your day. Google calendars appear once they are added in
+   System Settings, Internet Accounts. Add your own widgets in
+   ~/.config/grand-line/denden/widgets/ (see apps/denden/README.md).
 
 7. Volume for each app (FineTune)
    Open FineTune and allow audio access when asked. Its menu bar icon

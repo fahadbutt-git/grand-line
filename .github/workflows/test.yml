@@ -62,10 +62,19 @@ jobs:
             grep -E "error:|failed|XCTAssert" test.log | head -60 | sed "s/^/::error title=$APP test::/"; exit 1
           fi
           echo "::notice title=$APP tests::$(grep -Eo 'Executed [0-9]+ tests?, with [0-9]+ failures?' test.log | tail -1)"
-          # The release build setup installs from.
-          if ! swift build -c release 2>&1 | tee release.log; then
-            grep -E "error:" release.log | head -20 | sed "s/^/::error title=$APP release::/"; exit 1
+          # The app bundles, made exactly as setup makes them (lib/native-apps.sh).
+          cd "$GITHUB_WORKSPACE"
+          export GRAND_LINE_APPS_DEST="$RUNNER_TEMP/apps" REPO_DIR="$GITHUB_WORKSPACE" DRY_RUN=0
+          mkdir -p "$GRAND_LINE_APPS_DEST"
+          if ! bash -c 'source lib/common.sh && source lib/native-apps.sh && build_and_install "apps/$APP"' 2>&1 | tee release.log; then
+            grep -E "error:|!" release.log | head -20 | sed "s/^/::error title=$APP bundle::/"; exit 1
           fi
+          [ -f "apps/$APP/apps.tsv" ] || exit 0
+          for app in "$GRAND_LINE_APPS_DEST"/*.app; do
+            plutil -lint "$app/Contents/Info.plist" >/dev/null && codesign --verify --deep "$app" \
+              && echo "::notice title=$APP bundle::$(basename "$app") built and signed" \
+              || { echo "::error title=$APP bundle::$(basename "$app") is not a valid signed app"; exit 1; }
+          done
 
   full-install:
     name: Full install on a clean Mac (${{ matrix.image }})
