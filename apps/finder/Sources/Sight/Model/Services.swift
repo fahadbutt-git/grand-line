@@ -28,6 +28,8 @@ final class Services {
     let saved = SavedSearchProvider()
 
     private(set) var engine: SearchEngine
+    /// Sources, result counts and web engines from Settings.
+    private(set) var preferences: SightPreferences
     private var external: [ExternalProvider] = []
     private var lastReload = Date.distantPast
 
@@ -35,8 +37,21 @@ final class Services {
         usage = UsageStore(fileURL: URL(fileURLWithPath: paths.usage))
         rates = CurrencyRatesStore(fileURL: URL(fileURLWithPath: paths.rates))
         names = NameIndex(snapshot: URL(fileURLWithPath: paths.index), root: paths.home)
+        preferences = SightPreferences(defaults: .standard)
         engine = SearchEngine(providers: [])
+        ResultLayout.current = preferences.layout
+        web.setEngines(preferences.engines)
         engine = makeEngine()
+    }
+
+    /// Settings changed: the next keystroke searches with the new sources,
+    /// order, row counts and engines.
+    func apply(_ next: SightPreferences) {
+        let old = preferences
+        preferences = next
+        ResultLayout.current = next.layout
+        if next.engines != old.engines { web.setEngines(next.engines) }
+        if next.sources != old.sources || next.fallbacks != old.fallbacks { engine = makeEngine() }
     }
 
     func start() {
@@ -59,9 +74,10 @@ final class Services {
             spotlight: { text, limit in await spotlight.run(text, limit: limit, savedSearch: { saved.query(named: $0) }) },
             unreadable: { await names.unreadable() }
         )
+        let sources = preferences.sources
         var providers: [any LaunchProvider] = [
             RecentsProvider(usage: usage),
-            CalculatorProvider(rates: rates),
+            CalculatorProvider(rates: rates, arithmetic: sources.isEnabled(.calculator), conversions: sources.isEnabled(.units)),
             settingsActions,
             aliases, apps, menu, commands, keybindings, settings, menuItems, processes,
             DefineProvider(lookup: { DictionaryLookup.define($0) }),
@@ -69,8 +85,10 @@ final class Services {
             WindowsProvider(), PathProvider(),
             ReminderProvider(paths: paths), ShellProvider(paths: paths), ClipboardProvider(),
             PrefixListProvider(keywords: external.map { (keyword: $0.config.keyword, title: $0.config.title) }),
-            FallbackProvider(),
+            FallbackProvider(fallbacks: preferences.fallbacks),
         ]
+        // Sources turned off in Settings, Sources.
+        providers = providers.filter { sources.runs(providerID: $0.id) }
         providers += external.map { $0 as any LaunchProvider }
         return SearchEngine(providers: providers, ranker: Ranker(usage: usage, aliases: aliases.aliases))
     }

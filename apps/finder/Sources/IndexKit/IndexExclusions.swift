@@ -39,6 +39,31 @@ public struct IndexExclusions: Sendable, Equatable {
 
     public static let none = IndexExclusions()
 
+    /// ~/Library names the home index keeps: Google Drive and other cloud
+    /// folders live in ~/Library/CloudStorage.
+    public static let keptInLibrary: Set<String> = ["CloudStorage"]
+
+    /// What the shared index of a home folder leaves out: the standard
+    /// exclusions and everything in ~/Library except ~/Library/CloudStorage.
+    /// - Parameters:
+    ///   - home: the home folder as the index sees it (a real path).
+    ///   - libraryNames: the names in ~/Library.
+    public static func home(_ home: String, libraryNames: [String]) -> IndexExclusions {
+        var rules = IndexExclusions.standard
+        let library = home + "/Library"
+        for name in libraryNames where !keptInLibrary.contains(name) {
+            rules.paths.insert(library + "/" + name)
+        }
+        return rules
+    }
+
+    /// Reads ~/Library once; call it off the main thread.
+    public static func home(_ home: String) -> IndexExclusions {
+        let real = FolderWatcher.realPath(home)
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: real + "/Library")) ?? []
+        return Self.home(real, libraryNames: names)
+    }
+
     public func skips(_ name: String) -> Bool {
         names.contains(name) || prefixes.contains { name.hasPrefix($0) }
     }

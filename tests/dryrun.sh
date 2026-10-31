@@ -26,7 +26,7 @@ expect() {
 }
 
 [[ $status -eq 0 ]] || { echo "setup.sh --dry-run exited with $status"; fail=1; }
-expect "Homebrew/install/HEAD/install.sh"
+expect "Homebrew/install/$(sed -n "s/^HOMEBREW_INSTALL_COMMIT=//p" "$ROOT/steps/01-homebrew.sh")/install.sh, check its SHA-256"
 expect "brew bundle --file="
 expect "install WordCraft from the latest release of github.com/storytold/wordcraft"
 expect "install PdfCraft from the latest release of github.com/storytold/pdfcraft"

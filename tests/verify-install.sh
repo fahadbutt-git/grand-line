@@ -120,6 +120,26 @@ if [[ -d "/Applications/Sight.app" ]]; then
     [[ "$spotlight" != 0 ]] && pass "Command + Space opens Spotlight (switched back)" || fail "Spotlight's Command + Space is still off"
   fi
 fi
+index_app="/Applications/Grand Line Index.app"
+if [[ -d "$index_app" ]]; then
+  status="$("$index_app/Contents/MacOS/GrandLineIndex" --status 2>&1)"
+  if [[ "$status" == enabled* ]]; then pass "Grand Line Index is registered to run in the background"
+  elif [[ "$CI" == 1 && "$status" == *"requires approval"* ]]; then note "Grand Line Index waits for approval in Login Items (expected on a test machine)"
+  else fail "Grand Line Index is not running in the background: ${status:-no answer}"; fi
+  launchctl print "gui/$(id -u)/com.grandline.index" >/dev/null 2>&1 \
+    && pass "the index agent is loaded" || { if [[ "$CI" == 1 ]]; then note "the index agent is not loaded"; else fail "the index agent is not loaded"; fi; }
+fi
+# The apps are signed with hardened runtime (and, off test machines, by the package's own identity).
+for app in /Applications/Nexus.app /Applications/Sight.app /Applications/Iceberg.app "$index_app"; do
+  [[ -d "$app" ]] || continue
+  if codesign -d --verbose "$app" 2>&1 | grep -qE 'flags=0x[0-9a-f]+\([^)]*runtime'; then pass "$(basename "$app" .app) has hardened runtime"
+  else fail "$(basename "$app" .app) is not signed with hardened runtime"; fi
+  if [[ "$CI" == 0 ]]; then
+    codesign -d -r- "$app" 2>&1 | grep -q 'certificate leaf = H"' \
+      && pass "$(basename "$app" .app) keeps its permissions across updates (signed by the local identity)" \
+      || note "$(basename "$app" .app) is signed ad hoc, so it asks for its permissions after each update"
+  fi
+done
 
 echo "Preinstalled apps the package replaces"
 # shellcheck source=steps/05-declutter.sh

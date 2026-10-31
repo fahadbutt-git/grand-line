@@ -350,10 +350,12 @@ grep -q "aerospace focus --window-id 9" "$STUB_LOG" && ! grep -q "open " "$STUB_
 : > "$STUB_LOG"; "$ROOT/bin/webapp" "https://www.youtube.com" "YouTube"
 grep -q "open " "$STUB_LOG" && t_ok "a web app key opens a window when none matches" || t_fail "webapp did not open"
 unset AEROSPACE_WINDOWS
-locktmp="$(mktemp -d)"; lock="$locktmp/grand-line-update.lock"
+locktmp="$(mktemp -d)"; lock="$locktmp/update.lock"
 mkdir "$lock"; echo "$$" > "$lock/pid"
-out="$(TMPDIR="$locktmp" "$ROOT/bin/update" 2>&1)"
+out="$(GRAND_LINE_UPDATE_LOCK="$lock" "$ROOT/bin/update" 2>&1)"
 grep -q "Another update is running" <<<"$out" && t_ok "a second update waits for the first" || t_fail "update lock" "$out"
+out="$(GRAND_LINE_HOME="$ROOT" GRAND_LINE_UPDATE_LOCK="$lock" bash "$ROOT/setup.sh" --only folders 2>&1)"; code=$?
+[[ "$code" == 1 ]] && grep -q "An update or another setup is running" <<<"$out" && t_ok "setup waits while an update runs" || t_fail "setup lock" "$out"
 rm -rf "$locktmp"
 : > "$STUB_LOG"; "$ROOT/bin/update" --window
 grep -q "open -na Ghostty --args -e .*/bin/in-window --run .*/bin/update" "$STUB_LOG" && t_ok "update --window opens its own Ghostty window" || t_fail "update --window" "$(cat "$STUB_LOG")"
@@ -465,7 +467,7 @@ printf '#!/bin/sh\necho built\n' > "$dir/.build/release/Demo"; chmod +x "$dir/.b
 [[ "$args" == *"--product DemoLib"* ]] && echo lib > "$dir/.build/release/libDemoLib.dylib"
 exit 0
 EOF
-printf '#!/bin/bash\necho "codesign $*" >> "$STUB_LOG"\n' > "$tmp/bin-apps/codesign"; chmod +x "$tmp/bin-apps/"*
+chmod +x "$tmp/bin-apps/"*
 (
   export PATH="$tmp/bin-apps:$PATH" REPO_DIR="$apps_root" DRY_RUN=0 GRAND_LINE_APPS_DEST="$tmp/Applications"
   source "$ROOT/lib/common.sh"; source "$ROOT/lib/native-apps.sh"
@@ -592,5 +594,301 @@ logged() { local _; for _ in 1 2 3 4 5 6 7 8 9 10; do grep -qF -- "$1" "$STUB_LO
     grep -qF "$k;LSHandlerRoleAll=\"app.zen-browser.zen\"" "$STUB_LOG" || { echo "missing $k"; exit 1; }
   done
 ) && t_ok "the default browser takes links and web pages" || t_fail "default browser" "$(cat "$STUB_LOG")"
+
+# --- signing: a stable identity, hardened runtime, permissions kept across rebuilds
+(
+  export PATH="$tmp/bin-apps:$PATH" REPO_DIR="$apps_root" DRY_RUN=0 GRAND_LINE_APPS_DEST="$tmp/Applications"
+  source "$ROOT/lib/common.sh"; source "$ROOT/lib/native-apps.sh"
+  app="$tmp/Applications/Demo App.app"
+  # No identity: ad hoc, but always with hardened runtime.
+  : > "$STUB_LOG"; touch "$apps_root/apps/demo/Sources/main.swift"; rm -f "$GRAND_LINE_STATE/built-demo"
+  build_native_apps >/dev/null 2>&1 || exit 1
+  grep -q "^codesign --force --options runtime --sign - .*\.Demo App\.app\.new$" "$STUB_LOG" || exit 2
+  grep -q "^codesign --force --options runtime --sign - .*DemoKit.framework/Versions/A$" "$STUB_LOG" || exit 3
+  signing_check "$app" >/dev/null || exit 4
+  # The identity, made once: passwords only ever on security's standard input.
+  export STUB_SECURITY="$tmp/sec" GRAND_LINE_SIGN_KEYCHAIN="$tmp/kc/grand-line-signing.keychain-db"
+  SIGN_KEYCHAIN="$GRAND_LINE_SIGN_KEYCHAIN"
+  : > "$STUB_LOG"; signing_ensure >/dev/null 2>&1 || exit 5
+  [[ -f "$GRAND_LINE_SIGN_KEYCHAIN" && -f "$STUB_SECURITY/imported" && -f "$STUB_SECURITY/partition" ]] || exit 6
+  pw="$(cat "$STUB_SECURITY/password")"; [[ ${#pw} -ge 32 ]] || exit 7
+  grep -v "^security -i: " "$STUB_LOG" | grep -qF "$pw" && exit 8
+  grep -q "^security -i: import" "$STUB_LOG" && grep -q "^security set-keychain-settings -l -u -t 300" "$STUB_LOG" || exit 9
+  : > "$STUB_LOG"; signing_ensure >/dev/null 2>&1 || exit 10
+  grep -q "security -i: create-keychain" "$STUB_LOG" && exit 11   # never made twice
+  # Signed with it: the requirement pins the certificate, the entitlements go in.
+  mkdir -p "$apps_root/apps/demo/Entitlements"; printf '<plist><dict/></plist>\n' > "$apps_root/apps/demo/Entitlements/Demo.entitlements"
+  : > "$STUB_LOG"; build_native_apps >/dev/null 2>&1 || exit 12
+  grep -q -- "--entitlements $apps_root/apps/demo/Entitlements/Demo.entitlements" "$STUB_LOG" || exit 13
+  grep -qF -- '--sign 0123456789ABCDEF0123456789ABCDEF01234567 -r =designated => identifier "com.example.demo" and certificate leaf = H"0123456789abcdef0123456789abcdef01234567"' "$STUB_LOG" || exit 14
+  grep -q "^security lock-keychain" "$STUB_LOG" || exit 15
+  [[ "$(signing_check "$app")" == "" ]] || exit 16
+  codesign -d -r- "$app" 2>&1 | grep -q 'certificate leaf = H"0123456789abcdef' || exit 17
+  # A bundle signed some other way is refused, and the installed copy kept.
+  codesign --force --sign - "$app" 2>/dev/null
+  signing_check "$app" >/dev/null && exit 18
+  exit 0
+) && t_ok "apps are signed with hardened runtime by one identity made once, passwords never on a command line" \
+  || t_fail "signing (step $?)" "$(tail -5 "$STUB_LOG")"
+
+(
+  export PATH="$tmp/bin-apps:$PATH" REPO_DIR="$apps_root" DRY_RUN=0 GRAND_LINE_APPS_DEST="$tmp/Applications"
+  source "$ROOT/lib/common.sh"; source "$ROOT/lib/native-apps.sh"
+  git -C "$apps_root" init -q -b main && git -C "$apps_root" add -A && git -C "$apps_root" -c user.email=t@t -c user.name=t commit -q -m apps
+  echo '// planted' > "$apps_root/apps/demo/Sources/extra.swift"; sleep 1; touch "$apps_root/apps/demo/Sources/main.swift"
+  : > "$STUB_LOG"
+  GRAND_LINE_UNATTENDED=1 build_native_apps >/dev/null 2>&1 && exit 1
+  grep -q "^swift " "$STUB_LOG" && exit 2          # nothing built from a tree with changes
+  rm "$apps_root/apps/demo/Sources/extra.swift"
+  # Unattended, from a clean tree: built, a running copy is restarted from the new one.
+  echo Demo > "$tmp/running"; report="$tmp/apps-report"; : > "$report"
+  : > "$STUB_LOG"; STUB_RUNNING="$tmp/running" GRAND_LINE_APPS_REPORT="$report" GRAND_LINE_UNATTENDED=1 build_native_apps >/dev/null 2>&1 || exit 3
+  grep -q "^pkill -TERM -x Demo" "$STUB_LOG" && grep -q "^open -g .*Demo App.app" "$STUB_LOG" || exit 4
+  [[ "$(cat "$report")" == "Demo App" ]] || exit 5
+  exit 0
+) && t_ok "the unattended update never builds uncommitted app code, and restarts the apps it replaces" \
+  || t_fail "unattended app build (step $?)" "$(cat "$STUB_LOG")"
+
+(
+  export REPO_DIR="$apps_root" DRY_RUN=0
+  source "$ROOT/lib/common.sh"; source "$ROOT/lib/native-apps.sh"
+  sup="$HOME/Library/Application Support"; mkdir -p "$sup/Nexus" "$sup/Sight" "$HOME/Library/Caches/com.grandline.sight"
+  mkdir -p "$sup/Grand Line Index"; : > "$sup/Grand Line Index/names.index"
+  : > "$sup/Nexus/name-index.snapshot"; : > "$sup/Sight/names.index"; : > "$sup/Sight/usage.json"; : > "$sup/Nexus/view-settings.json"
+  : > "$STUB_LOG"; exclude_indexes_from_backup
+  for f in "$sup/Nexus/name-index.snapshot" "$sup/Sight/names.index" "$sup/Sight/usage.json" "$sup/Grand Line Index/names.index" "$HOME/Library/Caches/com.grandline.sight"; do
+    grep -qxF "tmutil addexclusion $f" "$STUB_LOG" || exit 1
+  done
+  grep -q "view-settings" "$STUB_LOG" && exit 2   # settings stay in the backup
+  exit 0
+) && t_ok "file indexes, search history and caches are kept out of Time Machine, settings are not" || t_fail "backup exclusions (step $?)" "$(cat "$STUB_LOG")"
+
+# --- a background service: its launch agent sealed in the bundle, registered as you
+(
+  srv="$tmp/svc-repo"; mkdir -p "$srv/apps/svc/Sources" "$srv/apps/svc/Bundle/Svc/Library/LaunchAgents" "$tmp/svc-bin" "$tmp/SvcApps"
+  printf 'Svc\tSvc Index\tcom.example.svc\tno\n' > "$srv/apps/svc/apps.tsv"
+  echo '// svc' > "$srv/apps/svc/Sources/main.swift"
+  printf '<plist><dict><key>Label</key><string>com.example.svc</string></dict></plist>\n' > "$srv/apps/svc/Bundle/Svc/Library/LaunchAgents/com.example.svc.plist"
+  cat > "$tmp/svc-bin/swift" <<'EOF'
+#!/bin/bash
+args="$*"; pp="${args#*--package-path }"; dir="${pp%% *}"; mkdir -p "$dir/.build/release"
+printf '#!/bin/bash\necho "svc $*" >> "$STUB_LOG"\n[[ "$1" == --register ]] && { echo "requires approval"; exit 1; }\nexit 0\n' > "$dir/.build/release/Svc"
+chmod +x "$dir/.build/release/Svc"
+EOF
+  chmod +x "$tmp/svc-bin/swift"
+  export PATH="$tmp/svc-bin:$PATH" REPO_DIR="$srv" DRY_RUN=0 GRAND_LINE_APPS_DEST="$tmp/SvcApps"
+  source "$ROOT/lib/common.sh"; source "$ROOT/lib/native-apps.sh"
+  app="$tmp/SvcApps/Svc Index.app"
+  : > "$STUB_LOG"; out="$(build_native_apps 2>&1)"
+  [[ -f "$app/Contents/Library/LaunchAgents/com.example.svc.plist" ]] || exit 1
+  # Copied in before signing, so the signature seals it.
+  [[ "$(grep -n "codesign --force --options runtime --sign - .*\.Svc Index\.app\.new$" "$STUB_LOG" | head -1 | cut -d: -f1)" -gt 0 ]] || exit 2
+  grep -q "^svc --register$" "$STUB_LOG" || exit 3
+  grep -q "Allow in the Background, Svc Index" <<<"$out" || exit 4
+  grep -q "sudo" "$STUB_LOG" && exit 5
+  grep -q "launchctl kickstart" "$STUB_LOG" && exit 6       # first install: nothing to restart
+  sleep 1; touch "$srv/apps/svc/Sources/main.swift"
+  : > "$STUB_LOG"; build_native_apps >/dev/null 2>&1
+  grep -q "^launchctl kickstart -k gui/501/com.example.svc$" "$STUB_LOG" || exit 7
+  grep -q "^open -g" "$STUB_LOG" && exit 8                   # launchd restarts it, not open
+  DRY_RUN=1 install_app_bundle "$srv/apps/svc" Svc "Svc Index" com.example.svc no | grep -q "\[dry-run\] .*Svc --register" || exit 9
+  exit 0
+) && t_ok "a background service's launch agent is sealed in its bundle, registered as you, restarted by launchd" \
+  || t_fail "background service (step $?)" "$(cat "$STUB_LOG")"
+
+# --- theme-matched Finder icons: the apps get the theme's icon and keep their signature
+(
+  irepo="$tmp/icons-repo"; mkdir -p "$irepo/apps/demo" "$irepo/tools" "$tmp/IconApps/Demo App.app/Contents/Resources"
+  printf 'Demo\tDemo App\tcom.example.demo\tyes\n' > "$irepo/apps/demo/apps.tsv"
+  cat > "$irepo/tools/make-icons.py" <<'EOF'
+import sys, os
+args = sys.argv[1:]
+out = args[args.index("--out") + 1]; theme = args[args.index("--theme") + 1]
+os.makedirs(os.path.join(out, "Demo"), exist_ok=True)
+open(os.path.join(out, "Demo", "AppIcon.icns"), "w").write("icon " + theme)
+EOF
+  app="$tmp/IconApps/Demo App.app"; echo old > "$app/Contents/Resources/AppIcon.icns"
+  export GRAND_LINE_APPS_DEST="$tmp/IconApps"
+  source "$ROOT/lib/signing.sh"; source "$ROOT/lib/app-icons.sh"
+  # Without the identity nothing changes: an ad-hoc signature would cost permissions.
+  SIGN_KEYCHAIN="$tmp/none.keychain-db"
+  refresh_app_icons nord "$irepo" >/dev/null; [[ "$(cat "$app/Contents/Resources/AppIcon.icns")" == old ]] || exit 1
+  export STUB_SECURITY="$tmp/sec"; SIGN_KEYCHAIN="$tmp/kc/grand-line-signing.keychain-db"
+  : > "$STUB_LOG"; refresh_app_icons nord "$irepo" >/dev/null || exit 2
+  [[ "$(cat "$app/Contents/Resources/AppIcon.icns")" == "icon nord" ]] || exit 3
+  grep -qF 'certificate leaf = H"0123456789abcdef' "$app/.stub-signature" || exit 4
+  compgen -G "$tmp/IconApps/.*.app*" >/dev/null && exit 5   # no copies left behind
+  : > "$STUB_LOG"; refresh_app_icons nord "$irepo" >/dev/null
+  grep -q "^codesign" "$STUB_LOG" && exit 6   # already matching: left alone
+  exit 0
+) && t_ok "theme icons: the installed apps get the theme's icon, re-signed with the identity, skipped without it" \
+  || t_fail "theme icons (step $?)" "$(cat "$STUB_LOG")"
+python3 "$ROOT/tools/make-icons.py" --theme nord --only Iceberg --out "$tmp/icons-out" >/dev/null 2>&1
+[[ -s "$tmp/icons-out/Iceberg/AppIcon.icns" ]] && git -C "$ROOT" diff --quiet -- apps/iceberg/Resources/Iceberg/AppIcon.icns \
+  && t_ok "make-icons --out writes the icons elsewhere, leaving the package's own" || t_fail "make-icons --out"
+
+# --- updates: only signed commits apply by themselves
+if command -v ssh-keygen >/dev/null 2>&1; then
+(
+  source "$ROOT/lib/update-trust.sh"
+  ssh-keygen -q -t ed25519 -N "" -C test -f "$tmp/signkey" && ssh-keygen -q -t ed25519 -N "" -C other -f "$tmp/otherkey" || exit 1
+  export GIT_CONFIG_GLOBAL="$tmp/gitconfig"
+  git config --global user.name t; git config --global user.email t@example.com
+  git config --global gpg.format ssh; git config --global user.signingkey "$tmp/signkey.pub"
+  export GRAND_LINE_ALLOWED_SIGNERS="$tmp/trust/allowed_signers"; ALLOWED_SIGNERS="$GRAND_LINE_ALLOWED_SIGNERS"
+  trust_init >/dev/null || exit 2
+  grep -qF "t@example.com namespaces=\"git\" $(cut -d' ' -f1,2 "$tmp/signkey.pub")" "$ALLOWED_SIGNERS" || exit 3
+  [[ "$(stat -c %a "$ALLOWED_SIGNERS" 2>/dev/null || stat -f %Lp "$ALLOWED_SIGNERS")" == 600 ]] || exit 4
+  # GitHub's copy, and this Mac's clone of it.
+  git init -q --bare -b main "$tmp/origin.git"
+  git clone -q "$tmp/origin.git" "$tmp/up" 2>/dev/null; echo 1 > "$tmp/up/f"; git -C "$tmp/up" add f
+  git -C "$tmp/up" commit -q -S -m one && git -C "$tmp/up" push -q origin main 2>/dev/null || exit 5
+  git clone -q "$tmp/origin.git" "$tmp/mac" 2>/dev/null
+  STRICT=1
+  # A signed commit applies by itself.
+  echo 2 > "$tmp/up/f"; git -C "$tmp/up" commit -q -S -am two; git -C "$tmp/up" push -q 2>/dev/null
+  changed=(); needs=(); package_update "$tmp/mac" >/dev/null || exit 6
+  [[ "$(cat "$tmp/mac/f")" == 2 && ${#changed[@]} == 1 ]] || exit 7
+  # An unsigned one, or one signed by another key, waits for you.
+  echo 3 > "$tmp/up/f"; git -C "$tmp/up" commit -q --no-gpg-sign -am three; git -C "$tmp/up" push -q 2>/dev/null
+  changed=(); needs=(); package_update "$tmp/mac" >/dev/null; rc=$?
+  [[ "$rc" == 2 && "$(cat "$tmp/mac/f")" == 2 && ${#needs[@]} == 1 ]] || exit 8
+  STRICT=0; package_update "$tmp/mac" </dev/null >/dev/null; [[ "$(cat "$tmp/mac/f")" == 2 ]] || exit 9   # no keyboard, no yes
+  STRICT=1
+  git -C "$tmp/up" reset -q --hard HEAD~1
+  echo 3 > "$tmp/up/f"; git -C "$tmp/up" -c user.signingkey="$tmp/otherkey.pub" commit -q -S -am three-other
+  git -C "$tmp/up" push -q -f 2>/dev/null
+  # (the unsigned commit was only fetched, never applied, so this is not a rewrite of what this Mac has)
+  git -C "$tmp/mac" fetch -q 2>/dev/null
+  changed=(); needs=(); package_update "$tmp/mac" >/dev/null; [[ $? == 2 && "$(cat "$tmp/mac/f")" == 2 ]] || exit 10
+  commit_trusted "$tmp/mac" "$(git -C "$tmp/mac" rev-parse origin/main)" && exit 11
+  # A rewritten (force-pushed) history is never applied, even when signed.
+  git -C "$tmp/up" reset -q --hard HEAD~1; echo 4 > "$tmp/up/g"; git -C "$tmp/up" add g; git -C "$tmp/up" commit -q -S -m four
+  git -C "$tmp/up" push -q -f 2>/dev/null
+  changed=(); needs=(); package_update "$tmp/mac" >/dev/null; [[ $? == 2 && ! -e "$tmp/mac/g" ]] || exit 12
+  grep -q rewritten <<<"${needs[*]}" || exit 13
+  # Your own commits not yet on GitHub are kept on top of GitHub's.
+  git -C "$tmp/mac" reset -q --hard origin/main
+  echo mine > "$tmp/mac/local"; git -C "$tmp/mac" add local; git -C "$tmp/mac" commit -q --no-gpg-sign -m mine
+  echo 5 > "$tmp/up/f"; git -C "$tmp/up" commit -q -S -am five; git -C "$tmp/up" push -q 2>/dev/null
+  changed=(); needs=(); package_update "$tmp/mac" >/dev/null || exit 14
+  [[ "$(cat "$tmp/mac/f")" == 5 && -f "$tmp/mac/local" && "$(git -C "$tmp/mac" log -1 --format=%s)" == mine ]] || exit 15
+  # GPG-style signatures are not accepted (only keys in the allowed list count).
+  git -C "$tmp/mac" cat-file commit HEAD~1 | grep -q "BEGIN SSH SIGNATURE" || exit 16
+  exit 0
+) && t_ok "update applies commits signed by a trusted key, keeps your own, refuses unsigned, foreign and rewritten ones" \
+  || t_fail "signed updates (step $?)"
+elif [[ -n "${CI:-}" ]]; then t_fail "ssh-keygen is missing, so the signed update test could not run"
+else echo "    skip  ssh-keygen is not installed"; fi
+
+# --- the unattended update: launch agent, no sudo steps, marked migrations only
+(
+  export STUB_LAUNCHD="$tmp/launchd"; : > "$STUB_LAUNCHD"
+  plist="$HOME/Library/LaunchAgents/com.grandline.update.plist"
+  "$ROOT/bin/update" auto on >/dev/null || exit 1
+  grep -q "<string>--unattended</string>" "$plist" && grep -q "<key>StartCalendarInterval</key>" "$plist" \
+    && grep -q "<key>LowPriorityIO</key><true/>" "$plist" && grep -q "<key>RunAtLoad</key><true/>" "$plist" \
+    && grep -q "Library/Logs/grand-line/update.log" "$plist" || exit 2
+  grep -qx com.grandline.update "$STUB_LAUNCHD" || exit 3
+  [[ "$("$ROOT/bin/update" auto status)" == on* ]] || exit 4
+  "$ROOT/bin/update" auto off >/dev/null; "$ROOT/bin/update" auto status >/dev/null && exit 5
+  [[ ! -e "$plist" ]] && compgen -G "$HOME/.Trash/com.grandline.update*" >/dev/null || exit 6
+  # Off means off: the agent's run stops at once.
+  GRAND_LINE_UPDATE_LOCK="$tmp/u.lock" "$ROOT/bin/update" --unattended >/dev/null 2>&1 || exit 7
+  [[ ! -e "$tmp/u.lock" ]] || exit 8
+  "$ROOT/bin/update" auto toggle >/dev/null; [[ "$("$ROOT/bin/update" auto status)" == on* ]] || exit 9
+  "$ROOT/bin/update" auto off >/dev/null
+  exit 0
+) && t_ok "update auto on, off and status manage the daily low-priority launch agent" || t_fail "update auto (step $?)" "$(tail -5 "$STUB_LOG")"
+out="$(GRAND_LINE_HOME="$ROOT" bash "$ROOT/setup.sh" --unattended --only security 2>&1)"; code=$?
+[[ "$code" == 2 ]] && grep -q "does not run unattended" <<<"$out" && t_ok "setup --unattended refuses steps that may ask for a password" || t_fail "setup --unattended" "$out"
+grep -q '^UNATTENDED_STEPS="folders,dotfiles,native-tools,downloads"$' "$ROOT/setup.sh" \
+  && ! grep -nE '\bsudo\b' "$ROOT/steps/07-folders.sh" "$ROOT/steps/08-dotfiles.sh" "$ROOT/steps/09-native-tools.sh" "$ROOT/steps/13-downloads.sh" \
+  && t_ok "the unattended steps never use sudo" || t_fail "an unattended step uses sudo"
+(
+  mrepo="$tmp/mig"; mkdir -p "$mrepo/migrations"
+  printf '# grandline:unattended\necho a >> "%s"\n' "$tmp/mig.out" > "$mrepo/migrations/1800000000-quiet.sh"
+  printf 'echo b >> "%s"\n' "$tmp/mig.out" > "$mrepo/migrations/1800000001-asks.sh"
+  rm -rf "$HOME/.local/state/grand-line/migrations"
+  GRAND_LINE_REPO="$mrepo" "$ROOT/bin/migrate" --unattended >/dev/null; rc=$?
+  [[ "$rc" == 3 && "$(cat "$tmp/mig.out")" == a ]] || exit 1
+  GRAND_LINE_REPO="$mrepo" "$ROOT/bin/migrate" >/dev/null || exit 2
+  [[ "$(tr -d '\n' < "$tmp/mig.out")" == ab ]] || exit 3
+  rm -rf "$HOME/.local/state/grand-line/migrations"
+) && t_ok "unattended migrations run only those marked # grandline:unattended" || t_fail "migrate --unattended (step $?)"
+
+# --- nothing is sent to GitHub by itself
+! grep -nE 'git[^|;&]* push|git_ push|push_\b' "$ROOT/bin/update" "$ROOT/bin/app" "$ROOT/lib/"*.sh "$ROOT/setup.sh" "$ROOT/steps/"*.sh \
+  && [[ "$(grep -c 'git_ push' "$ROOT/bin/grandline")" == 1 ]] && grep -q 'ask "Send these' "$ROOT/bin/grandline" \
+  && t_ok "only grandline publish sends to GitHub, and only after asking" || t_fail "automatic push left somewhere"
+! grep -nE 'git[^|;&]* commit' "$ROOT/bin/update" "$ROOT/bin/app" && t_ok "update and app install never commit by themselves" || t_fail "automatic commit left"
+(
+  r2="$tmp/repo2"; mkdir -p "$r2"; git -C "$r2" init -q -b main; git -C "$r2" config user.email t@t; git -C "$r2" config user.name t
+  echo one > "$r2/a.txt"; git -C "$r2" add -A; git -C "$r2" commit -q -m First
+  echo two > "$r2/a.txt"; echo note > "$r2/clinic-note.txt"
+  GRAND_LINE_REPO="$r2" GRAND_LINE_NO_APPLY=1 "$ROOT/bin/grandline" save "x" >/dev/null
+  [[ -z "$(git -C "$r2" status --porcelain --untracked-files=no)" ]] || exit 1   # tracked edit saved
+  git -C "$r2" ls-files --error-unmatch clinic-note.txt >/dev/null 2>&1 && exit 2   # new file never added
+  out="$(GRAND_LINE_REPO="$r2" "$ROOT/bin/grandline" publish </dev/null 2>&1)" && exit 3
+  grep -q "in a terminal" <<<"$out" || exit 4
+  exit 0
+) && t_ok "grandline saves edits to tracked files only, and publish needs someone at the keyboard" || t_fail "grandline save and publish (step $?)"
+
+# --- the Trash: root never moves anything into a folder you can write
+(
+  source "$ROOT/lib/trash.sh"
+  victim="$tmp/victim"; mkdir -p "$victim" "$HOME/.Trash"
+  echo data > "$tmp/Report.txt"
+  ln -sfn "$victim" "$HOME/.Trash/Report.txt"          # a planted link with the same name
+  move_to_trash "$tmp/Report.txt" || exit 1
+  [[ ! -e "$tmp/Report.txt" && -z "$(ls -A "$victim")" ]] || exit 2
+  compgen -G "$HOME/.Trash/Report *.txt" >/dev/null || exit 3
+  # The sudo path: staged in a folder only root can write, links never followed.
+  stub="$tmp/sudo-bin"; mkdir -p "$stub" "$tmp/stage-root"
+  printf '#!/bin/bash\necho "sudo $*" >> "$STUB_LOG"\n[[ "$1" == -n ]] && shift\nexec "$@"\n' > "$stub/sudo"; chmod +x "$stub/sudo"
+  echo app > "$tmp/Old.app"; ln -sfn "$victim" "$HOME/.Trash/Old.app"
+  calls="$tmp/mv-calls"; : > "$calls"
+  mv() { echo x >> "$calls"; [[ "$(wc -l < "$calls")" == 1 ]] && return 1; command mv "$@"; }
+  : > "$STUB_LOG"
+  PATH="$stub:$PATH" GRAND_LINE_TRASH_STAGE="$tmp/stage-root" move_to_trash "$tmp/Old.app" || exit 4
+  unset -f mv
+  [[ ! -e "$tmp/Old.app" && -z "$(ls -A "$victim")" ]] || exit 5
+  grep -q "^sudo mv -n $tmp/Old.app $tmp/stage-root/grand-line-trash\..*/Old.app$" "$STUB_LOG" || exit 6
+  grep -q "^sudo chown -R -h " "$STUB_LOG" || exit 7
+  compgen -G "$HOME/.Trash/Old *.app" >/dev/null || exit 8
+  [[ -z "$(ls -A "$tmp/stage-root")" ]] || exit 9
+  : > "$STUB_LOG"; echo x > "$tmp/Q.txt"; : > "$calls"
+  mv() { echo x >> "$calls"; [[ "$(wc -l < "$calls")" == 1 ]] && return 1; command mv "$@"; }
+  PATH="$stub:$PATH" GRAND_LINE_UNATTENDED=1 GRAND_LINE_TRASH_STAGE="$tmp/stage-root" move_to_trash "$tmp/Q.txt"
+  unset -f mv
+  grep -q "^sudo -n mktemp" "$STUB_LOG" || exit 10   # unattended never waits for a password
+  rm -f "$HOME/.Trash/Report.txt" "$HOME/.Trash/Old.app"
+  exit 0
+) && t_ok "move_to_trash never follows a link planted in the Trash, and root works only in its own folder" || t_fail "trash (step $?)" "$(cat "$STUB_LOG")"
+
+# --- clipboard and notifications around the clinical apps
+(
+  stub="$tmp/ocr-bin"; mkdir -p "$stub"
+  printf '#!/bin/bash\nprintf "Patient Example 0012345"\n' > "$stub/ocr"
+  printf '#!/bin/bash\necho "screencapture $*" >> "$STUB_LOG"\necho png > "${!#}"\n' > "$stub/screencapture"
+  printf '#!/bin/bash\ncat > /dev/null\n' > "$stub/pbcopy"; chmod +x "$stub/"*
+  : > "$STUB_LOG"
+  PATH="$stub:$PATH" GRAND_LINE_TEST_PATH="$stub:$ROOT/tests/stubs" "$ROOT/bin/capture" text
+  sleep 0.3
+  grep -q "osascript - Text copied Copied 23 characters" "$STUB_LOG" || exit 1
+  grep -q "Patient" "$STUB_LOG" && exit 2
+  exit 0
+) && t_ok "capture text says how much it copied, never what" || t_fail "capture text notification (step $?)" "$(cat "$STUB_LOG")"
+(
+  export REPO_DIR="$ROOT" DRY_RUN=0
+  source "$ROOT/lib/common.sh"; source "$ROOT/steps/10-macos-defaults.sh"
+  mkdir -p "$GRAND_LINE_STATE"; touch "$GRAND_LINE_STATE/done-macos-defaults"
+  : > "$STUB_LOG"; step_macos_defaults >/dev/null
+  grep -q "defaults write org.p0deje.Maccy ignoredApps -array com.citrix.receiver.icaviewer.mac com.citrix.receiver.nomas com.vmware.horizon com.omnissa.horizon.client.mac" "$STUB_LOG" || exit 1
+  grep -q "ignoredPasteboardTypes -array Pasteboard generator type com.agilebits.onepassword .* org.nspasteboard.ConcealedType org.nspasteboard.TransientType" "$STUB_LOG" || exit 2
+  grep -q "historySize" "$STUB_LOG" && exit 3      # your other settings are still set only once
+  rm -f "$GRAND_LINE_STATE/done-macos-defaults"
+  exit 0
+) && t_ok "Maccy's ignore list is checked on every run, keeping its own defaults" || t_fail "Maccy ignore list (step $?)" "$(cat "$STUB_LOG")"
 
 exit $FAIL

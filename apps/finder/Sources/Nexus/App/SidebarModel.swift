@@ -38,10 +38,19 @@ final class SidebarModel: ObservableObject {
     }
 
     func refresh() {
+        groups = SidebarBuilder.build(input())
+    }
+
+    /// Every section and item, hidden ones too, in the chosen order (Settings, Sidebar).
+    func everything() -> [SidebarGroup] {
+        SidebarBuilder.everything(input())
+    }
+
+    private func input() -> SidebarBuilder.Input {
         let paths = services.paths
         let drives = GoogleDrive.accounts(home: paths.home)
         let settings = services.settings
-        let input = SidebarBuilder.Input(
+        return SidebarBuilder.Input(
             home: paths.home,
             places: settings.placeURLs(home: paths.home) ?? SidebarBuilder.defaultPlaces(home: paths.home, drives: drives),
             projects: settings.projectURLs(home: paths.home, children: FolderReader.subfolderNames),
@@ -50,9 +59,9 @@ final class SidebarModel: ObservableObject {
             drives: drives,
             trash: paths.trash,
             newDownloads: newDownloads().count,
-            hidden: services.sidebarHidden
+            hidden: services.sidebarHidden,
+            layout: NexusPreferencesStore.shared.current.sidebar
         )
-        groups = SidebarBuilder.build(input)
     }
 
     /// Visiting Downloads clears the "new" badge.

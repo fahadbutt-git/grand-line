@@ -181,15 +181,29 @@ public final class SettingsActionsProvider: InstantProvider, @unchecked Sendable
     }
 
     /// The exit codes of fail() in lib/bin-common.sh, as a sentence.
+    static let automationMessage = "Allow Automation for System Events in Privacy & Security"
+
     static func failure(status: Int32, output: String, job: SettingJob) -> SettingFailure? {
         let said = output.split(separator: "\n").last.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
+        // osascript's own words when Apple events are refused (-1743), from a
+        // command that did not turn them into exit status 3.
+        if status != 0, output.contains("-1743") || output.contains("Not authorized to send Apple events") {
+            return SettingFailure(automationMessage, permission: .automation)
+        }
         switch status {
         case 0: return nil
-        case 3: return SettingFailure(said.isEmpty ? "Allow Automation for System Events in Privacy & Security" : said, permission: .automation)
+        case 3: return SettingFailure(said.isEmpty ? automationMessage : said, permission: .automation)
         case 5: return SettingFailure(said.isEmpty ? "Allow Accessibility in Privacy & Security" : said, permission: .accessibility)
         case 4: return SettingFailure(said.isEmpty ? "A tool it needs is not installed. Run: update" : said)
         case 2: return SettingFailure("This version of toggle does not know that setting. Run: update")
-        case 15: return job.toleratesTimeout ? nil : SettingFailure("It took too long and was stopped")
+        case 15:
+            if job.toleratesTimeout { return nil }
+            // A change made through System Events that never answers is
+            // waiting on the Automation question macOS asks (or cannot ask).
+            if job.permission == .automation {
+                return SettingFailure("System Events did not answer. " + automationMessage, permission: .automation)
+            }
+            return SettingFailure("It took too long and was stopped")
         default: return SettingFailure(said.isEmpty ? "It failed (status \(status))" : said)
         }
     }

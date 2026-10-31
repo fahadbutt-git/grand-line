@@ -5,8 +5,8 @@ import IndexKit
 
 /// Runs one search: IndexKit's name matches first (R1), then Spotlight through
 /// QueryKit's predicate (R2), merged without moving what is already shown.
-/// Spotlight's name matches lead its content matches, and content matches from
-/// app data (caches, ~/Library, hidden folders, app bundles) are left out.
+/// Spotlight's name matches lead its content matches, and results from app
+/// data (caches, ~/Library, hidden folders, app bundles) are left out of both.
 @MainActor
 final class SearchRunner {
     private unowned let services: Services
@@ -28,14 +28,32 @@ final class SearchRunner {
         )
         if let words = plan.nameText {
             let index = services.index
+            // Only the scope's folders are searched, in the service.
+            let folders = plan.scopes.filter { $0.hasPrefix("/") }
+            let scope = folders.count == plan.scopes.count ? folders : nil
+            // Folders the index leaves out (the Trash) are read from disk.
+            let skipped = plan.foldersTheIndexSkips
+            let plainWords = plan.words
             nameTask = Task { [weak self] in
-                let matches = await index.search(words, limit: 400)
+                let matches = await index.search(words, limit: 400, scope: scope)
+                var scanned: [String] = []
+                if !skipped.isEmpty {
+                    scanned = await Task.detached(priority: .userInitiated) {
+                        FolderNameScan.paths(in: skipped, words: plainWords)
+                    }.value
+                }
                 guard let self, !Task.isCancelled else { return }
-                self.names = SearchResults.names(matches, plan: plan)
+                let indexed = SearchResults.names(matches, plan: plan)
+                let known = Set(indexed)
+                self.names = indexed + scanned.filter { !known.contains($0) && plan.accepts($0) && plan.keeps($0) }
                 results(self.names)
             }
         }
-        startSpotlight(plan, results: results)
+        // Settings, Search: without content matches, Spotlight runs only for
+        // queries the name index cannot answer (filters alone).
+        if NexusPreferencesStore.shared.current.includeContentMatches || plan.nameText == nil {
+            startSpotlight(plan, results: results)
+        }
     }
 
     private func startSpotlight(_ plan: SearchPlan, results: @escaping ([String]) -> Void) {

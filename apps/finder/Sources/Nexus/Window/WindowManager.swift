@@ -17,6 +17,15 @@ final class WindowManager {
         show(BrowserModel(services: Services.shared, location: .folder(folder), select: select))
     }
 
+    /// A window where Settings, General says new windows open.
+    @discardableResult
+    func newWindow(from folder: URL?) -> BrowserWindowController {
+        show(BrowserModel(services: Services.shared, location: NexusPreferencesStore.shared.newWindowLocation(current: folder)))
+    }
+
+    /// Every open window's model, for settings that apply at once.
+    var models: [BrowserModel] { controllers.map(\.model) }
+
     func newTab(from model: BrowserModel) {
         let folder = model.focused.location.diskFolder ?? Services.shared.paths.home
         let controller = BrowserWindowController(model: BrowserModel(services: Services.shared, location: .folder(folder)))

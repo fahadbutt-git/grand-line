@@ -33,6 +33,12 @@ done
 
 if command -v shellcheck >/dev/null 2>&1; then
   check "shellcheck (all scripts)" shellcheck -x -S warning -e SC1091 "${SHELL_FILES[@]}"
+  # Notes that matter for security fail too: unquoted expansions (word
+  # splitting and globbing of paths), \$(...) run as a command, eval of an
+  # array, find -exec sh -c with {}, rm -rf "\$var/" with an empty var, ssh
+  # and here-documents expanding on the wrong side.
+  check "shellcheck security notes (SC2086 SC2046 SC2091 SC2294 SC2156 SC2115 SC2216 SC2029 SC2087)" \
+    shellcheck -x -S info -i SC2086,SC2046,SC2091,SC2294,SC2156,SC2115,SC2216,SC2029,SC2087 -e SC1091 "${SHELL_FILES[@]}"
 else
   fail "shellcheck is not installed (pip install shellcheck-py)"
 fi
@@ -188,7 +194,7 @@ print("\n".join(bad)); sys.exit(1 if bad else 0)'
 
 check "no personal paths or secrets committed" bash -c '
   found="$(grep -rnoE "/Users/[a-z]+/|ghp_[A-Za-z0-9]{20}|github_pat_" --exclude-dir=.git --exclude-dir=.build . \
-    | grep -v -e "^./tests/run-all.sh:" -e ":/Users/me/\$")"
+    | grep -v -e "^./tests/run-all.sh:" -e "^./tests/security-checks.sh:" -e ":/Users/me/\$")"
   [[ -z "$found" ]] || { printf "%s\n" "$found"; exit 1; }'
 
 # Names, emails and places belong in ~/.config/grand-line/personal.env.
@@ -196,6 +202,12 @@ check "no email addresses or home coordinates committed" bash -c '
   found="$(git ls-files -z | xargs -0 grep -nIoE "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.(com|org|net|ca|edu)|^-?[0-9]{1,2}\.[0-9]+ -?[0-9]{1,3}\.[0-9]+ [A-Z]" 2>/dev/null \
     | grep -vE "noreply|example\.(com|org)|@users\.noreply|apps/.*/Tests/")"
   [[ -z "$found" ]] || { printf "%s\n" "$found"; exit 1; }'
+
+echo "Security"
+check "no keys or tokens in the package's files" bash tests/security-checks.sh --secrets
+check "every GitHub action pinned to a commit SHA, read-only token, no credentials left in .git" bash tests/security-checks.sh --actions
+check "nothing downloaded is piped into a shell or eval'd" bash tests/security-checks.sh --remote-code
+check "the apps ask for no exceptions to hardened runtime beyond the allowed list" bash tests/security-checks.sh --entitlements
 
 echo "Behaviour"
 check "unit tests (menus, shortcuts, overlays, themes, migrations, hooks, ArtCraft)" bash tests/unit.sh

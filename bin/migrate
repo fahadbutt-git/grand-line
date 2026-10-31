@@ -4,6 +4,9 @@
 # migrate --pending    list them (exits 1 when there are none)
 # migrate --mark-all   record every migration as done without running it
 #                      (setup does this on a fresh install, which needs none)
+# migrate --unattended run only those marked "# grandline:unattended" (they
+#                      need no password and ask nothing); the rest wait for
+#                      an update you run yourself
 # Migrations are migrations/<unix time>-<what it does>.sh, as in Omarchy.
 # Each runs once; a marker in ~/.local/state/grand-line/migrations records it.
 # A failed migration stops the run, so the next update tries it again.
@@ -32,10 +35,14 @@ case "${1:-}" in
   --mark-all)
     pending | while IFS= read -r f; do touch "$DONE/${f##*/}"; done
     ;;
-  "")
+  ""|--unattended)
     [[ -n "$(pending)" ]] || { echo "No one-time changes waiting."; exit 0; }
+    waiting=0
     while IFS= read -r f; do
       [[ -n "$f" ]] || continue
+      if [[ "${1:-}" == --unattended ]] && ! grep -qx '# grandline:unattended' "$f"; then
+        waiting=$((waiting + 1)); continue
+      fi
       echo "Migration: ${f##*/}"
       if GRAND_LINE_REPO="$REPO" /bin/bash "$f" </dev/null; then
         touch "$DONE/${f##*/}"
@@ -44,6 +51,10 @@ case "${1:-}" in
         exit 1
       fi
     done < <(pending)
+    if [[ "$waiting" -gt 0 ]]; then
+      echo "$waiting one-time change(s) wait for an update you run yourself: update"
+      exit 3
+    fi
     ;;
-  *) echo "usage: migrate [--pending | --mark-all]" >&2; exit 2 ;;
+  *) echo "usage: migrate [--pending | --mark-all | --unattended]" >&2; exit 2 ;;
 esac

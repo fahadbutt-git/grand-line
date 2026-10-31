@@ -2,6 +2,7 @@ import AppKit
 import BrowserKit
 import FileKit
 import IndexKit
+import IndexService
 
 /// What every window shares: file operations and their undo, sizes, recents,
 /// the name index, stored view settings, workspaces, saved searches and the
@@ -14,7 +15,8 @@ final class Services: ObservableObject {
     let operations = FileOperations()
     let folderSizes = FolderSize()
     let recents = Recents()
-    let index: FileIndex
+    /// File names, from the Grand Line Index service Sight shares.
+    let index: SharedIndexClient
     let selectionFile: SelectionFile
     let workspaces: WorkspaceStore
     let theme = ThemeStore()
@@ -33,8 +35,7 @@ final class Services: ObservableObject {
     private(set) var drives: [GoogleDrive]
 
     private init() {
-        let order = ScanOrder.home(paths.home.path)
-        index = (try? FileIndex.load(from: paths.nameIndex, order: order)) ?? FileIndex(roots: [paths.home.path], order: order)
+        index = SharedIndexClient(home: paths.home.path)
         selectionFile = SelectionFile(url: paths.selectionFile)
         workspaces = WorkspaceStore(folder: paths.workspaces)
         viewPreferences = JSONFile<ViewPreferences>(paths.viewPreferences).read() ?? ViewPreferences()
@@ -48,15 +49,9 @@ final class Services: ObservableObject {
     }
 
     func start() {
-        let index = self.index
-        let file = paths.nameIndex
-        Task {
-            // Searchable while it builds; saved along the way and when done.
-            let count = await index.count
-            let complete = await index.isComplete
-            if count == 0 || !complete { await index.build(savingTo: file, every: 30) }
-            await index.startWatching()
-        }
+        // The service keeps the index current; this only connects (or, while
+        // it is out of reach, reads its snapshot).
+        index.start()
         let progress = operations.progress
         Task { [weak self] in
             for await step in progress { self?.transfers.apply(step) }
@@ -65,16 +60,9 @@ final class Services: ObservableObject {
         sidebar.start()
     }
 
+    /// The service saves the index, so quitting waits for nothing.
     func stop() {
-        let index = self.index
-        let file = paths.nameIndex
-        try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let done = DispatchSemaphore(value: 0)
-        Task.detached {
-            try? await index.save(to: file)
-            done.signal()
-        }
-        _ = done.wait(timeout: .now() + 3)
+        index.stop()
     }
 
     // MARK: Stored state
@@ -128,6 +116,13 @@ final class Services: ObservableObject {
         saveSidebarHidden()
     }
 
+    /// Settings, Sidebar: shows or hides sections and items.
+    func setSidebarHidden(_ hidden: SidebarHidden) {
+        guard hidden != sidebarHidden else { return }
+        sidebarHidden = hidden
+        saveSidebarHidden()
+    }
+
     private func saveSidebarHidden() {
         try? JSONFile<SidebarHidden>(paths.sidebarHidden).write(sidebarHidden)
         sidebar.refresh()
@@ -174,11 +169,9 @@ final class Services: ObservableObject {
     func noteOpened(_ urls: [URL]) {
         let recents = self.recents
         let index = self.index
+        for url in urls { index.noteOpened(url.path) }
         Task {
-            for url in urls {
-                try? await recents.record(url)
-                await index.noteOpened(url.path)
-            }
+            for url in urls { try? await recents.record(url) }
         }
     }
 }

@@ -21,7 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         NSApp.registerServicesMenuSendTypes([.fileURL], returnTypes: [])
         services.start()
         if !launchedWithRequest, WindowManager.shared.isEmpty {
-            WindowManager.shared.newWindow(at: services.paths.home)
+            WindowManager.shared.newWindow(from: nil)
         }
     }
 
@@ -30,14 +30,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag { WindowManager.shared.newWindow(at: services.paths.home) }
+        if !flag { WindowManager.shared.newWindow(from: nil) }
         return true
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
+    /// Folders to show, and `nexus://settings[/pane]`, which opens Settings
+    /// (the launcher's "nexus settings" and the main menu use it).
     func application(_ application: NSApplication, open urls: [URL]) {
-        route(.open(urls))
+        let settings = urls.filter { $0.scheme?.lowercased() == "nexus" }
+        for url in settings where (url.host ?? "") == "settings" {
+            let pane = url.pathComponents.dropFirst().first
+            launchedWithRequest = launchedWithRequest || WindowManager.shared.isEmpty
+            NexusSettingsWindow.shared.show(pane: pane)
+        }
+        let files = urls.filter { $0.isFileURL }
+        if !files.isEmpty { route(.open(files)) }
     }
 
     @objc func handle(_ event: NSAppleEventDescriptor, withReply reply: NSAppleEventDescriptor) {
@@ -63,7 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         guard let raw = (sender as? NSMenuItem)?.representedObject as? String,
               let command = BrowserCommand(rawValue: raw) else { return }
         if TextFieldGuard.forward(command, in: NSApp.keyWindow) { return }
-        let controller = WindowManager.shared.newWindow(at: services.paths.home)
+        let controller = WindowManager.shared.newWindow(from: nil)
         if command != .newWindow { controller.model.perform(command) }
     }
 
@@ -77,12 +86,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         return CommandCatalog.spec(command).menu == .go || [.newWindow, .newTab, .find, .connectToServer].contains(command)
     }
 
+    /// Nexus › Settings… (Cmd+,): the Settings window.
     @objc func openSettings(_ sender: Any?) {
-        let file = services.paths.settings
-        if !FileManager.default.fileExists(atPath: file.path) {
-            try? JSONFile<NexusSettings>(file).write(NexusSettings(places: nil, projectFolders: [], projects: []))
-        }
-        NSWorkspace.shared.open(file)
+        NexusSettingsWindow.shared.show()
+    }
+
+    /// Nexus › Open Configuration Folder: ~/.config/grand-line/nexus.
+    @objc func openConfigurationFolder(_ sender: Any?) {
+        let folder = services.paths.settingsFolder
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(folder)
     }
 
     @objc func reloadSettings(_ sender: Any?) {

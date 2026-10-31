@@ -113,7 +113,8 @@ private struct Column: View {
                 .font(.system(size: 12))
                 .foregroundStyle(item.isFolder ? palette.accent : palette.dim)
                 .frame(width: 18)
-            Text(item.name).font(.system(size: 13)).lineLimit(1).truncationMode(.middle)
+            Text(item.shownName(allExtensions: NexusPreferencesStore.shared.current.showAllExtensions))
+                .font(.system(size: 13)).lineLimit(1).truncationMode(.middle)
                 .foregroundStyle(selected ? palette.selectionText : palette.text)
             Spacer(minLength: 4)
             if item.isFolder {

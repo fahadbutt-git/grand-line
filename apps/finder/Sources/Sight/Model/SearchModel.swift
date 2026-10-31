@@ -265,7 +265,8 @@ final class SearchModel: ObservableObject {
 enum Metrics {
     static let width: CGFloat = 720
     static let preview: CGFloat = 340
-    static let row: CGFloat = 30
+    /// A result row: 30 at regular density (Settings, Appearance).
+    static var row: CGFloat = 30
     static let header: CGFloat = 24
     static let maxList: CGFloat = 9 * 30 + 3 * 24
     /// The preview pane is as tall as the field, a full list and the footer.

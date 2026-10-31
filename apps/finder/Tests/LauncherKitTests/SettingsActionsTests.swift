@@ -341,6 +341,20 @@ final class SettingsActionsTests: XCTestCase {
                        "Bluetooth needs blueutil. Run: update")
     }
 
+    func testAutomationThatNeverAnswersOrIsRefusedSaysWhichPermission() {
+        // CI and a first run: osascript waits on the Automation question, or
+        // macOS refuses with -1743. The row must say so, not keep working.
+        let dark = SettingJob(resultID: "setting.darkmode", executable: "/p", arguments: ["dark", "on"], timeout: 30, readBack: ["dark"],
+                              expectedKey: "dark", expectedValue: true, expectedVolume: nil, permission: .automation, toleratesTimeout: false)
+        let stalled = SettingsActionsProvider.failure(status: 15, output: "", job: dark)
+        XCTAssertEqual(stalled?.permission, .automation)
+        XCTAssertEqual(stalled?.message, "System Events did not answer. Allow Automation for System Events in Privacy & Security")
+        let refused = SettingsActionsProvider.failure(
+            status: 1, output: "execution error: Not authorized to send Apple events to System Events. (-1743)\n", job: dark)
+        XCTAssertEqual(refused, SettingFailure("Allow Automation for System Events in Privacy & Security", permission: .automation))
+        XCTAssertEqual(SettingsActionsProvider.failure(status: 3, output: "", job: dark)?.permission, .automation)
+    }
+
     func testScreenshotsAndPanesAreRunByTheWindow() throws {
         let provider = SettingsActionsProvider(paths: paths, runner: FakeMac())
         let shot = try row(provider, "screenshot")

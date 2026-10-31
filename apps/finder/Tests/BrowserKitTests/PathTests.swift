@@ -29,6 +29,27 @@ final class PathTests: XCTestCase {
         XCTAssertNil(PathInput.interpret("", relativeTo: documents, home: home))
     }
 
+    func testTildeUsesTheHomeGivenNotTheAccounts() {
+        // The journeys run with a fixture home; ~ must mean that folder.
+        let fixture = URL(fileURLWithPath: "/Volumes/Work/journeys/homes/files-tabs-go/journeyhome", isDirectory: true)
+        XCTAssertEqual(PathInput.interpret("~/Documents/Projects", relativeTo: fixture, home: fixture),
+                       .path(URL(fileURLWithPath: fixture.path + "/Documents/Projects", isDirectory: true)))
+    }
+
+    func testNothingFoundIsSaidInWords() {
+        let missing = PathInput.interpret("~/Documents/Nowhere", relativeTo: documents, home: home)!
+        XCTAssertEqual(PathInput.notFound(missing, home: home), "No folder at ~/Documents/Nowhere")
+        XCTAssertEqual(PathInput.notFound(.fuzzy("Lid Repair"), home: home), "No folder named \u{201C}Lid Repair\u{201D}")
+    }
+
+    func testAFolderNameIsFoundNearbyBeforeTheIndex() {
+        let folders: Set<String> = ["/Users/me/Documents/Projects", "/Users/me/Music"]
+        let isFolder: (URL) -> Bool = { folders.contains($0.path) }
+        XCTAssertEqual(PathInput.nearbyFolder(named: "Projects", in: documents, home: home, isFolder: isFolder)?.path, "/Users/me/Documents/Projects")
+        XCTAssertEqual(PathInput.nearbyFolder(named: "Music", in: documents, home: home, isFolder: isFolder)?.path, "/Users/me/Music")
+        XCTAssertNil(PathInput.nearbyFolder(named: "Lid Repair", in: documents, home: home, isFolder: isFolder))
+    }
+
     func testTabCompletion() {
         let children: (URL) -> [String] = { url in
             url.path == "/Users/me" ? ["Documents", "Downloads", "Desktop", "Developer"] : []

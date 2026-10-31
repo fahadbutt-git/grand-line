@@ -23,7 +23,10 @@ case "${1:-area}" in
     text="$(ocr "$tmp")"
     if [[ -n "$text" ]]; then
       printf '%s' "$text" | pbcopy
-      notify "Text copied" "$(printf '%s' "$text" | head -c 80)"
+      # Only the length: the text may be patient information from a Citrix
+      # window, and notifications stay in Notification Center and can show
+      # on the lock screen.
+      notify "Text copied" "Copied $(printf '%s' "$text" | wc -m | tr -d ' ') characters"
     else
       notify "Text capture" "No text found in that area."
     fi
@@ -38,7 +41,7 @@ case "${1:-area}" in
               -e 'delay 0.1' -e 'tell application "System Events" to keystroke "c" using command down' \
               -e 'delay 0.2' -e 'tell application "System Events" to key code 53' >/dev/null 2>&1
     url="$(pbpaste)"; [[ "$url" == *://* ]] || url=""
-    if [[ -n "$url" ]]; then printf '%s' "$url" | pbcopy; notify "URL copied" "$url"; fi
+    if [[ -n "$url" ]]; then printf '%s' "$url" | pbcopy; notify "URL copied" "Copied $(printf '%s' "$url" | wc -m | tr -d ' ') characters"; fi
     ;;
   *) echo "usage: capture area|window|screen|record|text|url" >&2; exit 2 ;;
 esac

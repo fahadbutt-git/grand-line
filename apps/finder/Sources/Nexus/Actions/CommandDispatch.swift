@@ -9,7 +9,7 @@ extension BrowserModel {
 
     func perform(_ command: BrowserCommand) {
         switch command {
-        case .newWindow: WindowManager.shared.newWindow(at: focused.location.diskFolder ?? services.paths.home)
+        case .newWindow: WindowManager.shared.newWindow(from: focused.location.diskFolder)
         case .newTab: WindowManager.shared.newTab(from: self)
         case .newFolder: newFolder(withSelection: false)
         case .newFolderWithSelection: newFolder(withSelection: true)

@@ -26,7 +26,9 @@ public enum ResultGrouping {
     ///   - ranked: best first.
     ///   - topHit: whether to lift the best result into Top hit.
     ///   - limitScale: a prefix shows one provider, so its section may hold more.
-    public static func group(_ ranked: [LaunchResult], topHit: Bool = true, limitScale: Int = 1) -> [ResultGroup] {
+    ///   - layout: the section order and row counts from Settings.
+    public static func group(_ ranked: [LaunchResult], topHit: Bool = true, limitScale: Int = 1,
+                             layout: ResultLayout = .current) -> [ResultGroup] {
         var buckets: [ResultSection: [LaunchResult]] = [:]
         var rest = ranked[...]
         if topHit, let best = ranked.first, canBeTopHit(best) {
@@ -34,12 +36,12 @@ public enum ResultGrouping {
             rest = ranked.dropFirst()
         }
         for result in rest {
-            let limit = result.section.limit * limitScale
+            let limit = layout.limit(result.section) * limitScale
             if buckets[result.section, default: []].count < limit {
                 buckets[result.section, default: []].append(result)
             }
         }
-        return ResultSection.allCases.compactMap { section in
+        return layout.order.compactMap { section in
             guard let rows = buckets[section], !rows.isEmpty else { return nil }
             return ResultGroup(section: section, rows: rows)
         }

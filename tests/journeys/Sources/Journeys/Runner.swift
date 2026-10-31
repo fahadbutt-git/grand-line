@@ -47,15 +47,19 @@ final class Journey {
     /// Whether the app runs with the fixture as its home folder. Off only for
     /// journeys about the Mac's own settings.
     let usesFixtureHome: Bool
+    /// Runs after the app quits, whether the steps passed or not (stopping a
+    /// helper a step started).
+    let cleanup: ((Ctx) -> Void)?
 
     init(_ name: String, role: String, summary: String, waitsForWindow: Bool = true, usesFixtureHome: Bool = true,
          window: @escaping (Ctx) -> Element?, rules: @escaping (Ctx, Snapshot, CGRect) -> [String] = { _, _, _ in [] },
-         steps: [Step]) {
+         cleanup: ((Ctx) -> Void)? = nil, steps: [Step]) {
         self.name = name
         self.role = role
         self.summary = summary
         self.waitsForWindow = waitsForWindow
         self.usesFixtureHome = usesFixtureHome
+        self.cleanup = cleanup
         self.window = window
         self.rules = rules
         self.steps = steps
@@ -81,6 +85,8 @@ final class Ctx {
     /// The notch app's closed size, and a settings window a step found.
     var closedFrame: CGRect?
     var settingsWindow: Element?
+    /// More environment for the next launch (the index service to use).
+    var extraEnv: [String: String] = [:]
 
     init(app: AppEntry, bundle: URL, home: URL, dir: URL, options: Options) {
         self.app = app
@@ -144,6 +150,7 @@ final class Ctx {
             try wait("the running \(app.name) to quit", timeout: 10) { existing.allSatisfy(\.isTerminated) }
         }
         var env = ["GRAND_LINE_JOURNEY": "1"]
+        extraEnv.forEach { env[$0.key] = $0.value }
         if fixtureHome {
             env["HOME"] = home.path
             env["CFFIXED_USER_HOME"] = home.path
@@ -443,6 +450,7 @@ final class Runner {
         }
         Watchdog.shared.arm(until: Date().addingTimeInterval(60), "\(journey.name), quitting \(app.name)")
         ctx.quit()
+        journey.cleanup?(ctx)
         result.seconds = Date().timeIntervalSince(start)
         result.metrics = ctx.metrics
         result.notes = ctx.notes

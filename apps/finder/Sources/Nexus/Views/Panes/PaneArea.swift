@@ -48,22 +48,44 @@ struct PaneView: View {
                     Text(problem).font(.system(size: 13)).foregroundStyle(palette.dim)
                         .multilineTextAlignment(.center).padding(24)
                 } else if !pane.isLoading, pane.items.isEmpty {
-                    Text(emptyText).font(.system(size: 13)).foregroundStyle(palette.faint)
+                    emptyState
                 }
             }
             // Always the whole area under the toolbar, whatever the view inside
             // measures: a view with no height of its own would otherwise shrink
             // the pane to nothing and pull the toolbar down to the middle.
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // One element for the whole area. Without it the identifier lands
+            // on each child instead, so an empty Recents or search reported its
+            // 16 pt "Empty folder" line as the file area.
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("nexus.pane")
         }
         .background(isFocused || !showsHeader ? palette.background : palette.panel.opacity(0.5))
         .simultaneousGesture(TapGesture().onEnded { model.focus(pane) })
     }
 
-    private var emptyText: String {
-        if case .search = pane.location { return pane.isLoading ? "Searching…" : "No matches" }
-        return "Empty folder"
+    @ViewBuilder private var emptyState: some View {
+        let empty = PaneEmptyState.make(for: pane.location, folderTitle: searchFolderTitle)
+        HStack(spacing: 4) {
+            Text(empty.message).font(.system(size: 13)).foregroundStyle(palette.faint)
+            if let wider = empty.widen, case .search(let query, _) = pane.location {
+                Button(empty.widenTitle) { pane.replace(.search(query: query, scope: wider)) }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 13))
+                    .foregroundStyle(palette.accent)
+                    .accessibilityIdentifier("nexus.empty.widen")
+            }
+        }
+        .padding(24)
+    }
+
+    /// The folder a search started in, by the name its chip shows ("Trash").
+    private var searchFolderTitle: String? {
+        guard case .search(_, .folder(let path)) = pane.location else { return nil }
+        let url = URL(fileURLWithPath: path).standardizedFileURL
+        if url.path == model.services.paths.trash.standardizedFileURL.path { return "Trash" }
+        return FileManager.default.displayName(atPath: url.path)
     }
 
     @ViewBuilder private var content: some View {

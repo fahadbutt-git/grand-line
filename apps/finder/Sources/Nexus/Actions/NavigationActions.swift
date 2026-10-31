@@ -42,31 +42,64 @@ extension BrowserModel {
     func beginPathEditing() {
         let folder = focused.location.diskFolder ?? services.paths.home
         pathText = PathSegments.editableText(for: folder, home: services.paths.home)
+        pathProblem = nil
         editingPath = true
     }
 
-    /// Return in the path field: a path goes there; a name goes to the best
-    /// folder match from the index. Returns false to keep the field open.
-    @discardableResult
-    func commitPath(_ text: String, fuzzyMatch: URL?) -> Bool {
-        let current = focused.location.diskFolder ?? services.paths.home
-        switch PathInput.interpret(text, relativeTo: current, home: services.paths.home, aliases: pathAliases) {
-        case .path(let url)?:
-            var isFolder: ObjCBool = false
-            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder) else { return false }
-            if isFolder.boolValue {
-                focused.go(.folder(url))
-            } else {
-                focused.go(.folder(url.deletingLastPathComponent()), select: [url])
-            }
-        case .fuzzy?:
-            guard let fuzzyMatch else { return false }
-            focused.go(.folder(fuzzyMatch))
-        case nil:
-            break
-        }
+    func endPathEditing() {
         editingPath = false
+        pathProblem = nil
+    }
+
+    /// Return in the path field: a path goes there; a name goes to the folder
+    /// picked in the list, a folder of that name nearby, or the best folder
+    /// match from the index. When nothing is found the field stays open and
+    /// says so under it.
+    func submitPath(_ text: String, fuzzyMatch: URL?) {
+        let home = services.paths.home
+        let current = focused.location.diskFolder ?? home
+        guard let intent = PathInput.interpret(text, relativeTo: current, home: home, aliases: pathAliases) else {
+            endPathEditing()
+            return
+        }
+        switch intent {
+        case .path(let url):
+            if !go(to: url) { showPathProblem(PathInput.notFound(intent, home: home)) }
+        case .fuzzy(let name):
+            if let fuzzyMatch, go(to: fuzzyMatch) { return }
+            if let near = PathInput.nearbyFolder(named: name, in: current, home: home, isFolder: Self.isFolder), go(to: near) { return }
+            // The list under the field may not have its answer yet: ask the index now.
+            Task { [weak self] in
+                guard let self else { return }
+                let found = await self.folderMatches(name).first
+                guard self.editingPath, self.pathText == text else { return }
+                if let found, self.go(to: found) { return }
+                self.showPathProblem(PathInput.notFound(intent, home: home))
+            }
+        }
+    }
+
+    /// Goes to a folder, or to a file's folder with the file selected.
+    private func go(to url: URL) -> Bool {
+        var isFolder: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder) else { return false }
+        if isFolder.boolValue {
+            focused.go(.folder(url))
+        } else {
+            focused.go(.folder(url.deletingLastPathComponent()), select: [url])
+        }
+        endPathEditing()
         return true
+    }
+
+    private func showPathProblem(_ text: String) {
+        pathProblem = text
+        NSSound.beep()
+    }
+
+    nonisolated private static func isFolder(_ url: URL) -> Bool {
+        var isFolder: ObjCBool = false
+        return FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder) && isFolder.boolValue
     }
 
     func completePath(_ text: String) -> String? {
@@ -172,7 +205,8 @@ extension BrowserModel {
             endSearch()
             return
         }
-        let start = scope ?? currentSearchScope ?? (focused.location.folderURL.map { .folder($0.path) } ?? .home)
+        let start = scope ?? currentSearchScope
+            ?? NexusPreferencesStore.shared.current.defaultSearchScope.scope(folder: focused.location.folderURL)
         // Typing more refines the search in place rather than adding history.
         if case .search = focused.location {
             focused.replace(.search(query: trimmed, scope: start))

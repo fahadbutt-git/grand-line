@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draws the bundled app icons (AppIcon.icns) for Nexus, Sight and Iceberg.
+"""Draws the bundled app icons (AppIcon.icns) for Nexus, Sight, Grand Line Index and Iceberg.
 
 The apps draw their icons again at run time from the active theme
 (apps/icons). This script draws the same glyphs, read from the table in
@@ -12,6 +12,9 @@ an icon before it first runs. Pure Python: PNGs are written with zlib and the
   python3 tools/make-icons.py --previews DIR   also write DIR/<App>-<theme>.png (1024 and 32)
   python3 tools/make-icons.py --theme signal-dark --previews DIR --previews-only
   python3 tools/make-icons.py --check          the table parses and every .icns is sound
+  python3 tools/make-icons.py --theme nord --out DIR
+                                               write DIR/<App>/AppIcon.icns instead (bin/theme
+                                               puts these in the installed apps)
 """
 import argparse
 import math
@@ -29,6 +32,9 @@ THEMES = os.path.join(ROOT, "config/themes")
 APPS = [
     ("nexus", "ICON_FILES", "apps/finder/Resources/Nexus/AppIcon.icns", "Nexus"),
     ("sight", "ICON_SEARCH", "apps/finder/Resources/Sight/AppIcon.icns", "Sight"),
+    # The index agent shows only in Login Items and Privacy & Security, under
+    # Sight's glyph, the app it mostly serves.
+    ("sight", "ICON_SEARCH", "apps/finder/Resources/GrandLineIndex/AppIcon.icns", "GrandLineIndex"),
     ("iceberg", "ICON_NOTCH", "apps/iceberg/Resources/Iceberg/AppIcon.icns", "Iceberg"),
 ]
 SIZE = 1024
@@ -353,6 +359,7 @@ def main():
     parser.add_argument("--previews", metavar="DIR")
     parser.add_argument("--only", choices=[a[3] for a in APPS])
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--out", metavar="DIR", help="write DIR/<App>/AppIcon.icns, leave the package's own")
     parser.add_argument("--previews-only", action="store_true", help="write the previews, leave the .icns files")
     args = parser.parse_args()
     tables = read_tables()
@@ -366,11 +373,14 @@ def main():
             continue
         sizes = render_sizes(tables, name, palette(values, key))
         if not args.previews_only:
-            target = os.path.join(ROOT, path)
+            if args.out:
+                target = os.path.join(args.out, product, "AppIcon.icns")
+            else:
+                target = os.path.join(ROOT, path)
             os.makedirs(os.path.dirname(target), exist_ok=True)
             with open(target, "wb") as f:
                 f.write(icns([(kind, png(sizes[s], s)) for kind, s in ICNS_TYPES]))
-            print("wrote", path)
+            print("wrote", target if args.out else path)
         if args.previews:
             os.makedirs(args.previews, exist_ok=True)
             preview = os.path.join(args.previews, "%s-%s.png" % (product, args.theme))

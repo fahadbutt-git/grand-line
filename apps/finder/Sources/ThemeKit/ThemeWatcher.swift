@@ -1,7 +1,11 @@
 import Foundation
 import IndexKit
 
-/// Publishes the theme again whenever `theme set` changes it or its file is edited.
+/// Publishes the theme again whenever `theme set` changes it or its file is
+/// edited, and, while the theme follows macOS (`ThemeLocation.followFile`),
+/// whenever the system switches between dark and light: the variant for the
+/// new appearance is shown at once, and one app runs `theme mode` so the rest
+/// of the package follows too.
 ///
 /// ```swift
 /// let watcher = ThemeWatcher()
@@ -18,11 +22,15 @@ public final class ThemeWatcher: @unchecked Sendable {
     private var current: Theme
     private var watcher: FolderWatcher?
     private var task: Task<Void, Never>?
+    private var systemIsDark: Bool
+    private var appearanceObserver: (any NSObjectProtocol)?
 
     public init(location: ThemeLocation = ThemeLocation(), latency: TimeInterval = 0.2) {
         self.location = location
         self.latency = latency
-        self.current = location.load()
+        let dark = SystemAppearance.isDark()
+        self.systemIsDark = dark
+        self.current = location.load(systemIsDark: dark)
         let (themes, continuation) = AsyncStream.makeStream(of: Theme.self, bufferingPolicy: .bufferingNewest(1))
         self.themes = themes
         self.continuation = continuation
@@ -31,6 +39,7 @@ public final class ThemeWatcher: @unchecked Sendable {
     deinit {
         task?.cancel()
         watcher?.stop()
+        if let appearanceObserver { DistributedNotificationCenter.default().removeObserver(appearanceObserver) }
         continuation.finish()
     }
 
@@ -47,6 +56,17 @@ public final class ThemeWatcher: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         guard watcher == nil else { return true }
+        if appearanceObserver == nil {
+            appearanceObserver = DistributedNotificationCenter.default().addObserver(
+                forName: SystemAppearance.changedNotification, object: nil, queue: nil
+            ) { [weak self] _ in
+                guard let watcher = self else { return }
+                // The default is written as the notification goes out; read it a moment later.
+                DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.25) { [weak watcher] in
+                    watcher?.systemAppearanceChanged(isDark: SystemAppearance.isDark())
+                }
+            }
+        }
         let folders = [location.stateFile.deletingLastPathComponent(), location.themesFolder]
             .map(\.path)
             .filter { FileManager.default.fileExists(atPath: $0) }
@@ -68,12 +88,33 @@ public final class ThemeWatcher: @unchecked Sendable {
         task = nil
         watcher?.stop()
         watcher = nil
+        if let appearanceObserver { DistributedNotificationCenter.default().removeObserver(appearanceObserver) }
+        appearanceObserver = nil
+    }
+
+    /// macOS switched between dark and light. While the theme follows macOS,
+    /// the matching variant shows now, and the `theme` command is run (by
+    /// whichever app gets there first) to switch everything else.
+    public func systemAppearanceChanged(isDark: Bool) {
+        lock.lock()
+        let changed = systemIsDark != isDark
+        systemIsDark = isDark
+        lock.unlock()
+        guard changed, location.followsSystem() else { return }
+        reload()
+        let location = self.location
+        Task.detached(priority: .utility) {
+            await ThemeFollow.switchIfNeeded(location: location, systemIsDark: isDark)
+        }
     }
 
     /// Reads the theme again and publishes it if it changed. Returns whether it changed.
     @discardableResult
     public func reload() -> Bool {
-        let fresh = location.load()
+        lock.lock()
+        let dark = systemIsDark
+        lock.unlock()
+        let fresh = location.load(systemIsDark: dark)
         lock.lock()
         let changed = fresh != current
         if changed { current = fresh }

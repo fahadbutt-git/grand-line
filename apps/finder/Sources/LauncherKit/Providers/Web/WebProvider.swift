@@ -11,6 +11,8 @@ public final class WebProvider: InstantProvider, @unchecked Sendable {
     let quicklinksFile: String
     private let lock = NSLock()
     private var searches = WebSearches.builtIn
+    /// The engines from Settings, Web; quicklinks.tsv adds to them.
+    private var engines = WebEngineList.standard
 
     public init(quicklinksFile: String = GrandLinePaths().quicklinks) {
         self.quicklinksFile = quicklinksFile
@@ -18,7 +20,14 @@ public final class WebProvider: InstantProvider, @unchecked Sendable {
 
     public func reload() {
         let text = (try? String(contentsOfFile: quicklinksFile, encoding: .utf8)) ?? ""
-        set(WebSearches.all(quicklinks: text))
+        let engines = lock.withLock { self.engines }
+        set(WebEngineList.searches(engines, quicklinks: text))
+    }
+
+    /// New engines from Settings take effect at once.
+    public func setEngines(_ list: [WebEngine]) {
+        lock.withLock { engines = list }
+        reload()
     }
 
     public func set(_ list: [WebSearch]) {

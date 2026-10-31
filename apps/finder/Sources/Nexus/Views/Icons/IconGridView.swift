@@ -54,7 +54,7 @@ struct IconCell: View {
             Thumbnail(item: item, size: size, palette: palette)
                 .padding(4)
                 .background(RoundedRectangle(cornerRadius: 6).fill(selected ? palette.selection : Color.clear))
-            Text(item.name)
+            Text(item.shownName(allExtensions: NexusPreferencesStore.shared.current.showAllExtensions))
                 .font(.system(size: 12))
                 .foregroundStyle(selected ? palette.selectionText : palette.text)
                 .lineLimit(2)

@@ -10,15 +10,22 @@ public final class CalculatorProvider: InstantProvider, @unchecked Sendable {
     let rates: CurrencyRatesStore
     let now: @Sendable () -> Date
     let calendar: Calendar
+    let arithmetic: Bool
+    let conversions: Bool
 
-    public init(rates: CurrencyRatesStore, calendar: Calendar = .current, now: @escaping @Sendable () -> Date = { Date() }) {
+    public init(rates: CurrencyRatesStore, calendar: Calendar = .current, now: @escaping @Sendable () -> Date = { Date() },
+                arithmetic: Bool = true, conversions: Bool = true) {
         self.rates = rates
         self.calendar = calendar
         self.now = now
+        self.arithmetic = arithmetic
+        self.conversions = conversions
     }
 
     public func instantResults(for query: LaunchQuery) -> [LaunchResult] {
-        let calculator = Calculator(rates: rates.current, dates: DateMath(now: now(), calendar: calendar))
+        var calculator = Calculator(rates: rates.current, dates: DateMath(now: now(), calendar: calendar))
+        calculator.arithmetic = arithmetic
+        calculator.conversions = conversions
         guard let answer = calculator.evaluate(query.term, strict: query.prefix != .calculator) else { return [] }
         var actions: [LaunchAction] = []
         if !answer.copy.isEmpty {

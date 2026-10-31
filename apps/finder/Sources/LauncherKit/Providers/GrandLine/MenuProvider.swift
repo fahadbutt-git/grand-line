@@ -49,6 +49,7 @@ public final class MenuProvider: InstantProvider, @unchecked Sendable {
         case "files": return "folder"
         case "system": return "power"
         case "learn": return "keyboard"
+        case "settings": return "gearshape"
         default: return "menubar.rectangle"
         }
     }

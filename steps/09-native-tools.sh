@@ -2,7 +2,8 @@
 # Builds the small native helpers in tools/*.swift with Apple's compiler
 # (installed with the command line tools). Output: ~/.grand-line/.build/<name>.
 # To add a helper, drop a new tools/<name>.swift file in; nothing else changes.
-# Then builds the package's own apps in apps/*/ (lib/native-apps.sh).
+# Then builds the package's own apps in apps/*/ (lib/native-apps.sh), signed
+# with the package's own identity so they keep their permissions.
 
 step_native_tools() {
   if ! have swiftc && [[ "$DRY_RUN" == 0 ]]; then
@@ -25,7 +26,15 @@ step_native_tools() {
   done
   # shellcheck source=lib/native-apps.sh
   source "$REPO_DIR/lib/native-apps.sh"
+  # The identity the apps are signed with, made once (lib/signing.sh). The
+  # unattended update never makes one, and never signs ad hoc in its place,
+  # which would cost the apps their permissions: it leaves them for you.
+  if ! signing_ensure && [[ "${GRAND_LINE_UNATTENDED:-0}" == 1 ]]; then
+    warn "The apps are not rebuilt unattended until setup has made their signing identity. Run: update"
+    return 1
+  fi
   build_native_apps || failed=1
+  [[ "$DRY_RUN" == 1 ]] || exclude_indexes_from_backup
   # The apps were renamed. Their files move to the new names right after the
   # new apps are installed and before anything starts them, so the first launch
   # finds its settings and index. Every run, so a Mac whose build failed catches

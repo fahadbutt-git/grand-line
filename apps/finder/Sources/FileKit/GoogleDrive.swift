@@ -16,7 +16,7 @@ public struct GoogleDrive: Sendable, Equatable {
         case move
     }
 
-    public static func accounts(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [GoogleDrive] {
+    public static func accounts(home: URL = HomeFolder.url) -> [GoogleDrive] {
         let storage = home.appendingPathComponent("Library/CloudStorage", isDirectory: true)
         let names = (try? FileManager.default.contentsOfDirectory(atPath: storage.path)) ?? []
         return names
@@ -32,7 +32,7 @@ public struct GoogleDrive: Sendable, Equatable {
         return path == base || path.hasPrefix(base + "/")
     }
 
-    public static func drive(containing url: URL, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> GoogleDrive? {
+    public static func drive(containing url: URL, home: URL = HomeFolder.url) -> GoogleDrive? {
         accounts(home: home).first { $0.contains(url) }
     }
 
@@ -42,7 +42,7 @@ public struct GoogleDrive: Sendable, Equatable {
     public static func dragOperation(
         from sources: [URL],
         to destination: URL,
-        home: URL = FileManager.default.homeDirectoryForCurrentUser
+        home: URL = HomeFolder.url
     ) -> DragOperation {
         let drives = accounts(home: home)
         let target = drives.first { $0.contains(destination) }

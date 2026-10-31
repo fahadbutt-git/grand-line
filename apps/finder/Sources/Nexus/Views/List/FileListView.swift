@@ -45,7 +45,8 @@ struct FileListView: NSViewRepresentable {
         scroll.backgroundColor = NSColor(colors.background)
         coordinator.table?.backgroundColor = NSColor(colors.background)
         coordinator.update(theme: colors, cut: services.clipboard.cutPaths, renameRequest: model.renameRequest)
-        if isFocused, let table = coordinator.table, model.window?.firstResponder !== table,
+        // Not while Go to Folder is open: its field is about to take the keys.
+        if isFocused, !model.editingPath, let table = coordinator.table, model.window?.firstResponder !== table,
            !(model.window?.firstResponder is NSText) {
             DispatchQueue.main.async { table.window?.makeFirstResponder(table) }
         }

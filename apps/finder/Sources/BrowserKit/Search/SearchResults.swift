@@ -4,10 +4,10 @@ import IndexKit
 /// Merges the two sources of a search: IndexKit's name matches come back at
 /// once (R1) and lead; Spotlight's content matches (R2) follow without moving them.
 /// With a plan, Spotlight's name matches come before its content matches, and
-/// content matches from app data are dropped (see `SearchPlan.keepsContentMatch`).
+/// results from app data are dropped from both sources (see `SearchPlan.keeps`).
 public enum SearchResults {
     public static func names(_ matches: [IndexMatch], plan: SearchPlan) -> [String] {
-        matches.map(\.path).filter { plan.accepts($0) }
+        matches.map(\.path).filter { plan.accepts($0) && plan.keeps($0) }
     }
 
     public static func merge(names: [String], spotlight: [String], plan: SearchPlan? = nil, limit: Int = 2_000) -> [String] {
@@ -15,10 +15,10 @@ public enum SearchResults {
         if let plan {
             var byName: [String] = []
             var byContent: [String] = []
-            for path in spotlight {
+            for path in spotlight where plan.keeps(path) {
                 if plan.matchesName(path) {
                     byName.append(path)
-                } else if plan.keepsContentMatch(path) {
+                } else {
                     byContent.append(path)
                 }
             }

@@ -13,6 +13,8 @@ final class PanelController: NSObject, NSWindowDelegate {
     private let panel: SearchPanel
     private var monitor: Any?
     private var changes: AnyCancellable?
+    /// Command + Comma in the search window opens Settings.
+    var openSettings: (() -> Void)?
 
     init(services: Services) {
         self.services = services
@@ -98,6 +100,10 @@ final class PanelController: NSObject, NSWindowDelegate {
             option: flags.contains(.option),
             control: flags.contains(.control)
         )
+        if flags == .command, event.charactersIgnoringModifiers == ",", let openSettings {
+            openSettings()
+            return true
+        }
         // Command+C with text selected in the field copies that text.
         let fieldSelection = (model.field?.currentEditor()?.selectedRange.length ?? 0) > 0
         if let command = KeyCommand.command(for: press), !(command == .copy && fieldSelection), model.handle(command) {

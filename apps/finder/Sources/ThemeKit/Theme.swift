@@ -41,6 +41,8 @@ public struct Theme: Sendable, Equatable {
     public let kinds: ThemeKinds
     /// The app icons' colours (ICON_*).
     public let icon: IconTheme
+    /// Row density, when the theme sets UI_DENSITY; otherwise each app's own choice.
+    public let density: Density?
 
     /// Missing keys come from the built-in theme of the same mode.
     public init(name: String, values: [String: String]) {
@@ -89,6 +91,7 @@ public struct Theme: Sendable, Equatable {
         self.chip = background.mixed(with: accent, isDark ? 0.22 : 0.12)
         self.palette = palette
         self.kinds = ThemeKinds(values: values, palette: palette, accent: accent, dim: dim)
+        self.density = values[Density.themeKey].flatMap { Density(rawValue: $0.lowercased()) }
         // The icon falls back to this theme's own background and text, never another theme's.
         self.icon = IconTheme(values: values.merging(
             ["MODE": isDark ? "dark" : "light", "TERM_BG": background.hex, "TERM_FG": rawText.hex,

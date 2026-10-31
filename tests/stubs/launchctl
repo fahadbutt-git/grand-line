@@ -1,0 +1,21 @@
+#!/bin/bash
+# Test stub: a pretend launchd. The loaded labels are the lines of the file
+# $STUB_LAUNCHD (none when unset); bootstrap loads a plist's Label, bootout
+# and print act on gui/<uid>/<label>.
+echo "launchctl $*" >> "${STUB_LOG:-/dev/null}"
+db="${STUB_LAUNCHD:-}"
+case "${1:-}" in
+  bootstrap)
+    [[ -n "$db" && -f "${3:-}" ]] || exit 5
+    label="$(sed -n 's#.*<key>Label</key><string>\([^<]*\)</string>.*#\1#p' "$3" | head -1)"
+    grep -qxF -- "$label" "$db" 2>/dev/null || echo "$label" >> "$db" ;;
+  bootout)
+    [[ -n "$db" && -f "$db" ]] || exit 3
+    label="${2##*/}"
+    grep -qxF -- "$label" "$db" || exit 3
+    grep -vxF -- "$label" "$db" > "$db.new"; mv "$db.new" "$db" ;;
+  print|list)
+    label="${2##*/}"
+    [[ -n "$db" && -f "$db" ]] && grep -qxF -- "$label" "$db" ;;
+  *) exit 0 ;;
+esac

@@ -31,6 +31,19 @@ final class PanelLayoutTests: XCTestCase {
         XCTAssertEqual(PanelLayout(settings: empty).enabled, [])
     }
 
+    func testTheJourneyFixtureShowsTheBatteryAndItsWidget() throws {
+        // The user journeys' fixture home writes this iceberg.toml; with the
+        // old keys the panel said "Nothing is turned on".
+        let script = try String(contentsOf: repoFolder.appendingPathComponent("tests/journeys/make-fixture.sh"), encoding: .utf8)
+        let start = try XCTUnwrap(script.range(of: "iceberg.toml <<'EOF'\n"))
+        let end = try XCTUnwrap(script.range(of: "\nEOF", range: start.upperBound..<script.endIndex))
+        let (s, issues) = IcebergSettings.parse(String(script[start.upperBound..<end.lowerBound]))
+        XCTAssertEqual(issues, [])
+        let layout = PanelLayout(settings: s)
+        XCTAssertEqual(layout.builtins, ["battery"])
+        XCTAssertEqual(layout.widgets(available: [WidgetConfig.id(forFileName: "journey.toml")]), ["journey"])
+    }
+
     func testPanelWithBadEntriesWarns() {
         let (s, issues) = IcebergSettings.parse("panel = [\"today\", 3]")
         XCTAssertEqual(s.panel, ["today"])

@@ -62,14 +62,18 @@ enum LauncherJourneys {
     static var answers: Journey {
         journey("launcher-answers", "calculator, unit conversion, web fallbacks, settings window if any", [
             step("open it") { ctx in try ctx.showPanel(metric: "time to visible") },
+            // An answer is the best match for what was typed, so it leads as the
+            // Top hit; with other results above it, it sits under Answers.
             step("calculator: 2+2") { ctx in
                 ctx.type("2+2")
                 try ctx.wait("the answer 4") { ctx.panelTexts().contains("4") }
-                try ctx.check(ctx.panelTexts().contains("Answers"), "no Answers section")
+                try ctx.check(ctx.answerSection(for: { $0 == "4" }) != nil, "4 is in neither the Top hit nor an Answers section")
             },
             step("unit conversion: 5km to m") { ctx in
                 try ctx.replaceQuery("5km to m")
-                try ctx.wait("5,000 m") { ctx.panelTexts().contains { $0.contains("5,000 m") || $0.contains("5000 m") } }
+                let isAnswer: (String) -> Bool = { $0.contains("5,000 m") || $0.contains("5000 m") }
+                try ctx.wait("5,000 m") { ctx.panelTexts().contains(where: isAnswer) }
+                try ctx.check(ctx.answerSection(for: isAnswer) != nil, "5,000 m is in neither the Top hit nor an Answers section")
             },
             step("web fallback rows") { ctx in
                 try ctx.replaceQuery("conj flap retraction")
@@ -140,9 +144,17 @@ enum LauncherJourneys {
         Setting(id: "logout", phrase: "log out", mode: .confirm, read: nil),
     ]
 
+    /// The launcher's section headings, to tell which one a row sits under.
+    static let headings: Set<String> = [
+        "Favourites", "Recent", "Top hit", "Answers", "Apps", "Grand Line", "Windows", "System",
+        "Bookmarks", "Snippets", "Symbols", "Files", "Web",
+    ]
+
     static var settings: Journey {
+        // Up to 10 s for the system to change, then up to the slowest change's
+        // own limit (30 s) for the row to say why it did not.
         let steps = settingsTable.map { setting in
-            step("\(setting.phrase) (setting.\(setting.id))", timeout: 60) { ctx in try ctx.exercise(setting) }
+            step("\(setting.phrase) (setting.\(setting.id))", timeout: 120) { ctx in try ctx.exercise(setting) }
         }
         // The system's own settings are what is under test, so the real home.
         return journey("launcher-settings", "each system setting switched from the launcher, checked against the system", fixtureHome: false,
@@ -197,6 +209,15 @@ extension Ctx {
         metric(name, ms)
         try check(ms <= options.showLimit, "the panel took \(Int(ms)) ms to appear (limit \(Int(options.showLimit)) ms)")
         try wait("the field to take the keys") { self.isEditingText() }
+    }
+
+    /// "Top hit" or "Answers": the section heading that comes before the
+    /// first text the test accepts, with no other heading between them.
+    func answerSection(for isAnswer: (String) -> Bool) -> String? {
+        let texts = panelTexts()
+        guard let at = texts.firstIndex(where: isAnswer) else { return nil }
+        let heading = texts[..<at].last { LauncherJourneys.headings.contains($0) }
+        return heading.flatMap { ["Top hit", "Answers"].contains($0) ? $0 : nil }
     }
 
     func replaceQuery(_ text: String) throws {
@@ -274,10 +295,34 @@ extension Ctx {
             try key("return")
             var newSystem = system
             if let system {
-                try wait("\(setting.phrase) to change in the system (\(label))", timeout: 10) {
-                    newSystem = self.readSetting(setting).map(LauncherJourneys.normalise)
-                    return newSystem != nil && newSystem != system
+                var refused: String?
+                do {
+                    try wait("\(setting.phrase) to change in the system (\(label))", timeout: 10) {
+                        newSystem = self.readSetting(setting).map(LauncherJourneys.normalise)
+                        if newSystem != nil && newSystem != system { return true }
+                        // The row says at once when macOS refused the change.
+                        if let row = self.settingRow(setting.id)?.text, row.contains("not changed") {
+                            refused = row
+                            return true
+                        }
+                        return false
+                    }
+                } catch let failure as StepFailure where failure.message.hasPrefix("timed out") {
+                    // Still not changed: report what the row says once it has
+                    // given up (a privacy prompt nobody can answer, a refusal).
+                    var row = settingRow(setting.id)?.text ?? ""
+                    try? wait("the row to finish (\(label))", timeout: 35, poll: 0.5) {
+                        if self.readSetting(setting).map(LauncherJourneys.normalise).map({ $0 != system }) == true { return true }
+                        row = self.settingRow(setting.id)?.text ?? row
+                        return !row.contains("Working") && !row.isEmpty
+                    }
+                    newSystem = readSetting(setting).map(LauncherJourneys.normalise)
+                    if newSystem == nil || newSystem == system {
+                        throw StepFailure(failure.message + (row.isEmpty ? "; the row is not shown" : "; the row reads \"\(row)\""))
+                    }
+                    note("\(setting.phrase) took more than 10 s to change (\(label))")
                 }
+                if let refused { throw StepFailure("\(setting.phrase) was not changed (\(label)); the row reads \"\(refused)\"") }
             }
             let rowText2 = try showSetting(setting)
             var latest = rowText2

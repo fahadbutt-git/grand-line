@@ -12,11 +12,9 @@ source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 BREWFILE="$GRAND_LINE_LINK/Brewfile"
 ARTCRAFT="$GRAND_LINE_CONFIG/artcraft.tsv"
 
-# Record the list change in the package's git history, so update can still
-# pull from GitHub (and push it, so the next Mac gets it).
-record() {
-  git -C "$GRAND_LINE_LINK/" commit -q -m "$1" -- Brewfile config/grand-line/artcraft.tsv >/dev/null 2>&1 || true
-}
+# The list changes stay on this Mac: update keeps them when it applies
+# GitHub's changes, and grandline publish sends them, after showing them and
+# asking, so the next Mac gets the same set. Nothing is committed or sent here.
 
 confirm() {
   osascript - "$1" <<'EOF' >/dev/null 2>&1
@@ -43,8 +41,7 @@ case "${1:-}" in
     notify "Installing $token" "This can take a minute."
     if quietly brew install --cask "$token"; then
       grep -q "^cask \"$token\"" "$BREWFILE" || printf 'cask "%s"\n' "$token" >> "$BREWFILE"
-      record "Add $token"
-      notify "$token installed" "Added to the Brewfile, so a new Mac gets it too."
+      notify "$token installed" "Added to the Brewfile. grandline publish shares it with your other Macs."
     else
       notify "$token did not install" "Try in Terminal: brew install --cask $token"; exit 1
     fi
@@ -68,7 +65,6 @@ case "${1:-}" in
         || { notify "$name was not removed" "Try in Terminal: brew uninstall --cask $name"; exit 1; }
       N="$name" perl -i -ne 'print unless /^cask "(?:[^"]*\/)?\Q$ENV{N}\E"/' "$BREWFILE"
     fi
-    record "Remove $name"
     notify "$name removed" "Also taken off the install list."
     ;;
   *) echo "usage: app install|remove [--window] [NAME]" >&2; exit 2 ;;

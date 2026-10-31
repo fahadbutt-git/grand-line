@@ -16,12 +16,15 @@ public struct ResultList: Sendable, Equatable {
     var limitScale = 1
     /// Whether a late result may still open Top hit.
     var awaitsTopHit = false
+    /// Section order and row counts, fixed for the life of the list.
+    var layout = ResultLayout.current
 
     public init() {}
 
-    public init(groups: [ResultGroup], limitScale: Int = 1, topHit: Bool = false) {
+    public init(groups: [ResultGroup], limitScale: Int = 1, topHit: Bool = false, layout: ResultLayout = .current) {
         self.groups = groups
         self.limitScale = limitScale
+        self.layout = layout
         selectedIndex = rows.isEmpty ? nil : 0
         awaitsTopHit = topHit && !groups.contains { $0.section == .topHit }
     }
@@ -51,7 +54,7 @@ public struct ResultList: Sendable, Equatable {
     }
 
     public mutating func replace(with groups: [ResultGroup], limitScale: Int = 1, topHit: Bool = false) {
-        self = ResultList(groups: groups, limitScale: limitScale, topHit: topHit)
+        self = ResultList(groups: groups, limitScale: limitScale, topHit: topHit, layout: .current)
     }
 
     public mutating func moveSelection(by delta: Int) {
@@ -90,7 +93,7 @@ public struct ResultList: Sendable, Equatable {
     /// Merges ranked results that arrived after the first batch.
     public mutating func merge(_ incoming: [LaunchResult]) {
         guard !groups.isEmpty else {
-            replace(with: ResultGrouping.group(incoming, limitScale: limitScale), limitScale: limitScale)
+            replace(with: ResultGrouping.group(incoming, limitScale: limitScale, layout: layout), limitScale: limitScale)
             return
         }
         var shown = Set(rows.map(\.id))
@@ -115,7 +118,7 @@ public struct ResultList: Sendable, Equatable {
         var start = 0
         for (g, group) in groups.enumerated() {
             if group.section == section {
-                guard group.rows.count < section.limit * limitScale else { return }
+                guard group.rows.count < layout.limit(section) * limitScale else { return }
                 var position = group.rows.count
                 for (r, row) in group.rows.enumerated() where start + r > frozen && result.rank < row.rank {
                     position = r
@@ -124,7 +127,7 @@ public struct ResultList: Sendable, Equatable {
                 groups[g].rows.insert(result, at: position)
                 return
             }
-            if group.section > section {
+            if layout.comesBefore(section, group.section) {
                 groups.insert(ResultGroup(section: section, rows: [result]), at: g)
                 return
             }

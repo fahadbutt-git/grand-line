@@ -7,6 +7,8 @@
 #   bash setup.sh --only artcraft,default-apps
 #   bash setup.sh --skip r-packages
 #   bash setup.sh --update      only the steps that update apps and settings
+#   bash setup.sh --unattended  only the steps that need no password or answer
+#                               (bin/update --unattended; combine with --only)
 #   bash setup.sh --ci          unattended mode for test machines
 #   bash setup.sh --list        list the steps
 #
@@ -22,7 +24,10 @@ export REPO_DIR
 source "$REPO_DIR/lib/common.sh"
 
 # Steps that keep an installed Mac current (used by --update and bin/update).
-UPDATE_STEPS="apps,artcraft,security,folders,dotfiles,native-tools,default-apps,downloads"
+UPDATE_STEPS="apps,artcraft,security,folders,dotfiles,native-tools,default-apps,downloads,auto-update"
+# The steps the unattended update runs: none asks for a password or an
+# answer, or shows a dialog.
+UNATTENDED_STEPS="folders,dotfiles,native-tools,downloads"
 
 STEPS=()
 for f in "$REPO_DIR"/steps/[0-9][0-9]-*.sh; do
@@ -31,6 +36,7 @@ done
 
 ONLY=""
 SKIP=""
+UNATTENDED=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run) DRY_RUN=1 ;;
@@ -38,14 +44,25 @@ while [[ $# -gt 0 ]]; do
     --only)    ONLY="${2:-}"; shift ;;
     --skip)    SKIP="${2:-}"; shift ;;
     --update)  ONLY="$UPDATE_STEPS" ;;
+    --unattended) UNATTENDED=1 ;;
     --list)    printf '%s\n' "${STEPS[@]}"; exit 0 ;;
-    -h|--help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) err "Unknown option: $1 (try --help)"; exit 2 ;;
   esac
   shift
 done
 export DRY_RUN CI_MODE
 [[ "$CI_MODE" == 1 ]] && export GRAND_LINE_NO_APPLEEVENTS=1
+if [[ "$UNATTENDED" == 1 ]]; then
+  export GRAND_LINE_UNATTENDED=1
+  [[ -n "$ONLY" ]] || ONLY="$UNATTENDED_STEPS"
+  for name in ${ONLY//,/ }; do
+    if [[ ",$UNATTENDED_STEPS," != *",$name,"* ]]; then
+      err "'$name' may ask for a password or an answer, so it does not run unattended."
+      exit 2
+    fi
+  done
+fi
 
 # Reject misspelled step names instead of silently skipping them.
 for name in ${ONLY//,/ } ${SKIP//,/ }; do
@@ -72,7 +89,20 @@ if [[ "$DRY_RUN" == 0 && "$REPO_DIR" != "$GRAND_LINE_HOME" ]]; then
   exec /bin/bash "$GRAND_LINE_HOME/setup.sh" "${ORIGINAL_ARGS[@]+"${ORIGINAL_ARGS[@]}"}"
 fi
 
-if [[ "$DRY_RUN" == 0 ]]; then
+# One setup or update at a time (bin/update holds the lock for the setup it runs).
+# shellcheck source=lib/auto-update.sh
+source "$REPO_DIR/lib/auto-update.sh"
+if [[ "$DRY_RUN" == 0 && -z "${GRAND_LINE_LOCK_HELD:-}" ]]; then
+  if ! update_lock_take; then
+    err "An update or another setup is running${UPDATE_LOCK_HOLDER:+ (process $UPDATE_LOCK_HOLDER)}. Wait for it to finish."
+    exit 1
+  fi
+  OWN_LOCK=1
+  trap update_lock_release EXIT
+fi
+
+# The unattended update writes everything to its own log.
+if [[ "$DRY_RUN" == 0 && "$UNATTENDED" == 0 ]]; then
   mkdir -p "$GRAND_LINE_LOGS"
   LOG_FILE="$GRAND_LINE_LOGS/setup-$(date +%Y%m%d-%H%M%S).log"
   exec > >(tee -a "$LOG_FILE") 2>&1
@@ -99,7 +129,7 @@ selected() {
 }
 
 KEEPALIVE_PID=""
-trap '[[ -n "$KEEPALIVE_PID" ]] && kill "$KEEPALIVE_PID" 2>/dev/null' EXIT
+trap '[[ -n "$KEEPALIVE_PID" ]] && kill "$KEEPALIVE_PID" 2>/dev/null; [[ -n "${OWN_LOCK:-}" ]] && update_lock_release' EXIT
 
 FAILED=()
 # The password is needed only up to the declutter step (installers, the

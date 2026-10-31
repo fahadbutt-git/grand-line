@@ -2,3 +2,10 @@
 <key>NSSupportsAutomaticTermination</key><false/>
 <key>NSSupportsSuddenTermination</key><false/>
 <key>CFBundleIconFile</key><string>AppIcon</string>
+<key>CFBundleURLTypes</key>
+<array>
+  <dict>
+    <key>CFBundleURLName</key><string>com.grandline.sight</string>
+    <key>CFBundleURLSchemes</key><array><string>sight</string></array>
+  </dict>
+</array>

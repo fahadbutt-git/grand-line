@@ -9,7 +9,8 @@ setvbuf(stdout, nil, _IOLBF, 0)
 /// only when asked for: CI asks; on your own Mac name them with --only.
 let changesTheMac: Set<String> = ["launcher-settings"]
 
-let allJourneys: [Journey] = FilesJourneys.all + LauncherJourneys.all + NotchJourneys.all
+let allJourneys: [Journey] = FilesJourneys.all + LauncherJourneys.all + IndexJourneys.all + NotchJourneys.all
+    + SettingsJourneys.all
 
 func fatal(_ message: String) -> Never {
     FileHandle.standardError.write(("journeys: " + message + "\n").data(using: .utf8)!)

@@ -3,100 +3,253 @@
 # Update everything in one go: this package, Homebrew apps and tools,
 # ArtCraft apps, settings, one-time changes (migrations), Neovim plugins and
 # mise languages, then your post-update hook.
-#   update            run here
-#   update --window   run it in its own terminal window (used by the menu)
-# One update runs at a time, the Mac stays awake while it runs, and the whole
-# run is saved to ~/Library/Logs/grand-line/update-<date>.log.
+#   update                     run here (asks before applying unsigned changes)
+#   update --window            run it in its own terminal window (the menu)
+#   update --unattended        what the daily agent runs: no password, no
+#                              questions, one notification if anything changed
+#   update --apps-only [--notify]
+#                              only this package and its apps (the apps'
+#                              "Update now" button runs this with --notify)
+#   update auto on|off|toggle|status
+#                              the daily unattended update (launch agent)
+# New commits from GitHub are fetched and checked before anything runs: they
+# apply by themselves only when each is signed by a key in
+# ~/.config/grand-line/allowed_signers (lib/update-trust.sh). Nothing is ever
+# sent to GitHub; that is grandline publish.
+# One update runs at a time, the Mac stays awake while it runs, and the run is
+# saved in ~/Library/Logs/grand-line (update-<date>.log, or update.log for
+# the unattended runs).
 # App Store apps update themselves (System Settings, General, Software Update).
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 
 REPO="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+# shellcheck source=lib/auto-update.sh
+source "$REPO/lib/auto-update.sh"
+# shellcheck source=lib/update-trust.sh
+source "$REPO/lib/update-trust.sh"
 
-if [[ "${1:-}" == "--window" ]]; then
-  exec "$REPO/bin/in-window" "$(readlink -f "$0")"
+case "${1:-}" in
+  --window) exec "$REPO/bin/in-window" "$(readlink -f "$0")" ;;
+  auto)
+    case "${2:-status}" in
+      on)
+        rm -f "$UPDATE_AGENT_OFF"
+        if update_agent_load; then
+          echo "Automatic updates on: daily at $UPDATE_AGENT_HOUR:$UPDATE_AGENT_MINUTE and after login."
+          [[ -t 1 ]] || notify "Automatic updates on" "Daily, and after login. Only signed changes apply by themselves."
+        else
+          echo "Automatic updates could not start (launchctl refused)."
+          [[ -t 1 ]] || notify "Automatic updates did not start" "Run in Terminal: update auto on"
+          exit 1
+        fi ;;
+      off)
+        mkdir -p "$GRAND_LINE_STATE" && touch "$UPDATE_AGENT_OFF"
+        update_agent_unload
+        echo "Automatic updates off. Run update yourself, or: update auto on"
+        [[ -t 1 ]] || notify "Automatic updates off" "Run update yourself when you want one." ;;
+      toggle)
+        if [[ -f "$UPDATE_AGENT_OFF" ]]; then exec "$0" auto on; else exec "$0" auto off; fi ;;
+      status)
+        last="$(cat "$GRAND_LINE_STATE/auto-update-last" 2>/dev/null)"
+        if [[ -f "$UPDATE_AGENT_OFF" ]]; then echo "off"; exit 1; fi
+        if update_agent_loaded; then echo "on${last:+ (last run $last)}"; else echo "on, but not loaded (run: update auto on)"; exit 1; fi ;;
+      *) echo "usage: update auto on|off|toggle|status" >&2; exit 2 ;;
+    esac
+    exit 0 ;;
+esac
+
+MODE=interactive   # interactive | unattended | apps
+NOTIFY=0
+DELAY=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --unattended) MODE=unattended ;;
+    --apps-only)  MODE=apps ;;
+    --notify)     NOTIFY=1 ;;
+    --delay)      DELAY="${2:-0}"; shift ;;
+    *) echo "usage: update [--window | --unattended | --apps-only [--notify] | auto on|off|toggle|status]" >&2; exit 2 ;;
+  esac
+  shift
+done
+[[ "$DELAY" =~ ^[0-9]+$ ]] || DELAY=0
+
+# Runs without anyone at the keyboard never wait for a password or an answer.
+# A plain `update` started without a terminal (by another program) is an
+# unattended one.
+EXPLICIT="$MODE"
+[[ "$MODE" == interactive && ! -t 0 ]] && MODE=unattended
+if [[ "$MODE" != interactive ]]; then
+  STRICT=1
+  export GRAND_LINE_UNATTENDED=1
+else
+  STRICT=0
 fi
 
-# One run at a time. A lock left by a run that no longer exists is taken over.
-LOCK="${TMPDIR:-/tmp}/grand-line-update.lock"
-if ! mkdir "$LOCK" 2>/dev/null; then
-  holder="$(cat "$LOCK/pid" 2>/dev/null)"
-  if [[ -z "$holder" ]] || kill -0 "$holder" 2>/dev/null; then
-    echo "Another update is running${holder:+ (process $holder)}. Wait for it to finish."
-    exit 1
-  fi
-  # The run that held it is gone. Clear it and take it, once; if another run
-  # takes it first, that run goes ahead and this one stops.
-  rm -f "$LOCK/pid"; rmdir "$LOCK" 2>/dev/null
-  if ! mkdir "$LOCK" 2>/dev/null; then
-    echo "Another update is running. Wait for it to finish."
-    exit 1
+LAST_RUN="$GRAND_LINE_STATE/auto-update-last"
+if [[ "$EXPLICIT" == unattended ]]; then
+  [[ -f "$UPDATE_AGENT_OFF" ]] && exit 0
+  sleep "$DELAY"
+  # At most every 12 hours, so a day with several logins checks once.
+  if [[ -f "$LAST_RUN" && -z "$(find "$LAST_RUN" -mmin +720 2>/dev/null)" ]]; then
+    exit 0
   fi
 fi
-echo "$$" > "$LOCK/pid"
-trap 'rm -f "$LOCK/pid"; rmdir "$LOCK" 2>/dev/null' EXIT
+
+if ! update_lock_take; then
+  msg="Another update is running${UPDATE_LOCK_HOLDER:+ (process $UPDATE_LOCK_HOLDER)}. Wait for it to finish."
+  echo "$msg"
+  [[ "$NOTIFY" == 1 ]] && notify "Update not started" "$msg"
+  exit 1
+fi
+trap update_lock_release EXIT
 
 # Stay awake (but let the display sleep) until this run ends.
 caffeinate -i -w "$$" >/dev/null 2>&1 &
 
 mkdir -p "$GRAND_LINE_LOGS"
-LOG="$GRAND_LINE_LOGS/update-$(date +%Y%m%d-%H%M%S).log"
-exec > >(tee -a "$LOG") 2>&1
+if [[ "$MODE" == interactive ]]; then
+  LOG="$GRAND_LINE_LOGS/update-$(date +%Y%m%d-%H%M%S).log"
+  exec > >(tee -a "$LOG") 2>&1
+else
+  LOG="$GRAND_LINE_LOGS/update.log"
+  # The shared log keeps its last 2000 lines.
+  if [[ -f "$LOG" && "$(wc -l < "$LOG")" -gt 4000 ]]; then
+    tail -n 2000 "$LOG" > "$LOG.new" && mv "$LOG.new" "$LOG"
+  fi
+  exec >> "$LOG" 2>&1
+  echo
+  echo "=== $(date '+%Y-%m-%d %H:%M') update --$MODE"
+fi
 echo "Log: $LOG"
 
-failed=()
+failed=()    # parts that did not update
+changed=()   # what this run changed, for the one notification
+needs=()     # what is waiting for you
 
+# own_app_sources_checked: the apps' sources at HEAD are GitHub's checked
+# copy (no commits made on this Mac change them), so the unattended run may
+# build them.
+own_app_sources_checked() {
+  git -C "$REPO" rev-parse -q --verify '@{u}' >/dev/null 2>&1 || return 1
+  git -C "$REPO" diff --quiet '@{u}' HEAD -- apps lib tools
+}
+
+# rebuild_apps: build the apps whose sources changed, replace them (the old
+# copy to the Trash), start again the ones that were running, then give them
+# the theme's icons.
+rebuild_apps() {
+  local report rc=0
+  report="$(mktemp)"
+  GRAND_LINE_APPS_REPORT="$report" bash "$REPO/setup.sh" --unattended --only native-tools || rc=1
+  if [[ -s "$report" ]]; then
+    changed+=("rebuilt $(sort -u "$report" | tr '\n' ' ' | sed 's/ $//; s/ /, /g')")
+    "$REPO/bin/theme" icons >/dev/null 2>&1
+  fi
+  rm -f "$report"
+  return "$rc"
+}
+
+pkg=0
 echo "== Package"
-if git -C "$REPO" remote get-url origin >/dev/null 2>&1; then
-  # Your own changes (apps added from the menu, edited rules) are kept: they
-  # are replayed on top of the GitHub copy, then sent back to GitHub.
-  if git -C "$REPO" pull --rebase --autostash -q; then
-    git -C "$REPO" push -q 2>/dev/null || true
-  else
-    git -C "$REPO" rebase --abort 2>/dev/null
-    echo "Your local changes clash with GitHub's copy. Kept yours; GitHub's copy was not pulled."
-    failed+=("package")
-  fi
-fi
+package_update "$REPO" || pkg=$?
+[[ "$pkg" == 1 ]] && failed+=("package")
 
-echo "== Homebrew apps and tools"
-# A record of what was installed before, to compare with or go back to:
-#   brew bundle install --file ~/.local/state/grand-line/brew-before-update.Brewfile
-brew bundle dump --file "$GRAND_LINE_STATE/brew-before-update.Brewfile" --force >/dev/null 2>&1
-if brew update; then
-  # Karabiner and AeroSpace keep running their old version until restarted.
-  restart="$(brew outdated --quiet 2>/dev/null | sed 's#.*/##' | grep -xE 'karabiner-elements|aerospace' | tr '\n' ' ')"
-  brew upgrade || failed+=("Homebrew")
-else
-  failed+=("Homebrew")
-fi
-export HOMEBREW_NO_AUTO_UPDATE=1
+case "$MODE" in
+  apps)
+    if [[ "$pkg" == 2 ]]; then
+      :   # the apps are not rebuilt from changes that were not applied
+    elif ! own_app_sources_checked && [[ "$STRICT" == 1 ]]; then
+      needs+=("the apps' sources have changes made on this Mac; run update in a terminal")
+    else
+      echo "== Apps"
+      rebuild_apps || failed+=("apps")
+    fi
+    ;;
+  unattended)
+    if [[ "$pkg" != 2 ]]; then
+      echo "== Apps, settings and one-time changes (no password needed)"
+      report="$(mktemp)"
+      skip=()
+      if ! own_app_sources_checked; then
+        skip=(--skip native-tools)
+        needs+=("the apps' sources have changes made on this Mac; run update to rebuild them")
+      fi
+      GRAND_LINE_APPS_REPORT="$report" bash "$REPO/setup.sh" --unattended "${skip[@]+"${skip[@]}"}" || failed+=("setup")
+      if [[ -s "$report" ]]; then
+        changed+=("rebuilt $(sort -u "$report" | tr '\n' ' ' | sed 's/ $//; s/ /, /g')")
+        "$REPO/bin/theme" icons >/dev/null 2>&1
+      fi
+      rm -f "$report"
+      "$REPO/bin/migrate" --unattended; rc=$?
+      [[ "$rc" == 3 ]] && needs+=("one-time changes wait for: update")
+      [[ "$rc" == 1 ]] && failed+=("migrations")
+      "$REPO/bin/theme" refresh || failed+=("theme")
+    fi
+    ;;
+  interactive)
+    echo "== Homebrew apps and tools"
+    # A record of what was installed before, to compare with or go back to:
+    #   brew bundle install --file ~/.local/state/grand-line/brew-before-update.Brewfile
+    brew bundle dump --file "$GRAND_LINE_STATE/brew-before-update.Brewfile" --force >/dev/null 2>&1
+    if brew update; then
+      # Karabiner and AeroSpace keep running their old version until restarted.
+      restart="$(brew outdated --quiet 2>/dev/null | sed 's#.*/##' | grep -xE 'karabiner-elements|aerospace' | tr '\n' ' ')"
+      brew upgrade || failed+=("Homebrew")
+    else
+      failed+=("Homebrew")
+    fi
+    export HOMEBREW_NO_AUTO_UPDATE=1
 
-echo "== New apps, ArtCraft apps and settings"
-bash "$REPO/setup.sh" --update || failed+=("setup")
+    echo "== New apps, ArtCraft apps and settings"
+    report="$(mktemp)"
+    GRAND_LINE_APPS_REPORT="$report" bash "$REPO/setup.sh" --update || failed+=("setup")
+    [[ -s "$report" ]] && "$REPO/bin/theme" icons >/dev/null 2>&1
+    rm -f "$report"
 
-echo "== One-time changes"
-"$REPO/bin/migrate" || failed+=("migrations")
+    echo "== One-time changes"
+    "$REPO/bin/migrate" || failed+=("migrations")
+    "$REPO/bin/theme" refresh || failed+=("theme")
 
-echo "== Neovim plugins and language versions"
-if command -v nvim >/dev/null; then
-  if nvim --headless '+Lazy! sync' +qa >/dev/null 2>&1; then
-    echo "Neovim plugins updated"
-    git -C "$REPO" commit -q -m "Update Neovim plugins" -- config/nvim/lazy-lock.json >/dev/null 2>&1 || true
-  else
-    failed+=("Neovim plugins")
-  fi
-fi
-command -v mise >/dev/null && { mise upgrade --yes >/dev/null 2>&1 || failed+=("mise"); }
+    echo "== Neovim plugins and language versions"
+    if command -v nvim >/dev/null; then
+      if nvim --headless '+Lazy! sync' +qa >/dev/null 2>&1; then
+        echo "Neovim plugins updated"
+        if ! git -C "$REPO" diff --quiet -- config/nvim/lazy-lock.json 2>/dev/null; then
+          echo "Their versions changed (config/nvim/lazy-lock.json). To share them with your other Macs: grandline publish"
+        fi
+      else
+        failed+=("Neovim plugins")
+      fi
+    fi
+    command -v mise >/dev/null && { mise upgrade --yes >/dev/null 2>&1 || failed+=("mise"); }
 
-"$REPO/bin/hook" post-update
+    "$REPO/bin/hook" post-update
+    ;;
+esac
+
+[[ "$MODE" == unattended && ${#failed[@]} -eq 0 ]] && date '+%Y-%m-%d %H:%M' > "$LAST_RUN"
 
 if [[ -n "${restart:-}" ]]; then
   echo "Restart needed: ${restart% } updated. Quit and reopen it, or restart the Mac."
 fi
+summary=""
+[[ ${#changed[@]} -gt 0 ]] && summary="$(printf '%s; ' "${changed[@]}")" && summary="${summary%; }."
+[[ ${#needs[@]} -gt 0 ]] && summary="$summary $(printf '%s; ' "${needs[@]}")" && summary="${summary%; }."
+[[ ${#failed[@]} -gt 0 ]] && summary="$summary Not updated: ${failed[*]}."
+summary="${summary# }"
+[[ -n "$summary" ]] && echo "$summary"
+
 if [[ ${#failed[@]} -gt 0 ]]; then
-  notify "Update finished with problems" "Not updated: ${failed[*]}. See $LOG"
-  echo "Not updated: ${failed[*]}"
+  notify "Update finished with problems" "$summary See $LOG"
   exit 1
 fi
-notify "Update finished" "Apps and tools are up to date.${restart:+ Restart: $restart}"
+if [[ ${#needs[@]} -gt 0 ]]; then
+  notify "Update needs you" "$summary"
+  exit 0
+fi
+case "$MODE" in
+  interactive) notify "Update finished" "Apps and tools are up to date.${restart:+ Restart: $restart}" ;;
+  unattended)  [[ ${#changed[@]} -gt 0 ]] && notify "Grand Line updated" "$summary" ;;
+  apps)        [[ "$NOTIFY" == 1 ]] && notify "Apps updated" "${summary:-The apps are up to date.}" ;;
+esac
 echo "Done."

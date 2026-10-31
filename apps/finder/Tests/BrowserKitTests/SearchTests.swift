@@ -121,6 +121,67 @@ final class SearchTests: XCTestCase {
         XCTAssertFalse(SearchPlan.make("conj", scope: .home, home: home.path, drives: []).keepsContentMatch("/Users/me/.config/app/settings.json"))
     }
 
+    func testAppDataNameMatchesAreDroppedFromBothSources() {
+        // The journeys' fixture: a package folder named like the query, inside
+        // node_modules in the folder searched.
+        let projects = "/Users/me/Documents/Projects/Conj Flap"
+        let module = projects + "/node_modules/conj-module"
+        let plan = SearchPlan.make("conj", scope: .folder(documents.path), home: home.path, drives: [])
+        let matches = [
+            IndexMatch(path: projects + "/conj notes.txt", name: "conj notes.txt", isFolder: false, tier: .prefix, highlights: []),
+            IndexMatch(path: module, name: "conj-module", isFolder: true, tier: .prefix, highlights: []),
+            IndexMatch(path: "/Users/me/Documents/.cache/conj-junk.tmp", name: "conj-junk.tmp", isFolder: false, tier: .prefix, highlights: []),
+        ]
+        XCTAssertEqual(SearchResults.names(matches, plan: plan), [projects + "/conj notes.txt"])
+        let merged = SearchResults.merge(names: [], spotlight: [module, module + "/index.js", projects + "/conj notes.txt"], plan: plan)
+        XCTAssertEqual(merged, [projects + "/conj notes.txt"])
+    }
+
+    func testAHomeOutsideUsersIsStillAPersonsFolder() {
+        // A fixture home in a temporary folder under /private: only the part
+        // of a path below the home counts, so its files are not system files.
+        let fixture = "/private/var/folders/x/T/journeyhome"
+        let plan = SearchPlan.make("conj", scope: .mac, home: fixture, drives: [])
+        XCTAssertTrue(plan.keeps(fixture + "/Documents/conj notes.txt"))
+        XCTAssertFalse(plan.keeps(fixture + "/Library/Caches/com.example.app/conj-cache.db"))
+        XCTAssertFalse(plan.keeps("/private/var/db/conj.plist"))
+    }
+
+    func testFoldersTheIndexSkipsAreReadFromDisk() {
+        XCTAssertEqual(SearchPlan.make("conj", scope: .folder("/Users/me/.Trash"), home: home.path, drives: []).foldersTheIndexSkips,
+                       ["/Users/me/.Trash"])
+        XCTAssertEqual(SearchPlan.make("conj", scope: .folder("/Users/me/Library/Mail"), home: home.path, drives: []).foldersTheIndexSkips,
+                       ["/Users/me/Library/Mail"])
+        XCTAssertEqual(SearchPlan.make("conj", scope: .folder(documents.path), home: home.path, drives: []).foldersTheIndexSkips, [])
+        XCTAssertEqual(SearchPlan.make("conj", scope: .folder("/Users/me/Library/CloudStorage/GoogleDrive-a@b.c"), home: home.path, drives: []).foldersTheIndexSkips, [])
+        XCTAssertEqual(SearchPlan.make("conj", scope: .home, home: home.path, drives: []).foldersTheIndexSkips, [])
+    }
+
+    func testTheTrashIsSearchedByName() throws {
+        let trash = FileManager.default.temporaryDirectory.appendingPathComponent("SearchTests-\(UUID().uuidString)/.Trash")
+        try FileManager.default.createDirectory(at: trash.appendingPathComponent("Old Folder"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: trash.deletingLastPathComponent()) }
+        for name in ["old conj draft.docx", "trashed CONJ note.txt", "scratch.txt", "Old Folder/conj inside.txt", ".conj hidden"] {
+            try Data("x".utf8).write(to: trash.appendingPathComponent(name))
+        }
+        let found = FolderNameScan.paths(in: [trash.path], words: ["conj"]).map { ($0 as NSString).lastPathComponent }.sorted()
+        XCTAssertEqual(found, ["conj inside.txt", "old conj draft.docx", "trashed CONJ note.txt"])
+        XCTAssertEqual(FolderNameScan.paths(in: [trash.path], words: ["conj"], limit: 1).count, 1)
+        XCTAssertEqual(FolderNameScan.paths(in: [trash.path], words: []), [])
+    }
+
+    func testAnEmptySearchSaysWhereItLookedAndOffersTheMac() {
+        let trash = PaneEmptyState.make(for: .search(query: "conj", scope: .folder("/Users/me/.Trash")), folderTitle: "Trash")
+        XCTAssertEqual(trash.message, "No results in Trash.")
+        XCTAssertEqual(trash.widenTitle, "Search This Mac?")
+        XCTAssertEqual(trash.widen, .mac)
+        XCTAssertEqual(PaneEmptyState.make(for: .search(query: "conj", scope: .folder(documents.path))).message, "No results in Documents.")
+        XCTAssertEqual(PaneEmptyState.make(for: .search(query: "conj", scope: .home)).message, "No results in Home.")
+        XCTAssertEqual(PaneEmptyState.make(for: .search(query: "conj", scope: .mac)), PaneEmptyState(message: "No matches", widen: nil))
+        XCTAssertEqual(PaneEmptyState.make(for: .folder(documents)).message, "Empty folder")
+        XCTAssertEqual(PaneEmptyState.make(for: .recents).message, "No recent files")
+    }
+
     func testNameMatchesIgnoreCaseAndAccents() {
         let plan = SearchPlan.make("cafe menu", scope: .home, home: home.path, drives: [])
         XCTAssertTrue(plan.matchesName("/Users/me/Café Menu.pdf"))

@@ -71,6 +71,16 @@ final class CommandTests: XCTestCase {
         XCTAssertLessThan(Date().timeIntervalSince(started), 3)
     }
 
+    func testShellRunnerAnswersWhenAChildHoldsTheOutputOpen() async throws {
+        // osascript waiting on a privacy prompt keeps the pipe open after the
+        // command that started it is stopped; the row must still hear back.
+        let runner = ShellRunner()
+        let started = Date()
+        let out = try await runner.run("/bin/sh", ["-c", "sleep 20 & wait"], timeout: 0.5)
+        XCTAssertEqual(out.status, 15)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 5)
+    }
+
     func testShellRunnerStopsWhenCancelled() async {
         let runner = ShellRunner()
         let started = Date()

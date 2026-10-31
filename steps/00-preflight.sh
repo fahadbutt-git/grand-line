@@ -22,6 +22,8 @@ step_preflight() {
   fi
 
   [[ "$DRY_RUN" == 1 ]] && return 0
+  # The unattended update has fetched already, and never asks for anything.
+  [[ "${GRAND_LINE_UNATTENDED:-0}" == 1 ]] && return 0
 
   if ! curl -fsS --max-time 15 -o /dev/null https://github.com; then
     err "No internet connection. Connect to Wi-Fi and run again."

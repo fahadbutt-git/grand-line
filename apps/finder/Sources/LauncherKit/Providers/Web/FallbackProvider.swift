@@ -1,15 +1,19 @@
 import Foundation
 
-/// The rows at the bottom of every search: Drive content, Google, PubMed, and
-/// the assistants. They never become the top hit.
+/// The rows at the bottom of every search: Drive content, the fallback
+/// engines (Google and PubMed unless Settings, Web says otherwise), and the
+/// assistants. They never become the top hit.
 public struct FallbackProvider: InstantProvider {
     public let id = "fallbacks"
     public let title = "Fallbacks"
     public let symbol = "arrow.turn.down.right"
     public let prefix: Prefix? = nil
     public let inGlobalSearch = true
+    let fallbacks: WebEngineList.Fallbacks
 
-    public init() {}
+    public init(fallbacks: WebEngineList.Fallbacks = .standard) {
+        self.fallbacks = fallbacks
+    }
 
     static let assistants: [(name: String, template: String, symbol: String)] = [
         ("Claude", "https://claude.ai/new?q=%s", "sparkle"),
@@ -20,22 +24,16 @@ public struct FallbackProvider: InstantProvider {
     public func instantResults(for query: LaunchQuery) -> [LaunchResult] {
         let term = query.term
         guard !term.isEmpty, query.prefix == nil || query.prefix == .exact else { return [] }
-        var rows: [LaunchResult] = [LaunchResult(
-            id: "fallback:drive",
-            title: "Search Drive contents for “\(term)”",
-            subtitle: "Files whose text matches, in Google Drive",
-            icon: .symbol("doc.text.magnifyingglass"),
-            section: .web,
-            accessory: "Files",
-            actions: [LaunchAction.complete(". \(term) drive:", title: "Search")],
-            isFallback: true,
-            providerID: id
-        )]
-        for search in WebSearches.builtIn where search.keyword == "g" || search.keyword == "pm" {
-            var row = WebSearches.result(search, query: term, match: .unmatched, isFallback: true)
-            row.id = "fallback:" + search.keyword
+        var rows: [LaunchResult] = []
+        if fallbacks.drive {
+            rows.append(driveRow(term))
+        }
+        for engine in fallbacks.engines {
+            var row = WebSearches.result(engine.search, query: term, match: .unmatched, isFallback: true)
+            row.id = "fallback:" + engine.id
             rows.append(row)
         }
+        guard fallbacks.assistants else { return rows }
         for assistant in Self.assistants {
             let url = assistant.template.replacingOccurrences(of: "%s", with: WebSearches.encode(term))
             rows.append(LaunchResult(
@@ -54,5 +52,19 @@ public struct FallbackProvider: InstantProvider {
             ))
         }
         return rows
+    }
+
+    private func driveRow(_ term: String) -> LaunchResult {
+        LaunchResult(
+            id: "fallback:drive",
+            title: "Search Drive contents for “\(term)”",
+            subtitle: "Files whose text matches, in Google Drive",
+            icon: .symbol("doc.text.magnifyingglass"),
+            section: .web,
+            accessory: "Files",
+            actions: [LaunchAction.complete(". \(term) drive:", title: "Search")],
+            isFallback: true,
+            providerID: id
+        )
     }
 }

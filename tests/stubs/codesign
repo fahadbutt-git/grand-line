@@ -1,0 +1,48 @@
+#!/bin/bash
+# Test stub: a pretend codesign. Signing writes what was asked into a file
+# beside the code (CODE/.stub-signature for a bundle or folder,
+# CODE.stub-signature for a file); -d and --verify read it back as codesign
+# would print it. Unsigned code fails, as on a Mac.
+echo "codesign $*" >> "${STUB_LOG:-/dev/null}"
+target="${!#}"
+if [[ -d "$target" ]]; then sig="$target/.stub-signature"; else sig="$target.stub-signature"; fi
+mode=sign identity="" runtime=0 req="" want=""
+args=("$@")
+i=0
+while [[ $i -lt ${#args[@]} ]]; do
+  case "${args[$i]}" in
+    -d|-dv|-dvv|--display) mode=display ;;
+    --verify) mode=verify ;;
+    -s|--sign) i=$((i + 1)); identity="${args[$i]}" ;;
+    --options) i=$((i + 1)); [[ "${args[$i]}" == *runtime* ]] && runtime=1 ;;
+    -r) i=$((i + 1)); req="${args[$i]#=}" ;;
+    -r-) want=requirement ;;
+    --entitlements|--keychain) i=$((i + 1)) ;;
+  esac
+  i=$((i + 1))
+done
+case "$mode" in
+  sign)
+    [[ -e "$target" ]] || { echo "$target: No such file or directory" >&2; exit 1; }
+    printf 'identity=%s\nruntime=%s\nrequirement=%s\n' "$identity" "$runtime" "$req" > "$sig" ;;
+  verify)
+    [[ -f "$sig" ]] || { echo "$target: code object is not signed at all" >&2; exit 1; } ;;
+  display)
+    [[ -f "$sig" ]] || { echo "$target: code object is not signed at all" >&2; exit 1; }
+    identity="$(sed -n 's/^identity=//p' "$sig")"; runtime="$(sed -n 's/^runtime=//p' "$sig")"
+    req="$(sed -n 's/^requirement=//p' "$sig")"
+    if [[ "$want" == requirement ]]; then
+      if [[ -n "$req" ]]; then echo "$req"
+      elif [[ "$identity" == - ]]; then echo 'designated => cdhash H"0000000000000000000000000000000000000000"'
+      else echo "designated => identifier \"stub\" and certificate root = H\"$(printf '%s' "$identity" | tr 'A-F' 'a-f')\""; fi
+    else
+      flags="0x0(none)"
+      if [[ "$identity" == - && "$runtime" == 1 ]]; then flags="0x10002(adhoc,runtime)"
+      elif [[ "$identity" == - ]]; then flags="0x2(adhoc)"
+      elif [[ "$runtime" == 1 ]]; then flags="0x10000(runtime)"; fi
+      echo "Executable=$target" >&2
+      echo "CodeDirectory v=20500 size=100 flags=$flags hashes=1+2 location=embedded" >&2
+      echo "TeamIdentifier=not set" >&2
+    fi ;;
+esac
+exit 0

@@ -69,6 +69,8 @@ apply_default_apps() {
     # If macOS refused, try again through NSWorkspace (tools/setdefault.swift).
     if [[ "$DRY_RUN" == 0 && "$(default_app_for "${exts%% *}")" != "$app.app" ]]; then
       local helper="$GRAND_LINE_BUILD/setdefault"
+      # The extension list (from default-apps.tsv in the package) is split on purpose.
+      # shellcheck disable=SC2086
       [[ -x "$helper" ]] && "$helper" "$(app_path_of "$app")" $exts >/dev/null
       # Last resort: write the setting where macOS keeps it, then restart the
       # service that reads it (it starts again by itself).

@@ -16,11 +16,13 @@ public enum SidebarBuilder {
         /// Downloads since you last opened the folder, for the "4 new" badge.
         public var newDownloads: Int
         public var hidden: SidebarHidden
+        /// Section and item order, and the Tags section (Settings).
+        public var layout: SidebarLayout
 
         public init(
             home: URL, places: [URL], projects: [URL] = [], savedSearches: [String] = [],
             volumes: [VolumeInfo] = [], drives: [GoogleDrive] = [], trash: URL, newDownloads: Int = 0,
-            hidden: SidebarHidden = SidebarHidden()
+            hidden: SidebarHidden = SidebarHidden(), layout: SidebarLayout = SidebarLayout()
         ) {
             self.home = home
             self.places = places
@@ -31,6 +33,7 @@ public enum SidebarBuilder {
             self.trash = trash
             self.newDownloads = newDownloads
             self.hidden = hidden
+            self.layout = layout
         }
     }
 
@@ -45,12 +48,18 @@ public enum SidebarBuilder {
     /// Hidden items and sections are left out; a section left empty goes too,
     /// except Locations, which always shows.
     public static func build(_ input: Input) -> [SidebarGroup] {
-        all(input).compactMap { group in
+        everything(input).compactMap { group in
             guard !input.hidden.hides(group.section) else { return nil }
             let items = group.items.filter { !input.hidden.hides($0) }
             guard !items.isEmpty || group.section == .locations else { return nil }
             return SidebarGroup(section: group.section, items: items)
         }
+    }
+
+    /// Every section and item in the chosen order, hidden ones included, for
+    /// Settings, Sidebar, where they can be shown again.
+    public static func everything(_ input: Input) -> [SidebarGroup] {
+        input.layout.apply(all(input))
     }
 
     static func all(_ input: Input) -> [SidebarGroup] {
@@ -66,6 +75,9 @@ public enum SidebarBuilder {
             }))
         }
         groups.append(SidebarGroup(section: .locations, items: locations(input)))
+        if input.layout.showsTags {
+            groups.append(SidebarGroup(section: .tags, items: input.layout.tagItems()))
+        }
         return groups
     }
 

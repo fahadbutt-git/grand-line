@@ -46,6 +46,16 @@ public final class UsageStore: @unchecked Sendable {
         return Record(score: decayed(record, at: date) + 1, last: date, count: record.count + 1)
     }
 
+    /// Forgets everything learned: scores, recents and favourites. The file
+    /// is left to the caller (Settings moves it to the Trash first).
+    public func reset() {
+        lock.lock()
+        data = Stored()
+        lock.unlock()
+    }
+
+    public var fileLocation: URL? { fileURL }
+
     /// Records that `result` was run from `query`.
     public func record(_ result: LaunchResult, query: LaunchQuery) {
         let date = now()

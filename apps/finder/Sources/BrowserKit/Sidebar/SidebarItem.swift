@@ -5,6 +5,8 @@ public enum SidebarSection: String, CaseIterable, Sendable {
     case activeProjects
     case savedSearches
     case locations
+    /// Tags chosen in Settings, Tags; absent until one is.
+    case tags
 
     public var title: String {
         switch self {
@@ -12,6 +14,17 @@ public enum SidebarSection: String, CaseIterable, Sendable {
         case .activeProjects: return "Active projects"
         case .savedSearches: return "Saved searches"
         case .locations: return "Locations"
+        case .tags: return "Tags"
+        }
+    }
+
+    public var symbol: String {
+        switch self {
+        case .places: return "star"
+        case .activeProjects: return "folder.badge.gearshape"
+        case .savedSearches: return "magnifyingglass"
+        case .locations: return "externaldrive"
+        case .tags: return "tag"
         }
     }
 }

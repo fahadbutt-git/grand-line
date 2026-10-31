@@ -19,7 +19,7 @@ Apple's own type for every letter and number. The one exception is a few termina
 - `HIGHLIGHT` marks matches and the focused item. `PALETTE` holds the 16 terminal colours, which terminal tools use.
 - The semantic keys name a role, not a hue: `ACCENT_HEX` (the accent as a colour, beside `ACCENT`, the macOS accent number), `MUTED` (secondary text), `BG_LIGHTER` and `BG_DARKER` (raised and sunken surfaces). Templates use these, so a new theme only fills them in.
 - Each app's colours come from a template in `config/themed/`. `theme set` fills it in with the theme's values into `~/.local/state/grand-line/current/theme/`, all at once.
-- Apps built for the package read the theme from `~/.local/state/grand-line/theme` (the theme's name) and the theme file, and follow light or dark mode from it.
+- Apps built for the package read the theme from `~/.local/state/grand-line/theme` (the theme's name) and the theme file, and follow light or dark mode from it. With Follow macOS chosen in Settings, Appearance, a theme with a dark and a light variant switches with the system.
 - Text keeps at least 4.5:1 contrast against its background in every theme, including Daylight, where every terminal colour reads at 4.5:1 on white (the tests check it).
 
 ### Theme keys
@@ -44,6 +44,7 @@ Every theme file holds the keys below (the tests check them). A key marked optio
 | `ICON_TILE`, `ICON_INK` | Optional. The tile (line and mono) and the glyph (line and solid). Missing: a dark tile (the theme's surface when it is dark) and light ink; mono is black, solid ink is near black |
 | `ICON_ACCENT`, `ICON_SOFT` | Optional. Every app's colour, and the quiet fills (the sea, the iceberg under water). Missing: `ACCENT_HEX`, then `HIGHLIGHT`; soft is the tile with a quarter of the accent |
 | `ICON_FILES`, `ICON_SEARCH`, `ICON_NOTCH` | Optional. One app's own colour: the file browser (Nexus), search (Sight, also the warm tone of its eye) and the notch app (Iceberg). Missing: `ICON_ACCENT` |
+| `UI_DENSITY` | Optional. `compact`, `regular` or `comfortable` rows in every app. Missing: each app's own choice in Settings, Appearance |
 
 The icons are original, generic glyphs drawn from one table (`apps/icons`): a sailing ship for the file browser, the back of an eye (optic disc, vessels arching around the macula) for search, and an iceberg for the notch app. They sit on Apple's icon grid (an 824 point tile on a 1024 canvas, corners of 185), use no gradients or shadows, and leave fine detail out at 16 and 32 pixels.
 

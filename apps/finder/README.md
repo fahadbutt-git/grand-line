@@ -38,6 +38,17 @@ try await index.save(to: snapshot)
 - `IndexExclusions.standard` skips `.DS_Store`, `._*`, `.git`, `node_modules`, `.build`, caches and similar, and indexes app bundles as one item.
 - `FolderWatcher` publishes coalesced `FolderChange`s. `apply(_:)` rescans only the changed folders.
 - Search runs one task per core over the arrays, behind a character bitmask that rejects most names at once.
+- Names are composed (NFC) before folding, so a decomposed name on disk matches a composed query and the other way round.
+
+## Grand Line Index (the shared index service)
+
+Nexus and Sight keep no index of their own. `Grand Line Index.app` (product `GrandLineIndex`, bundle id `com.grandline.index`) is a background-only agent that launchd runs at login from `Contents/Library/LaunchAgents/com.grandline.index.plist` (registered with `SMAppService.agent` by `GrandLineIndex --register`). It owns one `FileIndex` of the home folder, without `~/Library` except `~/Library/CloudStorage`, and serves it over the XPC Mach service `com.grandline.index`.
+
+- Start: the snapshot in `~/Library/Application Support/Grand Line Index/names.index` loads at once. On the first start the agent adopts the best of Sight's `names.index` and Nexus's `name-index.snapshot` (finished before unfinished, then newer), so nothing is walked again.
+- Freshness: the snapshot stores the last FSEvents event and each root's volume UUID. `IndexRecovery.startup` resumes from the event, or walks again (while the old index answers) when the snapshot was unfinished, the volume UUID changed or the event counter is behind. `IndexRecovery.event` maps MustScanSubDirs and RootChanged to a rescan of that folder, dropped events to every root (walked in the background) and a wrapped counter to a full walk. A quiet full sweep runs weekly. The index is saved every five minutes when it changed, and on SIGTERM.
+- Clients: `SharedIndexClient` (IndexService) sends `search(text, limit, scope)` and gets one `MatchCodec` buffer back. Each connection has its own narrowing cache. When the agent cannot be reached the client runs `open -g -j -b com.grandline.index` and answers from a copy read from the agent's snapshot (never written), which follows FSEvents if the agent stays away.
+- Security: only processes of the same user can look up the Mach service, and each side checks the other's code signature (`setCodeSigningRequirement`): the same Apple team, else the same leaf certificate (the local signing identity), else, for ad-hoc builds, the bundle identifier only.
+- The agent is the app that needs Full Disk Access (or Files and Folders); for name search, Nexus and Sight no longer do.
 
 ## FileKit
 
@@ -59,6 +70,16 @@ Archives open like folders (R26). `Archive.list` reads .zip, .7z, .rar and .tar 
 ## ThemeKit
 
 Reads the active theme (`~/.local/state/grand-line/theme` and `~/.grand-line/config/themes/<name>.theme`) into a `Theme` of semantic colours: background, panel, field, line, hairline, text, strong, dim, faint, selection, selectionText, accent, highlight and chip. Keys a file leaves out are derived, and text and dim text are lifted to 4.5:1 contrast where a theme falls short. Graphite and Daylight are built in as fallbacks. `ThemeWatcher` publishes the theme again when it changes. `Color(_:)` and `NSColor(_:)` convert colours for SwiftUI and AppKit.
+
+`ThemeCatalog` lists the theme files as families (a FAMILY= pair, Graphite and Daylight, or a theme on its own) for the Appearance pane. While `~/.local/state/grand-line/theme-follows-macos` exists, the theme follows macOS: `ThemeWatcher` shows the variant for the system's appearance as soon as it changes (`AppleInterfaceThemeChangedNotification`), and the first app to take `theme-follow.lock` runs `theme mode dark|light` so the terminal and menus follow too. Iceberg does the same in its own `ThemeStore`. `Density` is a theme's optional UI_DENSITY, else each app's `Density` default.
+
+## Settings windows
+
+Nexus and Sight share one Settings window (`SettingsKit`): panes in a sidebar on the left, in the theme's colours, every entry with the accessibility identifier `nexus.settings.<pane>` or `sight.settings.<pane>`. It opens with Cmd+, (in Sight, while the search window is in front), from Sight's menu bar item, from `nexus://settings` and `sight://settings` (a pane can follow: `nexus://settings/search`), and from the main menu's Settings group, which Sight finds as "nexus settings", "sight settings" and "iceberg settings". Every change is saved at once and applies to open windows.
+
+- **Appearance** (both): a card per theme family drawn in its own colours (a Nexus row with a kind tag, a Sight row, Iceberg's pill), dark, light or Follow macOS (`theme set <family>` and `theme mode`, run with argument lists), the icon style the theme sets, and density.
+- **Nexus**: General (where new windows open, folders in tabs, what Return does, path and status bars), Sidebar (show, hide and order sections and items; hidden items stay in `sidebar-hidden.json`), Tags (tags in the sidebar, favourite tags as chips in the inspector), Views (the defaults in `view-settings.json`, kind colours), Search (where searches start, content matches, the index's state and Rebuild Index through IndexKit's `IndexStatusProviding`), Advanced (hidden files, extensions, warnings, the configuration folder, Update now: `grandline update --apps-only --notify`). Kept in the `com.grandline.nexus` defaults (`NexusPreferences`).
+- **Sight**: General (the launcher shortcut, recorded in `LauncherHotkey`; the menu bar item; open at login; `CloseAfterSettingChange`), Sources (turn result sources off and set the order of their sections, with each prefix), Search (what the index covers, read only, and rows per section), Web (search engines with a keyword and a URL with %s, which of them show as fallbacks, Drive and the assistants), Advanced (reload sources, logs, reset usage history: usage.json goes to the Trash), Update now. Kept in the `com.grandline.sight` defaults (`SightPreferences`); quicklinks.tsv still adds engines.
 
 ## LaunchKit
 
@@ -89,7 +110,7 @@ The search window that replaces Spotlight and Alfred. `LauncherKit` holds everyt
 - Providers answer a `LaunchQuery`. Instant providers (`InstantProvider`) answer on the keystroke; the others run concurrently, are cancelled by the next key, and merge in below without stealing the selection (`ResultList.merge`).
 - Rank order is fixed: exact alias, alias prefix, title tier, keyword tier, then learned frecency (`UsageStore`: per query and overall, halving every 7 days). Fallbacks always come last. Sections: Top hit, Answers, Apps, Grand Line, Windows, System, Bookmarks, Snippets, Symbols, Files, Web.
 - Prefixes: `.` files (QueryKit), `=` calculator, `?` web, `%` Zen bookmarks, `<` windows, `!` reminder, `>` shell, `;` snippets, `$` Maccy (presses its own ⇧⌘C, so Accessibility is needed), `:` symbols, `/` prefix list (`~/…` and `/a/b` are paths), `'` exact, `@` saved searches (Nexus's `saved-searches.tsv`).
-- File names come from an IndexKit index of the home folder, without `~/Library` (Google Drive in `~/Library/CloudStorage` stays) and with IndexKit's standard exclusions (`.git`, `node_modules`, `.build`, caches, the Trash). Contents and filters go to Spotlight.
+- File names come from the shared Grand Line Index service: an IndexKit index of the home folder, without `~/Library` (Google Drive in `~/Library/CloudStorage` stays) and with IndexKit's standard exclusions (`.git`, `node_modules`, `.build`, caches, the Trash). Contents and filters go to Spotlight.
 - Grand Line sources: `menu.tsv` and `menu.local.tsv` (guards and checks run in one bash process), `bin/*` summaries and arguments ("reminder buy milk, 30"), `keybindings.tsv` and `bindings.local.tsv`, Espanso match files, apps through `focus-or-open`.
 - Settings actions (`Providers/System/SettingsActions*.swift`): phrases such as "wifi off" or "volume 30" become rows that run `bin/toggle` or `bin/power` with an argument list, through a `CommandRunning` (tests pass a fake). State comes from `toggle status`, read on each window opening and again by name after each change; a change that did not take is a failure. Rows keep stable ids (`setting.wifi`), which are also their accessibility identifiers, with the state as the accessibility value. `ResultList.update` redraws them in place.
 - Settings in `~/.config/grand-line/sight/`: `aliases.tsv` (alias TAB result id, URL or path), `quicklinks.tsv` (keyword TAB title TAB URL with %s), `providers.tsv` (keyword TAB title TAB command TAB global yes/no; the command prints JSON lines). State in `~/Library/Application Support/Sight/`.

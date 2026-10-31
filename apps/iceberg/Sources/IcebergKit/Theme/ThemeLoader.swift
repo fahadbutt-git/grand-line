@@ -30,7 +30,40 @@ public enum ThemeLoader {
     /// theme chosen yet (a build run before setup), or a built-in one, it uses
     /// its own copy and says nothing.
     public static func load(paths: IcebergPaths) -> (Theme, [ConfigIssue]) {
+        load(paths: paths, named: currentName(paths: paths))
+    }
+
+    /// Whether the theme follows the macOS appearance.
+    public static func followsSystem(paths: IcebergPaths) -> Bool {
+        FileManager.default.fileExists(atPath: paths.themeFollowFile.path)
+    }
+
+    /// The theme to show: the state file's, or, while following macOS, its
+    /// variant for the system's appearance, by `theme mode`'s rules (FAMILY-dark
+    /// and FAMILY-light; Graphite and Daylight pair up).
+    public static func followedName(paths: IcebergPaths, systemIsDark: Bool) -> String {
         let name = currentName(paths: paths)
+        guard followsSystem(paths: paths) else { return name }
+        return variant(of: name, systemIsDark: systemIsDark, paths: paths) ?? name
+    }
+
+    /// The other variant to switch to, or nil when `name` already matches or has none.
+    public static func variant(of name: String, systemIsDark: Bool, paths: IcebergPaths) -> String? {
+        let target: String
+        if name == "graphite" || name == "daylight" {
+            target = systemIsDark ? "graphite" : "daylight"
+        } else {
+            let text = (try? String(contentsOf: paths.themeFile(named: name), encoding: .utf8)) ?? ""
+            guard let family = fields(text)["FAMILY"].flatMap(sanitizedName) else { return nil }
+            target = family + (systemIsDark ? "-dark" : "-light")
+        }
+        guard target != name,
+              FileManager.default.fileExists(atPath: paths.themeFile(named: target).path) || builtIn[target] != nil
+        else { return nil }
+        return target
+    }
+
+    public static func load(paths: IcebergPaths, named name: String) -> (Theme, [ConfigIssue]) {
         let url = paths.themeFile(named: name)
         guard let data = FileManager.default.contents(atPath: url.path),
               let text = String(data: data, encoding: .utf8) else {

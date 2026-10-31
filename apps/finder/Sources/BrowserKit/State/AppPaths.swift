@@ -1,3 +1,4 @@
+import FileKit
 import Foundation
 
 /// Where Nexus keeps things: state in Application Support, settings in
@@ -6,7 +7,7 @@ public struct AppPaths: Sendable, Equatable {
     public let home: URL
     public let support: URL
 
-    public init(home: URL = FileManager.default.homeDirectoryForCurrentUser, support: URL? = nil) {
+    public init(home: URL = HomeFolder.url, support: URL? = nil) {
         self.home = home
         self.support = support ?? home.appendingPathComponent("Library/Application Support/Nexus", isDirectory: true)
     }

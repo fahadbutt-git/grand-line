@@ -82,6 +82,7 @@ enum MainMenu {
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Settings…", action: #selector(AppDelegate.openSettings(_:)), keyEquivalent: ","))
         menu.addItem(NSMenuItem(title: "Reload Settings", action: #selector(AppDelegate.reloadSettings(_:)), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Open Configuration Folder", action: #selector(AppDelegate.openConfigurationFolder(_:)), keyEquivalent: ""))
         menu.addItem(.separator())
         let services = NSMenuItem(title: "Services", action: nil, keyEquivalent: "")
         let servicesMenu = NSMenu(title: "Services")

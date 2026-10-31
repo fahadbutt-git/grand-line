@@ -6,6 +6,10 @@ public struct Calculator: Sendable {
     public var rates: CurrencyRates?
     public var defaultCurrency: String
     public var dates: DateMath
+    /// Sums, dates and time zones (Settings, Sources, Calculator).
+    public var arithmetic = true
+    /// Units and currency (Settings, Sources, Units and currency).
+    public var conversions = true
 
     public init(rates: CurrencyRates? = nil, defaultCurrency: String = "CAD", dates: DateMath = DateMath()) {
         self.rates = rates
@@ -26,10 +30,10 @@ public struct Calculator: Sendable {
     public func evaluate(_ input: String, strict: Bool = false) -> Answer? {
         let text = input.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return nil }
-        if let answer = dates.evaluate(text) { return Answer(value: answer.text, copy: answer.copy, reading: text) }
-        if let answer = conversion(text) { return answer }
-        if let answer = money(text) { return answer }
-        guard !strict || Expression.hasWork(text), let value = Expression.evaluate(text) else { return nil }
+        if arithmetic, let answer = dates.evaluate(text) { return Answer(value: answer.text, copy: answer.copy, reading: text) }
+        if conversions, let answer = conversion(text) { return answer }
+        if conversions, let answer = money(text) { return answer }
+        guard arithmetic, !strict || Expression.hasWork(text), let value = Expression.evaluate(text) else { return nil }
         return Answer(value: NumberText.grouped(value), copy: NumberText.plain(value), reading: text)
     }
 

@@ -19,6 +19,13 @@ public struct IcebergPaths: Sendable, Equatable {
     public func themeFile(named name: String) -> URL {
         themesFolder.appendingPathComponent("\(name).theme")
     }
+    /// Present while the theme follows macOS between dark and light (Nexus
+    /// and Sight Settings, Appearance, "Follow macOS").
+    public var themeFollowFile: URL { home.appendingPathComponent(".local/state/grand-line/theme-follows-macos") }
+    /// Taken by the one app that runs `theme mode` after macOS switches.
+    public var themeFollowLock: URL { home.appendingPathComponent(".local/state/grand-line/theme-follow.lock") }
+    /// The package's `theme` command.
+    public var themeCommand: URL { home.appendingPathComponent(".grand-line/bin/theme") }
 
     /// Iceberg's own settings and the user's widgets.
     public var configFolder: URL { home.appendingPathComponent(".config/grand-line/iceberg") }

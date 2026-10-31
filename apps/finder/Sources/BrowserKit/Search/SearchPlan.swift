@@ -53,14 +53,37 @@ public struct SearchPlan {
         return words.allSatisfy { name.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
     }
 
-    /// Whether to show a result found only by its contents. Not from app data:
-    /// ~/Library (except Google Drive), hidden folders, the insides of apps and
-    /// other packages, .git, node_modules and caches, unless the search was
-    /// limited to a folder inside such a place.
-    public func keepsContentMatch(_ path: String) -> Bool {
-        let roots = scopes.filter { $0.hasPrefix("/") && Backstage.isInside(path, $0) }
-        let scope = roots.max { $0.count < $1.count }
-        return !Backstage.contains(path, home: home, scope: scope, hidden: true)
+    /// Whether a result may show at all, however it was found (the name index,
+    /// the index service or Spotlight, by name or by content): not app data.
+    /// That is ~/Library (except Google Drive), hidden folders, the insides of
+    /// apps and other packages, .git, node_modules and caches, unless the search
+    /// was limited to a folder inside such a place. Only the part of the path
+    /// below the search's folder, or below the home folder, counts.
+    public func keeps(_ path: String) -> Bool {
+        let roots = (scopes + [home]).filter { $0.hasPrefix("/") && Backstage.isInside(path, $0) }
+        let base = roots.max { $0.count < $1.count }
+        return !Backstage.contains(path, home: home, scope: base, hidden: true)
+    }
+
+    /// Whether to show a result found only by its contents (see `keeps`).
+    public func keepsContentMatch(_ path: String) -> Bool { keeps(path) }
+
+    /// The scope's folders that the name index leaves out (the Trash, a
+    /// node_modules, ~/Library), so their names are read from disk instead.
+    public var foldersTheIndexSkips: [String] {
+        scopes.filter { $0.hasPrefix("/") && Self.indexSkips($0, home: home) }
+    }
+
+    static func indexSkips(_ folder: String, home: String) -> Bool {
+        var base = home
+        while base.count > 1, base.hasSuffix("/") { base.removeLast() }
+        guard Backstage.isInside(folder, base) else { return false }
+        let names = folder.dropFirst(base.count).split(separator: "/").map(String.init)
+        if names.first == "Library", names.dropFirst().first.map({ IndexExclusions.keptInLibrary.contains($0) }) != true {
+            return true
+        }
+        let rules = IndexExclusions.standard
+        return names.contains { rules.skips($0) || rules.isPackage($0) }
     }
 
     static func plainWords(_ query: ParsedQuery) -> [String] {

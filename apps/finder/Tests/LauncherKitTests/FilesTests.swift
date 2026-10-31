@@ -77,7 +77,7 @@ final class FilesTests: XCTestCase {
             unreadable: { ["/Users/me/Downloads", "/Users/me/Projects/app/secret", "/Users/me/Library/CloudStorage/GoogleDrive-me@example.com"] }
         )
         let rows = try await provider.results(for: LaunchQuery(raw: "conj"))
-        XCTAssertEqual(rows.map(\.title), ["Allow Sight to read Downloads", "Allow Sight to read Google Drive"])
+        XCTAssertEqual(rows.map(\.title), ["Allow Grand Line Index to read Downloads", "Allow Grand Line Index to read Google Drive"])
         XCTAssertEqual(rows.first?.primary?.command, .openURL(FileResults.filesAndFoldersPane, bundleID: nil))
         XCTAssertTrue(rows.allSatisfy(\.isFallback), "below every real match")
         let empty = try await provider.results(for: LaunchQuery(raw: ""))

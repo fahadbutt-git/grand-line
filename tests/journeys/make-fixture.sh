@@ -140,16 +140,18 @@ file "Documents/Projects/Conj Flap/node_modules/conj-module/index.js"
 mkdir -p .local/state/grand-line .grand-line/config .config/grand-line/iceberg/widgets
 cp -R "$repo/config/themes" .grand-line/config/themes
 printf 'graphite\n' > .local/state/grand-line/theme
+# The panel list names what shows, in order: built-in items by id and script
+# widgets by file name (journey.toml is "journey"). Only the battery and the
+# Journey widget, so the panel shows exactly these and nothing asks for
+# calendar or reminders access.
 cat > .config/grand-line/iceberg/iceberg.toml <<'EOF'
-# Only the battery and one widget, so the panel shows exactly these sections
-# and nothing asks for calendar or reminders access.
 external_displays = "none"
 open_on = "hover"
 hover_delay = 0.1
 close_delay = 0.3
 live_activity = false
 launch_at_login = false
-builtin = ["battery"]
+panel = ["battery", "journey"]
 EOF
 cat > .config/grand-line/iceberg/widgets/journey.toml <<'EOF'
 title = "Journey"

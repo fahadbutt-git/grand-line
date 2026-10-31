@@ -13,7 +13,10 @@ on:
     # Mondays: catches apps that were renamed or removed from Homebrew.
     - cron: "17 11 * * 1"
 
-# The test runs only read this repository.
+# The test runs only read this repository. Each job asks for no more.
+# Actions are pinned to a commit (the version is in the comment beside it),
+# so a moved tag cannot change what runs; tests/security-checks.sh --actions
+# checks it.
 permissions:
   contents: read
 
@@ -21,31 +24,45 @@ jobs:
   checks:
     name: Checks (Linux, fast)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - run: sudo apt-get install -y shellcheck zsh tmux jq
+      - name: Security checks (keys and tokens, pinned actions, downloaded code, entitlements)
+        run: bash tests/security-checks.sh
       - run: bash tests/run-all.sh
 
   macos-checks:
     name: Checks with macOS bash 3.2
     runs-on: macos-26
+    permissions:
+      contents: read
     env:
       # Put Apple's /bin/bash 3.2 ahead of Homebrew's bash 5, as on a new Mac.
       PATH: /usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - run: brew install shellcheck jq tmux
       - run: bash --version | head -1 && /bin/bash tests/run-all.sh
 
   apps:
     name: Apps, build and test (${{ matrix.app }}, macOS 27)
     runs-on: xcode-27
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
         app: [finder, iceberg]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - name: Build and test
         env:
           APP: ${{ matrix.app }}
@@ -82,14 +99,22 @@ jobs:
               && echo "::notice title=$APP bundle::$(basename "$app") built and signed" \
               || { echo "::error title=$APP bundle::$(basename "$app") is not a valid signed app"; exit 1; }
           done
+          # Hardened runtime on, nothing that weakens it in the entitlements.
+          if ! out="$(bash tests/security-checks.sh --bundles "$GRAND_LINE_APPS_DEST")"; then
+            echo "::error title=$APP hardened runtime::$(printf '%s' "$out" | tr '\n' ' ')"; exit 1
+          fi
 
   journeys:
     name: User journeys, every app driven like a person (macOS 27)
     runs-on: xcode-27
+    permissions:
+      contents: read
     # Hard stop; each step and the driver have their own, shorter limits.
     timeout-minutes: 50
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - name: Build the app bundles and the journey driver
         id: build
         timeout-minutes: 25
@@ -106,6 +131,7 @@ jobs:
             fi
           done
           ls "$APPS_OUT"
+          bash tests/security-checks.sh --bundles "$APPS_OUT" || exit 1
           if ! swift build -c release --package-path tests/journeys 2>&1 | tee driver.log; then
             echo "::error title=journey driver build::$(grep -E 'error:' driver.log | head -20 | awk 'BEGIN{ORS="%0A"} {gsub(/%/,"%25"); print}')"; exit 1
           fi
@@ -113,7 +139,9 @@ jobs:
       - name: Allow the driver to use Accessibility and record the screen
         timeout-minutes: 5
         run: |
-          bash tests/journeys/grant-tcc.sh "$DRIVER"
+          # Sight switches dark mode, the Dock and the menu bar through System
+          # Events, so it gets Automation too (a prompt would block it here).
+          bash tests/journeys/grant-tcc.sh --automation "$APPS_OUT/Sight.app" "$DRIVER"
           if "$DRIVER" --check-permissions; then
             echo "::notice title=journeys permissions::Accessibility and Screen Recording granted"
           else
@@ -146,7 +174,7 @@ jobs:
           cd "$(dirname "$RESULTS")" && zip -qr journeys.zip "$(basename "$RESULTS")"
       - name: Keep the screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: journey-screenshots
           path: ${{ runner.temp }}/journeys.zip
@@ -164,16 +192,25 @@ jobs:
         # xcode-27 is GitHub's macOS 27 image, the version the new Mac runs.
         image: [xcode-27, macos-26]
     runs-on: ${{ matrix.image }}
+    permissions:
+      contents: read
     timeout-minutes: 120
     env:
       GRAND_LINE_HOME: ${{ github.workspace }}
       HOMEBREW_NO_INSTALL_CLEANUP: 1
     steps:
-      - uses: actions/checkout@v5
-      - name: Run 1, full setup
-        run: /bin/bash setup.sh --ci --skip r-packages
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      # The token is only for ArtCraft's release lookups (GitHub's rate limit),
+      # so only that step gets it. The rest of the install runs Homebrew's and
+      # each app's own installers, which never see it.
+      - name: Run 1a, ArtCraft apps
+        run: /bin/bash setup.sh --ci --only artcraft
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # only for ArtCraft release lookups
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run 1b, full setup
+        run: /bin/bash setup.sh --ci --skip r-packages,artcraft
       - name: Report what was installed
         if: always()
         run: |
@@ -213,7 +250,7 @@ jobs:
         run: /bin/bash setup.sh --ci --only r-packages
       - name: Keep the logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: setup-logs
           path: ~/Library/Logs/grand-line/

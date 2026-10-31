@@ -20,12 +20,13 @@ public final class FolderWatcher: @unchecked Sendable {
     /// - Parameter since: an event ID to replay from (from `latestEventID` of an earlier
     ///   run), or nil for changes from now on.
     public init(paths: [String], since: UInt64? = nil, latency: TimeInterval = 0.5) {
-        self.paths = paths.map(FolderWatcher.realPath)
+        let real = paths.map(FolderWatcher.realPath)
+        self.paths = real
         self.since = since
         self.latency = latency
         let (changes, continuation) = AsyncStream.makeStream(of: [FolderChange].self, bufferingPolicy: .unbounded)
         self.changes = changes
-        self.box = WatcherBox(continuation: continuation, latest: since ?? FolderWatcher.currentEventID)
+        self.box = WatcherBox(continuation: continuation, latest: since ?? FolderWatcher.currentEventID, roots: real)
     }
 
     deinit {
@@ -41,6 +42,36 @@ public final class FolderWatcher: @unchecked Sendable {
     /// The newest event this watcher has seen.
     public var latestEventID: UInt64 {
         box.latestEventID
+    }
+
+    /// The FSEvents UUID of the volume holding `path`: it changes when the disk
+    /// is erased or restored, which makes stored event IDs meaningless.
+    public static func volumeUUID(of path: String) -> String? {
+        var info = stat()
+        guard stat(path, &info) == 0 else { return nil }
+        return uuidString(FSEventsCopyUUIDForDevice(info.st_dev))
+    }
+
+    /// The volume UUID of each path that has one.
+    public static func volumeUUIDs(for paths: [String]) -> [String: String] {
+        var result: [String: String] = [:]
+        for path in paths {
+            if let uuid = volumeUUID(of: path) { result[path] = uuid }
+        }
+        return result
+    }
+
+    // The SDK has imported FSEventsCopyUUIDForDevice both as a managed and an
+    // unmanaged reference; one of these two fits whichever this SDK uses.
+    private static func uuidString(_ uuid: Unmanaged<CFUUID>?) -> String? {
+        guard let uuid else { return nil }
+        let value = uuid.takeRetainedValue()
+        return CFUUIDCreateString(kCFAllocatorDefault, value) as String?
+    }
+
+    private static func uuidString(_ uuid: CFUUID?) -> String? {
+        guard let uuid else { return nil }
+        return CFUUIDCreateString(kCFAllocatorDefault, uuid) as String?
     }
 
     /// Resolves symbolic links the way FSEvents reports paths. Missing paths come back standardized.
@@ -116,16 +147,29 @@ public final class FolderWatcher: @unchecked Sendable {
         self.stream = nil
     }
 
-    /// Turns raw FSEvents flags into changes. Exposed for tests.
-    static func changes(from events: [(String, FSEventStreamEventFlags, FSEventStreamEventId)]) -> [FolderChange] {
-        let deep = FSEventStreamEventFlags(
-            kFSEventStreamEventFlagMustScanSubDirs | kFSEventStreamEventFlagRootChanged
-                | kFSEventStreamEventFlagUserDropped | kFSEventStreamEventFlagKernelDropped
-        )
-        let ignored = FSEventStreamEventFlags(kFSEventStreamEventFlagHistoryDone | kFSEventStreamEventFlagEventIdsWrapped)
+    /// Turns raw FSEvents flags into changes, by `IndexRecovery.event`. Dropped
+    /// events and a wrapped counter ask for every root again (each root as one
+    /// recursive change; with no roots given, the event's own path). Exposed for tests.
+    static func changes(
+        from events: [(String, FSEventStreamEventFlags, FSEventStreamEventId)],
+        roots: [String] = []
+    ) -> [FolderChange] {
         var changes: [FolderChange] = []
-        for (path, flags, _) in events where flags & ignored == 0 || flags & deep != 0 {
-            changes.append(FolderChange(path: path, recursive: flags & deep != 0))
+        for (path, flags, _) in events {
+            switch IndexRecovery.event(path: path, flags: flags) {
+            case .ignore:
+                continue
+            case .folder(let folder):
+                changes.append(FolderChange(path: folder))
+            case .subtree(let folder):
+                changes.append(FolderChange(path: folder, recursive: true))
+            case .roots, .rebuild:
+                if roots.isEmpty {
+                    changes.append(FolderChange(path: path, recursive: true))
+                } else {
+                    changes += roots.map { FolderChange(path: $0, recursive: true) }
+                }
+            }
         }
         return FolderChange.coalesce(changes)
     }
@@ -134,12 +178,14 @@ public final class FolderWatcher: @unchecked Sendable {
 /// Lives as long as the stream, which owns one reference to it.
 final class WatcherBox: @unchecked Sendable {
     let continuation: AsyncStream<[FolderChange]>.Continuation
+    let roots: [String]
     private let lock = NSLock()
     private var latest: UInt64
 
-    init(continuation: AsyncStream<[FolderChange]>.Continuation, latest: UInt64) {
+    init(continuation: AsyncStream<[FolderChange]>.Continuation, latest: UInt64, roots: [String] = []) {
         self.continuation = continuation
         self.latest = latest
+        self.roots = roots
     }
 
     var latestEventID: UInt64 {
@@ -154,7 +200,7 @@ final class WatcherBox: @unchecked Sendable {
             latest = max(latest, newest)
             lock.unlock()
         }
-        let changes = FolderWatcher.changes(from: events)
+        let changes = FolderWatcher.changes(from: events, roots: roots)
         if !changes.isEmpty { continuation.yield(changes) }
     }
 }

@@ -73,6 +73,18 @@ final class PaneModel: ObservableObject, Identifiable {
         state.setManualOrder(prefs.manualOrder(for: folder.path))
     }
 
+    /// Settings, Views changed the defaults: a pane still on the old ones takes the new ones.
+    func defaultsChanged(from old: ViewSettings, to new: ViewSettings) {
+        var listOld = old
+        listOld.mode = .list
+        guard windowSettings == listOld || windowSettings == old else { return }
+        var next = new
+        next.mode = .list
+        windowSettings = next
+        applyFolderSettings()
+        readLastOpened()
+    }
+
     func setSettings(_ settings: ViewSettings) {
         state.setSettings(settings)
         readLastOpened()

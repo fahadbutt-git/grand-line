@@ -2,8 +2,11 @@
 // ordo-one/FuzzyMatch (Apache-2.0), Prefilters.swift and WordBoundary.swift.
 import Foundation
 
-/// Names are matched in folded form: lowercase and without accents, so "resume"
-/// finds "Résumé". ASCII names, the usual case, fold byte for byte.
+/// Names are matched in folded form: composed (NFC), lowercase and without
+/// accents, so "resume" finds "Résumé" whether the disk stored the name composed
+/// or decomposed (NFD, as older HFS+ volumes and many sync tools write it), and
+/// a decomposed Hangul syllable finds the composed one typed in a query. ASCII
+/// names, the usual case, fold byte for byte.
 enum NameFold {
     static let space: UInt8 = 0x20
     static let dot: UInt8 = 0x2E
@@ -23,11 +26,12 @@ enum NameFold {
         if let ascii = character.asciiValue, character.utf8.count == 1 {
             return [lower(ascii)]
         }
-        let folded = String(character).folding(
+        let composed = String(character).precomposedStringWithCanonicalMapping
+        let folded = composed.folding(
             options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
             locale: nil
         )
-        return Array(folded.utf8)
+        return Array(folded.precomposedStringWithCanonicalMapping.utf8)
     }
 
     static func isASCII(_ text: String) -> Bool {

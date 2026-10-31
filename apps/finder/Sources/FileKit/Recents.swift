@@ -15,9 +15,7 @@ public actor Recents {
     private var items: [Item]?
 
     public static var defaultFile: URL {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
-        return support.appendingPathComponent("Nexus/recents.json")
+        HomeFolder.url.appendingPathComponent("Library/Application Support/Nexus/recents.json")
     }
 
     public init(file: URL = Recents.defaultFile, limit: Int = 500) {

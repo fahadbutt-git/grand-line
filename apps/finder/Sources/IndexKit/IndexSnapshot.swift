@@ -4,8 +4,11 @@ import Foundation
 /// search window has results before the first rescan finishes.
 struct IndexSnapshot {
     static let magic: UInt32 = 0x474C_4958 // "GLIX"
-    /// Version 2 adds whether the walk had finished; version 1 files still load.
-    static let version: UInt32 = 2
+    /// Version 2 adds whether the walk had finished; version 3 adds the volume
+    /// UUID of each root, so a restored or reformatted disk is noticed, and names
+    /// are folded after composing them (NFC). Versions 1 and 2 still load: their
+    /// non-ASCII names are folded again on load, so nothing is rebuilt.
+    static let version: UInt32 = 3
 
     var roots: [String]
     var storage: IndexStorage
@@ -13,6 +16,9 @@ struct IndexSnapshot {
     var lastEventID: UInt64
     /// False for a snapshot saved part way through a first build.
     var complete: Bool
+    /// The FSEvents volume UUID of each root's disk when the snapshot was saved.
+    /// Empty for snapshots from before version 3.
+    var volumes: [String: String] = [:]
 
     enum Failure: Error, Equatable {
         case notAnIndex
@@ -44,22 +50,48 @@ struct IndexSnapshot {
             out.put(Array(path.utf8))
         }
         out.put(Array(try JSONEncoder().encode(usage)))
+        out.put(Array(try JSONEncoder().encode(volumes)))
         return out.data
     }
 
-    init(roots: [String], storage: IndexStorage, usage: [String: Usage], lastEventID: UInt64, complete: Bool = true) {
+    init(
+        roots: [String], storage: IndexStorage, usage: [String: Usage], lastEventID: UInt64,
+        complete: Bool = true, volumes: [String: String] = [:]
+    ) {
         self.roots = roots
         self.storage = storage
         self.usage = usage
         self.lastEventID = lastEventID
         self.complete = complete
+        self.volumes = volumes
+    }
+
+    /// What a snapshot file says about itself, read without decoding the arrays.
+    struct Header: Equatable {
+        var version: UInt32
+        var lastEventID: UInt64
+        var complete: Bool
+        var roots: [String]
+    }
+
+    static func header(of data: Data) throws -> Header {
+        var input = SnapshotReader(data: data)
+        guard try input.take(UInt32.self) == magic else { throw Failure.notAnIndex }
+        let version = try input.take(UInt32.self)
+        guard (1...Self.version).contains(version) else { throw Failure.wrongVersion(version) }
+        let eventID = try input.take(UInt64.self)
+        let complete = try version == 1 || input.take(UInt8.self) != 0
+        var roots: [String] = []
+        let rootCount = try input.count()
+        for _ in 0..<rootCount { roots.append(try input.string()) }
+        return Header(version: version, lastEventID: eventID, complete: complete, roots: roots)
     }
 
     init(decoding data: Data) throws {
         var input = SnapshotReader(data: data)
         guard try input.take(UInt32.self) == Self.magic else { throw Failure.notAnIndex }
         let version = try input.take(UInt32.self)
-        guard version == 1 || version == Self.version else { throw Failure.wrongVersion(version) }
+        guard (1...Self.version).contains(version) else { throw Failure.wrongVersion(version) }
         let eventID = try input.take(UInt64.self)
         let complete = try version == 1 || input.take(UInt8.self) != 0
         var rootList: [String] = []
@@ -101,7 +133,13 @@ struct IndexSnapshot {
         storage.removedCount = removed
         let usageBytes = try input.array(UInt8.self)
         let usage = try JSONDecoder().decode([String: Usage].self, from: Data(usageBytes))
-        self.init(roots: rootList, storage: storage, usage: usage, lastEventID: eventID, complete: complete)
+        var volumes: [String: String] = [:]
+        if version >= 3 {
+            volumes = try JSONDecoder().decode([String: String].self, from: Data(try input.array(UInt8.self)))
+        } else {
+            storage.refold()
+        }
+        self.init(roots: rootList, storage: storage, usage: usage, lastEventID: eventID, complete: complete, volumes: volumes)
     }
 }
 

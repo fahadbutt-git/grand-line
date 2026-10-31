@@ -10,6 +10,16 @@ final class FileCellView: NSTableCellView {
         let badge: DriveBadge?
         let isCut: Bool
         let theme: Theme?
+        var display = Display()
+    }
+
+    /// What Settings changes about every row.
+    struct Display: Equatable {
+        /// Icons in their kind's colour (Settings, Views).
+        var kindColours = true
+        /// Names with their extensions (Settings, Advanced).
+        var allExtensions = true
+        var rowHeight: CGFloat = 24
     }
 
     private let icon = NSImageView()
@@ -69,12 +79,16 @@ final class FileCellView: NSTableCellView {
         alphaValue = info.isCut ? 0.45 : 1
         switch column {
         case .name:
-            label.stringValue = item.name
+            label.stringValue = item.shownName(allExtensions: info.display.allExtensions)
             label.textColor = text
             label.isEditable = !item.isInArchive
             icon.image = NSImage(systemSymbolName: FileSymbol.name(for: item), accessibilityDescription: nil)
             let accent = info.theme.map { NSColor($0.accent) } ?? .controlAccentColor
-            icon.contentTintColor = item.isFolder ? accent : dim
+            if info.display.kindColours, let theme = info.theme, let kind = item.kindName {
+                icon.contentTintColor = NSColor(theme.kinds[kind])
+            } else {
+                icon.contentTintColor = item.isFolder ? accent : dim
+            }
             extra.image = info.badge.flatMap { NSImage(systemSymbolName: $0.symbol, accessibilityDescription: $0.label) }
             extra.contentTintColor = dim
             extra.toolTip = info.badge?.label
@@ -109,4 +123,30 @@ final class FileCellView: NSTableCellView {
             tagDots.addArrangedSubview(dot)
         }
     }
+}
+
+extension FileItem {
+    /// The theme's kind (KIND_*) for this item, from its extension.
+    var kindName: FileKindName? {
+        if isFolder && !isPackage { return .folder }
+        return Self.kinds[ext]
+    }
+
+    private static let kinds: [String: FileKindName] = {
+        var table: [String: FileKindName] = [:]
+        let groups: [(FileKindName, [String])] = [
+            (.document, ["doc", "docx", "pages", "rtf", "odt", "wpd"]),
+            (.pdf, ["pdf"]),
+            (.presentation, ["ppt", "pptx", "key", "odp"]),
+            (.spreadsheet, ["xls", "xlsx", "numbers", "csv", "tsv", "ods"]),
+            (.image, ["png", "jpg", "jpeg", "gif", "heic", "tif", "tiff", "bmp", "svg", "webp", "raw", "psd"]),
+            (.video, ["mp4", "mov", "m4v", "avi", "mkv", "webm", "mpg"]),
+            (.code, ["swift", "py", "js", "ts", "sh", "zsh", "rb", "go", "rs", "c", "h", "cpp", "m", "java", "json",
+                     "yaml", "yml", "toml", "html", "css", "r", "rmd", "sql", "lua"]),
+            (.archive, ["zip", "tar", "gz", "tgz", "bz2", "xz", "7z", "rar", "dmg"]),
+            (.text, ["txt", "md", "markdown", "log", "tex", "bib"]),
+        ]
+        for (kind, extensions) in groups { for e in extensions { table[e] = kind } }
+        return table
+    }()
 }

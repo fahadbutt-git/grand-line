@@ -61,7 +61,12 @@ final class ActionPerformer {
         let url = URL(fileURLWithPath: target)
         var isFolder: ObjCBool = false
         let exists = FileManager.default.fileExists(atPath: target, isDirectory: &isFolder)
-        guard exists else { return NSSound.beep() }
+        guard exists else {
+            // macOS may keep Sight itself out of the folder (the index service
+            // is the app with the folder permissions); LaunchServices opens it all the same.
+            if !NSWorkspace.shared.open(url) { NSSound.beep() }
+            return
+        }
         let isPackage = NSWorkspace.shared.isFilePackage(atPath: target)
         if isFolder.boolValue, !isPackage, let nexus = NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.nexus) {
             NSWorkspace.shared.open([url], withApplicationAt: nexus, configuration: NSWorkspace.OpenConfiguration())
@@ -131,6 +136,10 @@ final class ActionPerformer {
         let url = URL(fileURLWithPath: paths.expand(path))
         return NSWorkspace.shared.urlsForApplications(toOpen: url).prefix(20).map { app in
             let name = FileManager.default.displayName(atPath: app.path)
+            // Opened by NSWorkspace in this process, not by a separate `open`.
+            if let id = Bundle(url: app)?.bundleIdentifier {
+                return LaunchAction(name, symbol: "app", .openURL(url.absoluteString, bundleID: id))
+            }
             return LaunchAction(name, symbol: "app", .run("/usr/bin/open", arguments: ["-a", app.path, url.path]))
         }
     }

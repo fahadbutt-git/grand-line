@@ -19,7 +19,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.minSize = NSSize(width: 640, height: 400)
-        window.tabbingMode = .preferred
+        window.tabbingMode = NexusPreferencesStore.tabbingMode(NexusPreferencesStore.shared.current)
         window.tabbingIdentifier = "Nexus"
         window.isReleasedWhenClosed = false
         super.init(window: window)

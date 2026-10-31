@@ -21,14 +21,16 @@ The first run copies the package to `~/grand-line`. That copy is the one to edit
 
 | Command | Does |
 | --- | --- |
-| `update` | Updates every app, tool and this package, then runs any one-time changes and your post-update hook. One run at a time, the Mac stays awake, and the whole run is saved to `~/Library/Logs/grand-line/update-<date>.log`. It also records what was installed before (`~/.local/state/grand-line/brew-before-update.Brewfile`) and says when Karabiner-Elements or AeroSpace need a restart. `update --window` runs it in its own terminal window |
+| `update` | Updates every app, tool and this package, then runs any one-time changes and your post-update hook. New commits from GitHub are checked first (see "Updates" below): unsigned ones are shown and applied only if you say yes. One run at a time, the Mac stays awake, and the whole run is saved to `~/Library/Logs/grand-line/update-<date>.log`. It also records what was installed before (`~/.local/state/grand-line/brew-before-update.Brewfile`) and says when Karabiner-Elements or AeroSpace need a restart. `update --window` runs it in its own terminal window |
+| `update auto on`, `off`, `status` | The daily unattended update (also in the Update menu) |
+| `update --apps-only --notify` | Updates this package and rebuilds only the apps whose sources changed, then posts one notification. The apps' "Update now" buttons run this |
 | `keybindings --print` | Prints every shortcut |
 | `theme pick` | Changes theme (Graphite, Daylight, Nord, Forest, and the Harbour, Lantern, Signal, Ledger, Atlas and Paper families, each dark and light): terminal, editor, menus, tmux, btop, lazygit, Claude Code, the apps and their icons, accent and wallpaper together. Rules in `DESIGN.md` |
 | `theme set harbour` | A family in the variant that matches the current macOS appearance (`theme set harbour-light` names one) |
 | `theme mode toggle` | The other variant of the current family (Graphite and Daylight pair up too). `toggle dark` does this when the theme has a pair |
 | `grandline commands` | Lists every command in the package with what it does |
 | `migrate --pending` | Lists the one-time changes an update has not run yet (`migrate` runs them) |
-| `app install`, `app remove` | Installs or removes an app and updates the Brewfile to match (also in the menu) |
+| `app install`, `app remove` | Installs or removes an app and updates the Brewfile to match (also in the menu). `grandline publish` shares the change with your other Macs |
 | `tidy-downloads` | Sorts Downloads now (`--dry-run` shows the plan, `--log` the recent moves) |
 | `default-apps fallback` | LibreOffice and Preview open documents instead of ArtCraft (`primary` switches back). Videos stay in IINA |
 | `bash ~/grand-line/setup.sh --only artcraft` | Re-runs one step (`--list` shows them) |
@@ -212,7 +214,15 @@ Nexus (files), Sight (search) and Iceberg (the notch) are built on this Mac from
 
 Nexus, Sight and Iceberg were formerly Log Pose, Byakugan and Den Den. The first `update` after the rename carries their settings, index and state over (`migrations/1793472900-rename-apps.sh`), and the old apps go to the Trash.
 
-Each app draws its icon in the theme's colours when it starts and whenever the theme changes (the `ICON_*` keys in `DESIGN.md`), for the Dock and for Finder. The bundles also carry a fixed `AppIcon.icns` in Graphite's colours, drawn by `python3 tools/make-icons.py` from the same glyph table (`apps/icons/Sources/AppIcon/Glyphs.swift`), so an app has an icon before it first runs. After changing a glyph, run the script and commit the `.icns` files; `tests/run-all.sh` checks they are sound.
+### Signing and permissions
+
+Setup makes one code-signing identity on this Mac, "Grand Line Local Signing" (`lib/signing.sh`), and signs every app with it, with hardened runtime. macOS ties Accessibility, Calendars and Automation to the certificate rather than to one build, so a rebuilt app keeps its permissions. The first build signed this way asks for each permission once more. The apps ask for nothing beyond hardened runtime except what they use: Apple events (all three) and Calendars (Iceberg), in `apps/*/Entitlements/`. Iceberg's Now Playing adapter is loaded by Apple's own `/usr/bin/perl`, not by Iceberg, so library validation stays on.
+
+Because the key is what keeps the permissions, it is guarded: it lives in its own keychain (`~/Library/Keychains/grand-line-signing.keychain-db`, locked after each use and after 5 minutes), it cannot be exported, only Apple's `codesign` may use it, the keychain's random password is kept only in your login keychain, and passwords never appear on a command line. The certificate is for code signing only and is trusted for that by you alone. A program already running as you could still ask `codesign` to sign, which is why the unattended update builds only signature-checked commits from a clean tree. If the identity cannot be made, the apps are signed ad hoc as before and say so.
+
+Grand Line Index is the shared file index Nexus and Sight search through. It runs in the background: its launch agent is inside the app (sealed by its signature) and the app registers it itself (`GrandLineIndex --register`), as you, never with sudo. It needs Full Disk Access (or Files and Folders for Desktop, Documents, Downloads and Google Drive); the checklist says where.
+
+Each app draws its icon in the theme's colours when it starts and whenever the theme changes (the `ICON_*` keys in `DESIGN.md`), for the Dock and for Finder. The bundles also carry a fixed `AppIcon.icns` in Graphite's colours, drawn by `python3 tools/make-icons.py` from the same glyph table (`apps/icons/Sources/AppIcon/Glyphs.swift`), so an app has an icon before it first runs. `theme set` and `theme mode` then put icons in the new theme's colours into the installed apps in the background (`theme icons`; `make-icons.py --out DIR`), and sign them again with the same identity, so Finder matches the theme and the permissions stay. Without the identity this is skipped, since an ad-hoc signature would cost the permissions. After changing a glyph, run the script and commit the `.icns` files; `tests/run-all.sh` checks they are sound.
 
 Once installed, Nexus opens folders and every "Show in Finder", and Sight answers Command + Space (so Caps + Space too). Both switch back from the Toggle menu, or with `toggle files` and `toggle search`, and the choice is kept across updates.
 
@@ -237,6 +247,8 @@ Typing a setting changes it, rather than opening System Settings. The row shows 
 
 These run `toggle` and `power`, the same commands as the Toggle and System menus, so both always agree. The first time, macOS asks to let Sight control System Events (dark mode without a theme pair, menu bar hiding, log out, restart, shut down) and, for Lock, to allow Accessibility.
 
+Typing "nexus settings", "sight settings" or "iceberg settings" opens that app's Settings window (Cmd+, works in each too).
+
 **Do Not Disturb.** macOS has no command for Focus, so it runs two shortcuts you make once in the Shortcuts app. Make a shortcut named `Do Not Disturb On` with the action Set Focus, Turn Do Not Disturb On, Until Turned Off, and one named `Do Not Disturb Off` with Turn Do Not Disturb Off. Other names work too, set as `GRAND_LINE_DND_ON` and `GRAND_LINE_DND_OFF`. Until they exist, the row says which one is missing.
 
 ## How to add things
@@ -244,14 +256,14 @@ These run `toggle` and `power`, the same commands as the Toggle and System menus
 | To add | Do this |
 | --- | --- |
 | An app | Add a `cask "name"` line to `Brewfile`, then `bash ~/grand-line/setup.sh --only apps` |
-| An ArtCraft app | Add a line to `config/grand-line/artcraft.tsv`, then `--only artcraft` |
+| An ArtCraft app | Add a line to `config/grand-line/artcraft.tsv` (its Team ID, or `-` until the first install prints it), then `--only artcraft` |
 | A default app for a file type | Add a line to `config/grand-line/default-apps.tsv`, then `--only default-apps` |
 | A shortcut | Add a line to `BINDINGS` in `tools/bindings.py`, run `python3 tools/bindings.py`, then `--only dotfiles` |
 | A menu entry | Add a line to `config/grand-line/menu.tsv`. It works at once. A third column `?test` shows it only when the test succeeds, a fourth `✓test` gives it a check mark (helpers in `lib/toggle-state.sh`) |
 | A command | Add an executable script to `bin/` with a `# grandline:summary=` line under the first. It is on the PATH at once, and `grandline commands` and Sight list it. Arguments Sight should ask for go in `# grandline:arg1=` lines (up to three), as `{"type":"text"\|"dropdown","placeholder":"…","data":[…],"optional":true}` |
 | A theme | Add `config/themes/name.theme` (copy an existing one), its image to `backgrounds/`, and a `Style/` line to `config/grand-line/menu.tsv` with `✓theme_is name`. For a dark and light pair, name the files `name-dark.theme` and `name-light.theme` with `FAMILY=name` in both |
 | An app that takes theme colours | Add `config/themed/<file>.tpl` with `{{ KEY }}` placeholders, then have `bin/theme` put the rendered file where the app reads it |
-| A one-time change for Macs already set up | Add `migrations/<unix time>-<what>.sh` (`date +%s` gives the time). `update` runs it once on each Mac |
+| A one-time change for Macs already set up | Add `migrations/<unix time>-<what>.sh` (`date +%s` gives the time). `update` runs it once on each Mac. Mark it `# grandline:unattended` on a line of its own when it needs no password and asks nothing, so the daily update can run it too |
 | An R package | Add a line to `config/grand-line/r-packages.txt`, then `--only r-packages` |
 | A native helper | Add `tools/name.swift`. Setup builds it into `~/.grand-line/.build` |
 | A setup step | Add `steps/NN-name.sh` with a function `step_name`. Steps run in file-name order |
@@ -291,17 +303,28 @@ Run these before installing on a new Mac, and after any change.
 
 After setup on any Mac, `bash ~/grand-line/tests/verify-install.sh` checks every app, link, default app and setting.
 
+## Updates
+
+`update` and the daily unattended run both fetch GitHub's copy and check every new commit before anything runs:
+
+1. `git fetch`. If GitHub's history was rewritten (force-pushed), nothing is applied and you are told.
+2. Each new commit must carry an SSH signature from a key in `~/.config/grand-line/allowed_signers`. That file is outside the package, so a change cannot add its own key. Setup writes it once from your git signing key (`gpg.format ssh` and `user.signingkey`; the checklist shows how to set one up). GPG signatures are not accepted, since gpg would trust any key in your keyring.
+3. All signed by a listed key: they are applied (fast-forward; your own commits not yet on GitHub are replayed on top). Otherwise `update` shows the commits and what they change and asks; the unattended run stops and posts one notification.
+4. Then, in `update`: Homebrew, the setup steps, one-time changes, Neovim plugins, mise and your hook, as before. Nothing is committed or sent to GitHub.
+
+The unattended run (`update --unattended`, launch agent `com.grandline.update`, daily at 3:47 and three minutes after login, at most every 12 hours, niced with low-priority disk access, logged to `~/Library/Logs/grand-line/update.log`) never asks for a password: it runs only the steps that need none (`folders`, `dotfiles`, `native-tools`, `downloads`), the migrations marked `# grandline:unattended`, and the theme templates. It rebuilds only the apps whose sources changed, and only when those sources are exactly GitHub's signed copy (no edits or commits made on this Mac), moves the old copies to the Trash and starts again the ones that were running. Anything that needs the password (Homebrew, ArtCraft, the firewall) waits for an `update` you run. It posts one notification only when something changed or needs you. Turn it off with `update auto off` or from the Update menu.
+
 ## What runs in the background
 
-Kept deliberately small: Karabiner-Elements (keyboard), AeroSpace (windows), Maccy (clipboard), Espanso (text shortcuts), Handy (waits for the dictation key), FineTune (per-app volume), Iceberg (music, calendar, reminders and your own widgets in the notch) and Google Drive. Docker, local AI (Ollama) and the VPNs run only while you turn them on. Shortcut commands start, act and exit, and long jobs (video compression, keep-awake, app installs) run on their own so they never block the keyboard. The Downloads sorter is not a running process: macOS starts it at low priority when Downloads changes, and once an hour for the age rules. Nothing in the package indexes. The checklist shows how to stop other apps opening at login.
+Kept deliberately small: Karabiner-Elements (keyboard), AeroSpace (windows), Maccy (clipboard), Espanso (text shortcuts), Handy (waits for the dictation key), FineTune (per-app volume), Iceberg (music, calendar, reminders and your own widgets in the notch) and Google Drive. Docker, local AI (Ollama) and the VPNs run only while you turn them on. Shortcut commands start, act and exit, and long jobs (video compression, keep-awake, app installs) run on their own so they never block the keyboard. The Downloads sorter is not a running process: macOS starts it at low priority when Downloads changes, and once an hour for the age rules. The daily update runs at a quiet hour and exits. Grand Line Index keeps the shared file index current for Nexus and Sight. The checklist shows how to stop other apps opening at login.
 
 ## Security
 
-Every run checks that the firewall (in stealth mode) and automatic security updates are on, and warns if FileVault is off. Nothing turns off Gatekeeper or System Integrity Protection. ArtCraft downloads must carry the expected app name, match GitHub's checksum when one is published, and keep the same signing developer on every update. An app that Apple has not notarized is flagged so macOS asks before it first opens. sudo is used only by the steps that need it, then closed. The Downloads permission belongs to the sorter's own launcher, not to bash. Clipboard history ignores Citrix and Horizon, so patient information is not kept. Neovim plugins are pinned, and the GitHub test runs can only read the repository. Nothing is ever deleted: removed apps, old installers and replaced files go to the Trash, and removing an app keeps its data. Apps that Apple has not notarized keep macOS's first-open check, even when their installer removes it. No service listens on the network: Ollama and Docker answer only on this Mac.
+Every run checks that the firewall (in stealth mode) and automatic security updates are on, and warns if FileVault is off. Nothing turns off Gatekeeper or System Integrity Protection. Updates from GitHub apply by themselves only when signed by a key you listed (see "Updates"), and nothing is ever sent to GitHub except by `grandline publish`. The package's apps are signed with hardened runtime by a local identity whose key cannot leave this Mac (see "Signing and permissions"). Homebrew's installer runs from a fixed commit checked against its SHA-256. ArtCraft apps are installed only when signed by a developer, intact, notarized by Apple and signed by the Team ID pinned in `config/grand-line/artcraft.tsv` (fourth column; until it is filled in, the Team ID of the first notarized install is remembered and printed, and later releases must match it). The file indexes, Sight's history and the apps' caches are kept out of Time Machine. `capture text` and `capture url` say how many characters they copied, never what, since notifications stay in Notification Center. Maccy's ignore list is checked on every run; it matches apps only, so the web versions of Citrix and Horizon are not covered (use the apps). Universal Clipboard is left as you set it; the checklist shows how to turn it off. sudo is used only by the steps that need it, then closed. The Downloads permission belongs to the sorter's own launcher, not to bash. Clipboard history ignores Citrix and Horizon, so patient information is not kept. Neovim plugins are pinned, and the GitHub test runs can only read the repository. Nothing is ever deleted: removed apps, old installers and replaced files go to the Trash, and removing an app keeps its data. Apps that Apple has not notarized keep macOS's first-open check, even when their installer removes it. No service listens on the network: Ollama and Docker answer only on this Mac.
 
 ## Changing, saving and going back
 
-Everything is in git and on GitHub, so every change can be undone. The `grandline` command (or `gl` for short) looks after it, as `omarchy` does in Omarchy:
+Everything is in git, so every change can be undone. Changes stay on this Mac until you send them with `grandline publish`, which shows every line, checks them for keys and tokens, and asks first. The `grandline` command (or `gl` for short) looks after it, as `omarchy` does in Omarchy:
 
 | Command | Does |
 | --- | --- |
@@ -310,10 +333,11 @@ Everything is in git and on GitHub, so every change can be undone. The `grandlin
 | `grandline save "before notch work"` | Marks this moment as a version worth keeping |
 | `grandline versions`, `grandline restore` | Lists saved versions, or goes back to one (itself undoable) |
 | `grandline try start notch`, `grandline try keep`, `grandline try drop` | Tries a change on the side, then keeps or discards it |
+| `grandline publish` | Sends your saved changes to GitHub, after showing them and asking. Edits to files the package tracks are saved first; new files are never added by themselves (`git add` one on purpose) |
 | `grandline check` | Checks every app, link and setting |
 | `grandline edit` | Opens the package in Neovim |
 
-Edits made by hand, by Claude Code in `~/grand-line`, or from the Install and Remove menus are saved as changes the same way. Every change sent to GitHub runs the quick checks there, and the full install test runs every Monday.
+Edits made by hand, by an editor or tool in `~/grand-line`, or from the Install and Remove menus stay as edits until a `grandline` command saves them. Every change sent to GitHub runs the quick checks there, including the security checks (`tests/security-checks.sh`: keys and tokens, actions pinned to a commit, nothing downloaded piped into a shell, the apps' entitlements, and hardened runtime on every app built), and the full install test runs every Monday.
 
 ## Running setup again
 

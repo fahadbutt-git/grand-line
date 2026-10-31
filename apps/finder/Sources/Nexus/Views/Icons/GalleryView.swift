@@ -20,6 +20,10 @@ struct GalleryView: View {
                                 .background(RoundedRectangle(cornerRadius: 6).fill(pane.state.selection.contains(item.id) ? palette.selection : Color.clear))
                                 .id(item.id)
                                 .help(item.name)
+                                // One image per item, named, as Finder's gallery strip reads.
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(item.name)
+                                .accessibilityAddTraits(.isImage)
                                 .modifier(ItemInteraction(model: model, pane: pane, item: item))
                         }
                     }
@@ -33,5 +37,10 @@ struct GalleryView: View {
         }
         .modifier(BrowserKeys(model: model, pane: pane, rowStep: 1))
         .background(palette.background)
+        // Finder's gallery always previews something: the first item until
+        // another is chosen, not "No selection" over the strip.
+        .task(id: pane.items.first?.id ?? "") {
+            if pane.state.selection.isEmpty, let first = pane.items.first { pane.select(ids: [first.id]) }
+        }
     }
 }

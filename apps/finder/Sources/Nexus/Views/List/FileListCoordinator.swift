@@ -14,6 +14,8 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
     private var shownIDs: [String] = []
     private var shownCut: Set<String> = []
     private var theme: Theme?
+    /// Kind colours, extensions and row height from Settings, as last drawn.
+    private var display: FileCellView.Display?
     private var renameRequest = 0
     private var syncing = false
     private var typeSelect = TypeSelect()
@@ -32,7 +34,14 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
         let ids = pane.state.ids
         let themeChanged = self.theme != theme
         self.theme = theme
-        if ids != shownIDs || cut != shownCut || themeChanged {
+        let store = NexusPreferencesStore.shared
+        let display = FileCellView.Display(kindColours: store.current.showKindColours,
+                                           allExtensions: store.current.showAllExtensions,
+                                           rowHeight: store.rowHeight(theme: theme))
+        let displayChanged = display != self.display
+        self.display = display
+        if table.rowHeight != display.rowHeight { table.rowHeight = display.rowHeight }
+        if ids != shownIDs || cut != shownCut || themeChanged || displayChanged {
             let scrollToTop = shownIDs.isEmpty || ids.first != shownIDs.first && ids.count != shownIDs.count
             shownIDs = ids
             shownCut = cut
@@ -62,9 +71,10 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
     /// longest few hundred names by length.
     private func fitNameColumn() {
         guard let column = table?.tableColumn(withIdentifier: FileColumn.name.identifier) else { return }
+        let all = display?.allExtensions ?? true
         let names = items.count > 2_000
-            ? items.map(\.name).sorted { $0.count > $1.count }.prefix(300).map { $0 }
-            : items.map(\.name)
+            ? items.map { $0.shownName(allExtensions: all) }.sorted { $0.count > $1.count }.prefix(300).map { $0 }
+            : items.map { $0.shownName(allExtensions: all) }
         let font = NSFont.systemFont(ofSize: 13)
         column.width = ColumnWidth.fitting(names) { Double(($0 as NSString).size(withAttributes: [.font: font]).width) }
     }
@@ -91,7 +101,8 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
             folderSize: pane.state.folderSizes[item.path],
             badge: pane.badges[item.id],
             isCut: shownCut.contains(item.url.standardizedFileURL.path),
-            theme: theme
+            theme: theme,
+            display: display ?? FileCellView.Display()
         ))
         return cell
     }
@@ -124,11 +135,14 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
         guard let field = notification.object as? NSTextField, let table else { return }
         let row = table.row(for: field)
         guard row >= 0, row < items.count else { return }
-        let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        if name.isEmpty || name == items[row].name {
-            field.stringValue = items[row].name
+        let allExtensions = NexusPreferencesStore.shared.current.showAllExtensions
+        let item = items[row]
+        let typed = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let shown = item.shownName(allExtensions: allExtensions)
+        if typed.isEmpty || typed == shown || typed == item.name {
+            field.stringValue = shown
         } else {
-            model.rename(items[row], to: name)
+            model.rename(item, to: item.typedName(typed, allExtensions: allExtensions))
         }
         table.window?.makeFirstResponder(table)
     }
@@ -142,7 +156,8 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
                                      modifiers: Self.modifiers(event.modifierFlags))
         guard let shortcut else { return false }
         let context = model.context
-        if let command = KeyMap.command(for: shortcut, inArchive: context.inArchive, inTrash: context.inTrash) {
+        if let found = KeyMap.command(for: shortcut, inArchive: context.inArchive, inTrash: context.inTrash) {
+            let command = NexusPreferencesStore.shared.current.returnKey.command(found, for: shortcut)
             switch shortcut.key {
             case .up, .down, .left, .right:
                 if shortcut.modifiers.isEmpty || shortcut.modifiers == [.shift] { return false }

@@ -1,7 +1,9 @@
 #!/bin/bash
 # grandline:summary=Look after this setup: history, undo, saved versions, experiments, checks
 # One command for looking after this setup, as `omarchy` is in Omarchy.
-# Every change is kept in git (and on GitHub), so any change can be undone.
+# Every change is kept in git, so any change can be undone. Nothing is sent to
+# GitHub (a public repository) until you run grandline publish, which shows
+# every line first and asks.
 #
 #   grandline history            the last changes, newest first
 #   grandline undo               undo the last change, then apply the result
@@ -11,6 +13,8 @@
 #   grandline try start <name>   try something on the side; main stays untouched
 #   grandline try keep           keep the experiment (it becomes part of main)
 #   grandline try drop           throw the experiment away, back to main
+#   grandline publish            send your saved changes to GitHub, after
+#                                showing them and asking
 #   grandline update             update everything (same as: update)
 #   grandline check              check every app, link and setting (verify-install)
 #   grandline edit               open the package in the editor
@@ -21,12 +25,26 @@ source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 REPO="${GRAND_LINE_REPO:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}"
 git_() { git -C "$REPO" "$@"; }
 apply() { [[ -n "${GRAND_LINE_NO_APPLY:-}" ]] || bash "$REPO/setup.sh" --update; }
+# Edits to files the package already tracks are saved first. New files are
+# never added by themselves: one dropped in the folder by mistake (a note, a
+# download) could otherwise end up on GitHub. Add one on purpose with git add.
 dirty_guard() {
-  if [[ -n "$(git_ status --porcelain)" ]]; then
-    git_ add -A && git_ commit -q -m "${1:-Save local edits}" && echo "Saved your unsaved edits first."
+  if [[ -n "$(git_ status --porcelain --untracked-files=no)" ]]; then
+    git_ add -u && git_ commit -q -m "${1:-Save local edits}" && echo "Saved your unsaved edits first."
   fi
+  local new
+  new="$(git_ status --porcelain --untracked-files=normal | sed -n 's/^?? //p')"
+  [[ -z "$new" ]] || printf 'Not saved (new files are never added by themselves):\n%s\n' "$(printf '%s\n' "$new" | sed 's/^/  /')"
 }
-push_() { git_ push -q --follow-tags 2>/dev/null || echo "(Not sent to GitHub now. It will be on the next update.)"; }
+local_note() { echo "Saved on this Mac only. To send it to GitHub: grandline publish"; }
+
+# ask QUESTION: yes only from someone at the keyboard.
+ask() {
+  [[ -t 0 ]] || return 1
+  local answer
+  read -r -p "$1 [y/N] " answer
+  [[ "$answer" == [yY]* ]]
+}
 
 case "${1:-}" in
   history)
@@ -37,14 +55,13 @@ case "${1:-}" in
     last="$(git_ log -1 --pretty=%s)"
     git_ revert --no-edit HEAD >/dev/null || { echo "Could not undo: $last"; exit 1; }
     echo "Undid: $last"
-    apply && push_
+    apply && local_note
     ;;
   save)
     label="$(printf '%s' "${2:-}" | tr -cs 'A-Za-z0-9-' '-' | sed 's/^-*//; s/-*$//')"
     [[ -n "$label" ]] || { echo 'usage: grandline save "label"'; exit 2; }
     dirty_guard "Save local edits"
-    git_ tag -a "good-$(date +%Y%m%d)-$label" -m "${2}" && echo "Saved this version as good-$(date +%Y%m%d)-$label"
-    push_
+    git_ tag -a "good-$(date +%Y%m%d)-$label" -m "${2}" && echo "Saved this version as good-$(date +%Y%m%d)-$label" && local_note
     ;;
   versions)
     git_ tag -l 'good-*' --sort=-creatordate --format='%(refname:short)  %(contents:subject)'
@@ -56,7 +73,7 @@ case "${1:-}" in
     # Restoring is itself a new change, so it can be undone too (grandline undo).
     git_ diff --binary HEAD "$tag" | git_ apply --index --whitespace=nowarn && git_ commit -q -m "Restore $tag" \
       && echo "Restored $tag. Undo with: grandline undo"
-    apply && push_
+    apply && local_note
     ;;
   try)
     case "${2:-}" in
@@ -67,13 +84,40 @@ case "${1:-}" in
         b="$(git_ branch --show-current)"; [[ "$b" == try/* ]] || { echo "No experiment running."; exit 1; }
         dirty_guard "Experiment ${b#try/}"
         git_ switch -q main && git_ merge -q --no-ff "$b" -m "Keep experiment ${b#try/}" && git_ branch -q -d "$b" \
-          && echo "Kept ${b#try/}." && apply && push_ ;;
+          && echo "Kept ${b#try/}." && apply && local_note ;;
       drop)
         b="$(git_ branch --show-current)"; [[ "$b" == try/* ]] || { echo "No experiment running."; exit 1; }
         git_ stash -q -u 2>/dev/null; git_ switch -q main && git_ branch -q -D "$b" \
           && echo "Dropped ${b#try/}. Back to main." && apply ;;
       *) echo "usage: grandline try start <name> | keep | drop"; exit 2 ;;
     esac
+    ;;
+  publish)
+    # Never by itself: it shows what would be sent, checks it for keys and
+    # tokens, and asks.
+    [[ -t 0 ]] || { echo "Run grandline publish in a terminal: it shows what would be sent and asks first."; exit 1; }
+    git_ rev-parse -q --verify '@{u}' >/dev/null || { echo "This branch has no GitHub copy to send to."; exit 1; }
+    git_ fetch -q || { echo "Could not reach GitHub."; exit 1; }
+    if [[ -n "$(git_ status --porcelain --untracked-files=no)" ]]; then
+      echo "Edits not yet saved in git:"
+      git_ --no-pager diff --stat
+      git_ diff
+      ask "Save these edits as one change?" || { echo "Nothing sent."; exit 1; }
+      git_ add -u && git_ commit -q -m "${2:-Local edits}" || exit 1
+    fi
+    new="$(git_ status --porcelain --untracked-files=normal | sed -n 's/^?? //p')"
+    [[ -z "$new" ]] || printf 'Not included (new files; add one on purpose with git add):\n%s\n' "$(printf '%s\n' "$new" | sed 's/^/  /')"
+    count="$(git_ rev-list --count '@{u}..HEAD')"
+    [[ "$count" -gt 0 ]] || { echo "Nothing to send: GitHub has every saved change."; exit 0; }
+    echo "These $count change(s) would go to $(git_ remote get-url "$(git_ rev-parse --abbrev-ref '@{u}' | cut -d/ -f1)"), which anyone may be able to read:"
+    git_ --no-pager log --stat --format='%n%h %s' '@{u}..HEAD'
+    git_ log -p --format='%n%h %s' '@{u}..HEAD'
+    if ! bash "$REPO/tests/security-checks.sh" --diff '@{u}..HEAD'; then
+      echo "Nothing sent: the lines above look like a key or token. Remove them (grandline undo), then publish again."
+      exit 1
+    fi
+    ask "Send these $count change(s) to GitHub?" || { echo "Nothing sent."; exit 1; }
+    git_ push -q --follow-tags && echo "Sent."
     ;;
   update) exec "$REPO/bin/update" "${@:2}" ;;
   check)  exec bash "$REPO/tests/verify-install.sh" ;;
@@ -85,5 +129,5 @@ case "${1:-}" in
       printf '%-16s %s\n' "${f##*/}" "$(sed -n '/^# grandline:summary=/{s///p;q;}' "$f")"
     done
     ;;
-  *) sed -n '3,18p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '3,22p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

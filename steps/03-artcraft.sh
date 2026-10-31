@@ -1,6 +1,14 @@
 # shellcheck shell=bash
 # Installs the ArtCraft apps listed in config/grand-line/artcraft.tsv from their
 # latest GitHub releases, all at once. Re-running only downloads newer releases.
+#
+# An app is installed only when it is signed by a developer (a Team ID), its
+# signature is intact, Apple has notarized it, and the Team ID is the one
+# pinned in artcraft.tsv (fourth column). With no pin yet ("-"), the Team ID
+# seen on the first notarized install is remembered on this Mac and every
+# later release must match it; setup prints it so you can pin it in the file.
+# The checksum GitHub lists only catches a damaged download: it comes from
+# the same place as the download.
 
 # Pick the macOS download from a release's JSON: a .dmg before a .zip, Apple
 # silicon or universal builds only, never another platform or a web build.
@@ -36,9 +44,12 @@ artcraft_release_json() {
 }
 
 # Installs one app. Prints progress. Exit code 0 on success, 2 when the
-# release simply has no Mac build yet (a warning, not a failure), 1 otherwise.
+# release simply has no Mac build yet, 3 when it was refused (unsigned, not
+# notarized or another developer); those two are warnings, not failures. 1
+# otherwise.
 artcraft_install_one() {
-  local app="$1" repo="$2" state="$GRAND_LINE_STATE/artcraft"
+  local app="$1" repo="$2" pinned="${3:-}" state="$GRAND_LINE_STATE/artcraft"
+  [[ "$pinned" == "-" ]] && pinned=""
   mkdir -p "$state"
 
   local tag installed_path
@@ -86,32 +97,36 @@ artcraft_install_one() {
       ;;
   esac
 
-  local status=0 dest team="" trusted=0 known
+  local status=0 dest team="" expected
   [[ -n "$found" ]] && team="$(codesign -dv "$found" 2>&1 | sed -n 's/^TeamIdentifier=//p')"
-  known="$(cat "$state/$app.team" 2>/dev/null)"
+  [[ "$team" == "not set" ]] && team=""
+  expected="${pinned:-$(cat "$state/$app.team" 2>/dev/null)}"
   if [[ -z "$found" ]]; then
     echo "  ! $app: no app found inside $name"; status=1
   elif [[ "$(basename "$found")" != "$app.app" ]]; then
     # Only ever install the app this line is for, so a bad release cannot
     # replace another app (Zen, Claude...) in /Applications.
     echo "  ! $app: the download contains $(basename "$found") instead of $app.app, so nothing was installed"; status=1
-  elif [[ -n "$known" && "$team" != "$known" ]]; then
-    # The developer that signed this app before must sign its updates.
-    echo "  ! $app: this release is signed by ${team:-nobody}, not by $known as before, so it was not installed"; status=1
+  elif ! codesign --verify --deep --strict "$found" 2>/dev/null; then
+    echo "  ! $app: the app is unsigned or its signature is broken, so it was not installed"; status=3
+  elif [[ -z "$team" ]]; then
+    echo "  ! $app: the app is not signed by a developer (no Team ID), so it was not installed"; status=3
+  elif [[ -n "$expected" && "$team" != "$expected" ]]; then
+    # The developer pinned (or seen first) must sign every release.
+    echo "  ! $app: this release is signed by Team ID $team, not $expected, so it was not installed"; status=3
+  elif ! spctl -a -t exec "$found" 2>/dev/null; then
+    echo "  ! $app: Apple has not notarized this release, so it was not installed"; status=3
   else
-    # Signed, notarized apps are trusted as Apple would trust them. Anything
-    # else gets the quarantine flag, so macOS checks it the first time it opens.
-    codesign --verify --deep --strict "$found" 2>/dev/null && spctl -a -t exec "$found" 2>/dev/null && trusted=1
     dest="/Applications/$(basename "$found")"
     # Copy beside the old version first, then swap: the old one goes to the
     # Trash, and a failed copy leaves the old one working.
     rm -rf "$dest.new"   # only ever a leftover of this package's own copy
     if ditto "$found" "$dest.new" && move_to_trash "$dest" && mv "$dest.new" "$dest"; then
-      if [[ "$trusted" == 0 ]]; then
-        xattr -w com.apple.quarantine "0081;$(printf %x "$(date +%s)");grand-line;" "$dest" 2>/dev/null
-        echo "  ! $app: not notarized by Apple, so macOS will ask before it first opens"
+      if [[ -z "$expected" ]]; then
+        printf '%s\n' "$team" > "$state/$app.team"
+        echo "  ! $app: first install, signed by Team ID $team and notarized by Apple. Later releases must match it."
+        echo "    To pin it for every Mac, put $team in the fourth column of $app in config/grand-line/artcraft.tsv"
       fi
-      [[ -n "$team" ]] && printf '%s\n' "$team" > "$state/$app.team"
       register_app "$dest"
       printf '%s\n' "$tag" > "$state/$app.tag"
       printf '%s\n' "$dest" > "$state/$app.path"
@@ -132,9 +147,9 @@ artcraft_install_one() {
 
 step_artcraft() {
   local list="$REPO_DIR/config/grand-line/artcraft.tsv"
-  local app repo _role
+  local app repo _role team
   if [[ "$DRY_RUN" == 1 ]]; then
-    while IFS=$'\t' read -r app repo _role; do
+    while IFS=$'\t' read -r app repo _role team; do
       [[ -z "$app" || "$app" == \#* ]] && continue
       run "install $app from the latest release of github.com/$repo"
     done < "$list"
@@ -144,9 +159,9 @@ step_artcraft() {
   # Download and install every app in parallel, then report in list order.
   local logs pids=() apps=() i failed=0
   logs="$(mktemp -d)"
-  while IFS=$'\t' read -r app repo _role; do
+  while IFS=$'\t' read -r app repo _role team; do
     [[ -z "$app" || "$app" == \#* ]] && continue
-    artcraft_install_one "$app" "$repo" > "$logs/$app.log" 2>&1 &
+    artcraft_install_one "$app" "$repo" "$team" > "$logs/$app.log" 2>&1 &
     pids+=("$!"); apps+=("$app")
   done < "$list"
   local rc
@@ -155,6 +170,8 @@ step_artcraft() {
     cat "$logs/${apps[$i]}.log"
     if [[ $rc -eq 2 ]]; then
       WARNINGS+=("${apps[$i]} has no Mac build yet; its file types use the fallback app.")
+    elif [[ $rc -eq 3 ]]; then
+      WARNINGS+=("${apps[$i]} was not installed: its release did not pass the signature checks (see above).")
     elif [[ $rc -ne 0 ]]; then
       failed=1
       WARNINGS+=("${apps[$i]} did not install. See the lines above.")

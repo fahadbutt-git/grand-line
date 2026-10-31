@@ -1,6 +1,7 @@
-# App name	GitHub repository	Role
-WordCraft	storytold/wordcraft	Word processor
-GridCraft	storytold/gridcraft	Spreadsheets
-DeckCraft	storytold/deckcraft	Presentations
-FilmCraft	storytold/filmcraft	Video editor
-PdfCraft	storytold/pdfcraft	PDF editor
+# App name	GitHub repository	Role	Team ID that must sign it (- until known: the first
+# notarized install is remembered on the Mac and printed, so it can be pinned here)
+WordCraft	storytold/wordcraft	Word processor	-
+GridCraft	storytold/gridcraft	Spreadsheets	-
+DeckCraft	storytold/deckcraft	Presentations	-
+FilmCraft	storytold/filmcraft	Video editor	-
+PdfCraft	storytold/pdfcraft	PDF editor	-

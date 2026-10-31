@@ -1,5 +1,6 @@
 # The apps the journeys drive. One line per app, so a rename is a one-line change here.
 # role	package folder	product (executable)	app name (.app)	bundle id	url scheme	accessibility id prefix
-files	apps/finder	Nexus	Nexus	com.grandline.nexus	-	nexus
-launcher	apps/finder	Sight	Sight	com.grandline.sight	-	sight
+files	apps/finder	Nexus	Nexus	com.grandline.nexus	nexus	nexus
+launcher	apps/finder	Sight	Sight	com.grandline.sight	sight	sight
 notch	apps/iceberg	Iceberg	Iceberg	com.grandline.iceberg	iceberg	iceberg
+index	apps/finder	GrandLineIndex	Grand Line Index	com.grandline.index	-	index

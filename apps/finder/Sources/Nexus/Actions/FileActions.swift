@@ -51,6 +51,15 @@ extension BrowserModel {
 
     func rename(_ item: FileItem, to name: String) {
         guard name != item.name, !item.isInArchive else { return }
+        let oldExtension = (item.name as NSString).pathExtension
+        let newExtension = (name as NSString).pathExtension
+        if !item.isFolder, oldExtension.lowercased() != newExtension.lowercased(),
+           NexusPreferencesStore.shared.current.warnBeforeChangingExtension,
+           !Prompt.confirm(
+               newExtension.isEmpty ? "Remove the extension \".\(oldExtension)\"?" : "Change the extension to \".\(newExtension)\"?",
+               message: "The file may open in a different app.",
+               action: newExtension.isEmpty ? "Remove" : "Use .\(newExtension)"
+           ) { return }
         runOperation("The item could not be renamed.") { operations in
             let renamed = try await operations.rename(item.url, to: name)
             return [renamed]
@@ -122,7 +131,7 @@ extension BrowserModel {
     /// you held Option (Opt+Shift+Cmd+Delete, as in Finder). Nexus itself
     /// never deletes a file.
     func emptyTrash(asking: Bool) {
-        if asking, !Prompt.confirm(
+        if asking, NexusPreferencesStore.shared.current.warnBeforeEmptyingTrash, !Prompt.confirm(
             "Empty the Trash?", message: "Items in the Trash are removed for good. This cannot be undone.", action: "Empty Trash"
         ) { return }
         var error: NSDictionary?
@@ -180,6 +189,12 @@ extension BrowserModel {
         let urls = selectedOnDisk
         let updated = TagEditor.toggling(tag, in: urls.map(TagEditor.read))
         writeTags(updated, to: urls)
+    }
+
+    /// A favourite tag's chip in the inspector, as Ctrl+1 to 7 toggle the colours.
+    func toggleTag(named tag: String) {
+        let urls = selectedOnDisk
+        writeTags(TagEditor.toggling(tag, in: urls.map(TagEditor.read)), to: urls)
     }
 
     func removeTags() {

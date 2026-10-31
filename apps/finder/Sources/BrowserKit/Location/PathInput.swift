@@ -46,6 +46,29 @@ public enum PathInput {
         return URL(fileURLWithPath: standard.isEmpty ? "/" : standard, isDirectory: true)
     }
 
+    /// What Go to Folder says under the field when Return finds nothing, so
+    /// the field never just stays as it was.
+    public static func notFound(_ intent: Intent, home: URL) -> String {
+        switch intent {
+        case .path(let url):
+            return "No folder at \(PathSegments.editableText(for: url, home: home))"
+        case .fuzzy(let name):
+            return "No folder named \u{201C}\(name)\u{201D}"
+        }
+    }
+
+    /// A folder name typed as is: a folder of that name in the current
+    /// folder, else in the home folder, before the index is asked.
+    public static func nearbyFolder(named name: String, in current: URL, home: URL,
+                                    isFolder: (URL) -> Bool) -> URL? {
+        guard !name.isEmpty, !name.contains("/") else { return nil }
+        for parent in [current, home] {
+            let candidate = parent.appendingPathComponent(name, isDirectory: true)
+            if isFolder(candidate) { return candidate }
+        }
+        return nil
+    }
+
     static func clean(_ text: String) -> String {
         var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         for (open, close) in [("\"", "\""), ("'", "'"), ("\u{201C}", "\u{201D}")] where trimmed.count >= 2 {

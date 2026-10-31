@@ -37,6 +37,45 @@ public struct ShellRunner: Sendable {
     final class Box: @unchecked Sendable {
         let process = Process()
         let pipe = Pipe()
+        private let lock = NSLock()
+        private var continuation: CheckedContinuation<ShellOutput, Error>?
+        private var launched = false
+
+        func hold(_ continuation: CheckedContinuation<ShellOutput, Error>) {
+            lock.lock(); self.continuation = continuation; lock.unlock()
+        }
+
+        func markLaunched() {
+            lock.lock(); launched = true; lock.unlock()
+        }
+
+        private var hasLaunched: Bool {
+            lock.lock(); defer { lock.unlock() }
+            return launched
+        }
+
+        /// Answers once: from whichever comes first, the end of the output or
+        /// the deadline after a stop.
+        func finish(_ result: Result<ShellOutput, Error>) {
+            lock.lock()
+            let waiting = continuation
+            continuation = nil
+            lock.unlock()
+            waiting?.resume(with: result)
+        }
+
+        /// Stops the program. A child it started can keep the output pipe open
+        /// after it has gone (osascript held by a privacy prompt that nobody
+        /// answers), so the answer is given a second later without waiting for
+        /// the end of the output.
+        func stop() {
+            guard hasLaunched else { return }
+            if process.isRunning { process.terminate() }
+            DispatchQueue.global().asyncAfter(deadline: .now() + 1) { [self] in
+                let status: Int32 = process.isRunning ? 15 : process.terminationStatus
+                finish(.success(ShellOutput(status: status, stdout: "")))
+            }
+        }
     }
 
     public func run(_ executable: String, _ arguments: [String] = [], timeout: TimeInterval = 3) async throws -> ShellOutput {
@@ -50,24 +89,26 @@ public struct ShellRunner: Sendable {
         process.standardInput = FileHandle.nullDevice
         let output: ShellOutput = try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<ShellOutput, Error>) in
+                box.hold(continuation)
                 do {
                     try process.run()
+                    box.markLaunched()
                 } catch {
-                    continuation.resume(throwing: error)
+                    box.finish(.failure(error))
                     return
                 }
-                DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
-                    if box.process.isRunning { box.process.terminate() }
-                }
+                // Also when the program itself has ended but something it
+                // started still holds its output open.
+                DispatchQueue.global().asyncAfter(deadline: .now() + timeout) { box.stop() }
                 DispatchQueue.global().async {
                     let data = box.pipe.fileHandleForReading.readDataToEndOfFile()
                     box.process.waitUntilExit()
                     let text = String(decoding: data, as: UTF8.self)
-                    continuation.resume(returning: ShellOutput(status: box.process.terminationStatus, stdout: text))
+                    box.finish(.success(ShellOutput(status: box.process.terminationStatus, stdout: text)))
                 }
             }
         } onCancel: {
-            if box.process.isRunning { box.process.terminate() }
+            box.stop()
         }
         try Task.checkCancellation()
         return output

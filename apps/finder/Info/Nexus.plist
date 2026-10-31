@@ -9,3 +9,10 @@
 </array>
 <key>NSAppleEventsUsageDescription</key><string>Nexus asks Finder to empty the Trash when you choose Empty Trash.</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
+<key>CFBundleURLTypes</key>
+<array>
+  <dict>
+    <key>CFBundleURLName</key><string>com.grandline.nexus</string>
+    <key>CFBundleURLSchemes</key><array><string>nexus</string></array>
+  </dict>
+</array>

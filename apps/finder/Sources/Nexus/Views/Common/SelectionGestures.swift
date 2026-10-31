@@ -109,8 +109,9 @@ struct BrowserKeys: ViewModifier {
         if plainArrow, key == KeyEquivalent.downArrow.character { move(rowStep, shift); return true }
         guard let shortcut = Self.shortcut(press) else { return false }
         let context = model.context
-        guard let command = KeyMap.command(for: shortcut, inArchive: context.inArchive, inTrash: context.inTrash),
-              shortcut.isPlain || [.enclosingFolder, .openSelection, .moveToTrash, .putBack].contains(command) else { return false }
+        guard let found = KeyMap.command(for: shortcut, inArchive: context.inArchive, inTrash: context.inTrash),
+              shortcut.isPlain || [.enclosingFolder, .openSelection, .moveToTrash, .putBack].contains(found) else { return false }
+        let command = NexusPreferencesStore.shared.current.returnKey.command(found, for: shortcut)
         if model.isEnabled(command) { model.perform(command) }
         return true
     }

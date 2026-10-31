@@ -22,4 +22,13 @@ public struct SidebarHidden: Codable, Equatable, Sendable {
     public mutating func hide(_ section: SidebarSection) {
         if !sections.contains(section.rawValue) { sections.append(section.rawValue) }
     }
+
+    /// Settings, Sidebar: shows a hidden item again.
+    public mutating func show(_ item: SidebarItem) {
+        items.removeAll { $0 == item.id }
+    }
+
+    public mutating func show(_ section: SidebarSection) {
+        sections.removeAll { $0 == section.rawValue }
+    }
 }

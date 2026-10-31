@@ -1,73 +1,79 @@
 import Foundation
 import IndexKit
-import LauncherKit
+import IndexService
 
 /// The name index of the home folder (without ~/Library, but with Google Drive
-/// in ~/Library/CloudStorage), loaded from its snapshot at launch, kept current
-/// with FSEvents and saved again on quit. On a first launch it can be searched
-/// while it is built: Downloads, Desktop and Documents first, Google Drive last,
-/// with the snapshot saved along the way.
-final class NameIndex: @unchecked Sendable {
+/// in ~/Library/CloudStorage). Sight no longer keeps one of its own: it asks the
+/// Grand Line Index service, which Nexus shares, and which is already current
+/// when the panel opens. While the service is out of reach, answers come from a
+/// copy read from the service's snapshot (see SharedIndexClient).
+final class NameIndex: IndexStatusProviding, @unchecked Sendable {
+    /// Sight's own snapshot from before the service. The service adopts it on
+    /// its first start; Sight no longer writes it.
     let snapshot: URL
     let root: String
-    private var index: FileIndex?
-    private let lock = NSLock()
+    let client: SharedIndexClient
 
     init(snapshot: URL, root: String) {
         self.snapshot = snapshot
         self.root = root
+        self.client = SharedIndexClient(home: root)
     }
 
     func start() {
-        let snapshot = self.snapshot
-        let root = self.root
-        Task.detached(priority: .userInitiated) { [weak self] in
-            let exclusions = HomeIndexScope.exclusions(home: root)
-            let order = ScanOrder.home(root)
-            let index = (try? FileIndex.load(from: snapshot, exclusions: exclusions, order: order))
-                ?? FileIndex(roots: [root], exclusions: exclusions, order: order)
-            // Searchable at once: a saved index in full, a new one as it fills.
-            self?.set(index)
-            let count = await index.count
-            let complete = await index.isComplete
-            if count == 0 || !complete {
-                await index.build(savingTo: snapshot, every: 30)
-            }
-            await index.startWatching()
+        client.start()
+        // A first reading, so the first search can already explain missing folders.
+        _ = Task.detached(priority: .utility) { [weak self] in
+            _ = await self?.unreadable()
         }
     }
 
-    private func set(_ index: FileIndex) {
+    func search(_ text: String, limit: Int) async -> [IndexMatch] {
+        await client.search(text, limit: limit)
+    }
+
+    /// Folders macOS would not let the index read. Asked for with every file
+    /// search, so it answers from the last reading and reads again in the
+    /// background at most every few seconds, never holding up the results.
+    func unreadable() async -> [String] {
+        let now = Date()
         lock.lock()
-        self.index = index
+        let known = knownUnreadable
+        let stale = now.timeIntervalSince(lastRead) > 5
+        if stale { lastRead = now }
+        lock.unlock()
+        if stale {
+            let client = self.client
+            Task.detached(priority: .utility) { [weak self] in
+                let folders = await client.unreadable()
+                self?.keep(folders)
+            }
+        }
+        return known
+    }
+
+    private let lock = NSLock()
+    private var knownUnreadable: [String] = []
+    private var lastRead = Date.distantPast
+
+    private func keep(_ folders: [String]) {
+        lock.lock()
+        knownUnreadable = folders
         lock.unlock()
     }
 
-    private var current: FileIndex? {
-        lock.lock()
-        defer { lock.unlock() }
-        return index
-    }
-
-    func search(_ text: String, limit: Int) async -> [IndexMatch] {
-        guard let index = current else { return [] }
-        return await index.search(text, limit: limit)
-    }
-
-    /// Folders macOS would not let the index read.
-    func unreadable() async -> [String] {
-        guard let index = current else { return [] }
-        return await index.unreadable
-    }
-
     func noteOpened(_ path: String) {
-        guard let index = current else { return }
-        Task { await index.noteOpened(path) }
+        client.noteOpened(path)
     }
 
-    func save() {
-        guard let index = current else { return }
-        let snapshot = self.snapshot
-        Task.detached(priority: .utility) { try? await index.save(to: snapshot) }
+    /// The service saves the index; nothing to do here.
+    func save() {}
+
+    func status() async -> IndexStatus {
+        await client.status()
+    }
+
+    func rebuild() async {
+        await client.rebuild()
     }
 }

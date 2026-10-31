@@ -1,0 +1,4 @@
+#!/bin/bash
+# Test stub: records which items are kept out of Time Machine.
+echo "tmutil $*" >> "${STUB_LOG:-/dev/null}"
+exit 0

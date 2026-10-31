@@ -21,6 +21,8 @@ final class BrowserModel: ObservableObject {
     @Published var sidebarWidth: Double = SidebarMetrics.defaultWidth
     @Published var editingPath = false
     @Published var pathText = ""
+    /// Under the Go to Folder field: why Return went nowhere.
+    @Published var pathProblem: String?
     @Published var searchText = ""
     @Published var searchFocused = false
     @Published var pinned = false
@@ -33,6 +35,11 @@ final class BrowserModel: ObservableObject {
         self.services = services
         self.layout = PaneLayout()
         self.mode = services.viewPreferences.defaults.mode == .panes ? .list : services.viewPreferences.defaults.mode
+        // Settings, General and Advanced.
+        let prefs = NexusPreferencesStore.shared.current
+        showPathBar = prefs.showPathBar
+        showStatusBar = prefs.showStatusBar
+        showHidden = prefs.showHiddenFiles
         let pane = makePane(location)
         panes = [pane]
         pane.go(location, select: select)

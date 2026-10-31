@@ -11,6 +11,8 @@ struct InspectorView: View {
     @Local private var summary: SelectionSummary? = nil
     @Local private var tagText = ""
     @Local private var comment = ""
+    /// Bumped after a favourite tag chip changes tags, so the summary is read again.
+    @Local private var tagsVersion = 0
 
     var body: some View {
         let selection = pane.selectedItems.filter { !$0.isInArchive }
@@ -32,6 +34,7 @@ struct InspectorView: View {
                     field("Tags", text: $tagText, prompt: "Add tags, comma separated") {
                         model.setCommonTags(from: summary.commonTags, to: TagEditor.parse(tagText))
                     }
+                    favouriteTags(common: summary.commonTags)
                     if selection.count == 1 {
                         field("Comment", text: $comment, prompt: "Spotlight comment") {
                             try? FinderComment.write(comment, to: selection[0].url)
@@ -50,13 +53,44 @@ struct InspectorView: View {
             .padding(14)
         }
         .background(palette.panel)
-        .task(id: selection.map(\.id).joined(separator: "\n")) {
+        .task(id: selection.map(\.id).joined(separator: "\n") + "#\(tagsVersion)") {
             summary = nil
             guard !selection.isEmpty else { return }
             let made = await SelectionSummary.make(for: selection.map(\.url), sizes: model.services.folderSizes)
             summary = made
             tagText = made.commonTags.joined(separator: ", ")
             comment = selection.count == 1 ? FinderComment.read(selection[0].url) : ""
+        }
+    }
+
+    /// The favourite tags from Settings, Tags: one click adds a tag to the
+    /// whole selection, or takes it off when every item has it.
+    @ViewBuilder
+    private func favouriteTags(common: [String]) -> some View {
+        let favourites = NexusPreferencesStore.shared.current.sidebar.favouriteTags
+        if !favourites.isEmpty {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 4)], alignment: .leading, spacing: 4) {
+                ForEach(favourites, id: \.self) { tag in
+                    let on = common.contains(tag)
+                    Button {
+                        model.toggleTag(named: tag)
+                        tagsVersion += 1
+                    } label: {
+                        Text(tag)
+                            .font(.system(size: 11))
+                            .lineLimit(1)
+                            .foregroundStyle(on ? palette.selectionText : palette.text)
+                            .padding(.horizontal, 6)
+                            .frame(height: 20)
+                            .frame(maxWidth: .infinity)
+                            .background(RoundedRectangle(cornerRadius: 5).fill(on ? palette.selection : palette.chip))
+                    }
+                    .buttonStyle(.plain)
+                    .help(on ? "Remove \(tag)" : "Add \(tag)")
+                    .accessibilityLabel(tag)
+                    .accessibilityValue(on ? "On" : "Off")
+                }
+            }
         }
     }
 

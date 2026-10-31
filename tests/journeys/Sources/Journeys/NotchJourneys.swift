@@ -113,7 +113,9 @@ enum NotchJourneys {
             step("and back to the dark theme", layout: false) { ctx in
                 let state = ctx.home.appendingPathComponent(".local/state/grand-line/theme")
                 try "graphite\n".write(to: state, atomically: true, encoding: .utf8)
-                guard Capture.canRecordScreen else { return }
+                // The theme is back either way; without Screen Recording the
+                // colours were not compared, which is a skip, not a pass.
+                guard Capture.canRecordScreen else { throw StepSkip("no Screen Recording permission, so colours cannot be compared") }
                 let back = ctx.dir.appendingPathComponent("theme-back.png")
                 let light = Capture.meanColour(of: ctx.dir.appendingPathComponent("theme-light.png"))
                 try ctx.wait("the panel to darken again", timeout: 8, poll: 0.5) {

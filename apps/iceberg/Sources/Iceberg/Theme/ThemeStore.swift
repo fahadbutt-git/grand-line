@@ -16,6 +16,9 @@ final class ThemeStore: ObservableObject {
 
     private let paths: IcebergPaths
     private var watcher: FileWatcher?
+    /// macOS's own appearance, for a theme that follows it.
+    private var systemIsDark = SystemStyle.isDark()
+    private var appearanceObserver: NSObjectProtocol?
 
     init(paths: IcebergPaths) {
         self.paths = paths
@@ -24,14 +27,36 @@ final class ThemeStore: ObservableObject {
         watcher = FileWatcher(paths: [paths.themeState, paths.renderedTheme, paths.themesFolder]) { [weak self] in
             self?.reload()
         }
+        appearanceObserver = DistributedNotificationCenter.default().addObserver(
+            forName: SystemStyle.changed, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let store = self else { return }
+            // The default is written as the notification goes out; read it a moment later.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak store] in
+                MainActor.assumeIsolated { store?.systemAppearanceChanged() }
+            }
+        }
+    }
+
+    /// macOS switched between dark and light. While the theme follows macOS
+    /// the matching variant shows now, and the `theme` command switches the
+    /// rest of the package (whichever app takes the lock runs it).
+    private func systemAppearanceChanged() {
+        let dark = SystemStyle.isDark()
+        guard dark != systemIsDark else { return }
+        systemIsDark = dark
+        guard ThemeLoader.followsSystem(paths: paths) else { return }
+        reload()
+        ThemeFollowSync.run(paths: paths, systemIsDark: dark)
     }
 
     func reload() {
-        let (loaded, problems) = ThemeLoader.load(paths: paths)
+        let name = ThemeLoader.followedName(paths: paths, systemIsDark: systemIsDark)
+        let (loaded, problems) = ThemeLoader.load(paths: paths, named: name)
         if loaded != theme { theme = loaded }
         if problems != issues { issues = problems }
         // The keys Iceberg's Theme does not hold: the panel's own colours and the icon's.
-        let file = paths.themeFile(named: ThemeLoader.currentName(paths: paths))
+        let file = paths.themeFile(named: name)
         let fields = (try? String(contentsOf: file, encoding: .utf8)).map(ThemeLoader.fields) ?? [:]
         let palette = NotchPalette(fields: fields, theme: loaded)
         if palette != notch { notch = palette }
@@ -66,4 +91,51 @@ final class ThemeStore: ObservableObject {
 
 extension RGB {
     var color: Color { Color(.sRGB, red: red, green: green, blue: blue, opacity: 1) }
+}
+
+/// macOS's appearance, read from the global AppleInterfaceStyle default (the
+/// app's own appearance follows the theme, so it says nothing about macOS).
+enum SystemStyle {
+    static let changed = Notification.Name("AppleInterfaceThemeChangedNotification")
+
+    static func isDark() -> Bool {
+        CFPreferencesAppSynchronize(kCFPreferencesAnyApplication)
+        let style = CFPreferencesCopyAppValue("AppleInterfaceStyle" as CFString, kCFPreferencesAnyApplication) as? String
+        return style?.lowercased() == "dark"
+    }
+}
+
+/// Runs `theme mode dark|light` once after macOS switches appearance, unless
+/// Nexus or Sight already is: the first app to create the lock file runs it.
+enum ThemeFollowSync {
+    static func run(paths: IcebergPaths, systemIsDark: Bool) {
+        let current = ThemeLoader.currentName(paths: paths)
+        guard ThemeLoader.variant(of: current, systemIsDark: systemIsDark, paths: paths) != nil,
+              FileManager.default.isExecutableFile(atPath: paths.themeCommand.path),
+              takeLock(paths.themeFollowLock) else { return }
+        let lock = paths.themeFollowLock
+        let process = Process()
+        process.executableURL = paths.themeCommand
+        process.arguments = ["mode", systemIsDark ? "dark" : "light"]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        process.terminationHandler = { _ in try? FileManager.default.removeItem(at: lock) }
+        do {
+            try process.run()
+        } catch {
+            try? FileManager.default.removeItem(at: lock)
+        }
+    }
+
+    /// Creates the lock file, unless another app made it in the last minute.
+    static func takeLock(_ url: URL) -> Bool {
+        if let made = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date,
+           Date().timeIntervalSince(made) > 60 {
+            try? FileManager.default.removeItem(at: url)
+        }
+        let fd = open(url.path, O_CREAT | O_EXCL | O_WRONLY, 0o644)
+        guard fd >= 0 else { return false }
+        close(fd)
+        return true
+    }
 }

@@ -370,7 +370,12 @@ enum FilesJourneys {
                 try ctx.wait("the Trash's items") { (ctx.status() ?? 0) == ctx.visibleCount(in: ".Trash") }
             },
             step("search \"conj\" from the Trash") { ctx in
-                try ctx.startSearch("conj")
+                // Finder searches the folder it is in. The Trash holds two conj
+                // files, which the app reads from disk (the name index leaves
+                // the Trash out); should none show, the empty state must say
+                // where it looked and offer the whole Mac.
+                try ctx.startSearch("conj", allowEmpty: "No results in Trash.")
+                if ctx.rows().isEmpty { ctx.note("the Trash search found nothing, and said so") }
                 let snap = ctx.snapshot(try ctx.mainWindow())
                 try ctx.check(ctx.chip(snap, "folder", "Trash") != nil, "the folder chip does not read \"Trash\"; chips: \(ctx.chipTexts(snap))")
                 let raw = snap.nodes.filter { $0.text == ".Trash" }
@@ -413,8 +418,13 @@ enum FilesJourneys {
             problems.append("no search field in the toolbar")
         }
         let pane = snap.identified(ctx.app.id("pane"))?.frame
-        if let pane, pane.height < window.height * 0.4 {
-            problems.append("the file area is \(Int(pane.height)) pt tall in a \(Int(window.height)) pt window")
+        if let pane {
+            if pane.height < window.height * 0.4 {
+                problems.append("the file area is \(Int(pane.height)) pt tall in a \(Int(window.height)) pt window")
+            }
+        } else {
+            // Without it the height check above would quietly not run.
+            problems.append("no file area marked \(ctx.app.id("pane")) in the window")
         }
         if let count = statusCount(snap), count > 0 {
             let area = pane ?? contentArea(snap, window)
@@ -563,7 +573,10 @@ extension Ctx {
         guard area.height > 100 else { return false }
         let inside = snap.nodes.filter { $0.isVisibleSize && area.intersects($0.frame!) }
         if mode == "gallery" {
-            return inside.contains { $0.role == "AXImage" }
+            // The strip's thumbnails: images, each named after its item.
+            let images = inside.filter { $0.role == "AXImage" }
+            guard let names else { return !images.isEmpty }
+            return images.contains { image in names.contains { image.allText.contains($0) } }
         }
         let texts = Set(inside.filter { ["AXStaticText", "AXTextField"].contains($0.role) }.map(\.text))
         guard let names else { return texts.contains { fold($0).contains("conj") } }
@@ -630,12 +643,19 @@ extension Ctx {
         try wait("the folder's items") { (self.status() ?? -1) >= 0 }
     }
 
-    func startSearch(_ text: String) throws {
+    /// Types a search. `allowEmpty`: the empty-state words that also end the
+    /// wait, for a scope where no results is a right answer.
+    func startSearch(_ text: String, allowEmpty: String? = nil) throws {
         try key("cmd+f")
         try wait("the search field to take the keys") { self.isEditingText() }
         type(text)
         try waitTitle("Search: " + text)
-        try wait("search results", timeout: 20) { (self.status() ?? 0) > 0 && !self.rows().isEmpty }
+        let what = allowEmpty.map { "search results or \"\($0)\"" } ?? "search results"
+        try wait(what, timeout: 20) {
+            if (self.status() ?? 0) > 0 && !self.rows().isEmpty { return true }
+            guard let allowEmpty, let snap = self.browserSnapshot() else { return false }
+            return snap.nodes.contains { $0.text == allowEmpty && $0.isVisibleSize }
+        }
     }
 
     func endSearch(returningTo title: String, alternatives: [String] = []) throws {

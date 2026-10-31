@@ -1,0 +1,40 @@
+#!/bin/bash
+# Test stub: a pretend security tool. With $STUB_SECURITY set to a folder, it
+# keeps a pretend keychain there: commands given on standard input (-i) make
+# the keychain, store its password and import the identity, which
+# find-identity then lists. Only the command names given on standard input
+# are logged, so a test can check no password reached a command line.
+echo "security $*" >> "${STUB_LOG:-/dev/null}"
+st="${STUB_SECURITY:-}"
+HASH=0123456789ABCDEF0123456789ABCDEF01234567
+# value_after FLAG WORDS...: the word after FLAG.
+value_after() {
+  local flag="$1"; shift
+  while [[ $# -gt 0 ]]; do [[ "$1" == "$flag" ]] && { printf '%s\n' "${2:-}"; return 0; }; shift; done
+  return 1
+}
+case "${1:-}" in
+  -i)
+    while IFS= read -r line; do
+      read -r -a w <<<"${line//\"/}"
+      echo "security -i: ${w[0]}" >> "${STUB_LOG:-/dev/null}"
+      [[ -n "$st" ]] || continue
+      mkdir -p "$st"
+      case "${w[0]}" in
+        add-generic-password) value_after -w "${w[@]}" > "$st/password" ;;
+        create-keychain) mkdir -p "$(dirname "${w[${#w[@]}-1]}")"; : > "${w[${#w[@]}-1]}" ;;
+        unlock-keychain) [[ "$(value_after -p "${w[@]}")" == "$(cat "$st/password" 2>/dev/null)" ]] && : > "$st/unlocked" ;;
+        import) : > "$st/imported" ;;
+        set-key-partition-list) : > "$st/partition" ;;
+      esac
+    done
+    exit 0 ;;
+  find-identity)
+    [[ -n "$st" && -f "$st/imported" ]] && printf '  1) %s "Grand Line Local Signing" (CSSMERR_TP_NOT_TRUSTED)\n     1 identities found\n' "$HASH"
+    exit 0 ;;
+  find-generic-password)
+    [[ -n "$st" && -f "$st/password" ]] && { cat "$st/password"; exit 0; }
+    echo "security: SecKeychainSearchCopyNext: The specified item could not be found in the keychain." >&2
+    exit 44 ;;
+esac
+exit 0

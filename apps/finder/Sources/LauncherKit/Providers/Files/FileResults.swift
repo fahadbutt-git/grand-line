@@ -50,8 +50,9 @@ public enum FileResults {
             if rows.contains(where: { $0.title.hasSuffix(" " + name) }) { continue }
             rows.append(LaunchResult(
                 id: "allow:" + folder,
-                title: "Allow Sight to read " + name,
-                subtitle: "macOS is keeping Sight out of \(name), so its files are missing here",
+                // The shared index service reads the folders, so it is the app to allow.
+                title: "Allow Grand Line Index to read " + name,
+                subtitle: "macOS is keeping the file index out of \(name), so its files are missing here",
                 icon: .symbol("lock"),
                 section: .files,
                 actions: [LaunchAction("Open Privacy Settings", symbol: "gear", .openURL(filesAndFoldersPane, bundleID: nil))],

@@ -1,0 +1,4 @@
+<key>LSBackgroundOnly</key><true/>
+<key>CFBundleIconFile</key><string>AppIcon</string>
+<key>NSSupportsAutomaticTermination</key><false/>
+<key>NSSupportsSuddenTermination</key><false/>

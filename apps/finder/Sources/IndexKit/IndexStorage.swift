@@ -157,6 +157,27 @@ struct IndexStorage: Sendable {
         return out
     }
 
+    /// Folds every non-ASCII name again with the current rules, for snapshots
+    /// written before names were composed (NFC) first. ASCII names keep their bytes.
+    mutating func refold() {
+        var pool: [UInt8] = []
+        pool.reserveCapacity(folded.count)
+        for i in 0..<count {
+            let fold: [UInt8]
+            if flags[i] & Self.asciiFlag != 0 {
+                let start = Int(foldStart[i])
+                fold = Array(folded[start..<(start + Int(foldLength[i]))])
+            } else {
+                fold = NameFold.fold(name(i))
+                mask[i] = NameFold.mask(fold)
+            }
+            foldStart[i] = UInt32(pool.count)
+            foldLength[i] = UInt16(min(fold.count, Int(UInt16.max)))
+            pool.append(contentsOf: fold)
+        }
+        folded = pool
+    }
+
     /// Every live folder by absolute path.
     func folderPaths() -> [String: Int32] {
         var pathOf: [Int32: String] = [:]

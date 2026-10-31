@@ -70,7 +70,11 @@ Hardware/Battery	notice battery
 Hardware/System information	open -a 'System Information'
 Hardware/Disk space	notice disk
 Hardware/Network speed test	notice speed
+Settings/Nexus settings	open 'nexus://settings'
+Settings/Sight settings	open 'sight://settings'
+Settings/Iceberg settings	open 'iceberg://settings'
 Update/Update everything	update --window
+Update/Automatic updates (daily, signed changes only)	update auto toggle		✓[[ ! -f "$HOME/.local/state/grand-line/auto-update-off" ]]
 Update/Run the waiting one-time changes	in-window migrate	?migrate --pending
 Update/Undo the last change	grandline undo
 Update/Go back to a saved version	grandline restore

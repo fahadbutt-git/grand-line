@@ -19,8 +19,12 @@ concurrency:
 jobs:
   publish:
     runs-on: xcode-27
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
       - name: Build the apps
         run: |
           export GRAND_LINE_APPS_DEST="$RUNNER_TEMP/apps" REPO_DIR="$GITHUB_WORKSPACE" DRY_RUN=0
@@ -31,12 +35,13 @@ jobs:
           done
           cd "$GRAND_LINE_APPS_DEST"
           for app in *.app; do codesign --verify --deep "$app"; done
+          bash "$GITHUB_WORKSPACE/tests/security-checks.sh" --bundles "$GRAND_LINE_APPS_DEST"
           # Zipped with ditto first: the artifact upload drops the executable
           # bit and the framework symlinks an app needs to open.
           mkdir -p "$RUNNER_TEMP/out"
           ditto -c -k --keepParent "$GRAND_LINE_APPS_DEST" "$RUNNER_TEMP/out/Grand-Line-apps.zip"
           echo "::notice title=apps::$(ls -1 | tr '\n' ' ')"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: Grand-Line-apps
           path: ${{ runner.temp }}/out/Grand-Line-apps.zip

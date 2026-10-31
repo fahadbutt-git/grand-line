@@ -40,4 +40,63 @@ public struct ThemeLocation: Sendable, Equatable {
         if let name = activeName(), let theme = load(named: name) { return theme }
         return BuiltInThemes.named(Self.fallbackName)!
     }
+
+    // MARK: Following the macOS appearance
+
+    /// Present while the theme follows macOS between its dark and light
+    /// variants (Settings, Appearance, "Follow macOS"). Every app reads it.
+    public var followFile: URL {
+        stateFile.deletingLastPathComponent().appendingPathComponent("theme-follows-macos")
+    }
+
+    /// Taken by the one app that runs `theme mode` after macOS switches.
+    public var followLock: URL {
+        stateFile.deletingLastPathComponent().appendingPathComponent("theme-follow.lock")
+    }
+
+    /// ~/.grand-line, the package the themes folder belongs to.
+    public var packageFolder: URL {
+        themesFolder.deletingLastPathComponent().deletingLastPathComponent()
+    }
+
+    /// The `theme` command that writes the state file and renders the templates.
+    public var themeCommand: URL {
+        packageFolder.appendingPathComponent("bin/theme")
+    }
+
+    public func followsSystem() -> Bool {
+        FileManager.default.fileExists(atPath: followFile.path)
+    }
+
+    public func setFollowsSystem(_ on: Bool) throws {
+        if on {
+            try FileManager.default.createDirectory(at: followFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data("yes\n".utf8).write(to: followFile, options: .atomic)
+        } else if FileManager.default.fileExists(atPath: followFile.path) {
+            try FileManager.default.removeItem(at: followFile)
+        }
+    }
+
+    /// The FAMILY= of a theme file, or nil for a theme without a pair.
+    public func family(of name: String) -> String? {
+        if ThemeFollow.systemPair.contains(name) { return ThemeFollow.systemFamily }
+        let family = ThemeFile.read(file(named: name))?["FAMILY"]?.trimmingCharacters(in: .whitespaces) ?? ""
+        return family.isEmpty ? nil : family
+    }
+
+    /// The name to show: the active one, or, while following macOS, its
+    /// variant for `systemIsDark` when the theme has one.
+    public func resolvedName(systemIsDark: Bool?) -> String {
+        let name = activeName() ?? Self.fallbackName
+        guard let systemIsDark, followsSystem() else { return name }
+        return ThemeFollow.variant(of: name, systemIsDark: systemIsDark, family: family(of: name)) {
+            FileManager.default.fileExists(atPath: file(named: $0).path) || BuiltInThemes.named($0) != nil
+        } ?? name
+    }
+
+    /// The active theme as `resolvedName` names it.
+    public func load(systemIsDark: Bool?) -> Theme {
+        guard systemIsDark != nil, activeName() != nil, followsSystem() else { return load() }
+        return load(named: resolvedName(systemIsDark: systemIsDark)) ?? load()
+    }
 }
