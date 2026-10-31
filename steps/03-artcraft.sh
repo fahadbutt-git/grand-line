@@ -92,6 +92,7 @@ artcraft_install_one() {
     rm -rf "$dest"
     if ditto "$found" "$dest"; then
       xattr -dr com.apple.quarantine "$dest" 2>/dev/null || true
+      register_app "$dest"
       printf '%s\n' "$tag" > "$state/$app.tag"
       printf '%s\n' "$dest" > "$state/$app.path"
       echo "  ✓ Installed $(basename "$dest") $tag"

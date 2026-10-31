@@ -77,6 +77,22 @@ append_once() {
 }
 
 # Read the bundle identifier of an installed app, e.g. "WordCraft" or "Preview".
+# Tells macOS about an app copied into place, so it can be a default app
+# straight away instead of after its first launch.
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+register_app() {
+  [[ -x "$LSREGISTER" && -d "$1" ]] && run "$LSREGISTER" -f "$1"
+  return 0
+}
+
+app_path_of() {
+  local path
+  for path in "/Applications/${1}.app" "$HOME/Applications/${1}.app" "/System/Applications/${1}.app"; do
+    [[ -d "$path" ]] && { echo "$path"; return 0; }
+  done
+  return 1
+}
+
 bundle_id_of() {
   local app="$1" path
   for path in "/Applications/${app}.app" "$HOME/Applications/${app}.app" "/System/Applications/${app}.app"; do

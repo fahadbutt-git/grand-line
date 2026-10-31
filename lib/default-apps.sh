@@ -24,9 +24,17 @@ apply_default_apps() {
       warn "Neither $primary nor $fallback is installed, so $exts keep their current app."
       failed=1; continue
     fi
+    register_app "$(app_path_of "$app")"
     for ext in $exts; do
       run duti -s "$id" "$ext" all || failed=1
     done
+    # duti can report success while macOS keeps the old app, so read it back.
+    local now
+    now="$([[ "$DRY_RUN" == 0 ]] && duti -x "${exts%% *}" 2>/dev/null | head -1)"
+    if [[ "$DRY_RUN" == 0 && "$now" != "$app.app" ]]; then
+      warn "$app was set for $exts, but macOS still opens ${exts%% *} with ${now:-nothing}."
+      failed=1; continue
+    fi
     ok "$app opens $exts"
   done < "$table"
   return "$failed"

@@ -72,8 +72,9 @@ while IFS=$'\t' read -r app exts _; do
   [[ -z "$app" || "$app" == \#* ]] && continue
   ext="${exts%% *}"; ext="${ext#.}"
   handler="$(duti -x "$ext" 2>/dev/null | head -1)"
-  if [[ "$handler" == "$app"* ]]; then pass ".$ext opens in $app"
-  elif [[ -n "$handler" ]]; then note ".$ext opens in $handler (fallback, $app missing)"
+  if [[ "$handler" == "$app.app" ]]; then pass ".$ext opens in $app"
+  elif [[ -d "/Applications/$app.app" ]]; then fail ".$ext opens in ${handler:-nothing}, but $app is installed and should open it"
+  elif [[ -n "$handler" ]]; then note ".$ext opens in $handler because $app is not installed"
   else fail ".$ext has no default app"; fi
 done < "$ROOT/config/mac-setup/default-apps.tsv"
 

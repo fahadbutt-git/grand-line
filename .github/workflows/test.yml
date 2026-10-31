@@ -18,7 +18,7 @@ jobs:
     name: Checks (Linux, fast)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: sudo apt-get install -y shellcheck zsh tmux jq
       - run: bash tests/run-all.sh
 
@@ -29,7 +29,7 @@ jobs:
       # Put Apple's /bin/bash 3.2 ahead of Homebrew's bash 5, as on a new Mac.
       PATH: /usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: brew install shellcheck jq tmux
       - run: bash --version | head -1 && /bin/bash tests/run-all.sh
 
@@ -46,7 +46,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       HOMEBREW_NO_INSTALL_CLEANUP: 1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run 1, full setup
         run: /bin/bash setup.sh --ci --skip r-packages
       - name: Report what was installed
