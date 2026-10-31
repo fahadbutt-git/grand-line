@@ -139,8 +139,10 @@ check "every theme has its own FORMAT=1, its background and all fields" bash -c 
              ICON_STYLE KIND_STYLE KIND_FOLDER KIND_DOCUMENT KIND_PDF KIND_PRESENTATION KIND_SPREADSHEET KIND_IMAGE KIND_VIDEO KIND_CODE KIND_ARCHIVE KIND_TEXT; do
       printf "%s\n" "$r" | grep -q "^$k=" || { echo "$t: no $k"; bad=1; }
     done
-    # The app icon reader (tools/make-icons.py) reads the file itself, so the style stays in every file.
-    grep -qE "^ICON_STYLE=(line|solid|mono)$" "$t" || { echo "$t: ICON_STYLE must be in the file itself"; bad=1; }
+    # ICON_STYLE and KIND_STYLE may come through EXTENDS: the apps and
+    # tools/make-icons.py read the resolved theme, as theme_resolve does.
+    printf "%s\n" "$r" | grep -qE "^ICON_STYLE=\"?(line|solid|mono)\"?$" || { echo "$t: ICON_STYLE must be line, solid or mono"; bad=1; }
+    printf "%s\n" "$r" | grep -qE "^KIND_STYLE=\"?(tag|dot|solid|text)\"?$" || { echo "$t: KIND_STYLE must be tag, dot, solid or text"; bad=1; }
     fam=$(get FAMILY)
     if [[ -n "$fam" ]]; then
       [[ "${t##*/}" == "$fam-dark.theme" || "${t##*/}" == "$fam-light.theme" ]] || { echo "$t: FAMILY=$fam needs the file named $fam-dark or $fam-light"; bad=1; }

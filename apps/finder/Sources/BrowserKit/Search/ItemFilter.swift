@@ -45,3 +45,13 @@ public enum ItemFilter {
         return pi == p.count
     }
 }
+
+/// Escape while the folder is filtered (the omnibar's filter and its bar,
+/// after Return handed the keys back): the filter goes, every row comes back
+/// and the bar closes, wherever the keys are in the window. A field being
+/// typed in keeps its own Escape, and a sheet keeps its own.
+public enum FilterEscape {
+    public static func clears(filter: String, typing: Bool, modifiers: Shortcut.Modifiers, sheetOpen: Bool) -> Bool {
+        !filter.isEmpty && !typing && modifiers.isEmpty && !sheetOpen
+    }
+}

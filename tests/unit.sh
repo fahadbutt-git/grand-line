@@ -545,10 +545,34 @@ grep -q "defaults write com.apple.finder AppleShowAllFiles -bool true" "$STUB_LO
   && t_ok "toggle hidden on shows hidden files and restarts Finder" || t_fail "hidden on" "$(cat "$STUB_LOG")"
 : > "$STUB_LOG"; "$T" dock off
 grep -q "defaults write com.apple.dock autohide -bool true" "$STUB_LOG" && t_ok "toggle dock off hides the Dock automatically" || t_fail "dock off"
-: > "$STUB_LOG"; "$T" dark on
-grep -q "set dark mode to true" "$STUB_LOG" && t_ok "toggle dark on without a theme pair sets the appearance" || t_fail "dark on" "$(cat "$STUB_LOG")"
+# Dark mode is macOS's appearance (System Events), read back from AppleInterfaceStyle.
+export STUB_APPEARANCE="$tmp/appearance"; : > "$STUB_APPEARANCE"
+echo harbour-light > "$HOME/.local/state/grand-line/theme"; rm -f "$HOME/.local/state/grand-line/theme-follows-macos"
+: > "$STUB_LOG"; GRAND_LINE_QUIET=1 "$T" dark on >/dev/null; code=$?
+[[ $code == 0 && "$(cat "$STUB_APPEARANCE")" == Dark ]] && grep -q "set dark mode to true" "$STUB_LOG" \
+  && [[ "$(cat "$HOME/.local/state/grand-line/theme")" == harbour-light ]] \
+  && t_ok "toggle dark on sets the macOS appearance and leaves a theme that does not follow macOS" || t_fail "dark on" "$code $(cat "$STUB_LOG")"
+"$T" status dark | grep -qx "dark on" && t_ok "toggle status reads dark mode from AppleInterfaceStyle" || t_fail "status dark after dark on"
+: > "$STUB_LOG"; GRAND_LINE_QUIET=1 "$T" dark on >/dev/null
+! grep -q "set dark mode" "$STUB_LOG" && t_ok "toggle dark on leaves the appearance alone when it is already dark" || t_fail "dark on when dark" "$(cat "$STUB_LOG")"
+: > "$STUB_LOG"; GRAND_LINE_QUIET=1 "$T" dark >/dev/null; code=$?
+[[ $code == 0 && ! -s "$STUB_APPEARANCE" ]] && grep -q "set dark mode to false" "$STUB_LOG" \
+  && t_ok "toggle dark with no state switches back to light" || t_fail "dark flip" "$code $(cat "$STUB_LOG")"
+# While the theme follows macOS, its variant switches with the appearance.
+touch "$HOME/.local/state/grand-line/theme-follows-macos"
+: > "$STUB_LOG"; GRAND_LINE_QUIET=1 GRAND_LINE_TEST_PATH="$GRAND_LINE_TEST_PATH:$ROOT/bin" "$T" dark on >/dev/null; code=$?
+[[ $code == 0 && "$(cat "$STUB_APPEARANCE")" == Dark && "$(cat "$HOME/.local/state/grand-line/theme")" == harbour-dark ]] \
+  && t_ok "toggle dark on switches a theme that follows macOS to its dark variant" || t_fail "dark on following macOS" "$code $(cat "$HOME/.local/state/grand-line/theme")"
+: > "$STUB_LOG"; GRAND_LINE_QUIET=1 GRAND_LINE_TEST_PATH="$GRAND_LINE_TEST_PATH:$ROOT/bin" "$T" dark off >/dev/null; code=$?
+[[ $code == 0 && ! -s "$STUB_APPEARANCE" && "$(cat "$HOME/.local/state/grand-line/theme")" == harbour-light ]] \
+  && t_ok "toggle dark off switches it back to its light variant" || t_fail "dark off following macOS" "$code $(cat "$HOME/.local/state/grand-line/theme")"
+rm -f "$HOME/.local/state/grand-line/theme-follows-macos"
+# System Events answered but macOS kept its appearance: a failure, never a success.
+out="$(STUB_APPEARANCE_STUCK=1 GRAND_LINE_QUIET=1 "$T" dark on)"; code=$?
+[[ $code == 1 && "$out" == *"kept the light appearance"* ]] && t_ok "toggle dark fails when the appearance did not change" || t_fail "dark readback" "$code $out"
 out="$(OSASCRIPT_FAIL="execution error: Not authorized to send Apple events to System Events. (-1743)" GRAND_LINE_QUIET=1 "$T" dark on)"; code=$?
-[[ $code == 3 && "$out" == *Automation* ]] && t_ok "a missing Automation permission exits 3 and says so" || t_fail "automation failure" "$code $out"
+[[ $code == 3 && "$out" == *Automation* && ! -s "$STUB_APPEARANCE" ]] && t_ok "a missing Automation permission exits 3 and says so" || t_fail "automation failure" "$code $out"
+unset STUB_APPEARANCE
 out="$(GRAND_LINE_QUIET=1 SHORTCUTS_LIST="" "$T" dnd on)"; code=$?
 [[ $code == 4 && "$out" == *"Do Not Disturb On"* ]] && t_ok "Do Not Disturb without its shortcut exits 4 and names it" || t_fail "dnd missing shortcut" "$code $out"
 : > "$STUB_LOG"; SHORTCUTS_LIST=$'Do Not Disturb On\nDo Not Disturb Off' "$T" dnd on
@@ -860,6 +884,25 @@ EOF
 python3 "$ROOT/tools/make-icons.py" --theme nord --only Iceberg --out "$tmp/icons-out" >/dev/null 2>&1
 [[ -s "$tmp/icons-out/Iceberg/AppIcon.icns" ]] && git -C "$ROOT" diff --quiet -- apps/iceberg/Resources/Iceberg/AppIcon.icns \
   && t_ok "make-icons --out writes the icons elsewhere, leaving the package's own" || t_fail "make-icons --out"
+# A light variant takes ICON_STYLE and its app colours through EXTENDS, as the apps read it.
+mkdir -p "$tmp/icon-themes"
+printf 'FORMAT=1\nLABEL="Base"\nMODE=dark\nICON_STYLE=mono   # inherited\nICON_FILES=#123456\nFAMILY=base\n' > "$tmp/icon-themes/base-dark.theme"
+printf 'FORMAT=1\nEXTENDS=base-dark\nLABEL="Base Light"\nMODE=light\n' > "$tmp/icon-themes/base-light.theme"
+printf 'EXTENDS=loop-b\n' > "$tmp/icon-themes/loop-a.theme"; printf 'EXTENDS=loop-a\n' > "$tmp/icon-themes/loop-b.theme"
+if python3 -I -B - "$ROOT/tools/make-icons.py" "$tmp/icon-themes" <<'EOF'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("make_icons", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+v = m.read_theme("base-light", folder=sys.argv[2])
+assert v["ICON_STYLE"] == "mono" and v["ICON_FILES"] == "#123456" and v["MODE"] == "light", v
+assert v["LABEL"] == "Base Light" and v["FAMILY"] == "base" and "EXTENDS" not in v, v
+assert m.palette(v, "ICON_FILES")["ink"] == m.hex_color("123456")   # mono: the app colour is the ink
+try:
+    m.read_theme("loop-a", folder=sys.argv[2]); sys.exit("a loop was not caught")
+except SystemExit as e:
+    assert "loop" in str(e), e
+EOF
+then t_ok "make-icons reads a theme with what it inherits through EXTENDS (and stops at a loop)"; else t_fail "make-icons EXTENDS"; fi
 
 # --- updates: only signed commits apply by themselves
 if command -v ssh-keygen >/dev/null 2>&1; then
@@ -982,18 +1025,28 @@ grep -q '^UNATTENDED_STEPS="folders,dotfiles,native-tools,downloads"$' "$ROOT/se
   printf '#!/bin/bash\necho "sudo $*" >> "$STUB_LOG"\n[[ "$1" == -n ]] && shift\nexec "$@"\n' > "$stub/sudo"; chmod +x "$stub/sudo"
   echo app > "$tmp/Old.app"; ln -sfn "$victim" "$HOME/.Trash/Old.app"
   calls="$tmp/mv-calls"; : > "$calls"
-  mv() { echo x >> "$calls"; [[ "$(wc -l < "$calls")" == 1 ]] && return 1; command mv "$@"; }
+  mv() { echo x >> "$calls"; (( $(wc -l < "$calls") == 1 )) && return 1; command mv "$@"; }
   : > "$STUB_LOG"
   PATH="$stub:$PATH" GRAND_LINE_TRASH_STAGE="$tmp/stage-root" move_to_trash "$tmp/Old.app" || exit 4
   unset -f mv
   [[ ! -e "$tmp/Old.app" && -z "$(ls -A "$victim")" ]] || exit 5
-  real="$(cd -P "$tmp" && pwd -P)"   # macOS: /var is /private/var
-  grep -qE "^sudo mv -n ($tmp|$real)/Old.app ($tmp|$real)/stage-root/grand-line-trash\..*/Old.app$" "$STUB_LOG" || exit 6
+  # Root moved the item itself (mv -n) into a new folder in the stage root.
+  # Paths are compared with their links resolved (macOS: /var is /private/var,
+  # and either side may be written either way).
+  resolved_dir() { (cd -P "$1" 2>/dev/null && pwd -P); }
+  moved="$(grep '^sudo mv -n ' "$STUB_LOG")"
+  [[ "$(grep -c . <<<"$moved")" == 1 ]] || exit 6
+  rest="${moved#sudo mv -n }"; from="${rest%%/Old.app *}/Old.app"; to="${rest#*/Old.app }"
+  [[ "$from $to" == "$rest" && "$to" == */Old.app ]] || exit 6
+  [[ -n "$(resolved_dir "$tmp")" && "$(resolved_dir "$(dirname "$from")")" == "$(resolved_dir "$tmp")" ]] || exit 6
+  stagedir="$(dirname "$to")"
+  [[ "$(basename "$stagedir")" == grand-line-trash.?????? ]] || exit 6
+  [[ "$(resolved_dir "$(dirname "$stagedir")")" == "$(resolved_dir "$tmp/stage-root")" ]] || exit 6
   grep -q "^sudo chown -R -h " "$STUB_LOG" || exit 7
   compgen -G "$HOME/.Trash/Old *.app" >/dev/null || exit 8
   [[ -z "$(ls -A "$tmp/stage-root")" ]] || exit 9
   : > "$STUB_LOG"; echo x > "$tmp/Q.txt"; : > "$calls"
-  mv() { echo x >> "$calls"; [[ "$(wc -l < "$calls")" == 1 ]] && return 1; command mv "$@"; }
+  mv() { echo x >> "$calls"; (( $(wc -l < "$calls") == 1 )) && return 1; command mv "$@"; }
   PATH="$stub:$PATH" GRAND_LINE_UNATTENDED=1 GRAND_LINE_TRASH_STAGE="$tmp/stage-root" move_to_trash "$tmp/Q.txt"
   unset -f mv
   grep -q "^sudo -n mktemp" "$STUB_LOG" || exit 10   # unattended never waits for a password

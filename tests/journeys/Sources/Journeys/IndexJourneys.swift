@@ -59,19 +59,37 @@ enum IndexJourneys {
                 try Data("probe\n".utf8).write(to: file)
                 // Only the service saw this file: a copy read from the snapshot would not have it.
                 Input.pause(1)
+                // Two separate times, so a slow launch is not blamed on the
+                // search: launch to a visible panel, and the typing to the result.
+                let launched = Date()
                 try ctx.launch(waitForWindow: false)
-                try ctx.showPanel(metric: "time to visible after restart")
-                let ms = try ctx.time("\(name) in the results", timeout: 5) {
-                    ctx.panelTexts().contains { $0.hasPrefix("conj while closed") }
-                } before: { ctx.type("conj while cl") }
-                ctx.metric("time to first result after restart", ms)
-                try ctx.check(ms <= 1000, "the first result took \(Int(ms)) ms after the launcher started again (limit 1000 ms)")
+                ctx.metric("launch to app running", Date().timeIntervalSince(launched) * 1000)
+                try ctx.showPanel(metric: "open to visible after restart")
+                let ready = Date().timeIntervalSince(launched) * 1000
+                ctx.metric("launch to visible panel", ready)
+                try ctx.check(ready <= IndexJourneys.launchLimit,
+                              "the panel took \(Int(ready)) ms from launch to visible (limit \(Int(IndexJourneys.launchLimit)) ms)")
+                let found = { ctx.panelTexts().contains { $0.hasPrefix("conj while closed") } }
+                let typingStarted = Date()
+                Input.type("conj while cl")
+                let typed = Date()
+                ctx.metric("typing", typed.timeIntervalSince(typingStarted) * 1000)
+                try ctx.wait("\(name) in the results", timeout: 5, poll: 0.01) { found() }
+                let lastKey = Date().timeIntervalSince(typed) * 1000
+                ctx.metric("first key to first result after restart", Date().timeIntervalSince(typingStarted) * 1000)
+                ctx.metric("last key to first result after restart", lastKey)
+                try ctx.check(lastKey <= IndexJourneys.resultLimit,
+                              "the first result came \(Int(lastKey)) ms after the last key once the launcher started again (limit \(Int(IndexJourneys.resultLimit)) ms)")
                 try ctx.key("escape"); try ctx.key("escape")
             },
         ])
     }
 
     static let serviceKey = "GRAND_LINE_INDEX_SERVICE"
+    /// From starting the launcher to its panel on screen with the field ready (CI machines included).
+    static let launchLimit: Double = 1500
+    /// From the last key typed to the file in the results.
+    static let resultLimit: Double = 500
 }
 
 extension Ctx {

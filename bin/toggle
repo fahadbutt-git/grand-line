@@ -94,12 +94,24 @@ case "$name" in
     fi
     ;;
   dark)
-    # A theme with a dark and a light variant switches with it; theme sets
-    # the macOS appearance to match.
+    # The setting is macOS's own appearance, changed through System Events
+    # (exit 3 when Automation for System Events is not allowed). `theme mode`
+    # alone could not be it: it skips or quietly loses that call, so the
+    # appearance stayed as it was while toggle reported success.
     if [[ "$want" == on ]]; then mode=dark; else mode=light; fi
-    if ! theme mode "$mode" >/dev/null 2>&1; then
-      osa -e "tell application \"System Events\" to tell appearance preferences to set dark mode to $yes"
+    osa -e "tell application \"System Events\" to tell appearance preferences to set dark mode to $yes"
+    # While the theme follows macOS (Settings, Appearance), its dark or light
+    # variant switches with it. A theme without a pair stays as it is.
+    if [[ -f "$GRAND_LINE_STATE/theme-follows-macos" ]]; then
+      theme mode "$mode" >/dev/null 2>&1 || true
     fi
+    # Read back what macOS says now (AppleInterfaceStyle); it can lag a moment.
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      if is_on dark; then now=on; else now=off; fi
+      [[ "$now" == "$want" ]] && break
+      sleep 0.2
+    done
+    [[ "$now" == "$want" ]] || fail 1 "macOS kept the $( [[ "$want" == on ]] && echo light || echo dark ) appearance"
     ;;
   hidden)
     defaults write com.apple.finder AppleShowAllFiles -bool "$yes"

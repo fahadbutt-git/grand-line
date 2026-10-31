@@ -52,7 +52,7 @@ struct ViewOptionsView: View {
     private var sortBinding: Binding<SortField> {
         Binding(
             get: { pane.state.settings.sort.field },
-            set: { field in model.sort(pane, by: field) }
+            set: { field in model.choose(pane, sort: field) }
         )
     }
 

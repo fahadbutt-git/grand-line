@@ -27,7 +27,7 @@ The first run copies the package to `~/grand-line`. That copy is the one to edit
 | `keybindings --print` | Prints every shortcut |
 | `theme pick` | Changes theme (Graphite, Daylight, Nord, Forest, and the Harbour, Lantern, Signal, Ledger, Atlas and Paper families, each dark and light): terminal, editor, menus, tmux, btop, lazygit, Claude Code, the apps and their icons, accent and wallpaper together. Rules in `DESIGN.md` |
 | `theme set harbour` | A family in the variant that matches the current macOS appearance (`theme set harbour-light` names one) |
-| `theme mode toggle` | The other variant of the current family (Graphite and Daylight pair up too). `toggle dark` does this when the theme has a pair |
+| `theme mode toggle` | The other variant of the current family (Graphite and Daylight pair up too). `toggle dark` switches the macOS appearance, and the variant too while the theme follows macOS |
 | `grandline commands` | Lists every command in the package with what it does |
 | `migrate --pending` | Lists the one-time changes an update has not run yet (`migrate` runs them) |
 | `app install`, `app remove` | Installs or removes an app and updates the Brewfile to match (also in the menu). `grandline publish` shares the change with your other Macs |
@@ -232,7 +232,7 @@ Typing a setting changes it, rather than opening System Settings. The row shows 
 
 | Type | Does |
 | --- | --- |
-| `dark`, `dark mode on`, `light mode` | Dark mode (with a theme that has a dark and a light variant, the theme switches too) |
+| `dark`, `dark mode on`, `light mode` | Dark mode: the macOS appearance (while the theme follows macOS, its variant switches too) |
 | `wifi`, `turn off wifi`, `bt off`, `bluetooth` | Wi-Fi and Bluetooth |
 | `dnd`, `do not disturb`, `focus off` | Do Not Disturb (needs the two shortcuts below) |
 | `mute`, `unmute`, `volume 30`, `volume up`, `louder` | Sound. Volume steps by 10 |
@@ -245,7 +245,7 @@ Typing a setting changes it, rather than opening System Settings. The row shows 
 | `screenshot`, `record screen`, `ocr` | The Capture menu's tools |
 | `night shift`, `low power`, `brightness` | Open their pane: macOS has no command for Night Shift, Low Power Mode needs an administrator password, and no brightness tool is installed |
 
-These run `toggle` and `power`, the same commands as the Toggle and System menus, so both always agree. The first time, macOS asks to let Sight control System Events (dark mode without a theme pair, menu bar hiding, log out, restart, shut down) and, for Lock, to allow Accessibility.
+These run `toggle` and `power`, the same commands as the Toggle and System menus, so both always agree. The first time, macOS asks to let Sight control System Events (dark mode, menu bar hiding, log out, restart, shut down) and, for Lock, to allow Accessibility.
 
 Typing "nexus settings", "sight settings" or "iceberg settings" opens that app's Settings window (Cmd+, works in each too).
 

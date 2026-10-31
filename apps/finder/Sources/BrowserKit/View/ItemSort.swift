@@ -77,6 +77,14 @@ public struct ItemSort: Codable, Hashable, Sendable {
         return ItemSort(field: field, foldersFirst: foldersFirst, grouping: grouping)
     }
 
+    /// Choosing a sort from View › Sort By, its shortcut or View Options: the
+    /// field in its default direction (names A to Z, dates newest first),
+    /// however it was sorted before, so the same choice always gives the same
+    /// order. Only a header click flips. Folders on top and grouping stay.
+    public func choosing(_ field: SortField) -> ItemSort {
+        ItemSort(field: field, foldersFirst: foldersFirst, grouping: grouping)
+    }
+
     enum CodingKeys: String, CodingKey {
         case field, ascending, foldersFirst, grouping
     }

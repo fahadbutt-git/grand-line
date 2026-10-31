@@ -483,11 +483,22 @@ final class LocalIndex: @unchecked Sendable {
     static func open(_ locations: IndexLocations) async -> FileIndex {
         let exclusions = IndexExclusions.home(locations.home)
         let order = ScanOrder.home(locations.home)
-        guard let found = SnapshotAdoption.load(locations, exclusions: exclusions, order: order) else {
+        // Reading and decoding the snapshot blocks for as long as the disk
+        // takes; off the concurrency pool, so searches typed meanwhile (the
+        // service's answers among them) still get a thread.
+        let found: Loaded? = await BlockingWork.run(qos: .userInitiated) {
+            SnapshotAdoption.load(locations, exclusions: exclusions, order: order).map { Loaded(index: $0.index, origin: $0.origin) }
+        }
+        guard let found else {
             return FileIndex(roots: locations.roots, exclusions: exclusions, order: order)
         }
         if found.origin != .own { await found.index.prune(exclusions.paths) }
         return found.index
+    }
+
+    private struct Loaded: Sendable {
+        let index: FileIndex
+        let origin: SnapshotAdoption.Origin
     }
 
     func search(_ text: String, limit: Int, scope: [String]?) async -> [IndexMatch] {

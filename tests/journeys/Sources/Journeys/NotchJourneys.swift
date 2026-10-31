@@ -36,10 +36,12 @@ enum NotchJourneys {
                 try ctx.wait("the Journey widget's output", timeout: 10) { ctx.notchTexts().contains { $0.contains("journey-ok") } }
             },
             step("only the sections turned on are shown") { ctx in
+                // A widget is one accessibility element ("Journey, journey-ok"),
+                // so a title is found within an element, not as one of its own.
                 let texts = ctx.notchTexts()
-                try ctx.check(texts.contains("Journey"), "the Journey widget's title is missing; shown: \(texts)")
+                try ctx.check(Ctx.anyContains(texts, "Journey"), "the Journey widget's title is missing; shown: \(texts)")
                 for off in ["Today", "Reminders"] {
-                    try ctx.check(!texts.contains(off), "\"\(off)\" shows although iceberg.toml leaves it out; shown: \(texts)")
+                    try ctx.check(!Ctx.anyContains(texts, off), "\"\(off)\" shows although iceberg.toml leaves it out; shown: \(texts)")
                 }
             },
             step("close (scheme://close)") { ctx in
@@ -198,8 +200,10 @@ extension NotchJourneys {
             step("a save with a mistake keeps the last good version") { ctx in
                 try ctx.writeWidgetFile("journey.toml", "title = \"Journey\"\ncommand = \"echo broken\n", inPlace: true)
                 Input.pause(1.5)
+                // The last good version is the one that echoes journey-reloaded,
+                // so still showing it (title and output, one element) is the pass.
                 let texts = ctx.notchTexts()
-                try ctx.check(texts.contains("Journey") && texts.contains("journey-reloaded"),
+                try ctx.check(Ctx.anyContains(texts, "Journey") && Ctx.anyContains(texts, "journey-reloaded"),
                               "the widget went away while its file had a mistake; shown: \(texts)")
             },
             step("fixing the file applies at once") { ctx in
@@ -306,5 +310,12 @@ extension Ctx {
 
     func notchTexts() -> [String] {
         windows().flatMap { snapshot($0).texts }
+    }
+
+    /// Whether any element's text contains `part`. A widget reads as one
+    /// element, its title and output together ("Journey, journey-ok"), so
+    /// checks look within elements rather than for an element equal to `part`.
+    static func anyContains(_ texts: [String], _ part: String) -> Bool {
+        texts.contains { $0.contains(part) }
     }
 }

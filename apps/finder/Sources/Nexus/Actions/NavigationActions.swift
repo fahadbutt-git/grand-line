@@ -142,12 +142,20 @@ extension BrowserModel {
             .sortModified: .modified, .sortCreated: .created, .sortSize: .size, .sortTags: .tags, .sortManual: .manual,
         ]
         guard let field = fields[command] else { return }
-        sort(focused, by: field)
+        choose(focused, sort: field)
     }
 
+    /// A column header clicked: the same column flips its direction (Finder).
     func sort(_ pane: PaneModel, by field: SortField) {
         var settings = pane.state.settings
         settings.sort = settings.sort.clicking(field)
+        pane.setSettings(settings)
+    }
+
+    /// View › Sort By, its shortcut or View Options: the field in its default direction.
+    func choose(_ pane: PaneModel, sort field: SortField) {
+        var settings = pane.state.settings
+        settings.sort = settings.sort.choosing(field)
         pane.setSettings(settings)
     }
 

@@ -46,10 +46,25 @@ struct FileListView: NSViewRepresentable {
         coordinator.table?.backgroundColor = NSColor(colors.background)
         coordinator.update(theme: colors, cut: services.clipboard.cutPaths, renameRequest: model.renameRequest)
         // Not while Go to Folder is open: its field is about to take the keys.
-        if isFocused, !model.editingPath, let table = coordinator.table, model.window?.firstResponder !== table,
-           !(model.window?.firstResponder is NSText) {
-            DispatchQueue.main.async { table.window?.makeFirstResponder(table) }
+        // Checked again once this update is over: when Return closes the path
+        // bar's field, this runs while its editor still has the keys, and the
+        // field going away left them with the window, so the list never got
+        // them back (and Escape never reached it to clear a filter).
+        if isFocused, !model.editingPath, let table = coordinator.table, model.window?.firstResponder !== table {
+            let model = self.model
+            DispatchQueue.main.async { [weak table] in
+                guard let table, let window = table.window, !model.editingPath, window.firstResponder !== table,
+                      !Self.isTyping(in: window) else { return }
+                window.makeFirstResponder(table)
+            }
         }
+    }
+
+    /// A field on screen is being typed in. A field editor left behind by a
+    /// field that has gone (no longer in the window) does not count.
+    static func isTyping(in window: NSWindow) -> Bool {
+        guard let text = window.firstResponder as? NSText else { return false }
+        return text.window === window && text.superview != nil
     }
 
     static func dismantleNSView(_ scroll: NSScrollView, coordinator: FileListCoordinator) {

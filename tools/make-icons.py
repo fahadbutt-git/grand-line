@@ -77,18 +77,63 @@ def luminance(c):
     return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
 
 
-def read_theme(name):
+def parse_theme(text):
+    """One file's KEY=value lines, read as ThemeSource.parse reads them."""
     values = {}
-    for line in open(os.path.join(THEMES, name + ".theme"), encoding="utf-8"):
+    for line in text.splitlines():
         line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
+        if not line or line.startswith("#"):
+            continue
+        for prefix in ("export ", "export\t"):
+            if line.startswith(prefix):
+                line = line[len(prefix):].strip()
+        if "=" not in line:
             continue
         key, value = line.split("=", 1)
-        value = value.strip()
-        if len(value) >= 2 and value[0] in "\"'" and value[-1] == value[0]:
-            value = value[1:-1]
-        values[key.strip()] = value
+        key, value = key.strip(), value.strip()
+        if not re.match(r"^[A-Z_][A-Z0-9_]*$", key):
+            continue
+        if value[:1] in ("\"", "'"):
+            end = value.find(value[0], 1)
+            value = value[1:end] if end >= 0 else value[1:]
+        else:
+            note = re.search(r"[ \t]#", value)
+            if note:
+                value = value[:note.start()].strip()
+        values[key] = value
     return values
+
+
+MAX_DEPTH = 8   # ThemeSource.maxDepth
+
+
+def read_theme(name, folder=THEMES):
+    """The theme's keys with what it inherits through EXTENDS (the nearest
+    file that sets a key wins), as the apps and lib/templates.sh read it."""
+    chain, seen, current = [], set(), name
+    while current is not None:
+        if current in seen:
+            raise SystemExit("make-icons: EXTENDS=%s leads back to %s (a loop)" % (current, current))
+        if len(chain) >= MAX_DEPTH:
+            raise SystemExit("make-icons: %s: EXTENDS goes more than %d themes deep" % (name, MAX_DEPTH))
+        if not re.match(r"^[a-z0-9][a-z0-9_-]*$", current):
+            raise SystemExit("make-icons: %r is not a theme name" % current)
+        seen.add(current)
+        path = os.path.join(folder, current + ".theme")
+        try:
+            with open(path, encoding="utf-8") as f:
+                values = parse_theme(f.read())
+        except OSError:
+            if not chain:
+                raise
+            raise SystemExit("make-icons: EXTENDS=%s names no theme (%s.theme is missing)" % (current, current))
+        chain.append(values)
+        current = values.get("EXTENDS")
+    merged = {}
+    for values in reversed(chain):
+        merged.update(values)
+    merged.pop("EXTENDS", None)
+    return merged
 
 
 def palette(values, app_key):

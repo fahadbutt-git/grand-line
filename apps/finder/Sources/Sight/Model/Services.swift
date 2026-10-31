@@ -1,4 +1,5 @@
 import AppKit
+import IndexKit
 import LauncherKit
 
 /// Builds every provider once and keeps them loaded. Sources are read again in
@@ -114,18 +115,25 @@ final class Services {
         let commands = self.commands, web = self.web, saved = self.saved, menu = self.menu, paths = self.paths
         let scripts = self.scripts
         Task.detached(priority: .utility) {
-            for catalog in catalogs { catalog.reload() }
-            if symbols.catalog.count == 0 { symbols.reload() }
-            commands.reload()
-            let before = scripts.providers.map(\.script)
-            scripts.reload()
-            let scriptsChanged = scripts.providers.map(\.script) != before
-            web.reload()
-            saved.reload()
+            // Reading app bundles, the symbol table and the config files blocks
+            // for as long as the disk takes. It runs on a Dispatch queue, not on
+            // the concurrency pool, which has a thread per core: at launch these
+            // reads used to hold it while the first search waited for a thread.
+            let read = await BlockingWork.run { () -> SourcesRead in
+                for catalog in catalogs { catalog.reload() }
+                if symbols.catalog.count == 0 { symbols.reload() }
+                commands.reload()
+                let before = scripts.providers.map(\.script)
+                scripts.reload()
+                let scriptsChanged = scripts.providers.map(\.script) != before
+                web.reload()
+                saved.reload()
+                let table = AliasTable.parse((try? String(contentsOfFile: paths.aliases, encoding: .utf8)) ?? "")
+                let configs = ExternalProviderConfig.parse((try? String(contentsOfFile: paths.externalProviders, encoding: .utf8)) ?? "")
+                return SourcesRead(aliases: table, external: configs, scriptsChanged: scriptsChanged)
+            }
             await menu.reload()
-            let table = AliasTable.parse((try? String(contentsOfFile: paths.aliases, encoding: .utf8)) ?? "")
-            let configs = ExternalProviderConfig.parse((try? String(contentsOfFile: paths.externalProviders, encoding: .utf8)) ?? "")
-            await MainActor.run { self.apply(aliases: table, external: configs, scriptsChanged: scriptsChanged) }
+            await MainActor.run { self.apply(aliases: read.aliases, external: read.external, scriptsChanged: read.scriptsChanged) }
         }
         let rates = self.rates
         Task.detached(priority: .utility) {
@@ -148,12 +156,15 @@ final class Services {
         reloadSources()
         readSelection(frontApp: frontApp)
         let history = clipboardHistory
-        Task.detached(priority: .utility) { history.reload() }
+        BlockingWork.start { history.reload() }
         let menuItems = self.menuItems
         guard let frontApp, frontApp.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
         let pid = frontApp.processIdentifier
         let name = frontApp.localizedName ?? "App"
-        Task.detached(priority: .userInitiated) {
+        // Walking another app's menus through Accessibility waits on that app,
+        // for seconds when it is busy: on a Dispatch queue, never on the pool
+        // the searches run on.
+        BlockingWork.start(qos: .userInitiated) {
             menuItems.replace(MenuBarReader.results(pid: pid, app: name))
         }
     }
@@ -177,4 +188,11 @@ final class Services {
             selection.set([], from: "")
         }
     }
+}
+
+/// What a reload of the sources read, for the main actor to apply.
+private struct SourcesRead: @unchecked Sendable {
+    let aliases: AliasTable
+    let external: [ExternalProviderConfig]
+    let scriptsChanged: Bool
 }

@@ -6,21 +6,46 @@ final class KindsAndIconTests: XCTestCase {
     func testEveryRepositoryThemeHasKindsAndIcons() throws {
         let files = try FileManager.default.contentsOfDirectory(at: ThemeTests.repoThemes, includingPropertiesForKeys: nil)
             .filter { $0.pathExtension == "theme" }
+        XCTAssertFalse(files.isEmpty)
         for file in files {
-            let values = try XCTUnwrap(ThemeFile.read(file))
+            // Read as the apps read it: a light variant takes keys such as
+            // KIND_STYLE from the dark theme it EXTENDS. Defaults are not
+            // filled, so every key below is set by the file or a parent.
+            let source = try XCTUnwrap(ThemeSource.resolve(url: file))
+            XCTAssertEqual(source.diagnostics.filter { $0.severity == .error }, [], file.lastPathComponent)
+            let values = source.entries.mapValues(\.value)
             let name = file.deletingPathExtension().lastPathComponent
             XCTAssertNotNil(values["KIND_STYLE"].flatMap(KindStyle.init(rawValue:)), "\(name): KIND_STYLE")
             XCTAssertNotNil(values["ICON_STYLE"].flatMap(IconStyle.init(rawValue:)), "\(name): ICON_STYLE")
             for kind in FileKindName.allCases {
                 XCTAssertNotNil(values[kind.themeKey].flatMap(ThemeColor.init(hex:)), "\(name): \(kind.themeKey)")
             }
-            let theme = Theme(name: name, values: values)
+            let theme = Theme(name: name, source: source)
+            XCTAssertEqual(theme.kinds.style, KindStyle(rawValue: values["KIND_STYLE"] ?? ""), name)
             XCTAssertEqual(theme.kinds.colors.count, FileKindName.allCases.count, name)
             if let family = values["FAMILY"] {
                 XCTAssertTrue(name == family + "-dark" || name == family + "-light", name)
                 XCTAssertEqual(theme.isDark, name.hasSuffix("-dark"), name)
             }
         }
+    }
+
+    func testKindAndIconStylesComeThroughExtends() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("kinds-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try "FORMAT=1\nLABEL=\"Base\"\nMODE=dark\nTERM_BG=101010\nTERM_FG=eeeeee\nKIND_STYLE=dot\nICON_STYLE=mono\nKIND_PDF=abcdef\n"
+            .write(to: folder.appendingPathComponent("base-dark.theme"), atomically: true, encoding: .utf8)
+        try "FORMAT=1\nEXTENDS=base-dark\nLABEL=\"Base Light\"\nMODE=light\nTERM_BG=ffffff\nTERM_FG=111111\n"
+            .write(to: folder.appendingPathComponent("base-light.theme"), atomically: true, encoding: .utf8)
+        let location = ThemeLocation(stateFile: folder.appendingPathComponent("state"), themesFolder: folder)
+        let theme = try XCTUnwrap(location.load(named: "base-light"))
+        XCTAssertFalse(theme.isDark)
+        XCTAssertEqual(theme.kinds.style, .dot)
+        XCTAssertEqual(theme.kinds[.pdf].hex, "abcdef")
+        XCTAssertEqual(theme.icon.style, .mono)
+        // The file alone does not have them: only resolution does.
+        XCTAssertNil(ThemeFile.read(folder.appendingPathComponent("base-light.theme"))?["KIND_STYLE"])
     }
 
     func testKindsFallBackToThePalette() {

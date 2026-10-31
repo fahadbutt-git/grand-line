@@ -106,4 +106,14 @@ final class OmnibarTests: XCTestCase {
         pane.navigate(to: .folder(home))
         XCTAssertEqual(pane.filter, "", "a filter belongs to its folder")
     }
+
+    func testEscapeClearsAFilterWhereverTheKeysAre() {
+        // After Return the keys are back with the list (or the window): Escape clears.
+        XCTAssertTrue(FilterEscape.clears(filter: "notes", typing: false, modifiers: [], sheetOpen: false))
+        // Nothing filtered, a field being typed in, a modifier or a sheet: not this Escape.
+        XCTAssertFalse(FilterEscape.clears(filter: "", typing: false, modifiers: [], sheetOpen: false))
+        XCTAssertFalse(FilterEscape.clears(filter: "notes", typing: true, modifiers: [], sheetOpen: false))
+        XCTAssertFalse(FilterEscape.clears(filter: "notes", typing: false, modifiers: [.command], sheetOpen: false))
+        XCTAssertFalse(FilterEscape.clears(filter: "notes", typing: false, modifiers: [], sheetOpen: true))
+    }
 }

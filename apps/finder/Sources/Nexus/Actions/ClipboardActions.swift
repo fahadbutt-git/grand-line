@@ -8,7 +8,7 @@ extension BrowserModel {
         let urls = selectedOnDisk
         guard !urls.isEmpty else { return }
         FilePasteboard.write(urls, to: .general)
-        services.clipboard.copy(urls)
+        services.clipboard.copy(urls, changeCount: NSPasteboard.general.changeCount)
     }
 
     func cut() {
@@ -22,8 +22,11 @@ extension BrowserModel {
         guard let folder = focused.location.folderURL else { return }
         let board = NSPasteboard.general
         guard let plan = services.clipboard.plan(
-            pasteboard: FilePasteboard.read(board), changeCount: board.changeCount, forceMove: forceMove
-        ) else { return }
+            reading: { FilePasteboard.read(board) }, changeCount: board.changeCount, forceMove: forceMove
+        ) else {
+            NSSound.beep()
+            return
+        }
         services.clipboard.didPaste(plan)
         transfer(plan.items, to: folder, moving: plan.moves, select: focused)
     }

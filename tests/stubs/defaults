@@ -1,5 +1,12 @@
 #!/bin/bash
 echo "defaults $*" >> "${STUB_LOG:-/dev/null}"
+# The appearance System Events set (see the osascript stub), read as macOS
+# answers it: "Dark", or an error when the key is absent (light).
+if [[ -n "${STUB_APPEARANCE:-}" && "${1:-} ${2:-} ${3:-}" == "read -g AppleInterfaceStyle" ]]; then
+  [[ -s "$STUB_APPEARANCE" ]] && { cat "$STUB_APPEARANCE"; exit 0; }
+  echo "The domain/default pair of (kCFPreferencesAnyApplication, AppleInterfaceStyle) does not exist" >&2
+  exit 1
+fi
 # With STUB_DEFAULTS set, "export DOMAIN -" and "import DOMAIN -" read and write
 # a pretend domain there (STUB_DEFAULTS/DOMAIN.plist), so a test can check what
 # was copied. A domain never written exports as an empty one, as on a Mac.

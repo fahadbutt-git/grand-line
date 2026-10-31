@@ -12,17 +12,11 @@ extension BrowserModel {
         let services = self.services
         let window = self.window
         Task {
-            let conflicts = FileOperations.conflicts(items, in: folder)
-            let answered = await ConflictQuestions.resolve(conflicts) { conflict, remaining in
-                await ConflictPrompt.ask(conflict, remaining: remaining, moving: moving, in: window)
-            }
-            guard let resolution = answered else { return }
-            let kind: FileOperationKind = moving ? .move : .copy
             do {
-                let made = try await services.run(kind, TaskTitles.title(kind, items, to: folder)) { operations in
-                    if moving { return try await operations.move(items, to: folder, resolution: resolution) }
-                    return try await operations.copy(items, to: folder, resolution: resolution)
+                let outcome = try await TransferFlow.run(items, to: folder, moving: moving, queue: services.tasks) { conflict, remaining in
+                    await ConflictPrompt.ask(conflict, remaining: remaining, moving: moving, in: window)
                 }
+                guard case .done(let made) = outcome else { return }
                 if let target, target.location.folderURL?.standardizedFileURL == folder.standardizedFileURL {
                     target.go(.folder(folder), select: made)
                 }

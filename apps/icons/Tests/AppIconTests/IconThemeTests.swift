@@ -17,6 +17,40 @@ final class IconThemeTests: XCTestCase {
         return out
     }
 
+    /// A theme's keys with what it inherits through EXTENDS (the nearest file
+    /// wins), as ThemeKit's ThemeSource.resolve reads it. AppIcon cannot
+    /// depend on ThemeKit, so the tests follow the chain themselves.
+    func resolved(_ name: String, in folder: URL) throws -> [String: String] {
+        var chain: [[String: String]] = []
+        var seen: Set<String> = []
+        var current: String? = name
+        while let link = current {
+            XCTAssertFalse(seen.contains(link), "EXTENDS loop at \(link)")
+            guard !seen.contains(link), chain.count < 8 else { break }
+            seen.insert(link)
+            let text = try String(contentsOf: folder.appendingPathComponent(link + ".theme"), encoding: .utf8)
+            let v = values(text)
+            chain.append(v)
+            current = v["EXTENDS"]
+        }
+        var merged: [String: String] = [:]
+        for v in chain.reversed() { merged.merge(v) { _, child in child } }
+        merged["EXTENDS"] = nil
+        return merged
+    }
+
+    func testResolvedFollowsExtends() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("icons-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try "MODE=dark\nICON_STYLE=mono\nICON_FILES=123456\n".write(to: folder.appendingPathComponent("a-dark.theme"), atomically: true, encoding: .utf8)
+        try "EXTENDS=a-dark\nMODE=light\n".write(to: folder.appendingPathComponent("a-light.theme"), atomically: true, encoding: .utf8)
+        let v = try resolved("a-light", in: folder)
+        XCTAssertEqual(v["MODE"], "light")
+        XCTAssertEqual(IconTheme(values: v).style, .mono)
+        XCTAssertEqual(IconTheme(values: v).apps[.nexus]?.hex, "123456")
+    }
+
     func testThemeWithoutIconKeysFallsBack() {
         let theme = IconTheme(values: ["MODE": "dark", "TERM_BG": "202020", "TERM_FG": "dddddd", "ACCENT_HEX": "ff9f0a"])
         XCTAssertEqual(theme.style, .line)
@@ -81,7 +115,8 @@ final class IconThemeTests: XCTestCase {
         let names = try FileManager.default.contentsOfDirectory(atPath: folder.path).filter { $0.hasSuffix(".theme") }
         XCTAssertFalse(names.isEmpty)
         for name in names {
-            let v = values(try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8))
+            // A light variant may take its icon keys from the theme it EXTENDS.
+            let v = try resolved(String(name.dropLast(6)), in: folder)
             XCTAssertNotNil(v["ICON_STYLE"].flatMap { IconStyle(rawValue: $0) }, name)
             for key in IconTheme.keys where key != "ICON_STYLE" {
                 if let raw = v[key] { XCTAssertNotNil(IconColor(hex: raw), "\(name): \(key)") }

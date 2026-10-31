@@ -127,9 +127,12 @@ enum FilesJourneys {
         }
         return journey("files-sorting", "every sort key, folders mixed with files, Keep Folders on Top and Group by Kind", [
             step("go to the Sorting folder (Go to Folder)") { ctx in try ctx.goToFolder("~/" + folder, expect: "Sorting") },
+            // The folder may already be sorted by name. The Sort By shortcut
+            // chooses A to Z whatever the sort was (only a header click flips
+            // the active column, as in Finder), and the order is checked
+            // ascending explicitly, so Z to A never passes for it.
             sortStep("name", "ctrl+opt+cmd+1") { ctx, rows in
-                ctx.inOrder(rows, folder) { a, b in a.name.localizedStandardCompare(b.name) != .orderedDescending }
-                    ?? ctx.mixed(rows, folder)
+                ctx.ascendingByName(rows, folder) ?? ctx.mixed(rows, folder)
             },
             sortStep("date modified", "ctrl+opt+cmd+5") { ctx, rows in
                 ctx.inOrder(rows, folder) { a, b in (a.modified ?? .distantPast) >= (b.modified ?? .distantPast).addingTimeInterval(-1) }
@@ -146,7 +149,28 @@ enum FilesJourneys {
                 ctx.inOrder(rows, folder) { a, b in a.kind.localizedStandardCompare(b.kind) != .orderedDescending }
             },
             sortStep("name again, from the View menu", "", menu: ["View", "Sort By", "Name"]) { ctx, rows in
-                ctx.inOrder(rows, folder) { a, b in a.name.localizedStandardCompare(b.name) != .orderedDescending }
+                ctx.ascendingByName(rows, folder)
+            },
+            step("clicking the active Name header flips it to Z to A, Sort By sets A to Z again") { ctx in
+                guard let header = ctx.anyNode({ $0.text == "Name" && ($0.role == "AXButton" || $0.subrole == "AXSortButton") && $0.isVisibleSize }) else {
+                    throw StepSkip("no Name column header in this view, so a header click cannot be checked")
+                }
+                try ctx.click(header)
+                try ctx.wait("rows sorted by name, Z to A", timeout: 8) {
+                    let rows = ctx.rows()
+                    return rows.count >= 6 && ctx.inOrder(rows, folder) { a, b in a.name.localizedStandardCompare(b.name) != .orderedAscending } == nil
+                }
+                try ctx.menu(["View", "Sort By", "Name"])
+                var why: String? = "no rows"
+                do {
+                    try ctx.wait("rows sorted by name, A to Z", timeout: 8) {
+                        let rows = ctx.rows()
+                        why = rows.count < 6 ? "only \(rows.count) rows" : ctx.ascendingByName(rows, folder)
+                        return why == nil
+                    }
+                } catch {
+                    throw StepFailure("View › Sort By › Name did not set A to Z: \(why ?? "\(error)")")
+                }
             },
             step("Keep Folders on Top") { ctx in
                 try ctx.menu(["View", "Keep Folders on Top"])
@@ -707,6 +731,14 @@ extension Ctx {
             return "\"\(rows[i])\" comes before \"\(rows[i + 1])\" (rows: \(rows))"
         }
         return nil
+    }
+
+    /// nil when the rows go A to Z by name; else what is out of order, and
+    /// whether the whole list runs Z to A instead.
+    func ascendingByName(_ rows: [String], _ folder: String) -> String? {
+        guard let problem = inOrder(rows, folder, { a, b in a.name.localizedStandardCompare(b.name) != .orderedDescending }) else { return nil }
+        let descending = inOrder(rows, folder) { a, b in a.name.localizedStandardCompare(b.name) != .orderedAscending } == nil
+        return descending ? "sorted Z to A, not A to Z (rows: \(rows))" : problem
     }
 
     /// nil when folders and files are mixed, as a single sort key leaves them.

@@ -95,6 +95,23 @@ final class ViewTests: XCTestCase {
         XCTAssertTrue(sort.clicking(.name).ascending)
     }
 
+    func testChoosingASortGivesItsDefaultDirectionAndClickingFlips() {
+        let byName = ItemSort(field: .name, foldersFirst: true, grouping: .kind)
+        XCTAssertTrue(byName.ascending)
+        // A header click on the active column flips it, as in Finder.
+        let flipped = byName.clicking(.name)
+        XCTAssertFalse(flipped.ascending)
+        XCTAssertTrue(flipped.clicking(.name).ascending)
+        // View › Sort By › Name (or its shortcut) sorts A to Z however it was sorted.
+        XCTAssertTrue(flipped.choosing(.name).ascending)
+        XCTAssertTrue(byName.choosing(.name).ascending)
+        XCTAssertEqual(byName.choosing(.name), byName)
+        XCTAssertEqual(flipped.choosing(.modified).field, .modified)
+        XCTAssertEqual(flipped.choosing(.modified).ascending, SortField.modified.defaultAscending)
+        XCTAssertTrue(flipped.choosing(.size).foldersFirst)
+        XCTAssertEqual(flipped.choosing(.size).grouping, .kind)
+    }
+
     func testSortByLastOpenedAddedAndTags() {
         let early = Date(timeIntervalSince1970: 1_000)
         let late = Date(timeIntervalSince1970: 9_000)

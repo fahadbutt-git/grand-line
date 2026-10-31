@@ -77,7 +77,12 @@ public final class IndexServiceCore: @unchecked Sendable {
         let exclusions = IndexExclusions.home(locations.home)
         let order = ScanOrder.home(locations.home)
         let index: FileIndex
-        if let found = SnapshotAdoption.load(locations, exclusions: exclusions, order: order) {
+        // The read blocks on the disk: off the concurrency pool, which the
+        // sessions' searches and hellos need meanwhile.
+        let adopted: Adopted? = await BlockingWork.run(qos: .userInitiated) {
+            SnapshotAdoption.load(locations, exclusions: exclusions, order: order).map { Adopted(index: $0.index, origin: $0.origin) }
+        }
+        if let found = adopted {
             index = found.index
             if found.origin != .own {
                 // Nexus indexed all of ~/Library; this index leaves most of it out.
@@ -203,6 +208,11 @@ public final class IndexServiceCore: @unchecked Sendable {
 
 private struct WeakSession {
     weak var session: IndexSession?
+}
+
+private struct Adopted: Sendable {
+    let index: FileIndex
+    let origin: SnapshotAdoption.Origin
 }
 
 /// What the service remembers between runs besides the index.

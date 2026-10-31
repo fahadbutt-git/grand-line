@@ -29,6 +29,28 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         window.title = model.windowTitle
         window.setFrameAutosaveName("NexusBrowser")
         if model.pinned { window.level = .floating }
+        watchFilterEscape()
+    }
+
+    private var escapeMonitor: Any?
+
+    /// Escape clears the omnibar's filter and closes its bar wherever the keys
+    /// are. The list handles it when it has the keys; after Return in the
+    /// filter field they may be with the window itself, which ignored Escape,
+    /// so the filter and its bar stayed (`FilterEscape`).
+    private func watchFilterEscape() {
+        escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            MainActor.assumeIsolated {
+                guard event.keyCode == 53, let self, let window = self.window, event.window === window, window.isKeyWindow,
+                      !self.model.editingPath else { return event }
+                let pane = self.model.focused
+                let modifiers = FileListCoordinator.modifiers(event.modifierFlags)
+                guard FilterEscape.clears(filter: pane.state.filter, typing: window.firstResponder is NSText,
+                                          modifiers: modifiers, sheetOpen: window.attachedSheet != nil) else { return event }
+                self.model.clearFilter(in: pane)
+                return nil
+            }
+        }
     }
 
     @available(*, unavailable)
@@ -70,6 +92,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
     }
 
     func windowWillClose(_ notification: Notification) {
+        if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
+        escapeMonitor = nil
         model.tearDown()
         WindowManager.shared.closed(self)
     }
