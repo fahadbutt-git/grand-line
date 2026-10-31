@@ -148,6 +148,16 @@ check "migrations are named <unix time>-<slug>.sh" bash -c '
   exit $bad'
 
 # /Users/me/ is the placeholder home that examples and tests use.
+check "every # grandline:arg line is valid JSON (Byakugan reads them)" python3 -c '
+import glob, json, re, sys
+def ok(line):
+    m = re.match(r"# grandline:arg[1-3]=(\{.*\})\s*$", line)
+    try: return bool(m) and "type" in json.loads(m.group(1))
+    except ValueError: return False
+bad = [f"{f}: {l.strip()}" for f in sorted(glob.glob("bin/*")) for l in open(f, errors="ignore")
+       if l.startswith("# grandline:arg") and not ok(l)]
+print("\n".join(bad)); sys.exit(1 if bad else 0)'
+
 check "no personal paths or secrets committed" bash -c '
   found="$(grep -rnoE "/Users/[a-z]+/|ghp_[A-Za-z0-9]{20}|github_pat_" --exclude-dir=.git --exclude-dir=.build . \
     | grep -v -e "^./tests/run-all.sh:" -e ":/Users/me/\$")"

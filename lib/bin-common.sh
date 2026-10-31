@@ -48,8 +48,16 @@ end run
 EOF
 }
 
-# Print the POSIX paths of the files selected in Finder, one per line.
+# Print the POSIX paths of the files selected in Log Pose or Finder, one per line.
+# Log Pose, when it is in front, keeps its selection in a file, one path per
+# line, so a shortcut can read it without asking the app.
 finder_selection() {
+  local front
+  front="$(lsappinfo info -only bundleid "$(lsappinfo front 2>/dev/null)" 2>/dev/null)"
+  if [[ "$front" == *com.grandline.logpose* ]]; then
+    cat "$GRAND_LINE_STATE/logpose-selection" 2>/dev/null
+    return 0
+  fi
   osascript <<'EOF' 2>/dev/null
 tell application "Finder" to set sel to selection as alias list
 set out to ""

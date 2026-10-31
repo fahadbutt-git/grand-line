@@ -1,6 +1,7 @@
 #!/bin/bash
-# grandline:summary=Convert or shrink the videos, images and PDFs selected in Finder
-# Converts the files selected in Finder. New files are saved beside the originals.
+# grandline:summary=Convert or shrink the videos, images and PDFs selected in Log Pose or Finder
+# grandline:arg1={"type":"dropdown","placeholder":"to","data":["video","png","jpeg","pdf","text"]}
+# Converts the files selected in Log Pose or Finder. New files are saved beside the originals.
 #   transcode video   compress to 1080p for uploads and submissions
 #   transcode png     convert images (TIFF, HEIC, JPEG) to PNG
 #   transcode jpeg    convert images to JPEG
