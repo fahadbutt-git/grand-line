@@ -36,9 +36,10 @@ final class StressTests: XCTestCase {
         var pane = PaneState(location: .folder(URL(fileURLWithPath: "/Stress")))
         pane.load(items)
         XCTAssertEqual(pane.items.count, 100_000)
-        XCTAssertTrue(pane.items.prefix(2_000).allSatisfy(\.isFolder), "folders first")
+        pane.setSettings(ViewSettings(sort: ItemSort(field: .name, foldersFirst: true)))
+        XCTAssertTrue(pane.items.prefix(2_000).allSatisfy(\.isFolder), "folders on top when asked")
 
-        pane.setSettings(ViewSettings(sort: ItemSort(field: .size)))
+        pane.setSettings(ViewSettings(sort: ItemSort(field: .size, foldersFirst: true)))
         XCTAssertGreaterThanOrEqual(pane.items[2_000].size ?? 0, pane.items[2_001].size ?? 0)
         pane.setSettings(ViewSettings(sort: ItemSort(field: .modified, foldersFirst: false)))
 
