@@ -54,18 +54,22 @@ public struct FilesProvider: LaunchProvider {
     let paths: GrandLinePaths
     let names: @Sendable (String, Int) async -> [IndexMatch]
     let spotlight: @Sendable (String, Int) async -> [FileHit]
+    let unreadable: @Sendable () async -> [String]
 
     /// - Parameters:
     ///   - names: the name index search (FileIndex.search).
     ///   - spotlight: runs a QueryKit query with NSMetadataQuery.
+    ///   - unreadable: folders the name index was not allowed to read.
     public init(
         paths: GrandLinePaths = GrandLinePaths(),
         names: @escaping @Sendable (String, Int) async -> [IndexMatch],
-        spotlight: @escaping @Sendable (String, Int) async -> [FileHit]
+        spotlight: @escaping @Sendable (String, Int) async -> [FileHit],
+        unreadable: @escaping @Sendable () async -> [String] = { [] }
     ) {
         self.paths = paths
         self.names = names
         self.spotlight = spotlight
+        self.unreadable = unreadable
     }
 
     public func results(for query: LaunchQuery) async throws -> [LaunchResult] {
@@ -84,6 +88,8 @@ public struct FilesProvider: LaunchProvider {
         // Apps have their own provider; outside `.` they would show twice.
         if !own { hits.removeAll { $0.ext == "app" } }
         let now = Date()
-        return hits.map { FileResults.result($0, paths: paths, now: now) }
+        let rows = hits.map { FileResults.result($0, paths: paths, now: now) }
+        guard plan.names != nil || plan.spotlight != nil else { return rows }
+        return rows + FileResults.permissionRows(await unreadable(), home: paths.home)
     }
 }

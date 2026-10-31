@@ -54,7 +54,8 @@ final class Services {
         let files = FilesProvider(
             paths: paths,
             names: { text, limit in await names.search(text, limit: limit) },
-            spotlight: { text, limit in await spotlight.run(text, limit: limit, savedSearch: { saved.query(named: $0) }) }
+            spotlight: { text, limit in await spotlight.run(text, limit: limit, savedSearch: { saved.query(named: $0) }) },
+            unreadable: { await names.unreadable() }
         )
         var providers: [any LaunchProvider] = [
             RecentsProvider(usage: usage),

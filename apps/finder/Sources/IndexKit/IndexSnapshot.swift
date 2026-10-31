@@ -4,12 +4,15 @@ import Foundation
 /// search window has results before the first rescan finishes.
 struct IndexSnapshot {
     static let magic: UInt32 = 0x474C_4958 // "GLIX"
-    static let version: UInt32 = 1
+    /// Version 2 adds whether the walk had finished; version 1 files still load.
+    static let version: UInt32 = 2
 
     var roots: [String]
     var storage: IndexStorage
     var usage: [String: Usage]
     var lastEventID: UInt64
+    /// False for a snapshot saved part way through a first build.
+    var complete: Bool
 
     enum Failure: Error, Equatable {
         case notAnIndex
@@ -22,6 +25,7 @@ struct IndexSnapshot {
         out.put(Self.magic)
         out.put(Self.version)
         out.put(lastEventID)
+        out.put(UInt8(complete ? 1 : 0))
         out.put(UInt64(roots.count))
         for root in roots { out.put(Array(root.utf8)) }
         out.put(storage.names)
@@ -43,19 +47,21 @@ struct IndexSnapshot {
         return out.data
     }
 
-    init(roots: [String], storage: IndexStorage, usage: [String: Usage], lastEventID: UInt64) {
+    init(roots: [String], storage: IndexStorage, usage: [String: Usage], lastEventID: UInt64, complete: Bool = true) {
         self.roots = roots
         self.storage = storage
         self.usage = usage
         self.lastEventID = lastEventID
+        self.complete = complete
     }
 
     init(decoding data: Data) throws {
         var input = SnapshotReader(data: data)
         guard try input.take(UInt32.self) == Self.magic else { throw Failure.notAnIndex }
         let version = try input.take(UInt32.self)
-        guard version == Self.version else { throw Failure.wrongVersion(version) }
+        guard version == 1 || version == Self.version else { throw Failure.wrongVersion(version) }
         let eventID = try input.take(UInt64.self)
+        let complete = try version == 1 || input.take(UInt8.self) != 0
         var rootList: [String] = []
         let rootCount = try input.count()
         for _ in 0..<rootCount {
@@ -95,7 +101,7 @@ struct IndexSnapshot {
         storage.removedCount = removed
         let usageBytes = try input.array(UInt8.self)
         let usage = try JSONDecoder().decode([String: Usage].self, from: Data(usageBytes))
-        self.init(roots: rootList, storage: storage, usage: usage, lastEventID: eventID)
+        self.init(roots: rootList, storage: storage, usage: usage, lastEventID: eventID, complete: complete)
     }
 }
 

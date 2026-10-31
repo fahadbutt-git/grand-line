@@ -20,7 +20,8 @@ final class SearchPanel: NSPanel {
         hasShadow = true
         isMovableByWindowBackground = false
         isReleasedWhenClosed = false
-        animationBehavior = .utilityWindow
+        // No fade: the window is there the moment the shortcut is pressed.
+        animationBehavior = .none
     }
 
     override var canBecomeKey: Bool { true }

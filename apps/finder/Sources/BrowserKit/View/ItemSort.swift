@@ -38,21 +38,62 @@ public enum SortField: String, Codable, CaseIterable, Sendable {
     }
 }
 
+/// What rows are gathered by before the sort applies inside each group.
+public enum ItemGrouping: String, Codable, CaseIterable, Sendable {
+    case none
+    /// By kind ("Folder", "PDF document"), kinds in alphabetical order.
+    case kind
+
+    public var title: String {
+        switch self {
+        case .none: return "None"
+        case .kind: return "Kind"
+        }
+    }
+}
+
+/// How a folder's rows are ordered. By default by one thing only, so a sort by
+/// date mixes folders and files. Keeping folders on top and grouping are
+/// choices that stack: folders on top first, then groups, then the sort.
 public struct ItemSort: Codable, Hashable, Sendable {
     public var field: SortField
     public var ascending: Bool
+    /// View › Keep Folders on Top.
     public var foldersFirst: Bool
+    /// View › Group By.
+    public var grouping: ItemGrouping
 
-    public init(field: SortField = .name, ascending: Bool? = nil, foldersFirst: Bool = true) {
+    public init(field: SortField = .name, ascending: Bool? = nil, foldersFirst: Bool = false, grouping: ItemGrouping = .none) {
         self.field = field
         self.ascending = ascending ?? field.defaultAscending
         self.foldersFirst = foldersFirst
+        self.grouping = grouping
     }
 
-    /// Clicking a column header: the same column flips, another starts at its default.
+    /// Clicking a column header: the same column flips, another starts at its
+    /// default. Folders on top and grouping stay as they are.
     public func clicking(_ field: SortField) -> ItemSort {
-        if field == self.field { return ItemSort(field: field, ascending: !ascending, foldersFirst: foldersFirst) }
-        return ItemSort(field: field, foldersFirst: foldersFirst)
+        if field == self.field { return ItemSort(field: field, ascending: !ascending, foldersFirst: foldersFirst, grouping: grouping) }
+        return ItemSort(field: field, foldersFirst: foldersFirst, grouping: grouping)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case field, ascending, foldersFirst, grouping
+    }
+
+    /// Settings saved before Keep Folders on Top was a choice had it on by
+    /// default, not by choice; they load with it off.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        field = try container.decode(SortField.self, forKey: .field)
+        ascending = try container.decodeIfPresent(Bool.self, forKey: .ascending) ?? field.defaultAscending
+        if let grouping = try container.decodeIfPresent(ItemGrouping.self, forKey: .grouping) {
+            self.grouping = grouping
+            foldersFirst = try container.decodeIfPresent(Bool.self, forKey: .foldersFirst) ?? false
+        } else {
+            grouping = .none
+            foldersFirst = false
+        }
     }
 }
 
@@ -68,6 +109,9 @@ public enum ItemSorter {
         let order = items.indices.sorted { a, b in
             let x = items[a], y = items[b]
             if sort.foldersFirst, x.isFolder != y.isFolder { return x.isFolder }
+            if sort.grouping == .kind, x.kind != y.kind {
+                return x.kind.localizedStandardCompare(y.kind) == .orderedAscending
+            }
             let result = compare(x, y, names[a], names[b], sort.field, folderSizes, lastOpened)
             if result == .orderedSame { return names[a].localizedStandardCompare(names[b] as String) == .orderedAscending }
             return sort.ascending ? result == .orderedAscending : result == .orderedDescending

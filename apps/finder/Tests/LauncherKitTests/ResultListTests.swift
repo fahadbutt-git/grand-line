@@ -95,4 +95,33 @@ final class ResultListTests: XCTestCase {
         XCTAssertEqual(list.selected?.title, "Notes")
         XCTAssertEqual(list.groups.first?.section, .topHit)
     }
+
+    func testAKeywordFoundOnlyByScatteredLettersIsNeverTopHit() {
+        let query = LaunchQuery(raw: "conj", term: "conj")
+        let bookmark = Make.row("Shared folder", section: .bookmarks, keywords: ["cxonqzj.example.com"])
+        let ranked = Ranker().rank(Make.matched([bookmark], "conj"), query: query)
+        XCTAssertEqual(ranked.first?.match.keyword, .fuzzy)
+        XCTAssertEqual(ResultGrouping.group(ranked).map(\.section), [.bookmarks])
+    }
+
+    func testAGoodMatchArrivingLateTakesTopHitUntilTheSelectionMoves() {
+        let query = LaunchQuery(raw: "conj", term: "conj")
+        let bookmark = Make.row("Shared folder", section: .bookmarks, keywords: ["cxonqzj.example.com"])
+        let first = Ranker().rank(Make.matched([bookmark], "conj"), query: query)
+        var list = ResultList()
+        list.replace(with: ResultGrouping.group(first), topHit: true)
+        XCTAssertEqual(list.selected?.title, "Shared folder")
+        let files = Ranker().rank(Make.matched([Make.row("Conj Flap", section: .files), Make.row("Lid Study - CONJ", section: .files)], "conj"), query: query)
+        list.merge(files)
+        XCTAssertEqual(list.groups.first?.section, .topHit)
+        XCTAssertEqual(list.selected?.title, "Conj Flap")
+        XCTAssertTrue(list.rows.contains { $0.title == "Lid Study - CONJ" })
+
+        var moved = ResultList()
+        moved.replace(with: ResultGrouping.group(first), topHit: true)
+        moved.moveSelection(by: 1)
+        moved.merge(files)
+        XCTAssertNotEqual(moved.groups.first?.section, .topHit)
+        XCTAssertEqual(moved.selected?.title, "Shared folder")
+    }
 }

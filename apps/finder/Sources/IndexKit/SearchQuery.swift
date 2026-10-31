@@ -22,4 +22,22 @@ struct SearchQuery: Sendable {
         self.words = words
         self.mask = NameFold.mask(bytes)
     }
+
+    /// Whether every name this query matches is sure to match `earlier` too: the
+    /// earlier words are all here unchanged except the last, which this query may
+    /// lengthen, and words may follow. Typing on from a query always narrows it.
+    func narrows(_ earlier: SearchQuery) -> Bool {
+        guard words.count >= earlier.words.count else { return false }
+        let last = earlier.words.count - 1
+        for k in 0...last {
+            let old = earlier.bytes[earlier.words[k]]
+            let new = bytes[words[k]]
+            if k == last {
+                guard new.starts(with: old) else { return false }
+            } else {
+                guard new.elementsEqual(old) else { return false }
+            }
+        }
+        return true
+    }
 }

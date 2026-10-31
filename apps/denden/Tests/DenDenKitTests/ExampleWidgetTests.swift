@@ -35,7 +35,7 @@ final class ExampleWidgetTests: XCTestCase {
         let home = TempFolder()
         let r = CommandRunner(environment: ["PATH": "/usr/bin:/bin", "HOME": home.url.path])
             .run("/bin/sh ./weather.sh", timeout: 10, workingDirectory: examples)
-        XCTAssertEqual(CommandOutputParser.display(for: r).text, "Set LOCATION")
+        XCTAssertEqual(CommandOutputParser.display(for: r).text, "Add your town")
     }
 
     func testWeatherScriptReadsPersonalEnv() {

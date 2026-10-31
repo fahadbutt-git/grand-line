@@ -31,6 +31,8 @@ final class PanelController: NSObject, NSWindowDelegate {
             guard let self, event.window === self.panel else { return event }
             return self.route(event) ? nil : event
         }
+        // Lay SwiftUI out now, while hidden, so the first open does not pay for it.
+        panel.layoutIfNeeded()
     }
 
     var isVisible: Bool { panel.isVisible }
@@ -39,21 +41,28 @@ final class PanelController: NSObject, NSWindowDelegate {
         isVisible ? hide() : show()
     }
 
+    /// Shows the window first, with the last results, and refreshes them on the
+    /// next turn of the run loop, so nothing waits on the providers.
     func show() {
         let front = NSWorkspace.shared.frontmostApplication
         if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
             model.performer.previousApp = front
         }
-        services.windowWillOpen(frontApp: model.performer.previousApp)
         position()
         panel.appearance = NSAppearance(named: themes.theme.appearanceName)
-        model.refresh()
         panel.makeKeyAndOrderFront(nil)
-        // The field exists once SwiftUI has laid the window out.
-        panel.layoutIfNeeded()
+        // The field exists once SwiftUI has laid the window out, the first time only.
+        if model.field == nil { panel.layoutIfNeeded() }
         if let field = model.field {
             panel.makeFirstResponder(field)
             field.currentEditor()?.selectAll(nil)
+        }
+        let shownText = model.text
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.panel.isVisible else { return }
+            self.services.windowWillOpen(frontApp: self.model.performer.previousApp)
+            // Typing since the window opened has already searched.
+            if self.model.text == shownText { self.model.refresh() }
         }
     }
 

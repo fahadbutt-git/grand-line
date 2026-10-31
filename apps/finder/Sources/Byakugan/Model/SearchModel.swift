@@ -46,7 +46,7 @@ final class SearchModel: ObservableObject {
         query = plan.query
         chips = plan.query.prefix == .files ? QueryChips.describe(QueryParser.parse(plan.query.term)) : []
         let started = Date()
-        list.replace(with: engine.instantGroups(plan), limitScale: plan.limitScale)
+        list.replace(with: engine.instantGroups(plan), limitScale: plan.limitScale, topHit: plan.topHit)
         status = statusText(milliseconds: Int(Date().timeIntervalSince(started) * 1000))
         task?.cancel()
         task = Task { [weak self] in
@@ -54,7 +54,7 @@ final class SearchModel: ObservableObject {
                 guard let self, !Task.isCancelled else { return }
                 switch update {
                 case .merge(let rows): self.list.merge(rows)
-                case .replace(let groups, let scale): self.list.replace(with: groups, limitScale: scale)
+                case .replace(let groups, let scale): self.list.replace(with: groups, limitScale: scale, topHit: plan.topHit)
                 case .finished(let ms): self.status = self.statusText(milliseconds: ms)
                 }
             }

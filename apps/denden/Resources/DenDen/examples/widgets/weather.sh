@@ -1,7 +1,9 @@
 #!/bin/sh
 # Prints {"text","icon"} for Den Den: the temperature and the sky now.
-# Location: LOCATION="lat lon Place" in ~/.config/grand-line/personal.env,
-# which setup asks for once. Nothing about the place is stored here.
+# Location: LOCATION="lat lon Place" in ~/.config/grand-line/personal.env.
+# Setup asks for your town once, the first time it runs (lib/personal.sh); no
+# command asks again, so to add it later put a line like
+# LOCATION="51.5 -0.13 London" in that file. Nothing about the place is stored here.
 set -f
 
 loc=""
@@ -13,7 +15,7 @@ fi
 # shellcheck disable=SC2086 # split "lat lon Place" into words on purpose
 set -- $loc
 if [ $# -lt 2 ]; then
-  echo '{"text":"Set LOCATION","icon":"location.slash","color":"muted"}'
+  echo '{"text":"Add your town","icon":"location.slash","color":"muted"}'
   exit 0
 fi
 lat=$1

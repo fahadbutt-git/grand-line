@@ -4,13 +4,15 @@ import Foundation
 ///
 /// ```swift
 /// let index = (try? FileIndex.load(from: snapshotURL)) ?? FileIndex(roots: [NSHomeDirectory()])
-/// if await index.count == 0 { await index.build() }
+/// if await index.count == 0 || !(await index.isComplete) { await index.build(savingTo: snapshotURL) }
 /// await index.startWatching()
 /// let matches = await index.search("gl rev", limit: 20)
 /// ```
 public actor FileIndex {
     public nonisolated let roots: [String]
     public nonisolated let exclusions: IndexExclusions
+    /// Which folders a build walks first and last.
+    public nonisolated let order: ScanOrder
 
     var storage = IndexStorage()
     var folders: [String: Int32] = [:]
@@ -20,20 +22,43 @@ public actor FileIndex {
     private var watcher: FolderWatcher?
     private var watchTask: Task<Void, Never>?
 
+    /// False while the index holds only part of its roots: during a first build,
+    /// or after loading a snapshot saved before a build finished.
+    public private(set) var isComplete: Bool
+    public private(set) var isBuilding = false
+    /// Folders the last build was not allowed to read (macOS privacy settings).
+    public private(set) var unreadable: [String] = []
+    private var buildID = 0
+    private var adoptedStep = 0
+    private var partialSave: (url: URL, every: TimeInterval, last: Date)?
+    private var partialWrite: Task<Void, Never>?
+    /// Changes whenever entries are added, removed or renumbered.
+    private var generation = 0
+    /// The last query and every entry it matched, so a query typed on from it
+    /// only searches those.
+    private var lastScan: (query: SearchQuery, generation: Int, matched: [Int32])?
+
     /// Roots are resolved to real paths, and a root inside another root is dropped.
-    public init(roots: [String], exclusions: IndexExclusions = .standard) {
+    public init(roots: [String], exclusions: IndexExclusions = .standard, order: ScanOrder = .none) {
         self.roots = FileIndex.distinctRoots(roots)
         self.exclusions = exclusions
+        self.order = order
         self.lastEventID = FolderWatcher.currentEventID
+        self.isComplete = false
     }
 
-    init(roots: [String], exclusions: IndexExclusions, storage: IndexStorage, usage: [String: Usage] = [:], lastEventID: UInt64) {
+    init(
+        roots: [String], exclusions: IndexExclusions, order: ScanOrder = .none, storage: IndexStorage,
+        usage: [String: Usage] = [:], lastEventID: UInt64, complete: Bool = true
+    ) {
         self.roots = roots
         self.exclusions = exclusions
+        self.order = order
         self.storage = storage
         self.folders = storage.folderPaths()
         self.usage = usage
         self.lastEventID = lastEventID
+        self.isComplete = complete
     }
 
     deinit {
@@ -43,18 +68,62 @@ public actor FileIndex {
     /// Files and folders in the index.
     public var count: Int { storage.liveCount }
 
-    /// Scans every root from scratch.
-    public func build() async {
+    /// Scans every root from scratch. What has been walked so far can be searched
+    /// while the walk goes on. With `snapshot`, the index is saved there every
+    /// `every` seconds during the walk (marked as unfinished) and once at the end,
+    /// so a crash or a forced quit keeps the work done.
+    public func build(savingTo snapshot: URL? = nil, every: TimeInterval = 30) async {
         let roots = self.roots
         let exclusions = self.exclusions
+        let order = self.order
         let started = FolderWatcher.currentEventID
+        buildID += 1
+        let id = buildID
+        adoptedStep = 0
+        isBuilding = true
+        partialSave = snapshot.map { (url: $0, every: every, last: Date()) }
         let built = await Task.detached(priority: .utility) {
-            FolderScanner.build(roots: roots, exclusions: exclusions)
+            FolderScanner.build(roots: roots, exclusions: exclusions, order: order, interval: 0.25) { partial in
+                Task { await self.adopt(partial, build: id) }
+            }
         }.value
+        guard id == buildID else { return }
         storage = built.storage
         folders = built.folders
+        unreadable = built.unreadable
+        generation += 1
         lastEventID = started
+        isComplete = true
+        isBuilding = false
+        partialSave = nil
         refreshBoosts()
+        // A save from part way through must not land on top of the finished one.
+        await partialWrite?.value
+        partialWrite = nil
+        guard id == buildID else { return }
+        if let snapshot { try? save(to: snapshot) }
+    }
+
+    /// Takes part of a build in progress, unless it holds fewer entries than the
+    /// index already has (a partial snapshot loaded at launch, say).
+    func adopt(_ partial: BuiltIndex, build id: Int) {
+        guard isBuilding, id == buildID, partial.step > adoptedStep else { return }
+        adoptedStep = partial.step
+        unreadable = partial.unreadable
+        guard partial.storage.count >= storage.liveCount else { return }
+        storage = partial.storage
+        folders = partial.folders
+        generation += 1
+        if let plan = partialSave, Date().timeIntervalSince(plan.last) >= plan.every {
+            partialSave?.last = Date()
+            let snapshot = IndexSnapshot(roots: roots, storage: storage, usage: usage, lastEventID: lastEventID, complete: false)
+            let url = plan.url
+            let previous = partialWrite
+            partialWrite = Task.detached(priority: .background) {
+                await previous?.value
+                try? FileIndex.write(snapshot, to: url)
+            }
+        }
     }
 
     /// The best `limit` matches, best first.
@@ -62,19 +131,31 @@ public actor FileIndex {
         guard limit > 0, let query = SearchQuery(text), storage.count > 0 else { return [] }
         if Date().timeIntervalSince(boostsRefreshed) > 3_600 { refreshBoosts() }
         let storage = self.storage
-        let count = storage.count
+        let generation = self.generation
+        var candidates: [Int32]? = nil
+        if let last = lastScan, last.generation == generation, query.narrows(last.query) {
+            candidates = last.matched
+        }
+        let count = candidates?.count ?? storage.count
         let chunks = max(1, min(ProcessInfo.processInfo.activeProcessorCount * 2, count / 8_192 + 1))
         let size = (count + chunks - 1) / chunks
-        var hits = await withTaskGroup(of: [Hit].self) { group in
+        let found = await withTaskGroup(of: ScanResult.self) { group in
             for chunk in 0..<chunks {
                 let range = (chunk * size)..<min(count, (chunk + 1) * size)
                 if range.isEmpty { continue }
-                group.addTask { IndexSearch.scan(storage, query, range, limit: limit) }
+                group.addTask { IndexSearch.scan(storage, query, range, candidates: candidates, limit: limit) }
             }
-            var all: [Hit] = []
-            for await part in group { all += part }
+            var all = ScanResult()
+            for await part in group {
+                all.hits += part.hits
+                all.matched += part.matched
+            }
             return all
         }
+        if self.generation == generation {
+            lastScan = (query, generation, found.matched)
+        }
+        var hits = found.hits
         hits.sort(by: Hit.ranksBefore)
         return hits.prefix(limit).map { hit in
             let i = Int(hit.index)
@@ -106,6 +187,7 @@ public actor FileIndex {
         for change in FolderChange.coalesce(changes) {
             rescan(change.path, recursive: change.recursive)
         }
+        if !changes.isEmpty { generation += 1 }
         if let watcher { lastEventID = max(lastEventID, watcher.latestEventID) }
         if storage.removedCount > 10_000, storage.removedCount * 4 > storage.count { compact() }
     }
@@ -135,17 +217,22 @@ public actor FileIndex {
     public func save(to url: URL) throws {
         if storage.removedCount > 0 { compact() }
         if let watcher { lastEventID = max(lastEventID, watcher.latestEventID) }
-        let snapshot = IndexSnapshot(roots: roots, storage: storage, usage: usage, lastEventID: lastEventID)
+        let snapshot = IndexSnapshot(roots: roots, storage: storage, usage: usage, lastEventID: lastEventID, complete: isComplete)
+        try FileIndex.write(snapshot, to: url)
+    }
+
+    static func write(_ snapshot: IndexSnapshot, to url: URL) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try snapshot.encoded().write(to: url, options: .atomic)
     }
 
-    /// Reads a saved index. Call `startWatching()` afterwards to catch up on changes.
-    public static func load(from url: URL, exclusions: IndexExclusions = .standard) throws -> FileIndex {
+    /// Reads a saved index. Call `startWatching()` afterwards to catch up on changes,
+    /// and `build()` when `isComplete` is false.
+    public static func load(from url: URL, exclusions: IndexExclusions = .standard, order: ScanOrder = .none) throws -> FileIndex {
         let snapshot = try IndexSnapshot(decoding: Data(contentsOf: url))
         let index = FileIndex(
-            roots: snapshot.roots, exclusions: exclusions, storage: snapshot.storage,
-            usage: snapshot.usage, lastEventID: snapshot.lastEventID
+            roots: snapshot.roots, exclusions: exclusions, order: order, storage: snapshot.storage,
+            usage: snapshot.usage, lastEventID: snapshot.lastEventID, complete: snapshot.complete
         )
         return index
     }
@@ -209,6 +296,7 @@ public actor FileIndex {
     private func compact() {
         storage = storage.compacted()
         folders = storage.folderPaths()
+        generation += 1
     }
 
     // MARK: Usage

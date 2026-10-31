@@ -119,6 +119,20 @@ extension BrowserModel {
         pane.setSettings(settings)
     }
 
+    /// View › Keep Folders on Top, on top of whatever the sort is.
+    func toggleFoldersOnTop() {
+        var settings = focused.state.settings
+        settings.sort.foldersFirst.toggle()
+        focused.setSettings(settings)
+    }
+
+    /// View › Group By: rows gathered by kind, each group in the current sort.
+    func group(by grouping: ItemGrouping) {
+        var settings = focused.state.settings
+        settings.sort.grouping = grouping
+        focused.setSettings(settings)
+    }
+
     func scaleIcons(by factor: Double) {
         var settings = focused.state.settings
         let range = ViewSettings.iconSizes

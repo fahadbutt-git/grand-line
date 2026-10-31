@@ -70,3 +70,30 @@ final class ExclusionTests: XCTestCase {
         XCTAssertEqual(index.roots, [folder])
     }
 }
+
+/// App data that searches leave out unless asked to look inside it.
+final class BackstageTests: XCTestCase {
+    let home = "/Users/me"
+
+    func testAppDataIsBackstage() {
+        XCTAssertTrue(Backstage.contains("/Users/me/Library/Caches/x.js", home: home))
+        XCTAssertTrue(Backstage.contains("/Users/me/Library/Application Support/Code/733.js", home: home))
+        XCTAssertFalse(Backstage.contains("/Users/me/Library/CloudStorage/GoogleDrive-me@example.com/My Drive/a.docx", home: home))
+        XCTAssertFalse(Backstage.contains("/Users/me/Library", home: home))
+        XCTAssertTrue(Backstage.contains("/Users/me/code/app/node_modules/x/server.mjs", home: home))
+        XCTAssertTrue(Backstage.contains("/Users/me/code/app/.git/HEAD", home: home))
+        XCTAssertTrue(Backstage.contains("/Applications/Tool.app/Contents/Info.plist", home: home))
+        XCTAssertFalse(Backstage.contains("/Applications/Tool.app", home: home))
+        XCTAssertTrue(Backstage.contains("/System/Library/a.txt", home: home))
+        XCTAssertFalse(Backstage.contains("/Users/me/.config/app.json", home: home))
+        XCTAssertTrue(Backstage.contains("/Users/me/.config/app.json", home: home, hidden: true))
+        XCTAssertFalse(Backstage.contains("/Users/me/Documents/notes.md", home: home, hidden: true))
+    }
+
+    func testOnlyThePartBelowTheScopeCounts() {
+        XCTAssertFalse(Backstage.contains("/Users/me/Library/Mail/a.eml", home: home, scope: "/Users/me/Library/Mail"))
+        XCTAssertFalse(Backstage.contains("/Users/me/.config/app.json", home: home, scope: "/Users/me/.config", hidden: true))
+        XCTAssertTrue(Backstage.contains("/Users/me/Library/Mail/a.eml", home: home, scope: "/Users/me"))
+        XCTAssertTrue(Backstage.contains("/Users/me/code/node_modules/a.js", home: home, scope: "/Users/me/code"))
+    }
+}
