@@ -1,0 +1,9 @@
+# Whether Docker and local AI (Ollama) are running, from the package's toggles.
+# Click opens the Toggle menu to start or stop them.
+title = "Services"
+icon = "shippingbox"
+command = "./services.sh"
+refresh = "on open"
+timeout = 5
+click = "$HOME/.grand-line/bin/menu Toggle"
+order = 20

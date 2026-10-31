@@ -1,0 +1,9 @@
+# The weather where you are, from Open-Meteo (free, no account).
+# The place comes from LOCATION="lat lon Place" in ~/.config/grand-line/personal.env.
+title = "Weather"
+icon = "cloud.sun"
+command = "./weather.sh"
+refresh = "30m"
+timeout = 10
+click = "open https://open-meteo.com"
+order = 10
