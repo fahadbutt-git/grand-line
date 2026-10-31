@@ -185,7 +185,7 @@ echo one > "$r/a.txt"; git -C "$r" add -A; git -C "$r" commit -q -m "First"
 export MAC_SETUP_REPO="$r" MAC_SETUP_NO_APPLY=1
 "$ROOT/bin/mac" save "known good" >/dev/null
 echo two > "$r/a.txt"; echo new > "$r/b.txt"; git -C "$r" add -A; git -C "$r" commit -q -m "Second"
-"$ROOT/bin/mac" history | grep -q "Second" && t_ok "mac history lists changes" || t_fail "mac history"
+hist="$("$ROOT/bin/mac" history)"; grep -q "Second" <<<"$hist" && t_ok "mac history lists changes" || t_fail "mac history"
 "$ROOT/bin/mac" undo >/dev/null; [[ "$(cat "$r/a.txt")" == one && ! -e "$r/b.txt" ]] && t_ok "mac undo reverses the last change" || t_fail "mac undo"
 "$ROOT/bin/mac" undo >/dev/null; [[ "$(cat "$r/a.txt")" == two ]] && t_ok "mac undo can undo an undo" || t_fail "mac undo of undo"
 tag="$(git -C "$r" tag -l 'good-*' | head -1)"
