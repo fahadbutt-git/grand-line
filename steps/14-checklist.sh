@@ -55,7 +55,7 @@ macOS requires these clicks from you. Work down the list once.
 8. Volume for each app (FineTune)
    Open FineTune and allow audio access when asked. Its menu bar icon
    then sets or mutes each app's volume. A browser mutes a single tab
-   itself: right-click the tab, Mute Tab (Mute site in Chrome).
+   itself: right-click the tab, Mute Tab.
 
 9. The desktop as a dashboard
    The desktop shows no files, only widgets. First add Google Calendar
@@ -84,7 +84,9 @@ macOS requires these clicks from you. Work down the list once.
     package's own shortcut commands see the screen, nothing else.
 
 14. Sign in to your apps
-    Zen (import from Chrome when it offers), Chrome, Claude, Claude Code (claude), Codex (codex), Antigravity
+    Zen (to bring your Chrome bookmarks, export them on the old Mac:
+    Chrome, Bookmarks, Bookmark Manager, Export; then in Zen: Bookmarks,
+    Manage Bookmarks, Import), Claude, Claude Code (claude), Codex (codex), Antigravity
     (agy), ChatGPT, Gemini, Notion, Anki (AnkiWeb), WhatsApp, Zoom,
     Discord, Spotify, Plaud, Citrix, Horizon, Proton VPN (free
     plan) and Tailscale. Leave the VPN off on hospital and school networks, where it

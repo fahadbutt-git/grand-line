@@ -93,7 +93,7 @@ artcraft_install_one() {
     echo "  ! $app: no app found inside $name"; status=1
   elif [[ "$(basename "$found")" != "$app.app" ]]; then
     # Only ever install the app this line is for, so a bad release cannot
-    # replace another app (Chrome, Claude...) in /Applications.
+    # replace another app (Zen, Claude...) in /Applications.
     echo "  ! $app: the download contains $(basename "$found") instead of $app.app, so nothing was installed"; status=1
   elif [[ -n "$known" && "$team" != "$known" ]]; then
     # The developer that signed this app before must sign its updates.

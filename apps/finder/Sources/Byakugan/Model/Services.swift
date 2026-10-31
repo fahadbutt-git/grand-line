@@ -14,7 +14,7 @@ final class Services {
     let apps = AppCatalog.provider()
     let keybindings = KeybindingsFile.provider()
     let snippets = EspansoMatches.provider()
-    let bookmarks = ChromeBookmarks.provider()
+    let bookmarks = Bookmarks.provider()
     let settings = SettingsPanes.provider()
     let symbols = SymbolTable.provider()
     let menuItems = MenuBarItems.provider()

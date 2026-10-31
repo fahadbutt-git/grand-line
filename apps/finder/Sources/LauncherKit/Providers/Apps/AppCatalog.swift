@@ -1,7 +1,7 @@
 import Foundation
 
 /// The installed apps: /Applications, /System/Applications and ~/Applications,
-/// two folders deep (Utilities, vendor folders, Chrome's web apps). Each opens
+/// two folders deep (Utilities, vendor folders). Each opens
 /// through focus-or-open, so a running app's window comes forward.
 public enum AppCatalog {
     public static func folders(home: String = NSHomeDirectory()) -> [String] {

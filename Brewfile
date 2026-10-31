@@ -94,8 +94,7 @@ brew "iperf3"           # measure speed between two machines
 brew "wakeonlan"        # wake the NAS or a server from sleep
 
 # Browser, terminal and music
-cask "zen"              # the browser, and the default one
-cask "google-chrome"    # web-app windows (Gmail, Calendar) and sites that need Chrome
+cask "zen"              # the one browser, and the default
 cask "ghostty"
 cask "spotify"
 

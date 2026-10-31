@@ -17,29 +17,12 @@ final class SourceTests: XCTestCase {
         XCTAssertEqual(bookmarks.map(\.folder), ["Bookmarks toolbar › Research", "Bookmarks toolbar"])
     }
 
-    func testChromeBookmarks() throws {
-        let json = """
-        {"roots": {
-          "bookmark_bar": {"type": "folder", "name": "Bookmarks bar", "children": [
-            {"type": "url", "name": "PubMed", "url": "https://pubmed.ncbi.nlm.nih.gov/"},
-            {"type": "folder", "name": "Research", "children": [
-              {"type": "url", "name": "", "url": "https://www.example.org/cornea"}
-            ]}
-          ]},
-          "other": {"type": "folder", "name": "Other bookmarks", "children": []}
-        }}
-        """
-        let bookmarks = ChromeBookmarks.parse(Data(json.utf8))
-        XCTAssertEqual(bookmarks.map(\.title), ["PubMed", "https://www.example.org/cornea"])
-        XCTAssertEqual(bookmarks[1].folder, "Bookmarks bar › Research")
-        XCTAssertEqual(ChromeBookmarks.host(bookmarks[1].url), "example.org")
-        let row = ChromeBookmarks.results(bookmarks)[0]
-        XCTAssertEqual(row.primary?.command, .openURL("https://pubmed.ncbi.nlm.nih.gov/", bundleID: "com.google.Chrome"))
-
-        let chrome = try Make.folder()
-        try Make.write(json, to: chrome.appendingPathComponent("Default/Bookmarks"))
-        try Make.write(json, to: chrome.appendingPathComponent("Profile 1/Bookmarks"))
-        XCTAssertEqual(ChromeBookmarks.load(chromeFolder: chrome.path).count, 2, "a URL in two profiles is listed once")
+    func testBookmarkResults() {
+        let bookmarks = [Bookmark(title: "PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/", folder: "Bookmarks toolbar")]
+        XCTAssertEqual(Bookmarks.host("https://www.example.org/cornea"), "example.org")
+        let row = Bookmarks.results(bookmarks)[0]
+        XCTAssertEqual(row.primary?.command, .openURL("https://pubmed.ncbi.nlm.nih.gov/", bundleID: nil), "opens in the default browser")
+        XCTAssertEqual(row.subtitle, "Bookmarks toolbar")
     }
 
     func testAeroSpaceWindows() {

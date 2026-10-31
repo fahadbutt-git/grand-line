@@ -1,15 +1,13 @@
 #!/bin/bash
-# grandline:summary=Open a website as its own app-style window, or focus the one already open
+# grandline:summary=Open a website in Zen, or focus the window already showing it
 # webapp URL [TITLE]
-# As Omarchy's web apps. With TITLE, a Chrome window whose title contains it
-# is focused instead of opening another (Gmail, YouTube and so on).
+# As Omarchy's web apps, in the one browser. With TITLE, a Zen window whose
+# title contains it is focused instead of opening the site again (Gmail,
+# YouTube and so on). Pinning these sites as Zen Essentials keeps them one
+# click away.
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 
 url="${1:?usage: webapp URL [TITLE]}"
 title="${2:-}"
-[[ -n "$title" ]] && focus_window "Google Chrome" "$title" && exit 0
-if [[ -d "/Applications/Google Chrome.app" ]]; then
-  open -na "Google Chrome" --args --app="$url"
-else
-  open "$url"
-fi
+[[ -n "$title" ]] && focus_window "Zen" "$title" && exit 0
+open -a Zen "$url" 2>/dev/null || open "$url"

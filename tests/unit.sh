@@ -327,7 +327,7 @@ grep -q "^main forest" "$tmp/hooks.log" && t_ok "theme set fires the theme-set h
 rm -rf "$hd"
 
 # --- focus or open, web apps, update lock and window
-export AEROSPACE_WINDOWS=$'7|Ghostty|~\n9|Google Chrome|Inbox (3) - Gmail'
+export AEROSPACE_WINDOWS=$'7|Ghostty|~\n9|Zen|Inbox (3) - Gmail'
 : > "$STUB_LOG"; "$ROOT/bin/focus-or-open" Ghostty
 grep -q "aerospace focus --window-id 7" "$STUB_LOG" && ! grep -q "open -a" "$STUB_LOG" && t_ok "an app key focuses its open window" || t_fail "focus-or-open did not focus" "$(cat "$STUB_LOG")"
 : > "$STUB_LOG"; "$ROOT/bin/focus-or-open" Notion

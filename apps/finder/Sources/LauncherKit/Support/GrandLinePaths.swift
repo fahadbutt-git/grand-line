@@ -31,7 +31,6 @@ public struct GrandLinePaths: Sendable, Equatable {
     public var usage: String { state + "/usage.json" }
     public var rates: String { state + "/exchange-rates.json" }
     public var index: String { state + "/names.index" }
-    public var chrome: String { home + "/Library/Application Support/Google/Chrome" }
     /// Zen keeps Firefox's layout: Profiles/<name>/places.sqlite.
     public var zen: String { home + "/Library/Application Support/zen/Profiles" }
 
