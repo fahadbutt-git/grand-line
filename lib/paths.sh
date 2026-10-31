@@ -13,7 +13,11 @@ MAC_SETUP_LOGS="$HOME/Library/Logs/mac-setup"
 SCREENSHOTS_DIR="$HOME/Pictures/Screenshots"
 BACKGROUNDS_DIR="$HOME/Pictures/Backgrounds"
 
-if [[ -d /opt/homebrew || "$(uname -m 2>/dev/null)" == arm64 ]]; then
+# MAC_SETUP_BREW_PREFIX lets the tests point at a pretend Homebrew, so they
+# behave the same whether or not the test machine has Homebrew.
+if [[ -n "${MAC_SETUP_BREW_PREFIX:-}" ]]; then
+  BREW_PREFIX="$MAC_SETUP_BREW_PREFIX"
+elif [[ -d /opt/homebrew || "$(uname -m 2>/dev/null)" == arm64 ]]; then
   BREW_PREFIX="/opt/homebrew"
 else
   BREW_PREFIX="/usr/local"

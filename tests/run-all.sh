@@ -43,10 +43,18 @@ check "executable bits set" bash -c '
   for f in bin/* setup.sh publish.sh tests/*.sh tests/stubs/*; do [[ -x "$f" ]] || { echo "$f"; bad=1; }; done
   exit $bad' 
 
-if command -v zsh >/dev/null 2>&1; then
+# On a laptop a missing tool only skips its check. In CI it fails, so a check
+# can never pass by quietly not running.
+have_tool() {
+  command -v "$1" >/dev/null 2>&1 && return 0
+  if [[ -n "${CI:-}" ]]; then fail "$1 is not installed, so its check could not run"
+  else echo "  skip  $1 is not installed"; fi
+  return 1
+}
+if have_tool zsh; then
   check "syntax: config/zsh/mac-setup.zsh" zsh -n config/zsh/mac-setup.zsh
 fi
-if command -v tmux >/dev/null 2>&1; then
+if have_tool tmux; then
   check "tmux.conf loads" tmux -f config/tmux/tmux.conf -L mac-setup-test start-server \; kill-server
 fi
 

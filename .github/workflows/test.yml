@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: command -v shellcheck || sudo apt-get install -y shellcheck
+      - run: sudo apt-get install -y shellcheck zsh tmux jq
       - run: bash tests/run-all.sh
 
   macos-checks:
@@ -30,7 +30,7 @@ jobs:
       PATH: /usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin
     steps:
       - uses: actions/checkout@v4
-      - run: brew install shellcheck jq
+      - run: brew install shellcheck jq tmux
       - run: bash --version | head -1 && /bin/bash tests/run-all.sh
 
   full-install:
