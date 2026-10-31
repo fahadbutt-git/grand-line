@@ -49,6 +49,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run 1, full setup
         run: /bin/bash setup.sh --ci --skip r-packages
+      - name: Report what was installed
+        if: always()
+        run: |
+          echo "::notice title=installed::$(brew list --cask -1 | wc -l | tr -d ' ') casks, $(brew list --formula -1 | wc -l | tr -d ' ') formulae, $(ls /Applications | wc -l | tr -d ' ') apps in /Applications"
+          echo "::notice title=disk::$(du -sh /Applications 2>/dev/null | cut -f1) in /Applications"
       - name: Check the installed machine
         run: /bin/bash tests/verify-install.sh --ci
       - name: Run 2, setup again must succeed and change nothing

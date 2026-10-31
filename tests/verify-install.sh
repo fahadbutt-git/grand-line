@@ -11,9 +11,10 @@ source "$ROOT/lib/paths.sh"
 export PATH="$BREW_PREFIX/bin:$MAC_SETUP_BIN:$MAC_SETUP_BUILD:$PATH"
 
 PASS=0; FAIL=0; WARN=0
+GH="${GITHUB_ACTIONS:-}"
 pass() { printf '  PASS  %s\n' "$1"; PASS=$((PASS + 1)); }
-fail() { printf '  FAIL  %s\n' "$1"; FAIL=$((FAIL + 1)); }
-note() { printf '  WARN  %s\n' "$1"; WARN=$((WARN + 1)); }
+fail() { printf '  FAIL  %s\n' "$1"; FAIL=$((FAIL + 1)); [[ -n "$GH" ]] && echo "::error title=verify::$1"; }
+note() { printf '  WARN  %s\n' "$1"; WARN=$((WARN + 1)); [[ -n "$GH" ]] && echo "::warning title=verify::$1"; }
 
 echo "Homebrew"
 command -v brew >/dev/null && pass "brew is on the PATH" || fail "brew is missing"
@@ -90,4 +91,5 @@ fi
 
 echo
 echo "$PASS passed, $FAIL failed, $WARN warnings"
+[[ -n "$GH" ]] && echo "::notice title=verify::$PASS passed, $FAIL failed, $WARN warnings"
 [[ "$FAIL" == 0 ]]

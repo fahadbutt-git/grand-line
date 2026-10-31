@@ -12,7 +12,10 @@ OFFLINE=0
 
 PASS=0; FAIL=0
 pass() { printf '  ok    %s\n' "$1"; PASS=$((PASS + 1)); }
-fail() { printf '  FAIL  %s\n' "$1"; [[ -n "${2:-}" ]] && printf '%s\n' "$2" | sed 's/^/        /'; FAIL=$((FAIL + 1)); }
+fail() {
+  printf '  FAIL  %s\n' "$1"; [[ -n "${2:-}" ]] && printf '%s\n' "$2" | sed 's/^/        /'; FAIL=$((FAIL + 1))
+  [[ -n "${GITHUB_ACTIONS:-}" ]] && echo "::error title=check::$1: $(printf '%s' "${2:-}" | head -3 | tr '\n' ' ')"
+}
 check() { local name="$1"; shift; local out; if out="$("$@" 2>&1)"; then pass "$name"; else fail "$name" "$out"; fi; }
 
 SHELL_FILES=()

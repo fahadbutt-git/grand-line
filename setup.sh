@@ -112,8 +112,11 @@ heading "Summary"
 if [[ ${#WARNINGS[@]} -gt 0 ]]; then
   log "Warnings:"
   printf '  - %s\n' "${WARNINGS[@]}"
+  # On GitHub's test machines, also post each warning where the run page shows it.
+  [[ -n "${GITHUB_ACTIONS:-}" ]] && printf '::warning title=setup::%s\n' "${WARNINGS[@]}"
 fi
 if [[ ${#FAILED[@]} -gt 0 ]]; then
+  [[ -n "${GITHUB_ACTIONS:-}" ]] && echo "::error title=setup::Steps that failed: ${FAILED[*]}"
   err "Steps that need another run: ${FAILED[*]}"
   log "Run the same command again. It only redoes what is missing."
   exit 1
