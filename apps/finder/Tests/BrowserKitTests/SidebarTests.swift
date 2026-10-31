@@ -4,12 +4,12 @@ import XCTest
 
 /// R29: the sidebar's size and sections, with every mounted drive.
 final class SidebarTests: XCTestCase {
-    func volume(_ name: String, root: Bool = false, network: Bool = false, removable: Bool = false, internal: Bool = false) -> VolumeInfo {
+    func volume(_ name: String, root: Bool = false, network: Bool = false, removable: Bool = false, internal isInside: Bool = false) -> VolumeInfo {
         VolumeInfo(
             url: URL(fileURLWithPath: root ? "/" : "/Volumes/\(name)", isDirectory: true), name: name,
             totalBytes: 2_000_000_000_000, availableBytes: 1_620_000_000_000, freeBytes: 1_500_000_000_000,
             isRemovable: removable, isEjectable: removable || network, isNetwork: network,
-            isInternal: internal || root, isRoot: root, format: "APFS"
+            isInternal: isInside || root, isRoot: root, format: "APFS"
         )
     }
 

@@ -1,0 +1,4 @@
+#!/bin/bash
+# The front app is $FRONT_APP (Finder when unset).
+[[ "$1" == front ]] && { echo "ASN:0x0-0x1"; exit 0; }
+echo "\"CFBundleIdentifier\"=\"${FRONT_APP:-com.apple.finder}\""

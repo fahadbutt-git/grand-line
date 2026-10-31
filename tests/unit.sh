@@ -444,9 +444,8 @@ printf '#!/bin/bash\necho "codesign $*" >> "$STUB_LOG"\n' > "$tmp/bin-apps/codes
 ) && t_ok "Log Pose and Byakugan take over Finder and Spotlight by default, and switch back" || t_fail "takeover (step $?)"
 
 # --- the selection comes from Log Pose when it is in front
-printf '#!/bin/bash\n[[ "$1" == front ]] && { echo ASN:0x1; exit; }\necho "\\"CFBundleIdentifier\\"=\\"${FRONT_APP:-com.apple.finder}\\""\n' > "$tmp/bin-apps/lsappinfo"; chmod +x "$tmp/bin-apps/lsappinfo"
 mkdir -p "$HOME/.local/state/grand-line"; printf '/Users/me/a.pdf\n/Users/me/b c.pdf\n' > "$HOME/.local/state/grand-line/logpose-selection"
-got="$(PATH="$tmp/bin-apps:$PATH" FRONT_APP=com.grandline.logpose bash -c 'source "$1/lib/bin-common.sh"; finder_selection' _ "$ROOT")"
+got="$(FRONT_APP=com.grandline.logpose bash -c 'source "$1/lib/bin-common.sh"; finder_selection' _ "$ROOT")"
 [[ "$got" == $'/Users/me/a.pdf\n/Users/me/b c.pdf' ]] && t_ok "the selection comes from Log Pose when it is in front" || t_fail "Log Pose selection" "$got"
 
 exit $FAIL

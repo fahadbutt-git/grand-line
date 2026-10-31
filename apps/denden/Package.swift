@@ -1,4 +1,4 @@
-// swift-tools-version: 5.10
+// swift-tools-version: 6.0
 import PackageDescription
 
 // Den Den, the notch app of Grand Line.
@@ -49,5 +49,7 @@ let package = Package(
             ]
         ),
         .testTarget(name: "DenDenKitTests", dependencies: ["DenDenKit"]),
-    ]
+    ],
+    // Swift 5 mode: strict concurrency checks warn instead of failing the build.
+    swiftLanguageModes: [.v5]
 )
