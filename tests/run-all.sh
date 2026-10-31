@@ -153,6 +153,12 @@ check "no personal paths or secrets committed" bash -c '
     | grep -v -e "^./tests/run-all.sh:" -e ":/Users/me/\$")"
   [[ -z "$found" ]] || { printf "%s\n" "$found"; exit 1; }'
 
+# Names, emails and places belong in ~/.config/mac-setup/personal.env.
+check "no email addresses or home coordinates committed" bash -c '
+  found="$(git ls-files -z | xargs -0 grep -nIoE "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.(com|org|net|ca|edu)|^-?[0-9]{1,2}\.[0-9]+ -?[0-9]{1,3}\.[0-9]+ [A-Z]" 2>/dev/null \
+    | grep -vE "noreply|example\.(com|org)|@users\.noreply|apps/.*/Tests/")"
+  [[ -z "$found" ]] || { printf "%s\n" "$found"; exit 1; }'
+
 echo "Behaviour"
 check "unit tests (menus, shortcuts, overlays, themes, migrations, hooks, ArtCraft)" bash tests/unit.sh
 check "dry run of the whole setup changes nothing" bash tests/dryrun.sh

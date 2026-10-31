@@ -8,6 +8,8 @@
 source "$(dirname "${BASH_SOURCE[0]}")/paths.sh"
 # shellcheck source=lib/trash.sh
 source "$(dirname "${BASH_SOURCE[0]}")/trash.sh"
+# shellcheck source=lib/personal.sh
+source "$(dirname "${BASH_SOURCE[0]}")/personal.sh"
 
 if [[ -t 1 ]]; then
   C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'; C_RED=$'\033[31m'; C_GREEN=$'\033[32m'

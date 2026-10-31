@@ -12,11 +12,8 @@ matches:
     replace: "{{t}}"
     vars: [{ name: t, type: date, params: { format: "%H:%M" } }]
 
-  # Email.
-  - trigger: ";br"
-    replace: "Best regards,\nFahad"
-  - trigger: ";sig"
-    replace: "Your Name"
+  # Email. ;br and ;sig use your own name and signature, so setup writes them
+  # from ~/.config/mac-setup/personal.env into personal.yml beside this file.
   - trigger: ";ty"
     replace: "Thank you for your time and consideration."
 

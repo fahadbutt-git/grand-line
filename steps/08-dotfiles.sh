@@ -23,8 +23,12 @@ step_dotfiles() {
   if ! git config --global --get-all include.path 2>/dev/null | grep -qF "$MAC_SETUP_LINK/config/git/config"; then
     run git config --global --add include.path "$MAC_SETUP_LINK/config/git/config"
   fi
-  git config --global user.name >/dev/null 2>&1 || run git config --global user.name "Your Name"
-  git config --global user.email >/dev/null 2>&1 || run git config --global user.email "you@example.com"
+  # Your name and email from personal.env, only where git has none yet.
+  local who
+  who="$(personal_get NAME)"
+  [[ -n "$who" ]] && ! git config --global user.name >/dev/null 2>&1 && run git config --global user.name "$who"
+  who="$(personal_get EMAIL)"
+  [[ -n "$who" ]] && ! git config --global user.email >/dev/null 2>&1 && run git config --global user.email "$who"
 
   # Docker: find Homebrew's compose and buildx plugins, keep logins in the Keychain.
   local dcfg="$HOME/.docker/config.json" plug="$BREW_PREFIX/lib/docker/cli-plugins"
@@ -43,6 +47,9 @@ step_dotfiles() {
   local esp="$HOME/Library/Application Support/espanso"
   run mkdir -p "$esp/match" "$esp/config"
   link_into_place "$cfg/espanso/match/mac-setup.yml" "$esp/match/mac-setup.yml"
+  # Your sign-off and signature, written from personal.env.
+  if [[ "$DRY_RUN" == 1 ]]; then run "write your email shortcuts to $esp/match/personal.yml"
+  else personal_espanso "$esp/match/personal.yml"; fi
   [[ -f "$esp/config/default.yml" ]] || run cp "$cfg/espanso/config/default.yml" "$esp/config/default.yml"
 
   # Download Neovim's plugins now, so the first launch is instant.

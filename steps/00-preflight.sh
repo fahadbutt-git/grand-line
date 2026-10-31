@@ -29,6 +29,9 @@ step_preflight() {
   fi
   ok "Internet connection works"
 
+  # Your name, email, signature and town, kept on this Mac only (lib/personal.sh).
+  personal_ask
+
   # Ask for the password once and keep it fresh until setup ends.
   if ! sudo -n true 2>/dev/null; then
     info "Enter your Mac password once. It is used for app installers."

@@ -366,4 +366,24 @@ flag docker off
 echo forest > "$HOME/.local/state/mac-setup/theme"
 theme_is forest && ! theme_is nord && t_ok "theme_is matches only the current theme" || t_fail "theme_is"
 
+# --- personal details: read from personal.env, never asked without a keyboard
+# shellcheck source=lib/personal.sh
+source "$ROOT/lib/personal.sh"
+source "$ROOT/lib/trash.sh"
+PERSONAL_FILE="$HOME/.config/mac-setup/personal.env"; rm -f "$PERSONAL_FILE"
+personal_ask </dev/null
+[[ ! -f "$PERSONAL_FILE" ]] && t_ok "personal details are not asked for without a keyboard" || t_fail "personal_ask wrote a file with no keyboard"
+mkdir -p "${PERSONAL_FILE%/*}"
+printf '%s\n' '# comment' 'NAME=Ada Lovelace' 'SIGNOFF="Ada"' 'SIGNATURE=Ada Lovelace\nAnalytical Engines' 'LOCATION=51.5 -0.13 London' > "$PERSONAL_FILE"
+[[ "$(personal_get NAME)" == "Ada Lovelace" && "$(personal_get SIGNOFF)" == Ada && -z "$(personal_get EMAIL)" ]] \
+  && t_ok "personal details are read, quotes removed, missing ones empty" || t_fail "personal_get" "$(personal_get NAME)|$(personal_get SIGNOFF)"
+esp="$tmp/personal.yml"; personal_espanso "$esp"
+grep -q 'replace: "Best regards,\\nAda"' "$esp" && grep -q 'replace: "Ada Lovelace\\nAnalytical Engines"' "$esp" \
+  && t_ok "your sign-off and signature become Espanso shortcuts" || t_fail "personal Espanso file" "$(cat "$esp")"
+read -r lat lon place <<<"$(personal_get LOCATION)"
+[[ "$lat $lon $place" == "51.5 -0.13 London" ]] && t_ok "the weather reads your town from personal details" || t_fail "LOCATION"
+printf 'NAME=x\n' > "$PERSONAL_FILE"; personal_espanso "$esp"
+[[ ! -f "$esp" ]] && t_ok "the Espanso file goes to the Trash when there is no signature" || t_fail "stale personal.yml kept"
+rm -f "$PERSONAL_FILE"
+
 exit $FAIL

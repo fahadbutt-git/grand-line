@@ -1,13 +1,13 @@
 #!/bin/bash
 # mac:summary=Show the time, battery, weather, disk space, reminders due or network speed
 # notice time | battery | weather | disk | reminders | speed
-# Weather comes from Open-Meteo (free, no account) for the place set in
-# config/mac-setup/location.
+# Weather comes from Open-Meteo (free, no account) for the LOCATION in
+# ~/.config/mac-setup/personal.env ("latitude longitude Place").
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 
 weather_text() {
   local lat lon place
-  read -r lat lon place < <(grep -v '^#' "$MAC_SETUP_CONFIG/location" 2>/dev/null | head -1)
+  read -r lat lon place <<<"$(personal_get LOCATION)"
   [[ -z "$lat" ]] && return 1
   curl -fsS --max-time 6 "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,apparent_temperature,weather_code" \
     | jq -r --arg place "$place" '
