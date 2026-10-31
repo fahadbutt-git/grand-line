@@ -2,6 +2,21 @@ import XCTest
 @testable import LauncherKit
 
 final class SourceTests: XCTestCase {
+    func testZenBookmarks() {
+        let rows: [ZenBookmarks.Row] = [
+            .init(id: 1, parent: 0, type: 2, title: "", url: nil),
+            .init(id: 3, parent: 1, type: 2, title: "toolbar", url: nil),
+            .init(id: 10, parent: 3, type: 2, title: "Research", url: nil),
+            .init(id: 11, parent: 10, type: 1, title: "PubMed", url: "https://pubmed.ncbi.nlm.nih.gov/"),
+            .init(id: 12, parent: 3, type: 1, title: "", url: "https://www.example.org/cornea"),
+            .init(id: 13, parent: 3, type: 1, title: "Recent", url: "place:sort=8"),
+            .init(id: 14, parent: 3, type: 3, title: "", url: nil),
+        ]
+        let bookmarks = ZenBookmarks.bookmarks(from: rows)
+        XCTAssertEqual(bookmarks.map(\.title), ["PubMed", "https://www.example.org/cornea"], "place: queries and separators are left out")
+        XCTAssertEqual(bookmarks.map(\.folder), ["Bookmarks toolbar › Research", "Bookmarks toolbar"])
+    }
+
     func testChromeBookmarks() throws {
         let json = """
         {"roots": {

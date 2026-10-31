@@ -1,6 +1,7 @@
 import Foundation
 
-/// Chrome's bookmarks, from each profile's Bookmarks JSON file.
+/// Chrome's bookmarks, from each profile's Bookmarks JSON file. The `%`
+/// provider lists Zen's first (ZenBookmarks), then Chrome's.
 public struct Bookmark: Sendable, Equatable {
     public let title: String
     public let url: String
@@ -64,8 +65,8 @@ public enum ChromeBookmarks {
                 keywords: [host(bookmark.url), bookmark.folder],
                 accessory: host(bookmark.url),
                 actions: [
+                    LaunchAction("Open", symbol: "globe", .openURL(bookmark.url, bundleID: nil)),
                     LaunchAction("Open in Chrome", symbol: "globe", .openURL(bookmark.url, bundleID: "com.google.Chrome")),
-                    LaunchAction("Open in default browser", symbol: "safari", .openURL(bookmark.url, bundleID: nil)),
                     .copy(bookmark.url, title: "Copy URL"),
                     .favourite,
                 ],
@@ -75,8 +76,10 @@ public enum ChromeBookmarks {
     }
 
     public static func provider(paths: GrandLinePaths = GrandLinePaths()) -> CatalogProvider {
-        CatalogProvider(id: "bookmarks", title: "Chrome bookmarks", symbol: "bookmark", prefix: .bookmarks, globalLimit: 12) {
-            results(load(chromeFolder: paths.chrome))
+        CatalogProvider(id: "bookmarks", title: "Bookmarks", symbol: "bookmark", prefix: .bookmarks, globalLimit: 12) {
+            var seen = Set<String>()
+            let all = ZenBookmarks.load(profilesFolder: paths.zen) + load(chromeFolder: paths.chrome)
+            return results(all.filter { seen.insert($0.url).inserted })
         }
     }
 }

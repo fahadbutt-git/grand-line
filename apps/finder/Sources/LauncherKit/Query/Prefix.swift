@@ -21,7 +21,7 @@ public enum Prefix: String, CaseIterable, Codable, Sendable {
         case .files: return "Files and their contents"
         case .calculator: return "Calculator, units, currency, dates and time zones"
         case .web: return "Search the web"
-        case .bookmarks: return "Chrome bookmarks"
+        case .bookmarks: return "Bookmarks"
         case .windows: return "Open windows"
         case .reminder: return "New reminder"
         case .shell: return "Run a shell command"
