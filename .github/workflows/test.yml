@@ -54,6 +54,12 @@ jobs:
         run: |
           echo "::notice title=installed::$(brew list --cask -1 | wc -l | tr -d ' ') casks, $(brew list --formula -1 | wc -l | tr -d ' ') formulae, $(ls /Applications | wc -l | tr -d ' ') apps in /Applications"
           echo "::notice title=disk::$(du -sh /Applications 2>/dev/null | cut -f1) in /Applications"
+          # Which file types each ArtCraft app tells macOS it can open.
+          for app in /Applications/*Craft.app; do
+            [ -d "$app" ] || continue
+            types=$(plutil -convert json -o - "$app/Contents/Info.plist" | jq -c '[.CFBundleDocumentTypes[]? | (.CFBundleTypeExtensions // []) + (.LSItemContentTypes // [])] | flatten')
+            echo "::notice title=filetypes $(basename "$app")::id $(defaults read "$app/Contents/Info" CFBundleIdentifier) declares $types"
+          done
       - name: Check the installed machine
         run: /bin/bash tests/verify-install.sh --ci
       - name: Run 2, setup again must succeed and change nothing
