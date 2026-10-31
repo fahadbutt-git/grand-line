@@ -121,15 +121,16 @@ jobs:
       - name: Run 2, setup again must succeed and change nothing
         run: |
           # Written to a file rather than piped, so a helper that keeps the
-          # output open cannot hold the step. If the run stalls, the last
+          # output open cannot hold the step. If the run stalls for 15 minutes, the last
           # lines and the processes still going are shown before stopping.
           /bin/bash setup.sh --ci --skip r-packages > run2.log 2>&1 &
           pid=$!
-          for _ in $(seq 1 150); do kill -0 "$pid" 2>/dev/null || break; sleep 10; done
+          for _ in $(seq 1 90); do kill -0 "$pid" 2>/dev/null || break; sleep 10; done
           if kill -0 "$pid" 2>/dev/null; then
-            tail -n 25 run2.log | while IFS= read -r l; do echo "::error title=run 2 stalled::$l"; done
-            ps -axo pid,ppid,etime,command | awk 'NR > 1 && $3 !~ /-/ && $3 !~ /:.*:/' | grep -vE "ps -axo|awk " | tail -n 40 \
-              | while IFS= read -r l; do echo "::error title=still running::$l"; done
+            # One annotation each, since a step shows at most ten.
+            enc() { awk 'BEGIN{ORS="%0A"} {gsub(/%/,"%25"); print}'; }
+            echo "::error title=run 2 stalled, last lines::$(tail -n 30 run2.log | sed 's/\x1b\[[0-9;]*m//g' | enc)"
+            echo "::error title=run 2 stalled, still running::$(ps -axo pid,ppid,etime,command | awk 'NR > 1 && $3 !~ /-/ && $3 !~ /:.*:/' | grep -vE 'ps -axo|awk ' | cut -c1-200 | tail -n 40 | enc)"
             kill "$pid"; exit 1
           fi
           status=0; wait "$pid" || status=$?
