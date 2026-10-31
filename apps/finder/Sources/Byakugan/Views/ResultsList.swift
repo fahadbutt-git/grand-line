@@ -21,6 +21,7 @@ struct ResultsList: View {
                             .padding(.horizontal, 14)
                         ForEach(group.rows) { row in
                             ResultRow(row: row, selected: row.id == selectedID, number: model.list.shortcutNumber(of: row.id), theme: theme)
+                                .modifier(SettingRowAccessibility(row: row))
                                 .id(row.id)
                                 .contentShape(Rectangle())
                                 .onTapGesture {
@@ -35,6 +36,24 @@ struct ResultsList: View {
             .onChange(of: selectedID) { _, id in
                 if let id { proxy.scrollTo(id) }
             }
+        }
+    }
+}
+
+/// Settings rows are one accessibility element each, named by their stable id
+/// ("setting.darkmode") with the state as the value ("On", "Working", "Failed"),
+/// so the journey tests can find a row, press it and read what it did.
+struct SettingRowAccessibility: ViewModifier {
+    let row: LaunchResult
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if row.providerID == SettingsActionsProvider.providerID {
+            content
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier(row.id)
+                .accessibilityValue(row.accessory)
+        } else {
+            content
         }
     }
 }

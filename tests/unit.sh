@@ -109,6 +109,19 @@ done
 [[ "$(cat "$HOME/.local/state/grand-line/theme" 2>/dev/null)" == nord ]] && t_ok "theme remembers the current theme" || t_fail "theme state not saved"
 grep -q "defaults write -g AppleAccentColor -int 4" "$STUB_LOG" && t_ok "theme sets the accent colour" || t_fail "accent colour not set"
 if ! "$ROOT/bin/theme" set nonexistent >/dev/null 2>&1; then t_ok "unknown theme fails cleanly"; else t_fail "unknown theme did not fail"; fi
+# A family name picks the variant for the current appearance (the defaults stub says light).
+"$ROOT/bin/theme" set harbour --no-wallpaper >/dev/null 2>&1
+[[ "$(cat "$HOME/.local/state/grand-line/theme" 2>/dev/null)" == harbour-light ]] && t_ok "theme set FAMILY picks the variant for the appearance" || t_fail "family not resolved" "$(cat "$HOME/.local/state/grand-line/theme")"
+"$ROOT/bin/theme" mode toggle >/dev/null 2>&1
+[[ "$(cat "$HOME/.local/state/grand-line/theme" 2>/dev/null)" == harbour-dark ]] && t_ok "theme mode toggle switches to the other variant" || t_fail "theme mode toggle"
+"$ROOT/bin/theme" set graphite --no-wallpaper >/dev/null 2>&1; "$ROOT/bin/theme" mode light >/dev/null 2>&1
+[[ "$(cat "$HOME/.local/state/grand-line/theme" 2>/dev/null)" == daylight ]] && t_ok "Graphite and Daylight pair up as dark and light" || t_fail "graphite to daylight"
+(source "$ROOT/lib/toggle-state.sh"; echo signal-dark > "$HOME/.local/state/grand-line/theme"; theme_is signal && ! theme_is sig) \
+  && t_ok "theme_is matches a family by its variants" || t_fail "theme_is family"
+names="$("$ROOT/bin/theme" list)"
+[[ "$(printf '%s\n' "$names" | sed -n 1p)" == atlas ]] && grep -qx paper <<< "$names" && grep -qx paper-light <<< "$names" \
+  && t_ok "theme list names families and every variant" || t_fail "theme list"
+"$ROOT/bin/theme" set nord --no-wallpaper >/dev/null 2>&1
 
 mkdir -p "$HOME/Pictures/Backgrounds"
 touch "$HOME/Pictures/Backgrounds/a.jpg" "$HOME/Pictures/Backgrounds/b.jpg" "$HOME/Pictures/Backgrounds/c.png"
@@ -365,6 +378,54 @@ flag docker off
 ! is_on no-such-toggle && t_ok "an unknown toggle reads as off" || t_fail "unknown toggle"
 echo forest > "$HOME/.local/state/grand-line/theme"
 theme_is forest && ! theme_is nord && t_ok "theme_is matches only the current theme" || t_fail "theme_is"
+
+# --- toggle: explicit on and off, new settings, and the status Byakugan reads
+T="$ROOT/bin/toggle"
+: > "$STUB_LOG"; WIFI_POWER=On "$T" wifi off
+grep -q "networksetup -setairportpower en0 off" "$STUB_LOG" && t_ok "toggle wifi off turns Wi-Fi off on the cached device" || t_fail "toggle wifi off" "$(cat "$STUB_LOG")"
+[[ "$(cat "$TOGGLE_FLAGS/.wifi-device" 2>/dev/null)" == en0 ]] && t_ok "the Wi-Fi device is looked up once and cached" || t_fail "wifi device cache"
+: > "$STUB_LOG"; WIFI_POWER=On "$T" wifi on
+! grep -q "setairportpower" "$STUB_LOG" && t_ok "toggle wifi on leaves Wi-Fi alone when it is already on" || t_fail "wifi on when on" "$(cat "$STUB_LOG")"
+: > "$STUB_LOG"; WIFI_POWER=Off "$T" wifi
+grep -q "networksetup -setairportpower en0 on" "$STUB_LOG" && t_ok "toggle wifi with no state flips it" || t_fail "wifi flip"
+: > "$STUB_LOG"; BLUEUTIL_POWER=1 "$T" bluetooth off
+grep -q "blueutil -p 0" "$STUB_LOG" && t_ok "toggle bluetooth off" || t_fail "bluetooth off" "$(cat "$STUB_LOG")"
+: > "$STUB_LOG"; BLUEUTIL_POWER=0 "$T" bluetooth off
+! grep -q "blueutil -p 0" "$STUB_LOG" && t_ok "toggle bluetooth off does nothing when already off" || t_fail "bluetooth off when off"
+: > "$STUB_LOG"; "$T" volume 30
+grep -q "osascript -e set volume output volume 30 without output muted" "$STUB_LOG" && t_ok "toggle volume 30 sets the level and unmutes" || t_fail "volume 30" "$(cat "$STUB_LOG")"
+: > "$STUB_LOG"; OSASCRIPT_REPLY=95 "$T" volume up
+grep -q "output volume 100 without" "$STUB_LOG" && t_ok "toggle volume up steps by 10 and stops at 100" || t_fail "volume up" "$(cat "$STUB_LOG")"
+: > "$STUB_LOG"; OSASCRIPT_REPLY=40 "$T" volume down
+grep -q "output volume 30 without" "$STUB_LOG" && t_ok "toggle volume down steps by 10" || t_fail "volume down"
+"$T" volume 'x; rm -rf /' >/dev/null 2>&1; [[ $? == 2 ]] && t_ok "toggle volume refuses anything but a number" || t_fail "volume accepted junk"
+"$T" wifi sideways >/dev/null 2>&1; [[ $? == 2 ]] && t_ok "toggle refuses a state other than on or off" || t_fail "bad state accepted"
+: > "$STUB_LOG"; OSASCRIPT_REPLY=false "$T" mute
+grep -q "osascript -e set volume with output muted" "$STUB_LOG" && t_ok "toggle mute mutes the sound" || t_fail "mute" "$(cat "$STUB_LOG")"
+: > "$STUB_LOG"; OSASCRIPT_REPLY=true "$T" mute off
+grep -q "set volume without output muted" "$STUB_LOG" && t_ok "toggle mute off unmutes" || t_fail "unmute"
+: > "$STUB_LOG"; "$T" hidden on
+grep -q "defaults write com.apple.finder AppleShowAllFiles -bool true" "$STUB_LOG" && grep -q "killall Finder" "$STUB_LOG" \
+  && t_ok "toggle hidden on shows hidden files and restarts Finder" || t_fail "hidden on" "$(cat "$STUB_LOG")"
+: > "$STUB_LOG"; "$T" dock off
+grep -q "defaults write com.apple.dock autohide -bool true" "$STUB_LOG" && t_ok "toggle dock off hides the Dock automatically" || t_fail "dock off"
+: > "$STUB_LOG"; "$T" dark on
+grep -q "set dark mode to true" "$STUB_LOG" && t_ok "toggle dark on without a theme pair sets the appearance" || t_fail "dark on" "$(cat "$STUB_LOG")"
+out="$(OSASCRIPT_FAIL="execution error: Not authorized to send Apple events to System Events. (-1743)" GRAND_LINE_QUIET=1 "$T" dark on)"; code=$?
+[[ $code == 3 && "$out" == *Automation* ]] && t_ok "a missing Automation permission exits 3 and says so" || t_fail "automation failure" "$code $out"
+out="$(GRAND_LINE_QUIET=1 SHORTCUTS_LIST="" "$T" dnd on)"; code=$?
+[[ $code == 4 && "$out" == *"Do Not Disturb On"* ]] && t_ok "Do Not Disturb without its shortcut exits 4 and names it" || t_fail "dnd missing shortcut" "$code $out"
+: > "$STUB_LOG"; SHORTCUTS_LIST=$'Do Not Disturb On\nDo Not Disturb Off' "$T" dnd on
+grep -q "shortcuts run Do Not Disturb On" "$STUB_LOG" && is_on dnd && t_ok "toggle dnd on runs its shortcut and remembers the state" || t_fail "dnd on" "$(cat "$STUB_LOG")"
+: > "$STUB_LOG"; SHORTCUTS_LIST=$'Do Not Disturb On\nDo Not Disturb Off' "$T" dnd
+grep -q "shortcuts run Do Not Disturb Off" "$STUB_LOG" && ! is_on dnd && t_ok "toggle dnd flips it back off" || t_fail "dnd flip off"
+status="$(WIFI_POWER=On BLUEUTIL_POWER=0 OSASCRIPT_REPLY=40 "$T" status)"
+grep -qx "wifi on" <<<"$status" && grep -qx "bluetooth off" <<<"$status" && grep -qx "volume 40" <<<"$status" \
+  && grep -qx "dark off" <<<"$status" && grep -qx "hidden off" <<<"$status" \
+  && t_ok "toggle status prints every setting's state and the volume" || t_fail "toggle status" "$status"
+[[ "$(WIFI_POWER=Off "$T" status wifi)" == "wifi off" ]] && t_ok "toggle status NAME reads only that setting" || t_fail "status wifi"
+: > "$STUB_LOG"; "$ROOT/bin/power" display-sleep && grep -q "pmset displaysleepnow" "$STUB_LOG" && t_ok "power display-sleep" || t_fail "power display-sleep"
+"$ROOT/bin/power" reboot-now >/dev/null 2>&1; [[ $? == 2 ]] && t_ok "power refuses an unknown action" || t_fail "power unknown"
 
 # --- personal details: read from personal.env, never asked without a keyboard
 # shellcheck source=lib/personal.sh

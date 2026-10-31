@@ -20,6 +20,8 @@ is_on() {
     wifi)    networksetup -getairportpower "$(wifi_device)" 2>/dev/null | grep -q 'On$' ;;
     bluetooth) [[ "$(blueutil -p 2>/dev/null)" == 1 ]] ;;
     mic-muted) [[ -f "$TOGGLE_FLAGS/$1" ]] ;;
+    mute)    [[ "$(osascript -e 'output muted of (get volume settings)' 2>/dev/null)" == true ]] ;;
+    dnd)     dnd_on ;;
     # Colima's VM does not survive a restart, so the flag counts only when it
     # was set since the Mac last started.
     docker)  [[ -f "$TOGGLE_FLAGS/docker" && "$(< "$TOGGLE_FLAGS/docker")" == "$(boot_time)" ]] ;;
@@ -27,6 +29,26 @@ is_on() {
     files|search) [[ "$(cat "$HOME/.local/state/grand-line/takeover-$1" 2>/dev/null || echo on)" == on ]] ;;
     *) return 1 ;;
   esac
+}
+
+# The output volume, 0 to 100, or nothing when the output has no volume
+# control (some USB and HDMI outputs).
+volume_level() {
+  local v
+  v="$(osascript -e 'output volume of (get volume settings)' 2>/dev/null)"
+  [[ "$v" =~ ^[0-9]+$ ]] && printf '%s\n' "$v"
+}
+
+# Whether a Focus (Do Not Disturb or another) is on. macOS keeps the active
+# one in Assertions.json; when that file cannot be read (it can need Full
+# Disk Access), the flag bin/toggle keeps is the answer instead.
+dnd_on() {
+  local db="$HOME/Library/DoNotDisturb/DB/Assertions.json" text
+  if text="$(cat "$db" 2>/dev/null)"; then
+    [[ "$text" == *storeAssertionRecords* ]]
+  else
+    [[ -f "$TOGGLE_FLAGS/dnd" ]]
+  fi
 }
 
 # The Wi-Fi interface (en0 on laptops, often en1 on desktops).
@@ -51,9 +73,10 @@ flag() {
   if [[ "$2" == on ]]; then boot_time > "$TOGGLE_FLAGS/$1"; else rm -f "$TOGGLE_FLAGS/$1"; fi
 }
 
-# theme_is NAME: succeeds when NAME is the current theme.
+# theme_is NAME: succeeds when NAME is the current theme, or the family
+# (harbour for harbour-dark and harbour-light) it belongs to.
 theme_is() {
   local current=""
   read -r current < "$HOME/.local/state/grand-line/theme" 2>/dev/null
-  [[ "$current" == "$1" ]]
+  [[ "$current" == "$1" || "$current" == "$1-dark" || "$current" == "$1-light" ]]
 }

@@ -23,6 +23,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.contentView = NSHostingView(rootView: root)
         panel.delegate = self
         model.hide = { [weak self] in self?.hide() }
+        model.show = { [weak self] in self?.show() }
         // The window is clear, so its shadow follows what is drawn: redraw it as rows change.
         changes = model.objectWillChange.sink { [weak self] _ in
             DispatchQueue.main.async { self?.panel.invalidateShadow() }
@@ -61,6 +62,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self, self.panel.isVisible else { return }
             self.services.windowWillOpen(frontApp: self.model.performer.previousApp)
+            self.model.panelDidOpen()
             // Typing since the window opened has already searched.
             if self.model.text == shownText { self.model.refresh() }
         }

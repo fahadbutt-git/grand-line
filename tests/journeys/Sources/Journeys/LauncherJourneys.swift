@@ -123,9 +123,9 @@ enum LauncherJourneys {
     /// Add a setting here, with the row's identifier (setting.<id>).
     static let settingsTable: [Setting] = [
         Setting(id: "darkmode", phrase: "dark mode", mode: .toggle, read: "defaults read -g AppleInterfaceStyle 2>&1"),
-        Setting(id: "wifi", phrase: "wi-fi", mode: .toggle, read: #"d=$(networksetup -listallhardwareports | awk '/Wi-Fi|AirPort/{getline; print $2; exit}'); [ -n "$d" ] || { echo "SKIP no Wi-Fi hardware on this Mac"; exit 0; }; networksetup -getairportpower "$d""#),
+        Setting(id: "wifi", phrase: "wifi", mode: .toggle, read: #"d=$(networksetup -listallhardwareports | awk '/Wi-Fi|AirPort/{getline; print $2; exit}'); [ -n "$d" ] || { echo "SKIP no Wi-Fi hardware on this Mac"; exit 0; }; networksetup -getairportpower "$d""#),
         Setting(id: "bluetooth", phrase: "bluetooth", mode: .toggle, read: #"if command -v blueutil >/dev/null; then blueutil -p; else s=$(system_profiler SPBluetoothDataType 2>/dev/null | awk -F': ' '/State:/{print $2; exit}'); [ -n "$s" ] && echo "$s" || echo "SKIP no Bluetooth hardware on this Mac"; fi"#),
-        Setting(id: "focus", phrase: "focus", mode: .toggle, read: nil),
+        Setting(id: "dnd", phrase: "do not disturb", mode: .toggle, read: nil),
         Setting(id: "mute", phrase: "mute", mode: .toggle, read: #"v=$(osascript -e 'output muted of (get volume settings)' 2>&1); case "$v" in true|false) echo "$v";; *) echo "SKIP no sound output on this Mac ($v)";; esac"#),
         Setting(id: "hiddenfiles", phrase: "hidden files", mode: .toggle, read: "defaults read com.apple.finder AppleShowAllFiles 2>&1"),
         Setting(id: "dockautohide", phrase: "dock autohide", mode: .toggle, read: "defaults read com.apple.dock autohide 2>&1"),
@@ -133,10 +133,11 @@ enum LauncherJourneys {
         Setting(id: "menubarautohide", phrase: "menu bar autohide", mode: .toggle, read: "defaults read -g _HIHideMenuBar 2>&1"),
         Setting(id: "keepawake", phrase: "keep awake", mode: .toggle, read: "pmset -g assertions | grep -i -E 'byakugan|caffeinate' | grep -c -i prevent"),
         Setting(id: "lock", phrase: "lock screen", mode: .offerOnly, read: nil),
-        Setting(id: "sleepdisplay", phrase: "sleep display", mode: .offerOnly, read: nil),
+        Setting(id: "displaysleep", phrase: "sleep display", mode: .offerOnly, read: nil),
         Setting(id: "restart", phrase: "restart", mode: .confirm, read: nil),
         Setting(id: "sleep", phrase: "sleep", mode: .confirm, read: nil),
         Setting(id: "shutdown", phrase: "shut down", mode: .confirm, read: nil),
+        Setting(id: "logout", phrase: "log out", mode: .confirm, read: nil),
     ]
 
     static var settings: Journey {

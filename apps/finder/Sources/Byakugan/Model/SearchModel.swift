@@ -25,6 +25,9 @@ final class SearchModel: ObservableObject {
     let performer: ActionPerformer
     weak var field: NSTextField?
     var hide: () -> Void = {}
+    var show: () -> Void = {}
+    /// The window is coming back to show a change that failed after it closed.
+    private var reopeningForFailure = false
     private var task: Task<Void, Never>?
     private var query = LaunchQuery(raw: "")
 
@@ -48,6 +51,7 @@ final class SearchModel: ObservableObject {
         let started = Date()
         list.replace(with: engine.instantGroups(plan), limitScale: plan.limitScale, topHit: plan.topHit)
         status = statusText(milliseconds: Int(Date().timeIntervalSince(started) * 1000))
+        readSettingsIfShown()
         task?.cancel()
         task = Task { [weak self] in
             for await update in engine.search(plan, includeInstant: false) {
@@ -171,6 +175,7 @@ final class SearchModel: ObservableObject {
 
     func run(_ action: LaunchAction, on row: LaunchResult) {
         guard gate.shouldRun(action, on: row.id) else { return }
+        if row.providerID == SettingsActionsProvider.providerID, runSetting(action, on: row) { return }
         switch action.command {
         case .toggleFavourite:
             services.usage.toggleFavourite(row)
@@ -192,6 +197,60 @@ final class SearchModel: ObservableObject {
         if let path = row.previewPath { services.names.noteOpened(path) }
         if action.closesWindow { hide() }
         performer.perform(action.command)
+    }
+
+    // MARK: Settings
+
+    /// Each opening reads the settings' state afresh, once a settings row is on screen.
+    func panelDidOpen() {
+        if reopeningForFailure {
+            reopeningForFailure = false
+            return
+        }
+        services.settingsActions.panelOpened()
+    }
+
+    private func readSettingsIfShown() {
+        let settings = services.settingsActions
+        guard list.rows.contains(where: { $0.providerID == SettingsActionsProvider.providerID }), settings.claimRead() else { return }
+        Task { [weak self] in
+            await settings.readState()
+            self?.updateSettingRows()
+        }
+    }
+
+    /// Redraws the settings rows in place, so nothing else on screen moves.
+    private func updateSettingRows() {
+        list.update(services.settingsActions.instantResults(for: query))
+    }
+
+    /// Runs a setting change off the main thread: the row says it is working,
+    /// then shows the state read back, or why it failed. A second Return on
+    /// the same row while it runs is ignored. Returns false for actions the
+    /// window runs itself (opening a pane, a screenshot).
+    private func runSetting(_ action: LaunchAction, on row: LaunchResult) -> Bool {
+        let settings = services.settingsActions
+        switch settings.begin(action, resultID: row.id) {
+        case .notManaged:
+            return false
+        case .busy:
+            return true
+        case .started(let job):
+            // Not recorded in Recents: the row's title is a state that will change.
+            let closes = action.closesWindow || UserDefaults.standard.bool(forKey: SettingsActionsProvider.closeAfterChangeKey)
+            if closes { hide() }
+            updateSettingRows()
+            Task { [weak self] in
+                let failure = await settings.finish(job)
+                guard let self else { return }
+                if failure != nil, closes {
+                    self.reopeningForFailure = true
+                    self.show()
+                }
+                self.updateSettingRows()
+            }
+            return true
+        }
     }
 
     // MARK: Layout

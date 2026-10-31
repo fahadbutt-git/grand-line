@@ -214,6 +214,29 @@ Each app draws its icon in the theme's colours when it starts and whenever the t
 
 Once installed, Log Pose opens folders and every "Show in Finder", and Byakugan answers Command + Space (so Caps + Space too). Both switch back from the Toggle menu, or with `toggle files` and `toggle search`, and the choice is kept across updates.
 
+### Changing settings from Byakugan
+
+Typing a setting changes it, rather than opening System Settings. The row shows the state it read when the window opened ("Wi-Fi: On, Return turns it off"), Return makes the change, and the row then shows the state read back from the Mac, so a second Return undoes it. Command + Return opens the setting's pane instead. If a change fails, the row says why, and when macOS needs a permission, Return opens that part of Privacy & Security. The window stays open after a change; `defaults write com.grandline.byakugan CloseAfterSettingChange -bool true` closes it instead.
+
+| Type | Does |
+| --- | --- |
+| `dark`, `dark mode on`, `light mode` | Dark mode (with a theme that has a dark and a light variant, the theme switches too) |
+| `wifi`, `turn off wifi`, `bt off`, `bluetooth` | Wi-Fi and Bluetooth |
+| `dnd`, `do not disturb`, `focus off` | Do Not Disturb (needs the two shortcuts below) |
+| `mute`, `unmute`, `volume 30`, `volume up`, `louder` | Sound. Volume steps by 10 |
+| `mute mic` | Microphone muted |
+| `hidden files`, `show hidden files` | Hidden files in Finder |
+| `hide dock`, `dock autohide`, `hide menu bar`, `desktop icons` | Dock and menu bar hiding, desktop icons |
+| `caffeinate`, `keep awake` | Keeps the Mac awake until switched off |
+| `lock`, `display off` | Locks the screen, or sleeps the display |
+| `sleep`, `restart`, `shut down`, `log out` | Ask first: press Return twice. Apps can still ask to save their work |
+| `screenshot`, `record screen`, `ocr` | The Capture menu's tools |
+| `night shift`, `low power`, `brightness` | Open their pane: macOS has no command for Night Shift, Low Power Mode needs an administrator password, and no brightness tool is installed |
+
+These run `toggle` and `power`, the same commands as the Toggle and System menus, so both always agree. The first time, macOS asks to let Byakugan control System Events (dark mode without a theme pair, menu bar hiding, log out, restart, shut down) and, for Lock, to allow Accessibility.
+
+**Do Not Disturb.** macOS has no command for Focus, so it runs two shortcuts you make once in the Shortcuts app. Make a shortcut named `Do Not Disturb On` with the action Set Focus, Turn Do Not Disturb On, Until Turned Off, and one named `Do Not Disturb Off` with Turn Do Not Disturb Off. Other names work too, set as `GRAND_LINE_DND_ON` and `GRAND_LINE_DND_OFF`. Until they exist, the row says which one is missing.
+
 ## How to add things
 
 | To add | Do this |

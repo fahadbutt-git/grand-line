@@ -67,6 +67,26 @@ public struct ResultList: Sendable, Equatable {
         if let index = rows.firstIndex(where: { $0.id == id }) { selectedIndex = index }
     }
 
+    /// Swaps rows already on screen for fresh copies of themselves (the same id),
+    /// such as a setting whose state was just read. Each keeps its place, rank
+    /// and section, and the selection stays put; rows not on screen are ignored.
+    public mutating func update(_ fresh: [LaunchResult]) {
+        guard !fresh.isEmpty else { return }
+        let byID = Dictionary(fresh.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        for g in groups.indices {
+            for r in groups[g].rows.indices {
+                let old = groups[g].rows[r]
+                guard var new = byID[old.id], new != old else { continue }
+                let highlights = new.match.highlights
+                new.match = old.match
+                new.match.highlights = highlights
+                new.rank = old.rank
+                new.section = old.section
+                groups[g].rows[r] = new
+            }
+        }
+    }
+
     /// Merges ranked results that arrived after the first batch.
     public mutating func merge(_ incoming: [LaunchResult]) {
         guard !groups.isEmpty else {

@@ -98,7 +98,7 @@ final class NavigationTests: XCTestCase {
     func testTitles() {
         XCTAssertEqual(BrowserLocation.folder(documents).title, "Documents")
         XCTAssertEqual(BrowserLocation.recents.title, "Recents")
-        XCTAssertEqual(BrowserLocation.folder(URL(fileURLWithPath: "/Users/someone/.Trash")).title, "Trash")
+        XCTAssertEqual(BrowserLocation.folder(URL(fileURLWithPath: "/private/tmp/journey/.Trash")).title, "Trash")
         XCTAssertEqual(BrowserLocation.archive(documents.appendingPathComponent("D.zip"), entry: "x/y").title, "y")
         XCTAssertNil(BrowserLocation.archive(documents, entry: "").folderURL, "nothing is written inside an archive")
     }

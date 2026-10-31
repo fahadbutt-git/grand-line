@@ -16,6 +16,8 @@ final class Services {
     let snippets = EspansoMatches.provider()
     let bookmarks = Bookmarks.provider()
     let settings = SettingsPanes.provider()
+    /// Settings changed in place: "dark mode", "wifi off", "volume 30".
+    let settingsActions = SettingsActionsProvider()
     let symbols = SymbolTable.provider()
     let menuItems = MenuBarItems.provider()
     let menu = MenuProvider()
@@ -60,6 +62,7 @@ final class Services {
         var providers: [any LaunchProvider] = [
             RecentsProvider(usage: usage),
             CalculatorProvider(rates: rates),
+            settingsActions,
             aliases, apps, menu, commands, keybindings, settings, menuItems, processes,
             DefineProvider(lookup: { DictionaryLookup.define($0) }),
             snippets, symbols, bookmarks, web, files, saved,

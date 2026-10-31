@@ -22,6 +22,40 @@ end run
 EOF
 }
 
+# say TITLE [TEXT]: a notification, unless the caller shows the outcome
+# itself (Byakugan sets GRAND_LINE_QUIET and reads the exit status).
+say() {
+  [[ -n "${GRAND_LINE_QUIET:-}" ]] || notify "$@"
+}
+
+# fail CODE REASON: print why a change could not be made, tell the person, and
+# stop. The codes Byakugan reads: 3 Automation permission missing, 4 a tool
+# is not installed, 5 Accessibility permission missing, 1 anything else.
+fail() {
+  printf '%s\n' "$2"
+  say "Could not do that" "$2"
+  exit "$1"
+}
+
+# osa ARGS...: run osascript, and on failure stop with the reason. macOS
+# answers -1743 when Automation (sending Apple events) is not allowed, and
+# 1002 when keystrokes need Accessibility. Use it as a statement, never
+# inside $( ), so the exit stops the command itself.
+osa() {
+  local out
+  if out="$(osascript "$@" 2>&1)"; then
+    [[ -z "$out" ]] || printf '%s\n' "$out"
+    return 0
+  fi
+  case "$out" in
+    *-1743*|*"Not authorized to send Apple events"*)
+      fail 3 "Allow Automation for System Events in Privacy & Security" ;;
+    *1002*|*"not allowed to send keystrokes"*|*"assistive access"*)
+      fail 5 "Allow Accessibility in Privacy & Security" ;;
+  esac
+  fail 1 "macOS refused: ${out##*: }"
+}
+
 # The menus' font and colours, rendered by the theme command
 # (config/themed/menu-flags.tpl). The older location is read until the next
 # theme change.

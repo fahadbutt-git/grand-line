@@ -3,4 +3,8 @@
 echo "osascript $*" >> "${STUB_LOG:-/dev/null}"
 # A script given as "-" arrives on stdin; read it so the caller never blocks.
 [[ "${1:-}" == "-" ]] && cat >/dev/null
+# OSASCRIPT_FAIL makes every call fail with that message on stderr, as macOS
+# does when a permission is missing. OSASCRIPT_REPLY is printed as the answer.
+if [[ -n "${OSASCRIPT_FAIL:-}" ]]; then echo "$OSASCRIPT_FAIL" >&2; exit 1; fi
+[[ -n "${OSASCRIPT_REPLY:-}" ]] && echo "$OSASCRIPT_REPLY"
 exit 0

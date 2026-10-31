@@ -1,99 +1,183 @@
 #!/bin/bash
 # grandline:summary=Turn a setting on or off (keep awake, dark mode, Wi-Fi, Docker and more)
-# toggle awake | dark | hidden | menubar | desktop-icons | dock | wifi | bluetooth | mic | ollama | docker
-#        files (Log Pose or Finder) | search (Byakugan or Spotlight)
+# toggle NAME [on|off]   flips NAME, or sets it; a setting already as asked is left alone
+#   NAME: awake | dark | hidden | menubar | desktop-icons | dock | wifi | bluetooth | dnd
+#         mute | mic | ollama | docker | files (Log Pose or Finder) | search (Byakugan or Spotlight)
+# toggle volume N|up|down   sets the output volume (0 to 100) or moves it by 10
+# toggle status [NAME...]   prints "NAME on|off" per setting and "volume N" (Byakugan reads it)
 # The menu shows each one's state with a check mark (lib/toggle-state.sh).
+# Exit status: 0 done, 2 usage, and the codes of fail() in lib/bin-common.sh.
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 # shellcheck source=lib/toggle-state.sh
 source "$(dirname "$(readlink -f "$0")")/../lib/toggle-state.sh"
 
-case "${1:-}" in
+# The two shortcuts Do Not Disturb runs (README: Do Not Disturb). macOS has
+# no command for Focus, so these are made once in the Shortcuts app.
+DND_ON_SHORTCUT="${GRAND_LINE_DND_ON:-Do Not Disturb On}"
+DND_OFF_SHORTCUT="${GRAND_LINE_DND_OFF:-Do Not Disturb Off}"
+
+usage() {
+  echo "usage: toggle awake|dark|hidden|menubar|desktop-icons|dock|wifi|bluetooth|dnd|mute|mic|ollama|docker|files|search [on|off]" >&2
+  echo "       toggle volume N|up|down   toggle status [NAME...]" >&2
+  exit 2
+}
+
+name="${1:-}"
+arg="${2:-}"
+
+case "$name" in
+  status)
+    shift
+    [[ $# -gt 0 ]] || set -- dark wifi bluetooth dnd mute hidden dock desktop-icons menubar awake mic-muted volume
+    for n in "$@"; do
+      case "$n" in
+        volume) v="$(volume_level)"; [[ -z "$v" ]] || echo "volume $v"; continue ;;
+        bluetooth) command -v blueutil >/dev/null 2>&1 || continue ;;
+        wifi) [[ -n "$(wifi_device)" ]] || continue ;;
+        dark|dnd|mute|hidden|dock|desktop-icons|menubar|awake|mic-muted|docker|ollama|files|search) ;;
+        *) continue ;;
+      esac
+      if is_on "$n"; then echo "$n on"; else echo "$n off"; fi
+    done
+    exit 0
+    ;;
+  volume)
+    now="$(volume_level)"
+    case "$arg" in
+      up|down)
+        [[ -n "$now" ]] || fail 1 "This sound output has no volume control"
+        if [[ "$arg" == up ]]; then level=$((now + 10)); else level=$((now - 10)); fi
+        ;;
+      *)
+        [[ "$arg" =~ ^[0-9]{1,3}$ ]] || usage
+        level=$((10#$arg))
+        ;;
+    esac
+    (( level > 100 )) && level=100
+    (( level < 0 )) && level=0
+    osa -e "set volume output volume $level without output muted"
+    exit 0
+    ;;
+esac
+
+# What the change is: the state asked for, or the other one. The microphone's
+# state is "muted", so "toggle mic on" mutes it.
+currently_on() {
+  case "$name" in
+    mic) is_on mic-muted ;;
+    docker) colima status >/dev/null 2>&1 ;;   # the VM itself, not the flag
+    *) is_on "$name" ;;
+  esac
+}
+case "$arg" in
+  on|off)
+    if currently_on; then now=on; else now=off; fi
+    [[ "$now" == "$arg" ]] && exit 0
+    want="$arg"
+    ;;
+  "")
+    if currently_on; then want=off; else want=on; fi
+    ;;
+  *) usage ;;
+esac
+if [[ "$want" == on ]]; then yes=true; else yes=false; fi
+
+case "$name" in
   awake)
     # Run caffeinate as its own background job so later shortcuts cannot stop it.
-    if is_on awake; then
+    if [[ "$want" == off ]]; then
       launchctl remove grand-line.caffeinate
-      notify "Keep awake off" "The Mac can sleep normally."
+      say "Keep awake off" "The Mac can sleep normally."
     else
       launchctl submit -l grand-line.caffeinate -- /usr/bin/caffeinate -dims
-      notify "Keep awake on" "The Mac will not sleep until you turn this off."
+      say "Keep awake on" "The Mac will not sleep until you turn this off."
     fi
     ;;
   dark)
-    osascript -e 'tell application "System Events" to tell appearance preferences to set dark mode to not dark mode'
+    # A theme with a dark and a light variant switches with it; theme sets
+    # the macOS appearance to match.
+    if [[ "$want" == on ]]; then mode=dark; else mode=light; fi
+    if ! theme mode "$mode" >/dev/null 2>&1; then
+      osa -e "tell application \"System Events\" to tell appearance preferences to set dark mode to $yes"
+    fi
     ;;
   hidden)
-    if is_on hidden; then
-      defaults write com.apple.finder AppleShowAllFiles -bool false; state=off
-    else
-      defaults write com.apple.finder AppleShowAllFiles -bool true; state=on
-    fi
+    defaults write com.apple.finder AppleShowAllFiles -bool "$yes"
     killall Finder
-    notify "Hidden files $state"
+    say "Hidden files $want"
     ;;
   menubar)
-    osascript -e 'tell application "System Events" to tell dock preferences to set autohide menu bar to not autohide menu bar'
+    # On means the menu bar stays shown, off hides it until the pointer is at the top.
+    if [[ "$want" == on ]]; then hide=false; else hide=true; fi
+    osa -e "tell application \"System Events\" to tell dock preferences to set autohide menu bar to $hide"
     ;;
   wifi)
     dev="$(wifi_device)"
-    if is_on wifi; then
-      networksetup -setairportpower "$dev" off; notify "Wi-Fi off"
-    else
-      networksetup -setairportpower "$dev" on; notify "Wi-Fi on"
-    fi
+    [[ -n "$dev" ]] || fail 1 "This Mac has no Wi-Fi"
+    networksetup -setairportpower "$dev" "$want" || fail 1 "Wi-Fi did not switch $want"
+    say "Wi-Fi $want"
     ;;
   bluetooth)
-    command -v blueutil >/dev/null || { notify "Bluetooth toggle needs blueutil" "Run: update"; exit 1; }
-    if is_on bluetooth; then blueutil -p 0; notify "Bluetooth off"
-    else blueutil -p 1; notify "Bluetooth on"; fi
+    command -v blueutil >/dev/null || fail 4 "Bluetooth needs blueutil. Run: update"
+    if [[ "$want" == on ]]; then blueutil -p 1; else blueutil -p 0; fi || fail 1 "Bluetooth did not switch $want"
+    say "Bluetooth $want"
+    ;;
+  dnd)
+    command -v shortcuts >/dev/null || fail 4 "The Shortcuts command is missing"
+    if [[ "$want" == on ]]; then shortcut="$DND_ON_SHORTCUT"; else shortcut="$DND_OFF_SHORTCUT"; fi
+    shortcuts list 2>/dev/null | grep -qxF "$shortcut" \
+      || fail 4 "Make the shortcut \"$shortcut\" in Shortcuts first (README: Do Not Disturb)"
+    shortcuts run "$shortcut" >/dev/null 2>&1 || fail 1 "The shortcut \"$shortcut\" did not run"
+    flag dnd "$want"
+    say "Do Not Disturb $want"
+    ;;
+  mute)
+    if [[ "$want" == on ]]; then osa -e 'set volume with output muted'; else osa -e 'set volume without output muted'; fi
     ;;
   mic)
     # Mutes the microphone by setting its input level to zero, and restores it.
     saved="$GRAND_LINE_STATE/mic-volume"
     level="$(osascript -e 'input volume of (get volume settings)')"
-    [[ "$level" =~ ^[0-9]+$ ]] || { notify "No microphone found"; exit 1; }
-    if [[ "$level" -gt 0 ]]; then
-      echo "$level" > "$saved"; osascript -e 'set volume input volume 0'; flag mic-muted on; notify "Microphone muted"
+    [[ "$level" =~ ^[0-9]+$ ]] || fail 1 "No microphone found"
+    if [[ "$want" == on ]]; then
+      [[ "$level" -gt 0 ]] && echo "$level" > "$saved"
+      osa -e 'set volume input volume 0'; flag mic-muted on; say "Microphone muted"
     else
-      osascript -e "set volume input volume $(cat "$saved" 2>/dev/null || echo 75)"; flag mic-muted off; notify "Microphone on"
+      osa -e "set volume input volume $(cat "$saved" 2>/dev/null || echo 75)"; flag mic-muted off; say "Microphone on"
     fi
     ;;
   desktop-icons)
-    if ! is_on desktop-icons; then
-      defaults write com.apple.finder CreateDesktop -bool true; state=shown
-    else
-      defaults write com.apple.finder CreateDesktop -bool false; state=hidden
-    fi
-    killall Finder; notify "Desktop icons $state"
+    defaults write com.apple.finder CreateDesktop -bool "$yes"
+    killall Finder
+    if [[ "$want" == on ]]; then say "Desktop icons shown"; else say "Desktop icons hidden"; fi
     ;;
   dock)
-    if ! is_on dock; then
-      defaults write com.apple.dock autohide -bool false
-    else
-      defaults write com.apple.dock autohide -bool true
-    fi
+    # On means the Dock is always shown; off hides it automatically.
+    if [[ "$want" == on ]]; then defaults write com.apple.dock autohide -bool false
+    else defaults write com.apple.dock autohide -bool true; fi
     killall Dock
     ;;
   ollama)
     # Local AI models. Runs as its own background job until toggled off.
-    if is_on ollama; then
-      launchctl remove grand-line.ollama; notify "Local AI off" "Its memory is free again."
+    if [[ "$want" == off ]]; then
+      launchctl remove grand-line.ollama; say "Local AI off" "Its memory is free again."
     else
       launchctl submit -l grand-line.ollama -- "$BREW_PREFIX/bin/ollama" serve
-      notify "Local AI on" "Try in Terminal: ollama run llama3.2"
+      say "Local AI on" "Try in Terminal: ollama run llama3.2"
     fi
     ;;
   docker)
     # Starts or stops the Colima VM that Docker runs in. Starting takes a few
     # seconds, so it runs on its own after the shortcut returns.
-    if colima status >/dev/null 2>&1; then
-      detach_self "$0" docker
-      colima stop >/dev/null 2>&1 && flag docker off && notify "Docker stopped" "Its memory is free again."
+    if [[ "$want" == off ]]; then
+      detach_self "$0" docker off
+      colima stop >/dev/null 2>&1 && flag docker off && say "Docker stopped" "Its memory is free again."
     else
-      detach_self "$0" docker
+      detach_self "$0" docker on
       # Apple's virtualisation, Rosetta for Intel images, and room to build.
       colima start --vm-type vz --vz-rosetta --cpu 6 --memory 12 --disk 120 >/dev/null 2>&1 \
-        && flag docker on && notify "Docker is running" "Stop it from the same menu when done." \
-        || notify "Docker did not start" "Run in Terminal: colima start"
+        && flag docker on && say "Docker is running" "Stop it from the same menu when done." \
+        || say "Docker did not start" "Run in Terminal: colima start"
     fi
     ;;
   files|search)
@@ -101,13 +185,13 @@ case "${1:-}" in
     source "$(dirname "$(readlink -f "$0")")/../lib/default-apps.sh"
     # shellcheck source=lib/takeover.sh
     source "$(dirname "$(readlink -f "$0")")/../lib/takeover.sh"
-    if [[ "$1" == files ]]; then app="Log Pose" was=Finder; else app=Byakugan was=Spotlight; fi
-    if is_on "$1"; then
-      "takeover_$1" off && notify "$was is back" "Switch to $app again from the same menu."
+    if [[ "$name" == files ]]; then app="Log Pose" was=Finder; else app=Byakugan was=Spotlight; fi
+    if [[ "$want" == off ]]; then
+      "takeover_$name" off && say "$was is back" "Switch to $app again from the same menu."
     else
-      "takeover_$1" on || { notify "$app is not installed" "Run: update"; exit 1; }
-      notify "$app is on" "Switch back to $was from the same menu."
+      "takeover_$name" on || fail 4 "$app is not installed. Run: update"
+      say "$app is on" "Switch back to $was from the same menu."
     fi
     ;;
-  *) echo "usage: toggle awake|dark|hidden|menubar|desktop-icons|dock|wifi|bluetooth|mic|ollama|docker|files|search" >&2; exit 2 ;;
+  *) usage ;;
 esac
