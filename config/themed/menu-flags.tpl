@@ -1,0 +1,1 @@
+-f SFProText-Regular -s 17 -n 12 -w 40 -c {{ HIGHLIGHT }} -b {{ TERM_SELECTION }} -u -a

@@ -55,6 +55,10 @@ expect "mru-spaces -bool false"
 expect "socketfilterfw --setglobalstate on"
 expect "CriticalUpdateInstall -bool true"
 expect "Setup finished."
+expect "bin/migrate --mark-all"
+for sample in "$ROOT"/config/mac-setup/hooks/*.sample; do
+  expect "cp $sample $tmp/home/.config/mac-setup/hooks/${sample##*/}"
+done
 
 if [[ -n "$(ls -A "$tmp/home")" ]]; then
   echo "dry run wrote into the home folder:"; ls -A "$tmp/home"; fail=1
@@ -75,6 +79,20 @@ sandbox --dry-run --only folders > "$tmp/only.txt" 2>&1
 if grep -q "brew bundle" "$tmp/only.txt" || ! grep -q "== folders ==" "$tmp/only.txt"; then
   echo "--only folders ran the wrong steps"; fail=1
 fi
+
+# A Mac already set up keeps its migrations to run, keeps its own hooks, and
+# gets its own shortcuts (bindings.local.tsv) merged into the Karabiner copy.
+h2="$tmp/home2"; mkdir -p "$h2/.local/state/mac-setup" "$h2/.config/mac-setup/hooks"
+echo graphite > "$h2/.local/state/mac-setup/theme"
+echo mine > "$h2/.config/mac-setup/hooks/post-update.sample"
+printf 'Caps + Shift + Z\tApps\tZotero\topen -a Zotero\n' > "$h2/.config/mac-setup/bindings.local.tsv"
+env -i HOME="$h2" PATH="$ROOT/tests/stubs:/usr/bin:/bin" TERM=dumb MAC_SETUP_BREW_PREFIX="$tmp/brew" \
+  bash "$ROOT/setup.sh" --dry-run --only dotfiles > "$tmp/again.txt" 2>&1
+grep -q "mark-all" "$tmp/again.txt" && { echo "an existing Mac had its migrations marked done"; fail=1; }
+grep -q "hooks/post-update.sample" "$tmp/again.txt" && { echo "setup would replace a hook sample you already have"; fail=1; }
+grep -qF "merge $h2/.config/mac-setup/bindings.local.tsv into the Caps Lock shortcuts" "$tmp/again.txt" \
+  || { echo "your own shortcuts were not merged"; cat "$tmp/again.txt"; fail=1; }
+[[ "$(cat "$h2/.config/mac-setup/hooks/post-update.sample")" == mine ]] || { echo "dry run changed a hook"; fail=1; }
 
 [[ $fail -eq 1 ]] && { echo "---- full output ----"; cat "$out"; }
 exit $fail

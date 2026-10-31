@@ -15,8 +15,10 @@ macOS requires these clicks from you. Work down the list once.
    General, Login Items and Extensions, then allow Input Monitoring
    for karabiner_grabber and karabiner_observer when asked.
 
-2. AeroSpace (window tiling)
-   Open AeroSpace and allow Accessibility when asked.
+2. AeroSpace (window tiling) and the drop-down terminal
+   Open AeroSpace and allow Accessibility when asked. Then press
+   Caps + ` once and allow Ghostty under Accessibility too, so its
+   quick terminal can drop down over any app.
 
 3. Maccy (clipboard history)
    Open Maccy, allow Accessibility, and in its settings turn on

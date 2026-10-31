@@ -10,7 +10,23 @@
   prune = true
 [rerere]
   enabled = true
+  autoupdate = true        # apply a remembered conflict resolution straight away
 [diff]
   algorithm = histogram
+  colorMoved = plain       # show moved lines as moved, not deleted and added
+  mnemonicPrefix = true    # i/ w/ c/ instead of a/ b/ in diffs
+[commit]
+  verbose = true           # show the diff while writing the message
+[column]
+  ui = auto
+[branch]
+  sort = -committerdate    # most recently used branches first
+[tag]
+  sort = -version:refname  # v1.10 after v1.9
+[alias]
+  co = checkout
+  br = branch
+  ci = commit
+  st = status
 [core]
   excludesFile = ~/.mac-setup/config/git/ignore

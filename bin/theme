@@ -1,4 +1,5 @@
 #!/bin/bash
+# mac:summary=Change the theme (terminal, editor, menus, tools, wallpaper) or background
 # theme pick                    choose a theme from a menu
 # theme set NAME [--no-wallpaper]
 # theme next-background         cycle through ~/Pictures/Backgrounds
@@ -8,6 +9,11 @@ source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 REPO="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 THEMES="$REPO/config/themes"
 BACKGROUNDS="$BACKGROUNDS_DIR"
+CURRENT="$MAC_SETUP_STATE/current"
+THEME_OUT="$CURRENT/theme"                       # rendered templates, read by apps
+USER_TEMPLATES="$HOME/.config/mac-setup/themed"  # your templates win over the package's
+# shellcheck source=lib/templates.sh
+source "$REPO/lib/templates.sh"
 
 set_wallpaper() {
   local img="$1"
@@ -20,13 +26,71 @@ EOF
   printf '%s\n' "$img" > "$MAC_SETUP_STATE/background"
 }
 
+# Render every template into a fresh folder, then swap it in whole, so an
+# app never reads a half-written theme.
+render_theme() {
+  local name="$1" file="$2" next="$CURRENT/next-theme"
+  rm -rf "$next" "$CURRENT/theme.old"
+  render_templates "$file" "$name" "$next" "$USER_TEMPLATES" "$REPO/config/themed" || return 1
+  if [[ -d "$THEME_OUT" ]]; then
+    mv "$THEME_OUT" "$CURRENT/theme.old" || { rm -rf "$next"; return 1; }
+  fi
+  if mv "$next" "$THEME_OUT"; then
+    rm -rf "$CURRENT/theme.old"
+  else
+    [[ -d "$CURRENT/theme.old" ]] && mv "$CURRENT/theme.old" "$THEME_OUT"
+    rm -rf "$next"
+    return 1
+  fi
+}
+
+# Put the rendered files where each app looks for them.
+install_theme_outputs() {
+  local out="$THEME_OUT"
+  # ~/.config/ghostty links to the package; theme.conf is listed in .gitignore.
+  # Ghostty reads it when a window opens (Cmd + Shift + , reloads open ones).
+  if [[ -f "$out/ghostty.conf" ]]; then
+    [[ -d "$HOME/.config/ghostty" ]] || mkdir -p "$HOME/.config/ghostty"
+    cp "$out/ghostty.conf" "$HOME/.config/ghostty/theme.conf"
+  fi
+
+  # tmux sources the colours from config/tmux/tmux.conf; a running server
+  # takes them now.
+  if [[ -f "$out/tmux.conf" ]] && command -v tmux >/dev/null 2>&1 && tmux info >/dev/null 2>&1; then
+    tmux source-file "$out/tmux.conf" >/dev/null 2>&1
+  fi
+
+  # btop: the theme file always, the setting only if you have not chosen one.
+  if [[ -f "$out/btop.theme" ]]; then
+    local btop="$HOME/.config/btop"
+    mkdir -p "$btop/themes" && cp "$out/btop.theme" "$btop/themes/mac-setup.theme"
+    if [[ ! -f "$btop/btop.conf" ]] || ! grep -q '^color_theme' "$btop/btop.conf"; then
+      printf 'color_theme = "mac-setup"\n' >> "$btop/btop.conf"
+    elif grep -qE '^color_theme *= *"Default"' "$btop/btop.conf"; then
+      perl -i -pe 's/^color_theme *= *"Default"/color_theme = "mac-setup"/' "$btop/btop.conf"
+    fi
+  fi
+
+  # lazygit: linked only when you have no settings file of your own.
+  local lg="$HOME/Library/Application Support/lazygit/config.yml"
+  if [[ -f "$out/lazygit.yml" && ! -e "$lg" && ! -L "$lg" ]]; then
+    mkdir -p "$(dirname "$lg")" && ln -s "$out/lazygit.yml" "$lg"
+  fi
+
+  # Claude Code lists ~/.claude/themes in /theme and reloads it on change.
+  # Choosing it there (once) is left to you.
+  if [[ -f "$out/claude.json" && -d "$HOME/.claude" ]]; then
+    mkdir -p "$HOME/.claude/themes" && cp "$out/claude.json" "$HOME/.claude/themes/mac-setup.json"
+  fi
+}
+
 apply_theme() {
   local name="$1" wallpaper="${2:-yes}" file="$THEMES/$1.theme"
   if [[ ! -f "$file" ]]; then
     echo "No theme called '$name'. Themes: $(cd "$THEMES" && ls ./*.theme | sed -e 's#^\./##' -e 's/\.theme$//' | tr '\n' ' ')" >&2
     return 1
   fi
-  local LABEL MODE ACCENT BACKGROUND TERM_BG TERM_FG TERM_CURSOR TERM_SELECTION PALETTE HIGHLIGHT NVIM
+  local LABEL MODE ACCENT BACKGROUND
   # shellcheck source=/dev/null
   source "$file"
 
@@ -42,31 +106,15 @@ apply_theme() {
     defaults write -g AppleAccentColor -int "$ACCENT"
   fi
 
-  # ~/.config/ghostty links to the package; theme.conf is listed in .gitignore.
-  [[ -d "$HOME/.config/ghostty" ]] || mkdir -p "$HOME/.config/ghostty"
-  cat > "$HOME/.config/ghostty/theme.conf" <<EOF
-# Written by: theme set $name
-background = $TERM_BG
-foreground = $TERM_FG
-cursor-color = $TERM_CURSOR
-selection-background = $TERM_SELECTION
-EOF
-  # All 16 terminal colours, so the prompt, tmux, lazygit and every other
-  # terminal tool use the theme's colours instead of Ghostty's defaults.
-  local i=0 c
-  for c in $PALETTE; do echo "palette = $i=#$c"; i=$((i + 1)); done >> "$HOME/.config/ghostty/theme.conf"
-
-  # Neovim reads its matching colour scheme from here when it starts.
-  printf '%s\n%s\n' "$NVIM" "$MODE" > "$MAC_SETUP_STATE/nvim-theme"
-
-  # The pop-up menus: the system font (SF Pro), the theme's colours.
-  printf '%s\n' "-f SFProText-Regular -s 17 -n 12 -w 40 -c $HIGHLIGHT -b $TERM_SELECTION -u -a" > "$MAC_SETUP_STATE/menu-flags"
+  render_theme "$name" "$file" || return 1
+  install_theme_outputs
 
   if [[ "$wallpaper" == yes && -z "${MAC_SETUP_NO_APPLEEVENTS:-}" ]]; then
     set_wallpaper "$BACKGROUNDS/$BACKGROUND" || set_wallpaper "$REPO/backgrounds/$BACKGROUND"
   fi
   printf '%s\n' "$name" > "$MAC_SETUP_STATE/theme"
   notify "Theme: $LABEL" "Accent colour applies to newly opened windows."
+  "$REPO/bin/hook" theme-set "$name"
 }
 
 case "${1:-pick}" in

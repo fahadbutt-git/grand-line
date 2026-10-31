@@ -1,5 +1,6 @@
 #!/bin/bash
-# notice time | battery | weather | disk
+# mac:summary=Show the time, battery, weather, disk space, reminders due or network speed
+# notice time | battery | weather | disk | reminders | speed
 # Weather comes from Open-Meteo (free, no account) for the place set in
 # config/mac-setup/location.
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
@@ -16,6 +17,23 @@ weather_text() {
         .current | "\($place): \(.temperature_2m | round)°C, feels \(.apparent_temperature | round)°C, \(.weather_code | sky)"'
 }
 
+# Open reminders due by the end of today: the count, then up to five titles.
+reminders_text() {
+  osascript <<'EOF' 2>/dev/null
+set endOfDay to current date
+set time of endOfDay to 86399
+tell application "Reminders"
+  set due to name of every reminder whose completed is false and due date is less than or equal to endOfDay
+end tell
+set out to (count of due) as text
+repeat with i from 1 to (count of due)
+  if i > 5 then exit repeat
+  set out to out & linefeed & item i of due
+end repeat
+return out
+EOF
+}
+
 case "${1:-time}" in
   time)
     notify "$(date '+%I:%M %p' | sed 's/^0//')" "$(date '+%A %e %B %Y' | tr -s ' ')"
@@ -30,5 +48,21 @@ case "${1:-time}" in
   disk)
     notify "Disk space" "$(df -h "$HOME" | awk 'NR == 2 { print $4 " free" }')"
     ;;
-  *) echo "usage: notice time|battery|weather|disk" >&2; exit 2 ;;
+  reminders)
+    text="$(reminders_text)" || { notify "Reminders" "Reminders did not answer. Allow it in System Settings, Privacy and Security, Automation."; exit 1; }
+    count="$(printf '%s\n' "$text" | head -1)"
+    case "$count" in
+      0) notify "Nothing due today" "No open reminders are due." ;;
+      1) notify "1 reminder due today" "$(printf '%s\n' "$text" | sed 1d)" ;;
+      *) notify "$count reminders due today" "$(printf '%s\n' "$text" | sed 1d | paste -sd ',' - | sed 's/,/, /g')" ;;
+    esac
+    ;;
+  speed)
+    # macOS's own test (networkQuality) takes about 20 seconds.
+    detach_self "$0" speed
+    notify "Testing network speed" "About 20 seconds."
+    result="$(networkQuality -c 2>/dev/null | jq -r '"Down \(.dl_throughput / 1e6 | floor) Mbps, up \(.ul_throughput / 1e6 | floor) Mbps"' 2>/dev/null)"
+    notify "Network speed" "${result:-The test did not finish. Check the connection.}"
+    ;;
+  *) echo "usage: notice time|battery|weather|disk|reminders|speed" >&2; exit 2 ;;
 esac

@@ -20,8 +20,10 @@ end run
 EOF
 }
 
-# The menus' font and colours, written by the theme command.
-: "${MAC_SETUP_CHOOSE_FLAGS:=$(cat "$MAC_SETUP_STATE/menu-flags" 2>/dev/null)}"
+# The menus' font and colours, rendered by the theme command
+# (config/themed/menu-flags.tpl). The older location is read until the next
+# theme change.
+: "${MAC_SETUP_CHOOSE_FLAGS:=$(cat "$MAC_SETUP_STATE/current/theme/menu-flags" 2>/dev/null || cat "$MAC_SETUP_STATE/menu-flags" 2>/dev/null)}"
 
 # Pick one line from stdin in the pop-up menu. Prints the choice.
 pick() {
@@ -63,4 +65,16 @@ detach_self() {
   MAC_SETUP_DETACHED=1 perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' -- "$@" \
     </dev/null >/dev/null 2>&1 &
   exit 0
+}
+
+# focus_window APP [TITLE]: focus an open window of APP (whose title contains
+# TITLE, when given) through AeroSpace, which also switches to its workspace.
+# Fails when there is no such window, so the caller can open one.
+focus_window() {
+  local app="$1" title="${2:-}" id
+  command -v aerospace >/dev/null 2>&1 || return 1
+  id="$(aerospace list-windows --all --format '%{window-id}|%{app-name}|%{window-title}' 2>/dev/null \
+        | awk -F'|' -v app="$app" -v title="$title" '
+            $2 == app && (title == "" || index(substr($0, length($1 $2) + 3), title)) { print $1; exit }')"
+  [[ -n "$id" ]] && aerospace focus --window-id "$id" >/dev/null 2>&1
 }

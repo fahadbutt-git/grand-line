@@ -27,10 +27,18 @@ fi
 # Language versions per project (mise), as in Omarchy
 command -v mise >/dev/null && eval "$(mise activate zsh)"
 
-# Editor and agents, as in Omarchy: n opens Neovim, cx opens Claude Code
+# Editor and agents, as in Omarchy: n opens Neovim (in this folder when
+# given nothing), cx opens Claude Code
 export EDITOR=nvim VISUAL=nvim
-alias n='nvim'
+unalias n 2>/dev/null
+n() { if (( $# == 0 )); then command nvim .; else command nvim "$@"; fi; }
 alias cx='claude'
+
+# Folders and sessions, as in Omarchy
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+alias t='tmux attach 2>/dev/null || tmux new -s Work'
 
 # Git and Docker shortcuts, as in Omarchy
 alias g='git'
@@ -38,6 +46,28 @@ alias gcm='git commit -m'
 alias gcam='git commit -a -m'
 alias gcad='git commit -a --amend'
 alias lzg='lazygit'
+
+# ga branch: a new branch in its own folder beside this one (a git worktree),
+# so two pieces of work never share a checkout. gd, run inside that folder,
+# removes the folder and the branch, but only when nothing in them would be
+# lost. As in Omarchy.
+ga() {
+  [[ -n "$1" ]] || { echo "usage: ga branch-name"; return 1; }
+  local wt="../$(basename "$PWD")--$1"
+  git worktree add -b "$1" "$wt" || return 1
+  command -v mise >/dev/null && mise trust "$wt" >/dev/null 2>&1
+  cd "$wt"
+}
+gd() {
+  local here="$PWD" name="${PWD:t}" root branch
+  root="${name%%--*}"; branch="${name#*--}"
+  [[ "$root" != "$name" ]] || { echo "Not in a folder made by ga."; return 1; }
+  read -q "?Remove this worktree and the branch $branch? [y/N] " || { echo; return 1; }
+  echo
+  # No --force and -d, not -D: git refuses while the folder has uncommitted
+  # changes or the branch has commits that are not merged, so no work is lost.
+  cd "../$root" && git worktree remove "$here" && git branch -d "$branch"
+}
 alias d='docker'
 alias lzd='lazydocker'
 
@@ -63,6 +93,9 @@ iso2sd() {
 
 # ff: find a file with a live preview, then print its path
 alias ff="fzf --preview 'bat --color=always --style=numbers --line-range=:100 {} 2>/dev/null || head -100 {}'"
+# eff: pick a file with ff, then edit it (nothing opens if you press Escape)
+unalias eff 2>/dev/null
+eff() { local f; f="$(ff)" && [[ -n "$f" ]] && "$EDITOR" "$f"; }
 
 # Archives
 compress()   { tar -czf "${1%/}.tar.gz" "${1%/}"; }

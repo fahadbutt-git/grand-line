@@ -21,9 +21,11 @@ The first run copies the package to `~/mac-setup`. That copy is the one to edit 
 
 | Command | Does |
 | --- | --- |
-| `update` | Updates every app, tool and this package |
+| `update` | Updates every app, tool and this package, then runs any one-time changes and your post-update hook. One run at a time, the Mac stays awake, and the whole run is saved to `~/Library/Logs/mac-setup/update-<date>.log`. It also records what was installed before (`~/.local/state/mac-setup/brew-before-update.Brewfile`) and says when Karabiner-Elements or AeroSpace need a restart. `update --window` runs it in its own terminal window |
 | `keybindings --print` | Prints every shortcut |
-| `theme pick` | Changes theme (Graphite, Nord, Forest, Paper): terminal, editor, menus, accent and wallpaper together. Rules in `DESIGN.md` |
+| `theme pick` | Changes theme (Graphite, Nord, Forest, Daylight): terminal, editor, menus, tmux, btop, lazygit, Claude Code, accent and wallpaper together. Rules in `DESIGN.md` |
+| `mac commands` | Lists every command in the package with what it does |
+| `migrate --pending` | Lists the one-time changes an update has not run yet (`migrate` runs them) |
 | `app install`, `app remove` | Installs or removes an app and updates the Brewfile to match (also in the menu) |
 | `tidy-downloads` | Sorts Downloads now (`--dry-run` shows the plan, `--log` the recent moves) |
 | `default-apps fallback` | LibreOffice and Preview open documents instead of ArtCraft (`primary` switches back). Videos stay in IINA |
@@ -38,6 +40,11 @@ Ghostty with Omarchy's shell tools, set up in `config/zsh/mac-setup.zsh`, `confi
 | --- | --- |
 | `cd res` | Jumps to the folder you use most that matches "res" (zoxide) |
 | `ff` | Finds a file by name with a live preview (fzf) |
+| `eff` | Finds a file the same way, then opens it in the editor |
+| `n`, `n file` | Opens Neovim on this folder, or on the file |
+| `..`, `...` | Goes up one folder, or two |
+| `t` | Joins the running tmux session, or starts one |
+| `ga name`, `gd` | Starts a branch in its own folder beside this one (a git worktree), and removes it again from inside |
 | Ctrl + R | Searches your command history as you type |
 | `ls`, `lt`, `lsa` | Lists files with icons, as a tree, or including hidden files (eza) |
 | `rg word`, `fd name` | Searches inside files, or for files by name |
@@ -102,6 +109,7 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + K | Shortcut list (type to filter, Return runs it) |
 | Caps + Escape | System menu (lock, sleep, restart, shut down) |
 | Caps + W | Close window |
+| Caps + Q | Quit app |
 | Caps + Ctrl + L | Lock screen |
 | Caps + T | Toggle tiling and floating |
 | Caps + J | Toggle split direction |
@@ -111,12 +119,16 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + - | Shrink window |
 | Caps + Left | Focus window left |
 | Caps + Shift + Left | Swap window left |
+| Caps + Ctrl + Shift + Left | Move window to the monitor left |
 | Caps + Down | Focus window down |
 | Caps + Shift + Down | Swap window down |
+| Caps + Ctrl + Shift + Down | Move window to the monitor down |
 | Caps + Up | Focus window up |
 | Caps + Shift + Up | Swap window up |
+| Caps + Ctrl + Shift + Up | Move window to the monitor up |
 | Caps + Right | Focus window right |
 | Caps + Shift + Right | Swap window right |
+| Caps + Ctrl + Shift + Right | Move window to the monitor right |
 | Caps + Tab | Next workspace |
 | Caps + Shift + Tab | Previous workspace |
 | Caps + Ctrl + Tab | Last used workspace |
@@ -130,6 +142,7 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + Shift + 9 | Move window to workspace 9 and follow |
 | Caps + Option + Shift + 9 | Move window to workspace 9, stay here |
 | Caps + Return | Terminal (Ghostty) |
+| Caps + ` | Quick terminal (drops down from the top) |
 | Caps + Option + Return | Terminal in a tmux session |
 | Caps + Shift + Return | Browser (Chrome) |
 | Caps + Option + Shift + B | Private browser window |
@@ -164,7 +177,9 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + Ctrl + O | Toggle menu |
 | Caps + Ctrl + C | Capture menu |
 | Caps + Ctrl + Shift + X | Copy text from a screen area |
+| Caps + Ctrl + P | Colour picker |
 | Caps + Ctrl + . | Transcode menu (video, images, PDF) |
+| Caps + A | Select all |
 | Caps + C | Copy |
 | Caps + X | Cut |
 | Caps + V | Paste |
@@ -178,6 +193,7 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + Shift + Space | Hide or show the menu bar |
 | Caps + Ctrl + Shift + M | Mute or unmute the microphone |
 | Caps + Ctrl + R | Set a reminder |
+| Caps + Ctrl + Option + R | Reminders due today |
 | Caps + Ctrl + Option + T | Show the time |
 | Caps + Ctrl + Option + B | Show the battery |
 | Caps + Ctrl + Option + W | Show the weather |
@@ -194,14 +210,27 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | An ArtCraft app | Add a line to `config/mac-setup/artcraft.tsv`, then `--only artcraft` |
 | A default app for a file type | Add a line to `config/mac-setup/default-apps.tsv`, then `--only default-apps` |
 | A shortcut | Add a line to `BINDINGS` in `tools/bindings.py`, run `python3 tools/bindings.py`, then `--only dotfiles` |
-| A menu entry | Add a line to `config/mac-setup/menu.tsv`. It works at once |
-| A command | Add an executable script to `bin/`. It is on the PATH at once |
-| A theme | Add `config/themes/name.theme` (copy an existing one) and its image to `backgrounds/` |
+| A menu entry | Add a line to `config/mac-setup/menu.tsv`. It works at once. A third column `?test` shows it only when the test succeeds, a fourth `✓test` gives it a check mark (helpers in `lib/toggle-state.sh`) |
+| A command | Add an executable script to `bin/` with a `# mac:summary=` line under the first. It is on the PATH at once, and `mac commands` lists it |
+| A theme | Add `config/themes/name.theme` (copy an existing one), its image to `backgrounds/`, and a `Style/` line to `config/mac-setup/menu.tsv` with `✓theme_is name` |
+| An app that takes theme colours | Add `config/themed/<file>.tpl` with `{{ KEY }}` placeholders, then have `bin/theme` put the rendered file where the app reads it |
+| A one-time change for Macs already set up | Add `migrations/<unix time>-<what>.sh` (`date +%s` gives the time). `update` runs it once on each Mac |
 | An R package | Add a line to `config/mac-setup/r-packages.txt`, then `--only r-packages` |
 | A native helper | Add `tools/name.swift`. Setup builds it into `~/.mac-setup/.build` |
 | A setup step | Add `steps/NN-name.sh` with a function `step_name`. Steps run in file-name order |
 
 The future search app takes over Caps + Space by changing that one line in `tools/bindings.py` and turning off Spotlight's own shortcut in System Settings, Keyboard Shortcuts.
+
+## Your own additions
+
+Keep personal changes in `~/.config/mac-setup/`, outside the package, so an update from GitHub never clashes with them.
+
+| File | Does |
+| --- | --- |
+| `bindings.local.tsv` | Your own Caps Lock shortcuts, in the same four columns as `config/mac-setup/keybindings.tsv` (keys, group, description, command). The same keys replace a shipped shortcut, and `unbind<TAB>Caps + X` removes one. Merged into Karabiner's copy by `bash ~/mac-setup/setup.sh --only dotfiles`, and shown in Caps + K at once |
+| `menu.local.tsv` | Your own menu entries, in the same columns as `menu.tsv`. The same path replaces a shipped entry, and `Path<TAB>-` removes it. Works at once |
+| `themed/<file>.tpl` | Your version of a theme template in `config/themed/`, used in its place from the next theme change |
+| `hooks/post-update`, `hooks/theme-set` | Scripts that run after every update, and after every theme change (with the theme's name). Several can go in `hooks/<name>.d/`. Setup copies examples there as `*.sample` files, which never run |
 
 ## Testing
 
@@ -264,11 +293,35 @@ steps/              one file per setup step
 bin/                commands behind the menus and shortcuts
 lib/                shared helpers and paths
 config/             aerospace, karabiner, ghostty, tmux, zsh, starship, nvim, git,
-                    espanso, themes, and mac-setup (menus, rules, data files)
+                    espanso, themes, themed (templates filled in by the theme),
+                    and mac-setup (menus, rules, data files, hook samples)
 backgrounds/        theme wallpapers
+migrations/         one-time changes for Macs already set up (bin/migrate)
 tools/              shortcut generator and native helpers (Swift)
 DESIGN.md           the type, colour and layout rules every part follows
 tests/              checks, dry run, VM rehearsal, post-install verification
 .github/workflows/  the GitHub test runs
 publish.sh          first upload of this package to GitHub
 ```
+
+## Credits
+
+Much of how this package works is adapted from [Omarchy](https://github.com/basecamp/omarchy) by David Heinemeier Hansson and contributors, under the MIT License. It is rebuilt here for macOS, in bash 3.2, with Apple's fonts and colours. The pieces and the Omarchy files each is based on:
+
+| Here | Based on, in Omarchy |
+| --- | --- |
+| Caps Lock layer (Super key layout) and the Caps + K shortcut list | `default/hypr/bindings/tiling.lua`, `default/hypr/bindings/utilities.lua`, `bin/omarchy-menu-keybindings` |
+| The menu (`bin/menu`, `menu.tsv`) and its Toggle and Style groups | `bin/omarchy-menu` |
+| Toggle states read from flag files (`lib/toggle-state.sh`) | `bin/omarchy-state`, `bin/omarchy-toggle-*` |
+| Theme files, templates and the swap of the rendered folder (`bin/theme`, `lib/templates.sh`, `config/themed/`) | `bin/omarchy-theme-set`, `bin/omarchy-theme-set-templates`, `default/themed/*.tpl` |
+| tmux, btop, lazygit and Claude Code colours | `default/themed/btop.theme.tpl`, `default/themed/claude.json.tpl`, `bin/omarchy-theme-set-tmux`, `bin/omarchy-theme-set-claude` |
+| Next background | `bin/omarchy-theme-bg-next` |
+| Migrations (`bin/migrate`, `migrations/`) | `bin/omarchy-migrate`, `bin/omarchy-dev-add-migration`, `migrations/` |
+| Hooks (`bin/hook`, hook samples) | `bin/omarchy-hook`, `config/omarchy/hooks/` |
+| The update run (lock, staying awake, restart note) | `bin/omarchy-update`, `bin/omarchy-update-lock`, `bin/omarchy-update-stay-awake`, `bin/omarchy-update-restart` |
+| A window that waits for a key when a job ends (`bin/in-window`) | `bin/omarchy-show-done` |
+| Focus an open window before opening another (`bin/focus-or-open`, `bin/webapp`) | `bin/omarchy-launch-or-focus`, `bin/omarchy-launch-or-focus-webapp`, `bin/omarchy-launch-webapp` |
+| Install and Remove menus (`bin/app`) | `bin/omarchy-pkg-install`, `bin/omarchy-pkg-remove` |
+| The `mac` command and `# mac:summary=` lines | `bin/omarchy` and its `# omarchy:summary=` lines |
+| Shell aliases and the `ga`, `gd` worktree functions | `default/bash/aliases`, `default/bash/fns/worktrees` |
+| Git settings | `config/git/config` |

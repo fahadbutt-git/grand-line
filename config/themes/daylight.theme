@@ -1,0 +1,16 @@
+# Daylight, Apple's neutral light appearance (as in Finder). Every app that has colours takes them from this file.
+LABEL="Daylight"
+MODE=light
+ACCENT=4
+BACKGROUND=daylight.jpg
+TERM_BG=ffffff
+TERM_FG=1d1d1f
+TERM_CURSOR=0a6cd6
+TERM_SELECTION=e3edfb
+PALETTE="1d1d1f d70015 1f7f37 b25000 0040dd 8944ab 0071a4 6e6e73 636366 d1302a 1d8233 946500 0066d6 9a45c8 00789e 1d1d1f"
+ACCENT_HEX=0a6cd6
+MUTED=6e6e73
+BG_LIGHTER=f5f5f7
+BG_DARKER=e5e5ea
+HIGHLIGHT=0a6cd6
+NVIM=vscode

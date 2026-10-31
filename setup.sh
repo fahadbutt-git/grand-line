@@ -84,6 +84,13 @@ for f in "$REPO_DIR"/steps/[0-9][0-9]-*.sh; do
   source "$f"
 done
 
+# A fresh install needs none of the one-time changes in migrations/, so they
+# are recorded as done. A Mac set up before migrations existed already has a
+# theme, so its migrations still run (bin/update runs them).
+if [[ ! -d "$MAC_SETUP_STATE/migrations" && ! -f "$MAC_SETUP_STATE/theme" ]]; then
+  run "$REPO_DIR/bin/migrate" --mark-all
+fi
+
 selected() {
   local step="$1"
   [[ "$step" == preflight ]] && return 0

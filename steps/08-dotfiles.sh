@@ -2,6 +2,9 @@
 # Puts the window, terminal and keyboard settings in place and adds the
 # package's commands (bin/) to the PATH.
 
+# shellcheck source=lib/overlay.sh
+source "$REPO_DIR/lib/overlay.sh"
+
 step_dotfiles() {
   local cfg="$REPO_DIR/config"
 
@@ -54,8 +57,22 @@ step_dotfiles() {
   # Karabiner rewrites and backs up its own settings file, so it gets a copy
   # rather than a link. The copy is replaced only when the package's shortcuts
   # change, so settings made in Karabiner's own window are kept otherwise.
+  # Your own shortcuts (lib/overlay.sh) are merged into the copy here, so the
+  # package's generated file stays as tools/bindings.py wrote it.
   local kdir="$HOME/.config/karabiner" kfile="$cfg/karabiner/karabiner.json"
-  local sum_file="$MAC_SETUP_STATE/karabiner.sha" sum
+  local sum_file="$MAC_SETUP_STATE/karabiner.sha" sum merged=""
+  if [[ -f "$BINDINGS_LOCAL" ]]; then
+    if [[ "$DRY_RUN" == 1 ]]; then
+      run "merge $BINDINGS_LOCAL into the Caps Lock shortcuts"
+    else
+      merged="$(mktemp)"
+      if karabiner_with_overlay "$kfile" "$BINDINGS_LOCAL" > "$merged"; then
+        kfile="$merged"
+      else
+        warn "$BINDINGS_LOCAL could not be read, so your own shortcuts were left out."
+      fi
+    fi
+  fi
   sum="$(shasum -a 256 "$kfile" 2>/dev/null | cut -d' ' -f1)"
   [[ -L "$kdir" ]] && backup_path "$kdir"
   if [[ ! -f "$kdir/karabiner.json" || "$(cat "$sum_file" 2>/dev/null)" != "$sum" ]]; then
@@ -68,4 +85,17 @@ step_dotfiles() {
     run_sh "launchctl kickstart -k gui/\$(id -u)/org.pqrs.service.agent.karabiner_console_user_server 2>/dev/null || true"
     ok "Caps Lock shortcuts updated"
   fi
+  [[ -n "$merged" ]] && rm -f "$merged"
+
+  # Example hooks (bin/hook), copied on the first setup only, so one you
+  # delete stays deleted, and never over your own.
+  local hooks="$HOME/.config/mac-setup/hooks" sample
+  [[ -d "$hooks" ]] || run mkdir -p "$hooks"
+  if first_time hook-samples; then
+    for sample in "$cfg"/mac-setup/hooks/*.sample; do
+      [[ -e "$hooks/${sample##*/}" ]] || run cp "$sample" "$hooks/${sample##*/}"
+    done
+    mark_done hook-samples
+  fi
+  return 0
 }

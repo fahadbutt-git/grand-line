@@ -1,24 +1,47 @@
 #!/bin/bash
+# mac:summary=Update everything: this package, apps, tools, settings and plugins
 # Update everything in one go: this package, Homebrew apps and tools,
-# ArtCraft apps, settings, Neovim plugins and mise languages.
+# ArtCraft apps, settings, one-time changes (migrations), Neovim plugins and
+# mise languages, then your post-update hook.
 #   update            run here
-#   update --window   open a Terminal window to run it (used by the menu)
+#   update --window   run it in its own terminal window (used by the menu)
+# One update runs at a time, the Mac stays awake while it runs, and the whole
+# run is saved to ~/Library/Logs/mac-setup/update-<date>.log.
 # App Store apps update themselves (System Settings, General, Software Update).
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 
 REPO="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 
 if [[ "${1:-}" == "--window" ]]; then
-  osascript - "$(readlink -f "$0")" <<'EOF' >/dev/null
-on run argv
-  tell application "Terminal"
-    activate
-    do script quoted form of (item 1 of argv)
-  end tell
-end run
-EOF
-  exit 0
+  exec "$REPO/bin/in-window" "$(readlink -f "$0")"
 fi
+
+# One run at a time. A lock left by a run that no longer exists is taken over.
+LOCK="${TMPDIR:-/tmp}/mac-setup-update.lock"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  holder="$(cat "$LOCK/pid" 2>/dev/null)"
+  if [[ -z "$holder" ]] || kill -0 "$holder" 2>/dev/null; then
+    echo "Another update is running${holder:+ (process $holder)}. Wait for it to finish."
+    exit 1
+  fi
+  # The run that held it is gone. Clear it and take it, once; if another run
+  # takes it first, that run goes ahead and this one stops.
+  rm -f "$LOCK/pid"; rmdir "$LOCK" 2>/dev/null
+  if ! mkdir "$LOCK" 2>/dev/null; then
+    echo "Another update is running. Wait for it to finish."
+    exit 1
+  fi
+fi
+echo "$$" > "$LOCK/pid"
+trap 'rm -f "$LOCK/pid"; rmdir "$LOCK" 2>/dev/null' EXIT
+
+# Stay awake (but let the display sleep) until this run ends.
+caffeinate -i -w "$$" >/dev/null 2>&1 &
+
+mkdir -p "$MAC_SETUP_LOGS"
+LOG="$MAC_SETUP_LOGS/update-$(date +%Y%m%d-%H%M%S).log"
+exec > >(tee -a "$LOG") 2>&1
+echo "Log: $LOG"
 
 failed=()
 
@@ -36,11 +59,23 @@ if git -C "$REPO" remote get-url origin >/dev/null 2>&1; then
 fi
 
 echo "== Homebrew apps and tools"
-{ brew update && brew upgrade; } || failed+=("Homebrew")
+# A record of what was installed before, to compare with or go back to:
+#   brew bundle install --file ~/.local/state/mac-setup/brew-before-update.Brewfile
+brew bundle dump --file "$MAC_SETUP_STATE/brew-before-update.Brewfile" --force >/dev/null 2>&1
+if brew update; then
+  # Karabiner and AeroSpace keep running their old version until restarted.
+  restart="$(brew outdated --quiet 2>/dev/null | sed 's#.*/##' | grep -xE 'karabiner-elements|aerospace' | tr '\n' ' ')"
+  brew upgrade || failed+=("Homebrew")
+else
+  failed+=("Homebrew")
+fi
 export HOMEBREW_NO_AUTO_UPDATE=1
 
 echo "== New apps, ArtCraft apps and settings"
 bash "$REPO/setup.sh" --update || failed+=("setup")
+
+echo "== One-time changes"
+"$REPO/bin/migrate" || failed+=("migrations")
 
 echo "== Neovim plugins and language versions"
 if command -v nvim >/dev/null; then
@@ -53,10 +88,15 @@ if command -v nvim >/dev/null; then
 fi
 command -v mise >/dev/null && { mise upgrade --yes >/dev/null 2>&1 || failed+=("mise"); }
 
+"$REPO/bin/hook" post-update
+
+if [[ -n "${restart:-}" ]]; then
+  echo "Restart needed: ${restart% } updated. Quit and reopen it, or restart the Mac."
+fi
 if [[ ${#failed[@]} -gt 0 ]]; then
-  notify "Update finished with problems" "Not updated: ${failed[*]}. See the Terminal window."
+  notify "Update finished with problems" "Not updated: ${failed[*]}. See $LOG"
   echo "Not updated: ${failed[*]}"
   exit 1
 fi
-notify "Update finished" "Apps and tools are up to date."
+notify "Update finished" "Apps and tools are up to date.${restart:+ Restart: $restart}"
 echo "Done."

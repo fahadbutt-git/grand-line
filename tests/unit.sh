@@ -69,11 +69,43 @@ lines="$(KEYBINDINGS_FILE="$ROOT/config/mac-setup/keybindings.tsv" "$ROOT/bin/ke
 [[ "$lines" -ge 90 ]] && t_ok "shortcut list prints all $lines shortcuts" || t_fail "shortcut list printed $lines lines"
 
 # --- themes
+cur="$HOME/.local/state/mac-setup/current/theme"
+mkdir -p "$HOME/.claude"
 "$ROOT/bin/theme" set nord --no-wallpaper >/dev/null 2>&1
 if grep -q "background = 2e3440" "$HOME/.config/ghostty/theme.conf" 2>/dev/null; then t_ok "theme writes terminal colours"; else t_fail "theme did not write terminal colours"; fi
 grep -q "palette = 15=#eceff4" "$HOME/.config/ghostty/theme.conf" && t_ok "theme writes all 16 terminal colours" || t_fail "theme palette missing"
-[[ "$(head -1 "$HOME/.local/state/mac-setup/nvim-theme" 2>/dev/null)" == nord ]] && t_ok "theme picks the matching Neovim scheme" || t_fail "theme did not set the Neovim scheme"
-grep -q -- "-f SFProText-Regular" "$HOME/.local/state/mac-setup/menu-flags" && t_ok "theme gives the menus the system font and theme colours" || t_fail "menu style not written"
+[[ "$(head -1 "$cur/nvim-theme" 2>/dev/null)" == nord ]] && t_ok "theme picks the matching Neovim scheme" || t_fail "theme did not set the Neovim scheme"
+grep -q -- "-f SFProText-Regular" "$cur/menu-flags" && t_ok "theme gives the menus the system font and theme colours" || t_fail "menu style not written"
+grep -q 'pane-active-border-style "fg=#88c0d0"' "$cur/tmux.conf" && t_ok "theme renders tmux colours" || t_fail "tmux colours not rendered"
+grep -q 'theme\[hi_fg\]="#88c0d0"' "$HOME/.config/btop/themes/mac-setup.theme" 2>/dev/null && t_ok "theme installs a btop theme" || t_fail "btop theme missing"
+grep -qx 'color_theme = "mac-setup"' "$HOME/.config/btop/btop.conf" && t_ok "theme chooses it in btop when you had not" || t_fail "btop setting not written"
+[[ -L "$HOME/Library/Application Support/lazygit/config.yml" ]] && t_ok "theme links lazygit's colours when it had no settings" || t_fail "lazygit not linked"
+jq -e '.base == "dark" and .overrides.claude == "#88c0d0"' "$HOME/.claude/themes/mac-setup.json" >/dev/null 2>&1 \
+  && t_ok "theme writes a Claude Code custom theme" || t_fail "Claude Code theme missing or invalid"
+printf 'color_theme = "Default"\n' > "$HOME/.config/btop/btop.conf"
+"$ROOT/bin/theme" set daylight --no-wallpaper >/dev/null 2>&1
+grep -qx 'color_theme = "mac-setup"' "$HOME/.config/btop/btop.conf" && t_ok "theme takes over btop's own Default setting" || t_fail "btop Default not replaced"
+printf 'color_theme = "nord"\n' > "$HOME/.config/btop/btop.conf"
+rm "$HOME/Library/Application Support/lazygit/config.yml"; echo "mine: true" > "$HOME/Library/Application Support/lazygit/config.yml"
+mkdir -p "$HOME/.config/mac-setup/themed"; echo "mine {{ LABEL }} {{ COLOR1 }} {{ NOPE }}" > "$HOME/.config/mac-setup/themed/menu-flags.tpl"
+"$ROOT/bin/theme" set daylight --no-wallpaper >/dev/null 2>&1
+grep -qx 'color_theme = "nord"' "$HOME/.config/btop/btop.conf" && t_ok "theme leaves a btop theme you chose" || t_fail "btop setting overwritten"
+grep -qx "mine: true" "$HOME/Library/Application Support/lazygit/config.yml" && t_ok "theme leaves your own lazygit settings" || t_fail "lazygit settings replaced"
+[[ "$(cat "$cur/menu-flags")" == "mine Daylight d70015 {{ NOPE }}" ]] && t_ok "your own template overrides the package's, unknown keys stay as written" \
+  || t_fail "user template not used" "$(cat "$cur/menu-flags")"
+[[ "$(sed -n 2p "$cur/nvim-theme")" == light && ! -d "$HOME/.local/state/mac-setup/current/next-theme" ]] \
+  && t_ok "theme swaps the rendered folder in whole" || t_fail "rendered folder not swapped"
+rm -rf "$HOME/.config/mac-setup/themed"
+# Every built-in template fills every placeholder, in every theme.
+# shellcheck source=lib/templates.sh
+source "$ROOT/lib/templates.sh"
+for th in "$ROOT"/config/themes/*.theme; do
+  n="$(basename "$th" .theme)"; render_templates "$th" "$n" "$tmp/render-$n" "$ROOT/config/themed"
+  left="$(grep -l '{{' "$tmp/render-$n"/* 2>/dev/null)"
+  [[ -z "$left" ]] && t_ok "templates: $n fills every placeholder" || t_fail "templates: $n left placeholders" "$left"
+  jq -e . "$tmp/render-$n/claude.json" >/dev/null 2>&1 || t_fail "templates: $n claude.json is not valid JSON"
+done
+"$ROOT/bin/theme" set nord --no-wallpaper >/dev/null 2>&1
 [[ "$(cat "$HOME/.local/state/mac-setup/theme" 2>/dev/null)" == nord ]] && t_ok "theme remembers the current theme" || t_fail "theme state not saved"
 grep -q "defaults write -g AppleAccentColor -int 4" "$STUB_LOG" && t_ok "theme sets the accent colour" || t_fail "accent colour not set"
 if ! "$ROOT/bin/theme" set nonexistent >/dev/null 2>&1; then t_ok "unknown theme fails cleanly"; else t_fail "unknown theme did not fail"; fi
@@ -194,6 +226,144 @@ tag="$(git -C "$r" tag -l 'good-*' | head -1)"
 [[ "$(cat "$r/a.txt")" == one && "$(git -C "$r" branch --show-current)" == main ]] && t_ok "mac try drop throws an experiment away" || t_fail "mac try drop"
 "$ROOT/bin/mac" try start better >/dev/null; echo better > "$r/a.txt"; "$ROOT/bin/mac" try keep >/dev/null
 [[ "$(cat "$r/a.txt")" == better && "$(git -C "$r" branch --show-current)" == main ]] && t_ok "mac try keep keeps an experiment" || t_fail "mac try keep"
+cmds="$("$ROOT/bin/mac" commands)"
+if grep -q "^migrate  *Run the package" <<<"$cmds" && [[ "$(grep -c . <<<"$cmds")" == "$(find "$ROOT/bin" -type f | wc -l | tr -d ' ')" ]] && ! grep -qE '^[^ ]+ *$' <<<"$cmds"; then
+  t_ok "mac commands lists each command with its summary"; else t_fail "mac commands" "$cmds"; fi
 unset MAC_SETUP_REPO MAC_SETUP_NO_APPLY
+
+# --- menu: guards, check marks (all in one process), and your own entries
+cat > "$tmp/menu.tsv" <<EOF
+Toggle/Always	echo always > "$tmp/ran"
+Toggle/Hidden	echo hidden	?false
+Toggle/On	echo on > "$tmp/ran"		✓true
+Toggle/Shown not checked	echo x	?true	✓false
+Toggle/Theme	echo t		✓theme_is nord
+Toggle/Old	echo old
+EOF
+export MENU_FILE="$tmp/menu.tsv" MENU_LOCAL="$tmp/menu.local.tsv"
+printf 'Toggle/Old\t-\nToggle/Always\techo mine > "%s/ran"\nToggle/Mine\techo new\n' "$tmp" > "$MENU_LOCAL"
+rm -f "$tmp/ran"; answers "On ✓"
+"$ROOT/bin/menu" Toggle
+seen="$(sed '/^--$/d' "$CHOOSE_SEEN" | tr '\n' '|')"
+[[ "$seen" == "Always|On ✓|Shown not checked|Theme ✓|Mine|" ]] && t_ok "menu hides failed guards, checks passing tests, merges your entries" \
+  || t_fail "menu showed" "$seen"
+[[ "$(cat "$tmp/ran" 2>/dev/null)" == on ]] && t_ok "menu runs a checked entry" || t_fail "checked entry did not run"
+rm -f "$tmp/ran"; answers "Always"; "$ROOT/bin/menu" Toggle
+[[ "$(cat "$tmp/ran" 2>/dev/null)" == mine ]] && t_ok "menu.local.tsv replaces a shipped entry" || t_fail "local entry did not replace the shipped one"
+printf 'G/A\techo a\t?echo $$ >> "%s/pids"\t\xe2\x9c\x93echo $$ >> "%s/pids"\nG/B\techo b\t?echo $$ >> "%s/pids"\nG/C\techo c\t\t\xe2\x9c\x93echo $$ >> "%s/pids"\n' "$tmp" "$tmp" "$tmp" "$tmp" > "$tmp/menu.tsv"
+: > "$tmp/pids"; rm -f "$MENU_LOCAL"; answers ""; "$ROOT/bin/menu" G
+[[ "$(wc -l < "$tmp/pids" | tr -d ' ')" == 4 && "$(sort -u "$tmp/pids" | wc -l | tr -d ' ')" == 1 ]] \
+  && t_ok "menu runs every guard and check in one bash process" || t_fail "menu guard processes" "$(tr '\n' ' ' < "$tmp/pids")"
+printf 'G/A\t-\n' > "$MENU_LOCAL"; answers ""; "$ROOT/bin/menu" G
+[[ "$(sed '/^--$/d' "$CHOOSE_SEEN" | tr '\n' '|')" == "B|C ✓|" ]] && t_ok "a \"-\" line in menu.local.tsv removes an entry" || t_fail "menu.local removal" "$(cat "$CHOOSE_SEEN")"
+unset MENU_FILE MENU_LOCAL
+
+# --- your own shortcuts, merged into the installed copy and the shortcut list
+printf 'Caps + Shift + Z\tApps\tZotero\topen -a Zotero\nunbind\tCaps + X\nCaps + Shift + Return\tApps\tMy browser\techo mine\n' > "$tmp/bindings.local.tsv"
+REPO_DIR="$ROOT"
+# shellcheck source=lib/overlay.sh
+source "$ROOT/lib/overlay.sh"
+merged="$(karabiner_with_overlay "$ROOT/config/karabiner/karabiner.json" "$tmp/bindings.local.tsv")"
+m() { jq -c "[.profiles[0].complex_modifications.rules[1].manipulators[] | select($1)]" <<<"$merged"; }
+[[ "$(m '.from.key_code == "z" and .from.modifiers.mandatory == ["shift"]')" == *'"open -a Zotero"'* ]] && t_ok "overlay adds a shortcut" || t_fail "overlay did not add Caps + Shift + Z"
+[[ "$(m '.from.key_code == "x" and .from.modifiers == null')" == "[]" ]] && t_ok "overlay unbinds a shortcut" || t_fail "overlay did not unbind Caps + X"
+got="$(m '.from.key_code == "return_or_enter" and .from.modifiers.mandatory == ["shift"]')"
+[[ "$got" == *'"echo mine"'* && "$(jq length <<<"$got")" == 1 ]] && t_ok "overlay replaces a shipped shortcut" || t_fail "overlay replace" "$got"
+[[ "$(m '.from.key_code == "c" and .from.modifiers == null')" != "[]" ]] && t_ok "overlay leaves other shortcuts alone" || t_fail "overlay removed Caps + C"
+list="$(KEYBINDINGS_FILE="$ROOT/config/mac-setup/keybindings.tsv" KEYBINDINGS_LOCAL="$tmp/bindings.local.tsv" "$ROOT/bin/keybindings" --print)"
+grep -q "^Caps + Shift + Z .*Zotero" <<<"$list" && ! grep -q "^Caps + X " <<<"$list" && grep -q "My browser" <<<"$list" \
+  && t_ok "the shortcut list shows your shortcuts too" || t_fail "shortcut list ignores bindings.local.tsv"
+
+# --- migrations: run once each, in order, stop at a failure
+mr="$tmp/mrepo"; mkdir -p "$mr/migrations"
+cp -R "$ROOT/lib" "$mr/lib"
+printf 'echo first >> "%s/order"\n' "$tmp" > "$mr/migrations/1700000000-first.sh"
+printf 'echo second >> "%s/order"\n' "$tmp" > "$mr/migrations/1700000100-second.sh"
+export MAC_SETUP_REPO="$mr"
+[[ "$("$ROOT/bin/migrate" --pending | tr '\n' ' ')" == "1700000000-first.sh 1700000100-second.sh " ]] && t_ok "migrate --pending lists them in order" || t_fail "pending list"
+"$ROOT/bin/migrate" >/dev/null; "$ROOT/bin/migrate" >/dev/null
+[[ "$(tr '\n' ' ' < "$tmp/order")" == "first second " ]] && t_ok "migrations run once each, oldest first" || t_fail "migration order" "$(cat "$tmp/order")"
+[[ -f "$HOME/.local/state/mac-setup/migrations/1700000100-second.sh" ]] && t_ok "migrations leave a marker" || t_fail "no marker"
+! "$ROOT/bin/migrate" --pending >/dev/null && t_ok "migrate --pending fails when none are left" || t_fail "pending with none left"
+printf 'exit 3\n' > "$mr/migrations/1700000200-broken.sh"; printf 'echo after >> "%s/order"\n' "$tmp" > "$mr/migrations/1700000300-after.sh"
+if ! "$ROOT/bin/migrate" >/dev/null 2>&1 && ! grep -q after "$tmp/order" && [[ ! -f "$HOME/.local/state/mac-setup/migrations/1700000200-broken.sh" ]]; then
+  t_ok "a failed migration stops the run and runs again next time"; else t_fail "failed migration handling"; fi
+"$ROOT/bin/migrate" --mark-all
+[[ "$("$ROOT/bin/migrate")" == "No one-time changes waiting." ]] && t_ok "migrate says when nothing is waiting" || t_fail "migrate with none waiting"
+! "$ROOT/bin/migrate" --pending >/dev/null && ! grep -q after "$tmp/order" && t_ok "migrate --mark-all records all without running them" || t_fail "mark-all"
+unset MAC_SETUP_REPO
+# The real first migration moves the old Desktop checklist to the Trash.
+mkdir -p "$HOME/Desktop"; echo old > "$HOME/Desktop/Finish setup.txt"
+MAC_SETUP_REPO="$ROOT" bash "$ROOT/migrations/1793404800-desktop-checklist-to-trash.sh"
+[[ ! -e "$HOME/Desktop/Finish setup.txt" && -f "$HOME/.Trash/Finish setup.txt" ]] && t_ok "migration: the old Desktop checklist goes to the Trash" || t_fail "Desktop checklist migration"
+MAC_SETUP_REPO="$ROOT" bash "$ROOT/migrations/1793404800-desktop-checklist-to-trash.sh" && t_ok "migration: running it again is harmless" || t_fail "Desktop migration not repeatable"
+# The template migration re-applies the current theme, and moves Paper to Daylight.
+echo paper > "$HOME/.local/state/mac-setup/theme"; rm -rf "$HOME/.local/state/mac-setup/current"
+MAC_SETUP_REPO="$ROOT" bash "$ROOT/migrations/1793404860-render-theme-templates.sh" >/dev/null 2>&1
+[[ "$(cat "$HOME/.local/state/mac-setup/theme")" == daylight && -f "$HOME/.local/state/mac-setup/current/theme/tmux.conf" ]] \
+  && t_ok "migration: the old Paper theme becomes Daylight, rendered from the templates" || t_fail "theme template migration"
+rm -f "$HOME/.local/state/mac-setup/theme"
+MAC_SETUP_REPO="$ROOT" bash "$ROOT/migrations/1793404860-render-theme-templates.sh" && t_ok "migration: with no theme yet it does nothing" || t_fail "theme migration with no theme"
+# A fresh install marks every migration done; a Mac with a theme does not.
+fh="$tmp/fresh"; mkdir -p "$fh"
+plan="$(HOME="$fh" bash "$ROOT/setup.sh" --dry-run --only folders 2>&1)"
+grep -q "bin/migrate --mark-all" <<<"$plan" && t_ok "a fresh install marks the migrations done" || t_fail "fresh install marking not planned"
+mkdir -p "$fh/.local/state/mac-setup"; echo nord > "$fh/.local/state/mac-setup/theme"
+plan="$(HOME="$fh" bash "$ROOT/setup.sh" --dry-run --only folders 2>&1)"
+grep -q "mark-all" <<<"$plan" && t_fail "an existing Mac had its migrations marked" || t_ok "an existing Mac keeps its migrations to run"
+
+# --- hooks: the named file and NAME.d/ in order, never .sample or non-executable
+hd="$HOME/.config/mac-setup/hooks"; mkdir -p "$hd/theme-set.d"
+mkhook() { printf '#!/bin/bash\necho "%s $*" >> "%s/hooks.log"\n' "$2" "$tmp" > "$1"; chmod +x "$1"; }
+mkhook "$hd/theme-set" main; mkhook "$hd/theme-set.d/20-b" b; mkhook "$hd/theme-set.d/10-a" a
+mkhook "$hd/theme-set.d/30-c.sample" sample; mkhook "$hd/theme-set.d/40-off" off; chmod -x "$hd/theme-set.d/40-off"
+printf '#!/bin/bash\nexit 1\n' > "$hd/theme-set.d/15-fails"; chmod +x "$hd/theme-set.d/15-fails"
+"$ROOT/bin/hook" theme-set nord 2>/dev/null
+[[ "$(tr '\n' '|' < "$tmp/hooks.log")" == "main nord|a nord|b nord|" ]] && t_ok "hooks run in order with their arguments, skipping samples, plain files and failures" \
+  || t_fail "hooks ran" "$(cat "$tmp/hooks.log")"
+! "$ROOT/bin/hook" ../x 2>/dev/null && t_ok "a hook name cannot leave the hooks folder" || t_fail "hook name not checked"
+: > "$tmp/hooks.log"; "$ROOT/bin/theme" set forest --no-wallpaper >/dev/null 2>&1
+grep -q "^main forest" "$tmp/hooks.log" && t_ok "theme set fires the theme-set hook with the theme name" || t_fail "theme-set hook not fired"
+rm -rf "$hd"
+
+# --- focus or open, web apps, update lock and window
+export AEROSPACE_WINDOWS=$'7|Ghostty|~\n9|Google Chrome|Inbox (3) - Gmail'
+: > "$STUB_LOG"; "$ROOT/bin/focus-or-open" Ghostty
+grep -q "aerospace focus --window-id 7" "$STUB_LOG" && ! grep -q "open -a" "$STUB_LOG" && t_ok "an app key focuses its open window" || t_fail "focus-or-open did not focus" "$(cat "$STUB_LOG")"
+: > "$STUB_LOG"; "$ROOT/bin/focus-or-open" Notion
+grep -q "open -a Notion" "$STUB_LOG" && t_ok "an app key opens an app with no window" || t_fail "focus-or-open did not open"
+: > "$STUB_LOG"; "$ROOT/bin/webapp" "https://mail.google.com" "Gmail"
+grep -q "aerospace focus --window-id 9" "$STUB_LOG" && ! grep -q "open " "$STUB_LOG" && t_ok "a web app key focuses its open window" || t_fail "webapp did not focus"
+: > "$STUB_LOG"; "$ROOT/bin/webapp" "https://www.youtube.com" "YouTube"
+grep -q "open " "$STUB_LOG" && t_ok "a web app key opens a window when none matches" || t_fail "webapp did not open"
+unset AEROSPACE_WINDOWS
+locktmp="$(mktemp -d)"; lock="$locktmp/mac-setup-update.lock"
+mkdir "$lock"; echo "$$" > "$lock/pid"
+out="$(TMPDIR="$locktmp" "$ROOT/bin/update" 2>&1)"
+grep -q "Another update is running" <<<"$out" && t_ok "a second update waits for the first" || t_fail "update lock" "$out"
+rm -rf "$locktmp"
+: > "$STUB_LOG"; "$ROOT/bin/update" --window
+grep -q "open -na Ghostty --args -e .*/bin/in-window --run .*/bin/update" "$STUB_LOG" && t_ok "update --window opens its own Ghostty window" || t_fail "update --window" "$(cat "$STUB_LOG")"
+code="$("$ROOT/bin/in-window" --run false </dev/null 2>/dev/null; echo "$?")"
+[[ "$code" == *"Failed (1)"*1 ]] && t_ok "the window reports a failure with its code" || t_fail "in-window failure" "$code"
+[[ "$("$ROOT/bin/in-window" --run bash -c 'echo "$MAC_SETUP_IN_WINDOW"' </dev/null 2>/dev/null | head -1)" == 1 ]] \
+  && t_ok "the window tells the command it is in sight" || t_fail "in-window did not set MAC_SETUP_IN_WINDOW"
+: > "$STUB_LOG"; "$ROOT/bin/app" install --window zoom
+grep -q "open -na Ghostty --args -e .*/bin/in-window --run .*/bin/app install zoom" "$STUB_LOG" \
+  && t_ok "app install from the menu works in its own window" || t_fail "app install --window" "$(cat "$STUB_LOG")"
+: > "$STUB_LOG"; MAC_SETUP_IN_WINDOW=1 "$ROOT/bin/app" install mpv
+grep -qx 'cask "mpv"' "$HOME/.mac-setup/Brewfile" && grep -q "brew install --cask mpv" "$STUB_LOG" \
+  && t_ok "app install in a window runs there, not in the background" || t_fail "app install in a window"
+
+# --- toggle states: flag files and the current theme
+# shellcheck source=lib/toggle-state.sh
+source "$ROOT/lib/toggle-state.sh"
+flag docker on; is_on docker && t_ok "a toggle flag reads as on" || t_fail "flag on"
+flag docker off; ! is_on docker && t_ok "a cleared toggle flag reads as off" || t_fail "flag off"
+echo "{ sec = 1" > "$TOGGLE_FLAGS/docker"; ! is_on docker && t_ok "a Docker flag from before the last restart reads as off" || t_fail "stale Docker flag read as on"
+flag docker off
+! is_on no-such-toggle && t_ok "an unknown toggle reads as off" || t_fail "unknown toggle"
+echo forest > "$HOME/.local/state/mac-setup/theme"
+theme_is forest && ! theme_is nord && t_ok "theme_is matches only the current theme" || t_fail "theme_is"
 
 exit $FAIL

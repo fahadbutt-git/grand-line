@@ -1,4 +1,5 @@
 #!/bin/bash
+# mac:summary=Sort the Downloads folder by its rules
 # Sorts the Downloads folder by the rules in config/mac-setup/downloads-rules.tsv.
 # macOS runs it whenever Downloads changes (see the downloads setup step).
 #   tidy-downloads              sort now

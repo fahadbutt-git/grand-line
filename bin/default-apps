@@ -1,4 +1,5 @@
 #!/bin/bash
+# mac:summary=Choose ArtCraft or LibreOffice and Preview as the apps that open documents
 # default-apps primary    ArtCraft apps open documents, sheets, slides and PDFs
 # default-apps fallback   LibreOffice and Preview open them instead
 # Videos open in IINA either way.

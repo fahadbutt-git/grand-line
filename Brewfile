@@ -24,7 +24,8 @@ brew "starship"         # the prompt line
 brew "bat"              # cat with syntax colours (also the ff preview)
 brew "tlrc"             # tldr: short worked examples for any command
 brew "rclone"           # Drive from the command line: bulk tidying now, NAS sync later
-cask "font-jetbrains-mono-nerd-font"   # the one code font (terminal, editor)
+cask "font-sf-mono"                    # the one code font (terminal, editor), Apple's own
+cask "font-symbols-only-nerd-font"     # icons only, the terminal's fallback for eza and starship
 cask "font-sf-pro"                     # the system font, installed by name so menus can use it too
 
 # Building, as in Omarchy. Docker runs in a Colima VM that starts only when

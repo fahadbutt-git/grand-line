@@ -1,18 +1,28 @@
 -- Neovim takes its colour scheme from the active package theme (theme pick),
 -- with a see-through background so it always sits on the terminal's colour.
-local f = io.open(vim.fn.expand("~/.local/state/mac-setup/nvim-theme"))
-local scheme = f and f:read("*l") or "vscode"
-if f then f:close() end
+-- The theme command writes the scheme name, then the mode (dark or light).
+local function read_lines(path)
+  local f = io.open(vim.fn.expand(path))
+  if not f then return nil end
+  local scheme, mode = f:read("*l"), f:read("*l")
+  f:close()
+  return scheme, mode
+end
+local scheme, mode = read_lines("~/.local/state/mac-setup/current/theme/nvim-theme")
+if not scheme then scheme, mode = read_lines("~/.local/state/mac-setup/nvim-theme") end
+scheme = scheme or "vscode"
+mode = mode or "dark"
 
 local by_theme = {
-  ["vscode"] = { "Mofiqul/vscode.nvim", opts = { transparent = true } },
+  -- Graphite (dark) and Daylight (light) both use vscode.nvim, in the theme's mode.
+  ["vscode"] = { "Mofiqul/vscode.nvim", opts = { transparent = true, style = mode } },
   ["nord"] = { "gbprod/nord.nvim", opts = { transparent = true } },
   ["everforest"] = { "neanias/everforest-nvim", main = "everforest", opts = { transparent_background_level = 1 } },
-  ["rose-pine-dawn"] = { "rose-pine/neovim", name = "rose-pine", opts = { variant = "dawn", styles = { transparency = true } } },
 }
 
 if not by_theme[scheme] then scheme = "vscode" end
--- All four are installed up front, so switching theme never waits on a
+vim.o.background = mode
+-- All of them are installed up front, so switching theme never waits on a
 -- download; only the active one loads.
 local specs = {}
 for name, spec in pairs(by_theme) do

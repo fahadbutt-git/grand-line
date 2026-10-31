@@ -1,0 +1,5 @@
+#!/bin/bash
+# Test stub: windows come from $AEROSPACE_WINDOWS (id|app|title per line).
+echo "aerospace $*" >> "${STUB_LOG:-/dev/null}"
+[[ "${1:-}" == list-windows ]] && printf '%s\n' "${AEROSPACE_WINDOWS:-}" | sed '/^$/d'
+exit 0

@@ -1,5 +1,8 @@
 # Ghostty terminal. Colours come from the active theme (see: theme pick).
-font-family = "JetBrainsMono Nerd Font"
+# SF Mono is the text; the Nerd Font symbols fill in the icons eza and
+# starship draw, which SF Mono does not have.
+font-family = "SF Mono"
+font-family = "Symbols Nerd Font Mono"
 font-size = 14
 window-padding-x = 12
 window-padding-y = 10
@@ -7,4 +10,11 @@ macos-titlebar-style = tabs
 cursor-style = block
 copy-on-select = clipboard
 confirm-close-surface = false
+
+# Caps + ` drops a terminal down from the top of the screen, from any app.
+# Karabiner sends this key; Ghostty needs Accessibility for global keys.
+quick-terminal-position = top
+keybind = global:ctrl+alt+super+grave_accent=toggle_quick_terminal
+
+# theme.conf is rendered by the theme command from config/themed/ghostty.conf.tpl.
 config-file = ?theme.conf

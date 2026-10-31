@@ -20,7 +20,8 @@ check() { local name="$1"; shift; local out; if out="$("$@" 2>&1)"; then pass "$
 
 SHELL_FILES=()
 while IFS= read -r f; do SHELL_FILES+=("$f"); done < <(
-  { ls setup.sh publish.sh lib/*.sh steps/*.sh bin/* tests/*.sh tests/stubs/* 2>/dev/null; } | sort -u)
+  { ls setup.sh publish.sh lib/*.sh steps/*.sh bin/* tests/*.sh tests/stubs/* \
+       migrations/*.sh config/mac-setup/hooks/*.sample 2>/dev/null; } | sort -u)
 
 echo "Shell scripts"
 for f in "${SHELL_FILES[@]}"; do
@@ -73,8 +74,12 @@ tomllib.load(open('config/aerospace/aerospace.toml', 'rb'))"
 check "karabiner.json parses" python3 -m json.tool config/karabiner/karabiner.json
 check "generated files are current with tools/bindings.py" python3 tools/bindings.py --check
 
-check "menu.tsv: two tab-separated fields per entry" bash -c \
-  "grep -v -e '^#' -e '^\$' config/mac-setup/menu.tsv | awk -F'\t' 'NF != 2 { print NR\": \"\$0; bad=1 } END { exit bad }'"
+check "menu.tsv: path and command, then optional ?guard and ✓check columns" bash -c \
+  "grep -v -e '^#' -e '^\$' config/mac-setup/menu.tsv | awk -F'\t' '
+     NF < 2 || NF > 4 || \$2 == \"\" { print NR\": \"\$0; bad=1; next }
+     NF >= 3 && \$3 != \"\" && substr(\$3, 1, 1) != \"?\" { print \"column 3 must start with ?: \"\$0; bad=1 }
+     NF == 4 && index(\$4, \"✓\") != 1 { print \"column 4 must start with ✓: \"\$0; bad=1 }
+     END { exit bad }'"
 
 check "every package command used by menus and shortcuts exists in bin/" bash -c '
   bad=0
@@ -100,7 +105,7 @@ check "every native helper has a matching source file" bash -c '
 check "every theme has its background and all fields" bash -c '
   bad=0
   for t in config/themes/*.theme; do
-    for k in LABEL MODE ACCENT BACKGROUND TERM_BG TERM_FG TERM_CURSOR TERM_SELECTION PALETTE HIGHLIGHT NVIM; do
+    for k in LABEL MODE ACCENT ACCENT_HEX BACKGROUND TERM_BG TERM_FG TERM_CURSOR TERM_SELECTION MUTED BG_LIGHTER BG_DARKER PALETTE HIGHLIGHT NVIM; do
       grep -q "^$k=" "$t" || { echo "$t: no $k"; bad=1; }
     done
     [[ "$(sed -n "s/^PALETTE=//p" "$t" | tr -d \" | wc -w | tr -d " ")" == 16 ]] || { echo "$t: PALETTE needs 16 colours"; bad=1; }
@@ -110,11 +115,46 @@ check "every theme has its background and all fields" bash -c '
     [[ -f "backgrounds/$bg" ]] || { echo "$t: backgrounds/$bg missing"; bad=1; }
   done; exit $bad'
 
+check "light themes: every terminal colour reads at 4.5:1 on the background" python3 -c '
+import glob, re, sys
+def lum(h):
+    c = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+def ratio(a, b):
+    hi, lo = sorted((lum(a), lum(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+bad = 0
+for path in sorted(glob.glob("config/themes/*.theme")):
+    t = dict(re.findall(r"^([A-Z_0-9]+)=\"?([^\"\n]*)\"?", open(path).read(), re.M))
+    bg = t["TERM_BG"]
+    colours = [("TERM_FG", t["TERM_FG"])]
+    if t["MODE"] == "light":
+        colours += [("MUTED", t["MUTED"]), ("HIGHLIGHT", t["HIGHLIGHT"])]
+        colours += [("PALETTE %d" % i, c) for i, c in enumerate(t["PALETTE"].split())]
+    for name, c in colours:
+        if ratio(c, bg) < 4.5:
+            print("%s: %s #%s is %.2f:1 on #%s" % (path, name, c, ratio(c, bg), bg)); bad = 1
+sys.exit(bad)'
+
+check "every bin/ command has a \"# mac:summary=\" line (mac commands lists them)" bash -c '
+  bad=0
+  for f in bin/*; do grep -q "^# mac:summary=." "$f" || { echo "$f has no summary"; bad=1; }; done
+  exit $bad'
+
+check "migrations are named <unix time>-<slug>.sh" bash -c '
+  bad=0
+  for f in migrations/*; do [[ "${f##*/}" =~ ^[0-9]{10}-[a-z0-9-]+\.sh$ ]] || { echo "$f"; bad=1; }; done
+  exit $bad'
+
+# /Users/me/ is the placeholder home that examples and tests use.
 check "no personal paths or secrets committed" bash -c '
-  ! grep -rnE "/Users/[a-z]+/|ghp_[A-Za-z0-9]{20}|github_pat_" --exclude-dir=.git . | grep -v "^./tests/run-all.sh"'
+  found="$(grep -rnoE "/Users/[a-z]+/|ghp_[A-Za-z0-9]{20}|github_pat_" --exclude-dir=.git --exclude-dir=.build . \
+    | grep -v -e "^./tests/run-all.sh:" -e ":/Users/me/\$")"
+  [[ -z "$found" ]] || { printf "%s\n" "$found"; exit 1; }'
 
 echo "Behaviour"
-check "unit tests (menus, shortcuts, ArtCraft asset choice, themes)" bash tests/unit.sh
+check "unit tests (menus, shortcuts, overlays, themes, migrations, hooks, ArtCraft)" bash tests/unit.sh
 check "dry run of the whole setup changes nothing" bash tests/dryrun.sh
 
 if [[ "$OFFLINE" == 0 ]]; then

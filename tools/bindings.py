@@ -31,15 +31,17 @@ def key(code, *mods):
 
 
 def app(name):
-    return sh(f"open -a '{name}'")
+    # Focuses the app's open window (on any workspace), or opens the app.
+    return cmd(f"focus-or-open '{name}'")
 
 
 def cmd(name_and_args):
     return sh(f"{BIN}/{name_and_args}")
 
 
-def web(url):
-    return cmd(f"webapp '{url}'")
+def web(url, title):
+    # Focuses the open window whose title contains TITLE, or opens one.
+    return cmd(f"webapp '{url}' '{title}'")
 
 
 def aero(args):
@@ -58,6 +60,7 @@ BINDINGS = [
 
     # Windows and workspaces
     ("w", [], "Windows", "Close window", key("w", "command")),
+    ("q", [], "Windows", "Quit app", key("q", "command")),
     ("l", ["control"], "Windows", "Lock screen", key("q", "control", "command")),
     ("t", [], "Windows", "Toggle tiling and floating", aero("layout floating tiling")),
     ("j", [], "Windows", "Toggle split direction", aero("layout horizontal vertical")),
@@ -78,6 +81,8 @@ BINDINGS = [
 for code, direction in ARROWS:
     BINDINGS.append((code, [], "Windows", f"Focus window {direction}", aero(f"focus {direction}")))
     BINDINGS.append((code, ["shift"], "Windows", f"Swap window {direction}", aero(f"move {direction}")))
+    BINDINGS.append((code, ["control", "shift"], "Windows", f"Move window to the monitor {direction}",
+                     aero(f"move-node-to-monitor --focus-follows-window --wrap-around {direction}")))
 
 for n in range(1, 10):
     BINDINGS.append((str(n), [], "Workspaces", f"Go to workspace {n}", aero(f"workspace {n}")))
@@ -89,6 +94,9 @@ for n in range(1, 10):
 BINDINGS += [
     # Apps
     ("return_or_enter", [], "Apps", "Terminal (Ghostty)", app("Ghostty")),
+    # Ghostty's quick terminal listens for this key (config/ghostty/config).
+    ("grave_accent_and_tilde", [], "Apps", "Quick terminal (drops down from the top)",
+     key("grave_accent_and_tilde", "control", "option", "command")),
     ("return_or_enter", ["option"], "Apps", "Terminal in a tmux session", sh(f"open -na Ghostty --args -e {BREW}/tmux new-session -A -s main")),
     ("return_or_enter", ["shift"], "Apps", "Browser (Chrome)", app("Google Chrome")),
     ("b", ["shift", "option"], "Apps", "Private browser window", sh("open -na 'Google Chrome' --args --incognito")),
@@ -108,10 +116,10 @@ BINDINGS += [
     ("o", ["shift"], "Apps", "PdfCraft (PDFs)", app("PdfCraft")),
     ("v", ["shift"], "Apps", "FilmCraft (video)", app("FilmCraft")),
     ("slash", ["shift"], "Apps", "Passwords", app("Passwords")),
-    ("e", ["shift"], "Web apps", "Gmail", web("https://mail.google.com")),
-    ("c", ["shift"], "Web apps", "Google Calendar", web("https://calendar.google.com")),
-    ("p", ["shift"], "Web apps", "PubMed", web("https://pubmed.ncbi.nlm.nih.gov")),
-    ("y", ["shift"], "Web apps", "YouTube", web("https://www.youtube.com")),
+    ("e", ["shift"], "Web apps", "Gmail", web("https://mail.google.com", "Gmail")),
+    ("c", ["shift"], "Web apps", "Google Calendar", web("https://calendar.google.com", "Google Calendar")),
+    ("p", ["shift"], "Web apps", "PubMed", web("https://pubmed.ncbi.nlm.nih.gov", "PubMed")),
+    ("y", ["shift"], "Web apps", "YouTube", web("https://www.youtube.com", "YouTube")),
 
     # System controls
     ("a", ["control"], "System", "Audio output menu", cmd("audio")),
@@ -125,8 +133,10 @@ BINDINGS += [
     ("o", ["control"], "System", "Toggle menu", cmd("menu Toggle")),
     ("c", ["control"], "Capture", "Capture menu", cmd("menu Capture")),
     ("x", ["control", "shift"], "Capture", "Copy text from a screen area", cmd("capture text")),
+    ("p", ["control"], "Capture", "Colour picker", sh("open -a 'Digital Color Meter'")),
     ("period", ["control"], "Capture", "Transcode menu (video, images, PDF)", cmd("menu Transcode")),
     # Universal copy and paste, as Super + C, X, V in Omarchy (works in the terminal too)
+    ("a", [], "Clipboard", "Select all", key("a", "command")),
     ("c", [], "Clipboard", "Copy", key("c", "command")),
     ("x", [], "Clipboard", "Cut", key("x", "command")),
     ("v", [], "Clipboard", "Paste", key("v", "command")),
@@ -142,6 +152,7 @@ BINDINGS += [
     ("spacebar", ["shift"], "Toggles", "Hide or show the menu bar", cmd("toggle menubar")),
     ("m", ["control", "shift"], "Toggles", "Mute or unmute the microphone", cmd("toggle mic")),
     ("r", ["control"], "Reminders", "Set a reminder", cmd("reminder")),
+    ("r", ["control", "option"], "Reminders", "Reminders due today", cmd("notice reminders")),
     ("t", ["control", "option"], "Notices", "Show the time", cmd("notice time")),
     ("b", ["control", "option"], "Notices", "Show the battery", cmd("notice battery")),
     ("w", ["control", "option"], "Notices", "Show the weather", cmd("notice weather")),
@@ -154,6 +165,7 @@ BINDINGS += [
 KEY_LABEL = {
     "spacebar": "Space", "escape": "Escape", "return_or_enter": "Return", "tab": "Tab",
     "equal_sign": "=", "hyphen": "-", "period": ".", "slash": "/", "comma": ",",
+    "grave_accent_and_tilde": "`", "delete_or_backspace": "Backspace",
     "left_arrow": "Left", "right_arrow": "Right", "up_arrow": "Up", "down_arrow": "Down",
 }
 MOD_LABEL = {"control": "Ctrl", "option": "Option", "shift": "Shift", "command": "Cmd"}

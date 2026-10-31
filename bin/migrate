@@ -1,0 +1,49 @@
+#!/bin/bash
+# mac:summary=Run the package's one-time changes (migrations) that have not run yet
+# migrate              run pending migrations, oldest first
+# migrate --pending    list them (exits 1 when there are none)
+# migrate --mark-all   record every migration as done without running it
+#                      (setup does this on a fresh install, which needs none)
+# Migrations are migrations/<unix time>-<what it does>.sh, as in Omarchy.
+# Each runs once; a marker in ~/.local/state/mac-setup/migrations records it.
+# A failed migration stops the run, so the next update tries it again.
+source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
+
+REPO="${MAC_SETUP_REPO:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}"
+DIR="$REPO/migrations"
+DONE="$MAC_SETUP_STATE/migrations"
+
+# The migration files not yet marked done, in order (names start with the time).
+pending() {
+  local f
+  for f in "$DIR"/*.sh; do
+    [[ -f "$f" && ! -f "$DONE/${f##*/}" ]] && echo "$f"
+  done
+  return 0
+}
+
+mkdir -p "$DONE"
+case "${1:-}" in
+  --pending)
+    list="$(pending)"
+    [[ -n "$list" ]] || exit 1
+    printf '%s\n' "$list" | sed 's#.*/##'
+    ;;
+  --mark-all)
+    pending | while IFS= read -r f; do touch "$DONE/${f##*/}"; done
+    ;;
+  "")
+    [[ -n "$(pending)" ]] || { echo "No one-time changes waiting."; exit 0; }
+    while IFS= read -r f; do
+      [[ -n "$f" ]] || continue
+      echo "Migration: ${f##*/}"
+      if MAC_SETUP_REPO="$REPO" /bin/bash "$f" </dev/null; then
+        touch "$DONE/${f##*/}"
+      else
+        echo "Migration failed: ${f##*/}. The next update tries it again." >&2
+        exit 1
+      fi
+    done < <(pending)
+    ;;
+  *) echo "usage: migrate [--pending | --mark-all]" >&2; exit 2 ;;
+esac

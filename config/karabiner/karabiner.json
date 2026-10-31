@@ -112,6 +112,102 @@
          }
         ],
         "from": {
+         "key_code": "left_arrow",
+         "modifiers": {
+          "mandatory": [
+           "control",
+           "shift"
+          ]
+         }
+        },
+        "to": [
+         {
+          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-monitor --focus-follows-window --wrap-around left"
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "down_arrow",
+         "modifiers": {
+          "mandatory": [
+           "control",
+           "shift"
+          ]
+         }
+        },
+        "to": [
+         {
+          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-monitor --focus-follows-window --wrap-around down"
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "up_arrow",
+         "modifiers": {
+          "mandatory": [
+           "control",
+           "shift"
+          ]
+         }
+        },
+        "to": [
+         {
+          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-monitor --focus-follows-window --wrap-around up"
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "right_arrow",
+         "modifiers": {
+          "mandatory": [
+           "control",
+           "shift"
+          ]
+         }
+        },
+        "to": [
+         {
+          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-monitor --focus-follows-window --wrap-around right"
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
          "key_code": "1",
          "modifiers": {
           "mandatory": [
@@ -362,7 +458,7 @@
         },
         "to": [
          {
-          "shell_command": "open -a 'ChatGPT'"
+          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'ChatGPT'"
          }
         ]
        },
@@ -386,7 +482,7 @@
         },
         "to": [
          {
-          "shell_command": "open -a 'Gemini'"
+          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'Gemini'"
          }
         ]
        },
@@ -410,7 +506,7 @@
         },
         "to": [
          {
-          "shell_command": "open -a 'FineTune'"
+          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'FineTune'"
          }
         ]
        },
@@ -458,7 +554,7 @@
         },
         "to": [
          {
-          "shell_command": "open -a 'Meetily'"
+          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'Meetily'"
          }
         ]
        },
@@ -483,6 +579,30 @@
         "to": [
          {
           "shell_command": "$HOME/.mac-setup/bin/toggle mic"
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "r",
+         "modifiers": {
+          "mandatory": [
+           "control",
+           "option"
+          ]
+         }
+        },
+        "to": [
+         {
+          "shell_command": "$HOME/.mac-setup/bin/notice reminders"
          }
         ]
        },
@@ -1042,7 +1162,7 @@
         },
         "to": [
          {
-          "shell_command": "open -a 'Google Chrome'"
+          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'Google Chrome'"
          }
         ]
        },
@@ -1111,7 +1231,7 @@
         },
         "to": [
          {
-          "shell_command": "open -a 'Claude'"
+          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'Claude'"
          }
         ]
        },
@@ -1134,7 +1254,7 @@
         },
         "to": [
          {
-          "shell_command": "open -a 'Notion'"
+          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'Notion'"
          }
         ]
        },
@@ -1157,7 +1277,7 @@
         },
         "to": [
          {
-          "shell_command": "open -a 'Reminders'"
+          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'Reminders'"
          }
         ]
        },
@@ -1180,7 +1300,7 @@
         },
         "to": [
          {
-          "shell_command": "open -a 'WhatsApp'"
+          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'WhatsApp'"
          }
         ]
        },
@@ -1203,7 +1323,7 @@
         },
         "to": [
          {
-          "shell_command": "open -a 'Spotify'"
+          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'Spotify'"
          }
         ]
        },
@@ -1226,7 +1346,7 @@
         },
         "to": [
          {
-          "shell_command": "open -a 'RStudio'"
+          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'RStudio'"
          }
         ]
        },
@@ -1249,7 +1369,7 @@
         },
         "to": [
          {
-          "shell_command": "open -a 'WordCraft'"
+          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'WordCraft'"
          }
         ]
        },
@@ -1272,7 +1392,7 @@
         },
         "to": [
          {
-          "shell_command": "open -a 'GridCraft'"
+          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'GridCraft'"
          }
         ]
        },
@@ -1295,7 +1415,7 @@
         },
         "to": [
          {
-          "shell_command": "open -a 'DeckCraft'"
+          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'DeckCraft'"
          }
         ]
        },
@@ -1318,7 +1438,7 @@
         },
         "to": [
          {
-          "shell_command": "open -a 'PdfCraft'"
+          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'PdfCraft'"
          }
         ]
        },
@@ -1341,7 +1461,7 @@
         },
         "to": [
          {
-          "shell_command": "open -a 'FilmCraft'"
+          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'FilmCraft'"
          }
         ]
        },
@@ -1364,7 +1484,7 @@
         },
         "to": [
          {
-          "shell_command": "open -a 'Passwords'"
+          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'Passwords'"
          }
         ]
        },
@@ -1387,7 +1507,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/webapp 'https://mail.google.com'"
+          "shell_command": "$HOME/.mac-setup/bin/webapp 'https://mail.google.com' 'Gmail'"
          }
         ]
        },
@@ -1410,7 +1530,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/webapp 'https://calendar.google.com'"
+          "shell_command": "$HOME/.mac-setup/bin/webapp 'https://calendar.google.com' 'Google Calendar'"
          }
         ]
        },
@@ -1433,7 +1553,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/webapp 'https://pubmed.ncbi.nlm.nih.gov'"
+          "shell_command": "$HOME/.mac-setup/bin/webapp 'https://pubmed.ncbi.nlm.nih.gov' 'PubMed'"
          }
         ]
        },
@@ -1456,7 +1576,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.mac-setup/bin/webapp 'https://www.youtube.com'"
+          "shell_command": "$HOME/.mac-setup/bin/webapp 'https://www.youtube.com' 'YouTube'"
          }
         ]
        },
@@ -1664,6 +1784,29 @@
         "to": [
          {
           "shell_command": "$HOME/.mac-setup/bin/menu Capture"
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "p",
+         "modifiers": {
+          "mandatory": [
+           "control"
+          ]
+         }
+        },
+        "to": [
+         {
+          "shell_command": "open -a 'Digital Color Meter'"
          }
         ]
        },
@@ -1982,6 +2125,27 @@
         "to": [
          {
           "key_code": "w",
+          "modifiers": [
+           "command"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "q"
+        },
+        "to": [
+         {
+          "key_code": "q",
           "modifiers": [
            "command"
           ]
@@ -2362,7 +2526,51 @@
         },
         "to": [
          {
-          "shell_command": "open -a 'Ghostty'"
+          "shell_command": "$HOME/.mac-setup/bin/focus-or-open 'Ghostty'"
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "grave_accent_and_tilde"
+        },
+        "to": [
+         {
+          "key_code": "grave_accent_and_tilde",
+          "modifiers": [
+           "control",
+           "option",
+           "command"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "a"
+        },
+        "to": [
+         {
+          "key_code": "a",
+          "modifiers": [
+           "command"
+          ]
          }
         ]
        },

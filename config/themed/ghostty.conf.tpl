@@ -1,0 +1,21 @@
+# Written by: theme set {{ NAME }}
+background = {{ TERM_BG }}
+foreground = {{ TERM_FG }}
+cursor-color = {{ TERM_CURSOR }}
+selection-background = {{ TERM_SELECTION }}
+palette = 0=#{{ COLOR0 }}
+palette = 1=#{{ COLOR1 }}
+palette = 2=#{{ COLOR2 }}
+palette = 3=#{{ COLOR3 }}
+palette = 4=#{{ COLOR4 }}
+palette = 5=#{{ COLOR5 }}
+palette = 6=#{{ COLOR6 }}
+palette = 7=#{{ COLOR7 }}
+palette = 8=#{{ COLOR8 }}
+palette = 9=#{{ COLOR9 }}
+palette = 10=#{{ COLOR10 }}
+palette = 11=#{{ COLOR11 }}
+palette = 12=#{{ COLOR12 }}
+palette = 13=#{{ COLOR13 }}
+palette = 14=#{{ COLOR14 }}
+palette = 15=#{{ COLOR15 }}

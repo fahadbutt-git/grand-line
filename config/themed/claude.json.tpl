@@ -1,0 +1,30 @@
+{
+  "name": "Mac setup ({{ LABEL }})",
+  "base": "{{ MODE }}",
+  "overrides": {
+    "claude": "#{{ ACCENT_HEX }}",
+    "text": "#{{ TERM_FG }}",
+    "inverseText": "#{{ TERM_BG }}",
+    "inactive": "#{{ MUTED }}",
+    "subtle": "#{{ MUTED }}",
+    "suggestion": "#{{ HIGHLIGHT }}",
+    "permission": "#{{ COLOR4 }}",
+    "remember": "#{{ COLOR3 }}",
+    "success": "#{{ COLOR2 }}",
+    "error": "#{{ COLOR1 }}",
+    "warning": "#{{ COLOR3 }}",
+    "merged": "#{{ COLOR5 }}",
+    "promptBorder": "#{{ MUTED }}",
+    "planMode": "#{{ COLOR6 }}",
+    "autoAccept": "#{{ COLOR3 }}",
+    "bashBorder": "#{{ COLOR11 }}",
+    "ide": "#{{ COLOR14 }}",
+    "userMessageBackground": "#{{ BG_LIGHTER }}",
+    "bashMessageBackgroundColor": "#{{ BG_LIGHTER }}",
+    "memoryBackgroundColor": "#{{ BG_LIGHTER }}",
+    "selectionBg": "#{{ TERM_SELECTION }}",
+    "rate_limit_fill": "#{{ ACCENT_HEX }}",
+    "rate_limit_empty": "#{{ BG_DARKER }}",
+    "briefLabelClaude": "#{{ ACCENT_HEX }}"
+  }
+}

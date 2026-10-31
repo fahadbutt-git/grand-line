@@ -1,8 +1,13 @@
 #!/bin/bash
-# Open a website in its own app-style Chrome window, as Omarchy's web apps do.
+# mac:summary=Open a website as its own app-style window, or focus the one already open
+# webapp URL [TITLE]
+# As Omarchy's web apps. With TITLE, a Chrome window whose title contains it
+# is focused instead of opening another (Gmail, YouTube and so on).
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 
-url="${1:?usage: webapp URL}"
+url="${1:?usage: webapp URL [TITLE]}"
+title="${2:-}"
+[[ -n "$title" ]] && focus_window "Google Chrome" "$title" && exit 0
 if [[ -d "/Applications/Google Chrome.app" ]]; then
   open -na "Google Chrome" --args --app="$url"
 else
