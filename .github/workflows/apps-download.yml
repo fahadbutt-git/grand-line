@@ -1,0 +1,43 @@
+name: Apps download
+
+# Builds Log Pose, Byakugan and Den Den exactly as setup does and publishes
+# them as a download on the run's page (signed-in GitHub users only), so
+# they can be tried on any Mac without running setup.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["apps/**", "lib/native-apps.sh"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apps-download
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build the apps
+        run: |
+          export GRAND_LINE_APPS_DEST="$RUNNER_TEMP/apps" REPO_DIR="$GITHUB_WORKSPACE" DRY_RUN=0
+          mkdir -p "$GRAND_LINE_APPS_DEST"
+          for dir in apps/*/; do
+            [ -f "$dir/apps.tsv" ] || continue
+            bash -c 'source lib/common.sh && source lib/native-apps.sh && build_and_install "$1"' _ "${dir%/}"
+          done
+          cd "$GRAND_LINE_APPS_DEST"
+          for app in *.app; do codesign --verify --deep "$app"; done
+          # Zipped with ditto first: the artifact upload drops the executable
+          # bit and the framework symlinks an app needs to open.
+          mkdir -p "$RUNNER_TEMP/out"
+          ditto -c -k --keepParent "$GRAND_LINE_APPS_DEST" "$RUNNER_TEMP/out/Grand-Line-apps.zip"
+          echo "::notice title=apps::$(ls -1 | tr '\n' ' ')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Grand-Line-apps
+          path: ${{ runner.temp }}/out/Grand-Line-apps.zip
+          retention-days: 30
