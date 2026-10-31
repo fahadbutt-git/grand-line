@@ -38,6 +38,11 @@ bash4="$(grep -nE 'mapfile |readarray |declare -A|local -A|\$\{[a-zA-Z_]+(,,|\^\
           "${SHELL_FILES[@]}" | grep -v '^tests/run-all.sh' || true)"
 if [[ -z "$bash4" ]]; then pass "no bash 4+ features (macOS ships bash 3.2)"; else fail "bash 4+ features found" "$bash4"; fi
 
+# bash 3.2 also misreads an apostrophe inside a here-document within $( ),
+# which only shows on a Mac. Catch the pattern everywhere instead.
+heredoc="$(grep -nE '^[^#]*\$\(cat <<' "${SHELL_FILES[@]}" || true)"
+if [[ -z "$heredoc" ]]; then pass "no here-documents inside \$( ) (bash 3.2 quoting bug)"; else fail "here-document inside \$( ) breaks on macOS bash 3.2" "$heredoc"; fi
+
 check "executable bits set" bash -c '
   bad=0
   for f in bin/* setup.sh publish.sh tests/*.sh tests/stubs/*; do [[ -x "$f" ]] || { echo "$f"; bad=1; }; done

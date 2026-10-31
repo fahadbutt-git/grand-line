@@ -4,7 +4,8 @@
 
 step_checklist() {
   local out="$HOME/Desktop/Finish setup.txt" text
-  text="$(cat <<'EOF'
+  # read, not $(cat <<EOF): macOS's bash 3.2 misreads apostrophes inside $( ).
+  IFS= read -r -d '' text <<'EOF' || true
 Finish setup
 
 macOS requires these clicks from you. Work down the list once.
@@ -86,7 +87,6 @@ Everyday commands, from Terminal or the Caps Lock menu:
    keybindings     list every shortcut
    theme pick      change theme and background
 EOF
-)"
   if [[ "$DRY_RUN" == 1 ]]; then
     run "write the finishing checklist to $out"
     return 0
