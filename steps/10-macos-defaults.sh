@@ -65,6 +65,11 @@ step_macos_defaults() {
     com.citrix.receiver.icaviewer.mac com.citrix.receiver.nomas com.vmware.horizon com.omnissa.horizon.client.mac
   run defaults write org.p0deje.Maccy historySize -int 300
 
+  # The desktop is a dashboard: no file icons, widgets shown on it
+  run defaults write com.apple.finder CreateDesktop -bool false
+  run defaults write com.apple.WindowManager StandardHideWidgets -bool false
+  run defaults write com.apple.WindowManager StageManagerHideWidgets -bool false
+
   # Screenshots without the drop shadow
   run defaults write com.apple.screencapture disable-shadow -bool true
 

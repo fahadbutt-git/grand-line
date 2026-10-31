@@ -1,9 +1,9 @@
 # shellcheck shell=bash
-# Writes the list of clicks macOS insists on to the Desktop.
+# Writes the list of clicks macOS insists on to Documents (the Desktop stays empty).
 # App names here are plain text: keep them in step with the Brewfile by hand.
 
 step_checklist() {
-  local out="$HOME/Desktop/Finish setup.txt" text
+  local out="$HOME/Documents/Finish setup.txt" text
   # read, not $(cat <<EOF): macOS's bash 3.2 misreads apostrophes inside $( ).
   IFS= read -r -d '' text <<'EOF' || true
 Finish setup
@@ -46,24 +46,33 @@ macOS requires these clicks from you. Work down the list once.
    then sets or mutes each app's volume. Chrome mutes a single tab
    itself: right-click the tab, Mute site.
 
-8. Downloads sorting
+8. The desktop as a dashboard
+   The desktop shows no files, only widgets. First add Google Calendar
+   to the Mac: System Settings, Internet Accounts, Add Account, Google,
+   then turn on Calendars. Then right-click the desktop, Edit Widgets,
+   and drag on Calendar (Up Next or List), Reminders and Weather.
+   In System Settings, Desktop and Dock, set Widget style to
+   Monochrome so they take the theme's colours. Workspace 8 is kept
+   empty, so Caps + 8 always shows the dashboard.
+
+9. Downloads sorting
    The first time a file lands in Downloads, macOS asks whether
    downloads-agent may use the Downloads folder. Click Allow.
 
-9. Notifications from the shortcuts
-   In Terminal run:  osascript -e 'display notification "test"'
-   Then allow Script Editor in System Settings, Notifications.
+10. Notifications from the shortcuts
+    In Terminal run:  osascript -e 'display notification "test"'
+    Then allow Script Editor in System Settings, Notifications.
 
-10. Google Drive
+11. Google Drive
     Sign in. In Drive settings, under My Drive syncing options,
     choose "Mirror files" (needed for full-text search on the Mac).
 
-11. Screen capture and text capture
+12. Screen capture and text capture
     The first time you use the capture menu, allow Screen Recording
     for karabiner_console_user_server when macOS asks. This lets the
     package's own shortcut commands see the screen, nothing else.
 
-12. Sign in to your apps
+13. Sign in to your apps
     Chrome, Claude, Claude Code (claude), Codex (codex), Antigravity
     (agy), ChatGPT, Gemini, Notion, Anki (AnkiWeb), WhatsApp, Zoom,
     Discord, Spotify, Plaud, Citrix, Horizon, Proton VPN (free
@@ -71,26 +80,26 @@ macOS requires these clicks from you. Work down the list once.
     can block Citrix and Horizon. Run one VPN at a time: turn Proton
     off while using Tailscale to reach the homelab.
 
-13. Keep start-up light
+14. Keep start-up light
     In Spotify and Discord settings, turn off "Open at login".
     Then review System Settings, General, Login Items and turn off
     anything you do not need at start-up. In System Settings, Menu Bar,
     turn off the icons you do not need to see.
 
-14. Install by hand (not available through Homebrew)
+15. Install by hand (not available through Homebrew)
     VoiceStudio.
     Microsoft Defender, only if Western or hospital IT requires it.
 
-15. Keep this package in sync with GitHub
+16. Keep this package in sync with GitHub
     In Terminal: gh auth login
 
-16. Google Drive from Terminal (optional, for bulk tidying and the NAS)
+17. Google Drive from Terminal (optional, for bulk tidying and the NAS)
     In Terminal: rclone config, choose "drive", and follow the prompts.
 
-17. Xcode, only when you start building Mac apps
+18. Xcode, only when you start building Mac apps
     Install it from the App Store (about 15 GB).
 
-18. Restart the Mac once.
+19. Restart the Mac once.
 
 Everyday commands, from Terminal or the Caps Lock menu:
    update          update every app and tool
@@ -114,5 +123,5 @@ EOF
     open -a "Espanso" 2>/dev/null
   fi
   mark_done checklist
-  ok "Checklist saved to your Desktop"
+  ok "Checklist saved to Documents (it opens now)"
 }

@@ -110,7 +110,7 @@ echo "System settings"
 
 if [[ "$CI" == 0 ]]; then
   echo "Desktop"
-  [[ -f "$HOME/Desktop/Finish setup.txt" ]] && pass "finishing checklist on the Desktop" || fail "checklist missing"
+  [[ -f "$HOME/Documents/Finish setup.txt" ]] && pass "finishing checklist in Documents" || fail "checklist missing"
   pgrep -qx AeroSpace && pass "AeroSpace is running" || note "AeroSpace is not running yet (open it and allow Accessibility)"
 fi
 

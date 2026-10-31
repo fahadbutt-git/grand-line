@@ -13,7 +13,7 @@ One command turns a new Mac into a ready workstation: apps, command line tools, 
    ```
 
 4. Type your Mac password once when asked. The rest runs unattended for 30 to 60 minutes.
-5. Work through `Finish setup.txt`, which appears on the Desktop at the end. It lists the clicks macOS insists on (Karabiner and AeroSpace permissions, notifications, Google Drive, app sign-ins).
+5. Work through `Finish setup.txt`, which opens at the end (it is saved in Documents). It lists the clicks macOS insists on (Karabiner and AeroSpace permissions, notifications, Google Drive, app sign-ins).
 
 The first run copies the package to `~/mac-setup`. That copy is the one to edit and keep. Later runs, from anywhere, use it.
 
