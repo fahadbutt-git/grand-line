@@ -145,7 +145,7 @@ final class CompilerTests: XCTestCase {
     func testDriveAndLocal() {
         let drive = Fixture.compile("drive:")
         XCTAssertEqual(drive.scopes, ["/Users/me/Library/CloudStorage"])
-        XCTAssertTrue(drive.postFilter("/Users/me/Library/CloudStorage/GoogleDrive-you@example.com/My Drive/a.pdf"))
+        XCTAssertTrue(drive.postFilter("/Users/me/Library/CloudStorage/GoogleDrive-me@example.com/My Drive/a.pdf"))
         XCTAssertFalse(drive.postFilter("/Users/me/Library/CloudStorage/Dropbox/a.pdf"))
 
         let local = Fixture.compile("local:")
