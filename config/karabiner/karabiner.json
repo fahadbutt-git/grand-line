@@ -434,7 +434,7 @@
         },
         "to": [
          {
-          "shell_command": "open -na 'Google Chrome' --args --incognito"
+          "shell_command": "open -na Zen --args --private-window"
          }
         ]
        },
@@ -1186,7 +1186,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'Google Chrome'"
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'Zen'"
          }
         ]
        },

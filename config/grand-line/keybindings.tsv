@@ -60,8 +60,8 @@ Caps + Option + Shift + 9	Workspaces	Move window to workspace 9, stay here	/opt/
 Caps + Return	Apps	Terminal (Ghostty)	$HOME/.grand-line/bin/focus-or-open 'Ghostty'
 Caps + `	Apps	Quick terminal (drops down from the top)	
 Caps + Option + Return	Apps	Terminal in a tmux session	open -na Ghostty --args -e /opt/homebrew/bin/tmux new-session -A -s main
-Caps + Shift + Return	Apps	Browser (Chrome)	$HOME/.grand-line/bin/focus-or-open 'Google Chrome'
-Caps + Option + Shift + B	Apps	Private browser window	open -na 'Google Chrome' --args --incognito
+Caps + Shift + Return	Apps	Browser (Zen)	$HOME/.grand-line/bin/focus-or-open 'Zen'
+Caps + Option + Shift + B	Apps	Private browser window	open -na Zen --args --private-window
 Caps + Shift + F	Apps	Files (Log Pose, or Finder if switched back)	open "$HOME"
 Caps + Shift + D	Apps	Google Drive folder	$HOME/.grand-line/bin/open-drive
 Caps + Shift + A	Apps	Claude	$HOME/.grand-line/bin/focus-or-open 'Claude'

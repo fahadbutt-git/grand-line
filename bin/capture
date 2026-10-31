@@ -29,7 +29,16 @@ case "${1:-area}" in
     fi
     ;;
   url)
-    url="$(osascript -e 'tell application "Google Chrome" to get URL of active tab of front window' 2>/dev/null)"
+    # Chrome reports its tab's address; Zen has no AppleScript, so its
+    # address bar is copied with the keyboard (needs Accessibility).
+    if [[ "$(lsappinfo info -only bundleid "$(lsappinfo front)" 2>/dev/null)" == *zen-browser* ]]; then
+      osascript -e 'tell application "System Events" to keystroke "l" using command down' \
+                -e 'delay 0.1' -e 'tell application "System Events" to keystroke "c" using command down' \
+                -e 'delay 0.2' -e 'tell application "System Events" to key code 53' >/dev/null 2>&1
+      url="$(pbpaste)"; [[ "$url" == *://* ]] || url=""
+    else
+      url="$(osascript -e 'tell application "Google Chrome" to get URL of active tab of front window' 2>/dev/null)"
+    fi
     if [[ -n "$url" ]]; then printf '%s' "$url" | pbcopy; notify "URL copied" "$url"; fi
     ;;
   *) echo "usage: capture area|window|screen|record|text|url" >&2; exit 2 ;;

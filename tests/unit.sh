@@ -448,4 +448,13 @@ mkdir -p "$HOME/.local/state/grand-line"; printf '/Users/me/a.pdf\n/Users/me/b c
 got="$(FRONT_APP=com.grandline.logpose bash -c 'source "$1/lib/bin-common.sh"; finder_selection' _ "$ROOT")"
 [[ "$got" == $'/Users/me/a.pdf\n/Users/me/b c.pdf' ]] && t_ok "the selection comes from Log Pose when it is in front" || t_fail "Log Pose selection" "$got"
 
+# --- the default browser: links, https and web pages, written for LaunchServices
+(
+  source "$ROOT/lib/default-apps.sh"
+  : > "$STUB_LOG"; set_default_browser app.zen-browser.zen
+  for k in "LSHandlerURLScheme=\"http\"" "LSHandlerURLScheme=\"https\"" "LSHandlerContentType=\"public.html\"" "LSHandlerContentType=\"public.xhtml\""; do
+    grep -qF "$k;LSHandlerRoleAll=\"app.zen-browser.zen\"" "$STUB_LOG" || { echo "missing $k"; exit 1; }
+  done
+) && t_ok "the default browser takes links and web pages" || t_fail "default browser" "$(cat "$STUB_LOG")"
+
 exit $FAIL

@@ -15,7 +15,7 @@ DECLUTTER_APPS=(Pages Numbers Keynote iMovie GarageBand)
 DECLUTTER_DATA=("/Library/Application Support/GarageBand" "/Library/Application Support/Logic" "/Library/Audio/Apple Loops")
 
 # The Dock starts with these; anything you add later is kept.
-DOCK_APPS=(/Applications/Google\ Chrome.app /Applications/Ghostty.app /Applications/Claude.app /Applications/WordCraft.app)
+DOCK_APPS=(/Applications/Zen.app /Applications/Ghostty.app /Applications/Claude.app /Applications/WordCraft.app)
 
 
 step_declutter() {

@@ -145,7 +145,7 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + Return | Terminal (Ghostty) |
 | Caps + ` | Quick terminal (drops down from the top) |
 | Caps + Option + Return | Terminal in a tmux session |
-| Caps + Shift + Return | Browser (Chrome) |
+| Caps + Shift + Return | Browser (Zen) |
 | Caps + Option + Shift + B | Private browser window |
 | Caps + Shift + F | Files (Log Pose, or Finder if switched back) |
 | Caps + Shift + D | Google Drive folder |

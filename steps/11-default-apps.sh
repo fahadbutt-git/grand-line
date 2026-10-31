@@ -12,6 +12,10 @@ step_default_apps() {
   local mode; mode="$(cat "$GRAND_LINE_STATE/default-apps-mode" 2>/dev/null || echo primary)"
   local status=0
   apply_default_apps "$mode" "$REPO_DIR/config/grand-line/default-apps.tsv" || status=1
+  # Zen for links and web pages, set once so a browser you pick later stays.
+  if first_time default-browser && [[ -d /Applications/Zen.app ]]; then
+    run set_default_browser app.zen-browser.zen && ok "Links open in Zen" && mark_done default-browser
+  fi
   # Log Pose for folders and Byakugan for Command + Space, once installed.
   # shellcheck source=lib/takeover.sh
   source "$REPO_DIR/lib/takeover.sh"

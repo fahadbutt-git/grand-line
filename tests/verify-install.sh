@@ -83,6 +83,12 @@ while IFS=$'\t' read -r app exts _; do
   else fail ".$ext has no default app"; fi
 done < "$ROOT/config/grand-line/default-apps.tsv"
 
+browser="$(defaults export com.apple.LaunchServices/com.apple.launchservices.secure - 2>/dev/null | plutil -convert json -o - - 2>/dev/null \
+  | jq -r '[.LSHandlers[]? | select(.LSHandlerURLScheme == "https") | .LSHandlerRoleAll][-1] // empty' 2>/dev/null)"
+if [[ -d /Applications/Zen.app ]]; then
+  [[ "$browser" == app.zen-browser.zen ]] && pass "links open in Zen" || note "links open in ${browser:-Safari}, not Zen (fine if you chose it)"
+fi
+
 echo "The package's own apps"
 for list in "$ROOT"/apps/*/apps.tsv; do
   [[ -f "$list" ]] || continue

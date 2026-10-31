@@ -8,12 +8,14 @@
 # Writes the default app for one type into macOS's own settings file,
 # replacing any earlier entry for that type so the list never grows.
 LS_PREFS=com.apple.LaunchServices/com.apple.launchservices.secure
+# set_ls_handler TYPE ID [KEY]: KEY is LSHandlerContentType (a file type, the
+# default) or LSHandlerURLScheme (a link such as https).
 set_ls_handler() {
-  local uti="$1" id="$2" work; work="$(mktemp -d)"
+  local uti="$1" id="$2" key="${3:-LSHandlerContentType}" work; work="$(mktemp -d)"
   if defaults export "$LS_PREFS" "$work/ls.plist" 2>/dev/null \
      && plutil -convert json -o "$work/ls.json" "$work/ls.plist" 2>/dev/null \
-     && jq --arg u "$uti" --arg i "$id" '.LSHandlers = ([.LSHandlers[]? | select(.LSHandlerContentType != $u)]
-          + [{LSHandlerContentType: $u, LSHandlerRoleAll: $i, LSHandlerPreferredVersions: {LSHandlerRoleAll: "-"}}])' \
+     && jq --arg k "$key" --arg u "$uti" --arg i "$id" '.LSHandlers = ([.LSHandlers[]? | select(.[$k] != $u)]
+          + [{($k): $u, LSHandlerRoleAll: $i, LSHandlerPreferredVersions: {LSHandlerRoleAll: "-"}}])' \
           "$work/ls.json" > "$work/new.json" \
      && plutil -convert xml1 -o "$work/new.plist" "$work/new.json" \
      && defaults import "$LS_PREFS" "$work/new.plist"; then
@@ -21,9 +23,20 @@ set_ls_handler() {
   else
     # The settings file holds a value JSON cannot express: add the entry instead.
     defaults write "$LS_PREFS" LSHandlers -array-add \
-      "{LSHandlerContentType=\"$uti\";LSHandlerRoleAll=\"$id\";LSHandlerPreferredVersions={LSHandlerRoleAll=\"-\";};}"
+      "{$key=\"$uti\";LSHandlerRoleAll=\"$id\";LSHandlerPreferredVersions={LSHandlerRoleAll=\"-\";};}"
   fi
   rm -rf "$work"
+}
+
+# set_default_browser ID: links and web pages open in this app. Written where
+# macOS keeps the choice, which avoids its "change your default browser?" prompt.
+set_default_browser() {
+  local id="$1" scheme
+  for scheme in http https; do set_ls_handler "$scheme" "$id" LSHandlerURLScheme; done
+  set_ls_handler public.html "$id"
+  set_ls_handler public.xhtml "$id"
+  killall lsd 2>/dev/null
+  return 0
 }
 
 # The app that opens files with this extension now, as "Name.app".
