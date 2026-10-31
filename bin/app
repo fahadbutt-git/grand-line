@@ -1,0 +1,53 @@
+#!/bin/bash
+# Install or remove an app, and keep the Brewfile in step so a new Mac gets
+# the same set. Like Omarchy's Install and Remove menus.
+#   app install     pick from every Homebrew app
+#   app remove      pick an installed app; removes it and its settings files
+source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
+
+BREWFILE="$MAC_SETUP_LINK/Brewfile"
+ARTCRAFT="$MAC_SETUP_CONFIG/artcraft.tsv"
+
+confirm() {
+  osascript - "$1" <<'EOF' >/dev/null 2>&1
+on run argv
+  display dialog (item 1 of argv) buttons {"Cancel", "OK"} default button "OK"
+end run
+EOF
+}
+
+case "${1:-}" in
+  install)
+    token="${2:-$(brew casks 2>/dev/null | pick)}" || exit 0
+    [[ -n "$token" ]] || exit 0
+    detach_self "$0" install "$token"   # keeps going after the next shortcut
+    notify "Installing $token" "This can take a minute."
+    if brew install --cask "$token" >/dev/null 2>&1; then
+      grep -q "^cask \"$token\"" "$BREWFILE" || printf 'cask "%s"\n' "$token" >> "$BREWFILE"
+      notify "$token installed" "Added to the Brewfile, so a new Mac gets it too."
+    else
+      notify "$token did not install" "Try in Terminal: brew install --cask $token"; exit 1
+    fi
+    ;;
+  remove)
+    choice="${2:-$( { brew list --cask -1 2>/dev/null
+                 grep -v '^#' "$ARTCRAFT" | cut -f1 | sed 's/$/ (ArtCraft)/'; } | sort -fu | pick)}" || exit 0
+    [[ -n "$choice" ]] || exit 0
+    name="${choice% (ArtCraft)}"
+    [[ -n "${MAC_SETUP_DETACHED:-}" ]] || confirm "Remove $name and its settings files?" || exit 0
+    detach_self "$0" remove "$choice"
+    if [[ "$choice" == *"(ArtCraft)" ]]; then
+      path="$(cat "$MAC_SETUP_STATE/artcraft/$name.path" 2>/dev/null)"
+      [[ -d "$path" ]] && mv "$path" "$HOME/.Trash/"
+      rm -f "$MAC_SETUP_STATE/artcraft/$name.path" "$MAC_SETUP_STATE/artcraft/$name.tag"
+      perl -i -ne "print unless /^\Q$name\E\t/" "$ARTCRAFT"
+      default-apps primary >/dev/null 2>&1   # its file types move to the fallback app
+    else
+      brew uninstall --cask --zap "$name" >/dev/null 2>&1 \
+        || { notify "$name was not removed" "Try in Terminal: brew uninstall --cask --zap $name"; exit 1; }
+      perl -i -ne "print unless /^cask \"(?:[^\"]*\/)?\Q$name\E\"/" "$BREWFILE"
+    fi
+    notify "$name removed" "Also taken off the install list."
+    ;;
+  *) echo "usage: app install | app remove" >&2; exit 2 ;;
+esac

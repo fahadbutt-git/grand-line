@@ -22,7 +22,7 @@ export REPO_DIR
 source "$REPO_DIR/lib/common.sh"
 
 # Steps that keep an installed Mac current (used by --update and bin/update).
-UPDATE_STEPS="apps,artcraft,dotfiles,native-tools,default-apps"
+UPDATE_STEPS="apps,artcraft,dotfiles,native-tools,default-apps,downloads"
 
 STEPS=()
 for f in "$REPO_DIR"/steps/[0-9][0-9]-*.sh; do

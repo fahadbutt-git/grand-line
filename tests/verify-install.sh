@@ -55,7 +55,11 @@ done
 cmp -s "$ROOT/config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json" \
   && pass "Karabiner has the current shortcuts" || fail "Karabiner settings differ from the package"
 grep -q "$MAC_SETUP_BIN" "$HOME/.zprofile" && pass "package commands are on the PATH for new shells" || fail ".zprofile does not add the package commands"
-for name in menu keybindings theme update; do
+launchctl print "gui/$(id -u)/mac-setup.downloads" >/dev/null 2>&1 \
+  && pass "Downloads sorting is loaded" || fail "Downloads sorting is not loaded"
+[[ -L "$HOME/Library/Application Support/espanso/match/mac-setup.yml" ]] \
+  && pass "Espanso has the text shortcuts" || fail "Espanso shortcuts are not linked"
+for name in menu keybindings theme update app tidy-downloads; do
   command -v "$name" >/dev/null && pass "command: $name" || fail "command $name is not on the PATH"
 done
 for src in "$ROOT"/tools/*.swift; do

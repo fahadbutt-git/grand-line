@@ -29,7 +29,13 @@ alias ff="fzf --preview 'head -100 {}'"
 
 # Archives
 compress()   { tar -czf "${1%/}.tar.gz" "${1%/}"; }
-decompress() { tar -xzf "$1"; }
+# decompress any archive: tar handles .zip and .tar.*, 7zz the rest (.7z, .rar).
+decompress() {
+  case "$1" in
+    *.7z|*.rar) 7zz x "$1" ;;
+    *) tar -xf "$1" ;;
+  esac
+}
 
 # tdl [agent]: a tmux layout with a terminal on the left and an AI agent on
 # the right (claude by default), in the current folder.

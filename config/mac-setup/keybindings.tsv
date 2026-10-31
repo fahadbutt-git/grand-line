@@ -62,10 +62,9 @@ Caps + Shift + A	Apps	Claude	open -a 'Claude'
 Caps + Option + Shift + A	Apps	ChatGPT	open -a 'ChatGPT'
 Caps + Ctrl + Shift + A	Apps	Gemini	open -a 'Gemini'
 Caps + Shift + N	Apps	Notion	open -a 'Notion'
-Caps + Shift + T	Apps	TickTick	open -a 'TickTick'
+Caps + Shift + T	Apps	Reminders (tasks)	open -a 'Reminders'
 Caps + Shift + G	Apps	WhatsApp	open -a 'WhatsApp'
 Caps + Shift + M	Apps	Spotify	open -a 'Spotify'
-Caps + Shift + Z	Apps	Zotero	open -a 'Zotero'
 Caps + Shift + R	Apps	RStudio	open -a 'RStudio'
 Caps + Shift + W	Apps	WordCraft (documents)	open -a 'WordCraft'
 Caps + Shift + S	Apps	GridCraft (spreadsheets)	open -a 'GridCraft'
@@ -94,7 +93,6 @@ Caps + Ctrl + I	Toggles	Keep the Mac awake	$HOME/.mac-setup/bin/toggle awake
 Caps + Ctrl + N	Toggles	Dark and light mode	$HOME/.mac-setup/bin/toggle dark
 Caps + Shift + Space	Toggles	Hide or show the menu bar	$HOME/.mac-setup/bin/toggle menubar
 Caps + Ctrl + R	Reminders	Set a reminder	$HOME/.mac-setup/bin/reminder
-Caps + Ctrl + Option + R	Reminders	See all reminders	open -a 'Reminders'
 Caps + Ctrl + Option + T	Notices	Show the time	$HOME/.mac-setup/bin/notice time
 Caps + Ctrl + Option + B	Notices	Show the battery	$HOME/.mac-setup/bin/notice battery
 Caps + Ctrl + Option + W	Notices	Show the weather	$HOME/.mac-setup/bin/notice weather

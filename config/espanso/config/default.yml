@@ -1,0 +1,6 @@
+# Espanso settings. Copied once by setup, then yours to change.
+# The package menus already cover search, so Espanso stays out of the way:
+# no search bar, no menu bar icon, no pop-ups.
+search_shortcut: off
+show_icon: false
+show_notifications: false

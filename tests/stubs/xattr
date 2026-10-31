@@ -1,0 +1,7 @@
+#!/bin/bash
+# Test stub: report where a file was downloaded from. The test writes the
+# address to $XATTR_SOURCES/<file name>; printed as hex, as macOS does.
+f="${!#}"
+src="${XATTR_SOURCES:-/nonexistent}/$(basename "$f")"
+[[ -f "$src" ]] || exit 1
+perl -e 'local $/; print unpack("H*", <STDIN>), "\n"' < "$src"

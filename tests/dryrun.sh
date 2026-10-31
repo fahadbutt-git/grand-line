@@ -43,6 +43,8 @@ expect "duti -s"
 expect ".docx all"
 expect ".pdf all"
 expect "bin/theme set graphite"
+expect "mac-setup.downloads.plist and load it"
+expect "espanso/match/mac-setup.yml"
 expect "Setup finished."
 
 if [[ -n "$(ls -A "$tmp/home")" ]]; then

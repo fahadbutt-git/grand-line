@@ -60,6 +60,19 @@ jobs:
             types=$(plutil -convert json -o - "$app/Contents/Info.plist" | jq -c '[.CFBundleDocumentTypes[]? | (.CFBundleTypeExtensions // []) + (.LSItemContentTypes // [])] | flatten')
             echo "::notice title=filetypes $(basename "$app")::id $(defaults read "$app/Contents/Info" CFBundleIdentifier) declares $types"
           done
+      - name: Default app diagnostics
+        if: always()
+        run: |
+          id=ai.storyteller.wordcraft
+          uti=org.openxmlformats.wordprocessingml.document
+          ls=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+          echo "::notice title=lsregister::WordCraft entries: $($ls -dump 2>/dev/null | grep -c 'ai.storyteller.wordcraft')"
+          out=$(duti -v -s $id .docx all 2>&1); echo "::notice title=duti ext::rc=$? $(echo $out)"
+          sleep 3; echo "::notice title=after ext::$(duti -x docx 2>&1 | tr '\n' ' ')"
+          out=$(duti -v -s $id $uti all 2>&1); echo "::notice title=duti uti::rc=$? $(echo $out)"
+          sleep 3; echo "::notice title=after uti::$(duti -x docx 2>&1 | tr '\n' ' ')"
+          echo "::notice title=handlers::$(plutil -convert json -o - ~/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist 2>&1 | jq -c '[.LSHandlers[]? | select((.LSHandlerContentType // "") | test("wordprocessing|pdf"))]' 2>&1 | cut -c1-900)"
+          echo "::notice title=session::$(launchctl managername 2>&1) uid $(id -u) console $(stat -f %Su /dev/console)"
       - name: Check the installed machine
         run: /bin/bash tests/verify-install.sh --ci
       - name: Run 2, setup again must succeed and change nothing

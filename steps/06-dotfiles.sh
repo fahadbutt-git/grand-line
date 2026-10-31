@@ -15,6 +15,13 @@ step_dotfiles() {
   link_into_place "$cfg/starship.toml" "$HOME/.config/starship.toml"
   append_once "source \"$MAC_SETUP_LINK/config/zsh/mac-setup.zsh\"" "$HOME/.zshrc"
 
+  # Espanso: the package's shortcuts are linked, its settings copied once so
+  # changes made in Espanso itself are kept.
+  local esp="$HOME/Library/Application Support/espanso"
+  run mkdir -p "$esp/match" "$esp/config"
+  link_into_place "$cfg/espanso/match/mac-setup.yml" "$esp/match/mac-setup.yml"
+  [[ -f "$esp/config/default.yml" ]] || run cp "$cfg/espanso/config/default.yml" "$esp/config/default.yml"
+
   # Karabiner rewrites and backs up its own settings file, so it gets a copy
   # rather than a link. The copy is replaced only when the package's shortcuts
   # change, so settings made in Karabiner's own window are kept otherwise.

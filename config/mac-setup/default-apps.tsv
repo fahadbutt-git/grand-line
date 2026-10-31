@@ -3,4 +3,6 @@ WordCraft	.docx .doc .odt .rtf	LibreOffice
 GridCraft	.xlsx .xls .ods	LibreOffice
 DeckCraft	.pptx .ppt .odp	LibreOffice
 PdfCraft	.pdf	Preview
-FilmCraft	.mp4 .mov .m4v	IINA
+# Videos play in IINA. FilmCraft only opens its own projects, so macOS
+# cannot make it the default for video files. Import clips from inside it.
+IINA	.mp4 .mov .m4v .mkv	QuickTime Player

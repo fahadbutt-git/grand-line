@@ -1,0 +1,122 @@
+#!/bin/bash
+# Sorts the Downloads folder by the rules in config/mac-setup/downloads-rules.tsv.
+# macOS runs it whenever Downloads changes (see the downloads setup step).
+#   tidy-downloads              sort now
+#   tidy-downloads --dry-run    show what would move, move nothing
+#   tidy-downloads --log        show the last 40 moves
+source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
+
+DL="${MAC_SETUP_DOWNLOADS:-$HOME/Downloads}"
+RULES="${MAC_SETUP_DOWNLOAD_RULES:-$MAC_SETUP_CONFIG/downloads-rules.tsv}"
+LOG="$MAC_SETUP_LOGS/downloads.log"
+DRY=0
+case "${1:-}" in
+  --dry-run) DRY=1 ;;
+  --log) tail -n 40 "$LOG" 2>/dev/null; exit 0 ;;
+  "") ;;
+  *) echo "usage: tidy-downloads [--dry-run | --log]" >&2; exit 2 ;;
+esac
+[[ -d "$DL" && -f "$RULES" ]] || exit 0
+# macOS asks once before a background job may read Downloads. Until it is
+# allowed, say so at most once a day instead of failing quietly.
+if ! ls "$DL" >/dev/null 2>&1; then
+  stamp="$MAC_SETUP_STATE/downloads-access-asked"
+  if [[ -z "$(find "$stamp" -mtime -1 2>/dev/null)" ]]; then
+    touch "$stamp"
+    notify "Downloads sorting needs access" "System Settings, Privacy and Security, Files and Folders: allow bash to use Downloads."
+  fi
+  exit 1
+fi
+
+# One run at a time. A lock older than ten minutes is left over from a crash.
+LOCK="${TMPDIR:-/tmp}/mac-setup-downloads.lock"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  [[ -n "$(find "$LOCK" -maxdepth 0 -mmin +10 2>/dev/null)" ]] || exit 0
+  rmdir "$LOCK" 2>/dev/null; mkdir "$LOCK" 2>/dev/null || exit 0
+fi
+trap 'rmdir "$LOCK" 2>/dev/null' EXIT
+
+now="$(date +%s)"
+mtime() { perl -e 'print((stat shift)[9])' "$1"; }
+lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+
+# The websites a file was downloaded from, as macOS recorded them.
+sources_of() {
+  xattr -px com.apple.metadata:kMDItemWhereFroms "$1" 2>/dev/null | tr -d ' \n' \
+    | perl -ne 'print pack("H*", $_)' \
+    | LC_ALL=C grep -aoE 'https?://[A-Za-z0-9.-]+' | sed -E 's#^https?://##' | tr '[:upper:]' '[:lower:]'
+}
+
+# Settings, then rules, read once.
+trash_days=7; archive_days=30
+kinds=(); matches=(); folders=(); onlys=()
+while IFS=$'\t' read -r kind match folder only; do
+  case "$kind" in
+    set) [[ "$match" == trash_installers_after_days ]] && trash_days="$folder"
+         [[ "$match" == archive_after_days ]] && archive_days="$folder" ;;
+    from|ext) kinds+=("$kind"); matches+=(" $(lower "$match") ")
+              folders+=("$folder"); onlys+=("${only:+ $(lower "$only") }") ;;
+  esac
+done < <(grep -v '^#' "$RULES")
+
+dest_dir() {
+  case "$1" in
+    "~"/*) echo "$HOME/${1#\~/}" ;;
+    /*) echo "$1" ;;
+    *) echo "$DL/$1" ;;
+  esac
+}
+
+# Moves a file, adding " 2", " 3" and so on if the name is taken.
+move() {
+  local src="$1" dir="$2" base name ext target n=2
+  base="$(basename "$src")"; name="${base%.*}"; ext=""
+  [[ "$base" == *.* ]] && ext=".${base##*.}"
+  target="$dir/$base"
+  while [[ -e "$target" ]]; do target="$dir/$name $n$ext"; n=$((n + 1)); done
+  if [[ "$DRY" == 1 ]]; then echo "$base -> ${target#"$DL"/}"; return 0; fi
+  mkdir -p "$dir" && mv "$src" "$target" || return 1
+  mkdir -p "$MAC_SETUP_LOGS"
+  printf '%s\t%s\t%s\n' "$(date '+%Y-%m-%d %H:%M')" "$src" "$target" >> "$LOG"
+}
+
+# Which rule a file matches. Prints the folder.
+folder_for() {
+  local f="$1" ext hosts="" i host m
+  ext="$(lower "${f##*.}")"; [[ "$(basename "$f")" == *.* ]] || ext=""
+  for i in "${!kinds[@]}"; do
+    if [[ "${kinds[$i]}" == ext ]]; then
+      [[ -n "$ext" && "${matches[$i]}" == *" $ext "* ]] && { echo "${folders[$i]}"; return 0; }
+      continue
+    fi
+    [[ -n "${onlys[$i]}" && "${onlys[$i]}" != *" $ext "* ]] && continue
+    [[ -z "$hosts" ]] && hosts="$(sources_of "$f")" && [[ -z "$hosts" ]] && hosts="-"
+    while IFS= read -r host; do
+      for m in ${matches[$i]}; do
+        [[ "$host" == "$m" || "$host" == *".$m" ]] && { echo "${folders[$i]}"; return 0; }
+      done
+    done <<< "$hosts"
+  done
+  return 1
+}
+
+# 1. Sort loose files. Skip hidden files, unfinished downloads and anything
+#    changed in the last 30 seconds (it may still be arriving).
+while IFS= read -r -d '' f; do
+  case "$(basename "$f")" in
+    .*|*.crdownload|*.download|*.part|*.partial|*.tmp) continue ;;
+  esac
+  age=$((now - $(mtime "$f")))
+  [[ $age -lt 30 ]] && continue
+  if folder="$(folder_for "$f")"; then
+    move "$f" "$(dest_dir "$folder")"
+  elif [[ $age -gt $((archive_days * 86400)) ]]; then
+    move "$f" "$DL/Archive/$(date -r "$(mtime "$f")" +%Y-%m 2>/dev/null || date +%Y-%m)"
+  fi
+done < <(find "$DL" -mindepth 1 -maxdepth 1 -type f -print0)
+
+# 2. Old installers go to the Trash, where they can still be restored.
+while IFS= read -r -d '' f; do
+  [[ $((now - $(mtime "$f"))) -gt $((trash_days * 86400)) ]] && move "$f" "$HOME/.Trash"
+done < <(find "$DL" -mindepth 1 -maxdepth 2 -type f \( -iname '*.dmg' -o -iname '*.pkg' \) -print0)
+exit 0

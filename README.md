@@ -24,6 +24,8 @@ The first run copies the package to `~/mac-setup`. That copy is the one to edit 
 | `update` | Updates every app, tool and this package |
 | `keybindings --print` | Prints every shortcut |
 | `theme pick` | Changes theme (Graphite, Nord, Forest, Paper) |
+| `app install`, `app remove` | Installs or removes an app and updates the Brewfile to match (also in the menu) |
+| `tidy-downloads` | Sorts Downloads now (`--dry-run` shows the plan, `--log` the recent moves) |
 | `default-apps fallback` | LibreOffice, Preview and IINA open documents instead of ArtCraft (`primary` switches back) |
 | `bash ~/mac-setup/setup.sh --only artcraft` | Re-runs one step (`--list` shows them) |
 | `bash ~/mac-setup/setup.sh --dry-run` | Shows what setup would do, changes nothing |
@@ -39,10 +41,18 @@ Ghostty with Omarchy's shell tools, set up in `config/zsh/mac-setup.zsh`, `confi
 | Ctrl + R | Searches your command history as you type |
 | `ls`, `lt`, `lsa` | Lists files with icons, as a tree, or including hidden files (eza) |
 | `rg word`, `fd name` | Searches inside files, or for files by name |
-| `compress folder`, `decompress file.tar.gz` | Makes or opens a .tar.gz archive |
+| `compress folder`, `decompress file` | Makes a .tar.gz, or opens any archive (.zip, .tar.gz, .7z, .rar) |
 | `tdl` | Splits the window: terminal on the left, Claude Code on the right (`tdl codex` for Codex) |
 | Caps + Option + Return | Opens a terminal inside a lasting tmux session |
 | Ctrl + Space, then ? | Lists every tmux key: Option + Return splits, Option + Escape closes a pane |
+
+## Downloads
+
+New files are sorted as they arrive, by the rules in `config/mac-setup/downloads-rules.tsv`. Files from Claude, ChatGPT and Gemini go to `Downloads/AI/<app>`, papers from journal and PubMed sites to `Downloads/Papers`, and everything else by type (Documents, Data, Slides, Images, Video, Installers and so on). Installers go to the Trash after a week, and anything left loose moves to `Downloads/Archive/<year-month>` after 30 days. Nothing is deleted, and every move is logged. The first time it runs, macOS asks whether bash may use Downloads. Allow it.
+
+## Text shortcuts
+
+Espanso replaces short triggers as you type, in any app: `;date` (October 31, 2026), `;iso` (2026-10-31), `;sig` (your signature), `;br`, `;ty`, `;ci`, `;sd`. Add your own in `config/espanso/match/mac-setup.yml`.
 
 ## The Caps Lock layer
 
@@ -94,10 +104,9 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + Option + Shift + A | ChatGPT |
 | Caps + Ctrl + Shift + A | Gemini |
 | Caps + Shift + N | Notion |
-| Caps + Shift + T | TickTick |
+| Caps + Shift + T | Reminders (tasks) |
 | Caps + Shift + G | WhatsApp |
 | Caps + Shift + M | Spotify |
-| Caps + Shift + Z | Zotero |
 | Caps + Shift + R | RStudio |
 | Caps + Shift + W | WordCraft (documents) |
 | Caps + Shift + S | GridCraft (spreadsheets) |
@@ -126,7 +135,6 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + Ctrl + N | Dark and light mode |
 | Caps + Shift + Space | Hide or show the menu bar |
 | Caps + Ctrl + R | Set a reminder |
-| Caps + Ctrl + Option + R | See all reminders |
 | Caps + Ctrl + Option + T | Show the time |
 | Caps + Ctrl + Option + B | Show the battery |
 | Caps + Ctrl + Option + W | Show the weather |
@@ -178,7 +186,7 @@ After setup on any Mac, `bash ~/mac-setup/tests/verify-install.sh` checks every 
 
 ## What runs in the background
 
-Kept deliberately small: Karabiner-Elements (keyboard), AeroSpace (windows), Maccy (clipboard) and Google Drive. Shortcut commands start, act and exit, and long jobs (video compression, keep-awake) run on their own so they never block the keyboard. Nothing in the package polls or indexes. The checklist turns off the apps that open themselves at login.
+Kept deliberately small: Karabiner-Elements (keyboard), AeroSpace (windows), Maccy (clipboard), Espanso (text shortcuts) and Google Drive. Shortcut commands start, act and exit, and long jobs (video compression, keep-awake, app installs) run on their own so they never block the keyboard. The Downloads sorter is not a running process: macOS starts it at low priority when Downloads changes, and once an hour for the age rules, and it exits in well under a second. Nothing in the package indexes. The checklist turns off the apps that open themselves at login.
 
 ## Layout
 

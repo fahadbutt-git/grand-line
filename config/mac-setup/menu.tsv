@@ -2,8 +2,13 @@
 # Group/Item<TAB>command. Groups can nest (A/B/Item). Commands run in bash
 # with the package commands on the PATH. Save, and the menu updates at once.
 Apps/Open an app	menu-apps
+Install/An app	app install
+Remove/An app and its settings	app remove
+Files/Sort Downloads now	tidy-downloads
+Files/Recent Downloads moves	open -a TextEdit "$MAC_SETUP_LOGS/downloads.log"
+Files/Edit the Downloads rules	open -a TextEdit "$MAC_SETUP_CONFIG/downloads-rules.tsv"
+Files/Open the setup logs	open "$MAC_SETUP_LOGS"
 Learn/Shortcut list	keybindings
-Learn/Setup log folder	open "$MAC_SETUP_LOGS"
 Capture/Screenshot of an area	capture area
 Capture/Screenshot of a window	capture window
 Capture/Screenshot of the whole screen	capture screen
@@ -37,7 +42,6 @@ Setup/Edit window tiling settings	open -a TextEdit "$HOME/.aerospace.toml"
 Setup/Default apps: ArtCraft and built-in	default-apps primary
 Setup/Default apps: LibreOffice, Preview, IINA	default-apps fallback
 Hardware/Battery	notice battery
-Hardware/Displays	open 'x-apple.systempreferences:com.apple.Displays-Settings.extension'
 Hardware/System information	open -a 'System Information'
 Hardware/Disk space	notice disk
 Update/Update everything	update --window

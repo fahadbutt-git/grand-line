@@ -1,0 +1,36 @@
+# Where new files in Downloads go. The first matching line wins.
+# Edit freely: the sorter rereads this file every time it runs.
+#
+# Columns (tab separated):
+#   kind      "from" matches the website a file came from (and its subdomains),
+#             "ext" matches the file extension
+#   match     website names or extensions, separated by spaces
+#   folder    folder inside Downloads, or a full path starting with ~ or /
+#   only      optional: extensions a "from" line applies to
+#
+# Files still downloading, hidden files and folders are never touched.
+# Nothing is ever deleted: installers go to the Trash after a week, and
+# anything left loose in Downloads moves to Archive/<year-month> after 30 days.
+
+from	claude.ai anthropic.com claudeusercontent.com	AI/Claude
+from	chatgpt.com openai.com oaiusercontent.com	AI/ChatGPT
+from	gemini.google.com aistudio.google.com notebooklm.google.com	AI/Gemini
+from	plaud.ai	Recordings
+from	ncbi.nlm.nih.gov doi.org sciencedirect.com elsevier.com springer.com nature.com wiley.com onlinelibrary.wiley.com jamanetwork.com nejm.org thelancet.com bmj.com aaojournal.org iovs.arvojournals.org arvojournals.org journals.lww.com tandfonline.com karger.com thieme-connect.com mdpi.com frontiersin.org biorxiv.org medrxiv.org cochranelibrary.com europepmc.org semanticscholar.org researchgate.net	Papers	pdf
+from	trinetx.com	Data/TriNetX
+from	researchallofus.org	Data/All of Us
+
+ext	pdf	Documents
+ext	docx doc odt rtf txt md pages	Documents
+ext	pptx ppt key odp	Slides
+ext	xlsx xls xlsm csv tsv ods numbers rds rdata sav dta parquet json	Data
+ext	png jpg jpeg heic gif webp svg tif tiff bmp	Images
+ext	mp4 mov m4v mkv webm avi	Video
+ext	mp3 m4a wav aac flac ogg	Audio
+ext	zip rar 7z tar gz tgz bz2 xz	Archives
+ext	dmg pkg	Installers
+ext	r rmd qmd py ipynb sh sql js ts html css swift	Code
+ext	ics vcf	Calendar and contacts
+
+set	trash_installers_after_days	7
+set	archive_after_days	30

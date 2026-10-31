@@ -21,6 +21,7 @@ brew "ripgrep"          # rg: search inside files
 brew "fd"               # simpler find
 brew "tmux"             # panes, windows and lasting sessions
 brew "starship"         # the prompt line
+brew "rclone"           # Drive from the command line: bulk tidying now, NAS sync later
 cask "font-jetbrains-mono-nerd-font"
 
 # AI
@@ -31,15 +32,13 @@ cask "chatgpt"
 cask "google-gemini"
 cask "antigravity-cli"      # Google's replacement for gemini-cli (command: agy)
 
-# Storage, notes and tasks
+# Storage and notes (tasks live in Apple Reminders, built in)
 cask "google-drive"
 cask "notion"
-cask "ticktick"
 
 # Research and study
 cask "r-app"
 cask "rstudio"
-cask "zotero"
 cask "anki"
 cask "plaud"
 
@@ -55,11 +54,10 @@ cask "whatsapp"
 cask "zoom"
 cask "discord"
 
-# Media utilities
-cask "handbrake-app"
-cask "iina"
-cask "keka"
-cask "imageoptim"
+# Media. Converting and compressing use the transcode shortcuts, and macOS
+# opens .zip itself, so no separate converter or archive apps.
+cask "iina"                 # plays every video format; FilmCraft is for editing
+brew "sevenzip"             # 7zz: opens .7z and .rar (see decompress in the terminal)
 
 # Browser, terminal and music
 cask "google-chrome"
@@ -70,3 +68,4 @@ cask "spotify"
 cask "karabiner-elements"
 cask "nikitabobko/tap/aerospace"
 cask "maccy"
+cask "espanso"              # text shortcuts (config/espanso)

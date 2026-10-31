@@ -1,0 +1,27 @@
+# Text shortcuts. Type the trigger anywhere and it is replaced.
+# Add your own in this file or in base.yml next to it. Espanso reloads on save.
+matches:
+  # Dates in the formats manuscripts, forms and file names use.
+  - trigger: ";date"
+    replace: "{{d}}"
+    vars: [{ name: d, type: date, params: { format: "%B %-d, %Y" } }]
+  - trigger: ";iso"
+    replace: "{{d}}"
+    vars: [{ name: d, type: date, params: { format: "%Y-%m-%d" } }]
+  - trigger: ";time"
+    replace: "{{t}}"
+    vars: [{ name: t, type: date, params: { format: "%H:%M" } }]
+
+  # Email.
+  - trigger: ";br"
+    replace: "Best regards,\nFahad"
+  - trigger: ";sig"
+    replace: "Your Name"
+  - trigger: ";ty"
+    replace: "Thank you for your time and consideration."
+
+  # Research.
+  - trigger: ";ci"
+    replace: "95% CI"
+  - trigger: ";sd"
+    replace: "mean (SD)"

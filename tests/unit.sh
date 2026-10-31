@@ -118,4 +118,45 @@ else
   t_fail "jq is not installed, so the ArtCraft tests could not run"
 fi
 
+# --- tidy-downloads: rules, sources, age, clashes, never deleting
+dl="$tmp/dl"; src="$tmp/sources"; mkdir -p "$dl/Documents" "$dl/My folder" "$src"
+export XATTR_SOURCES="$src" MAC_SETUP_DOWNLOADS="$dl" MAC_SETUP_DOWNLOAD_RULES="$ROOT/config/mac-setup/downloads-rules.tsv"
+age() { perl -e '$t = time - shift; utime $t, $t, @ARGV' "$1" "${@:2}"; }   # age SECONDS FILES
+mk() { : > "$dl/$1"; age 120 "$dl/$1"; [[ -n "${2:-}" ]] && printf '%s' "$2" > "$src/$1"; }
+mk report.pdf "https://claude.ai/api/files/x"
+mk paper.pdf "https://pmc.ncbi.nlm.nih.gov/articles/x.pdf"
+mk guide.docx "https://jamanetwork.com/author-guide"
+mk data.csv
+mk Notes.TXT; : > "$dl/Documents/Notes.TXT"
+mk odd.xyz
+mk old.xyz; age $((40 * 86400)) "$dl/old.xyz"
+mk new.dmg
+mk setup.dmg; age $((10 * 86400)) "$dl/setup.dmg"
+: > "$dl/fresh.pdf"
+mk part.pdf.crdownload; mk .hidden.pdf
+before="$(cd "$dl" && find . | sort)"
+plan="$("$ROOT/bin/tidy-downloads" --dry-run)"
+[[ "$(cd "$dl" && find . | sort)" == "$before" ]] && t_ok "Downloads: dry run moves nothing" || t_fail "Downloads: dry run moved files"
+grep -qx "report.pdf -> AI/Claude/report.pdf" <<<"$plan" && t_ok "Downloads: dry run shows the plan" || t_fail "Downloads: plan was" "$plan"
+"$ROOT/bin/tidy-downloads"
+check_at() { [[ -f "$dl/$1" ]] && t_ok "Downloads: $2" || t_fail "Downloads: $2" "$(cd "$dl" && find . -type f | sort | tr '\n' ' ')"; }
+check_at "AI/Claude/report.pdf" "a file from Claude goes to AI/Claude"
+check_at "Papers/paper.pdf" "a PDF from PubMed Central goes to Papers"
+check_at "Documents/guide.docx" "the Papers rule only takes PDFs"
+check_at "Data/data.csv" "a file with no source is sorted by type"
+check_at "Documents/Notes 2.TXT" "a name clash keeps both files"
+check_at "odd.xyz" "an unknown new file stays put"
+[[ -n "$(find "$dl/Archive" -name old.xyz 2>/dev/null)" ]] && t_ok "Downloads: an old loose file is archived by month" || t_fail "Downloads: old file not archived"
+check_at "Installers/new.dmg" "a new installer goes to Installers"
+[[ -f "$HOME/.Trash/setup.dmg" ]] && t_ok "Downloads: an installer older than a week goes to the Trash" || t_fail "Downloads: old installer not trashed"
+check_at "fresh.pdf" "a file still arriving is left alone"
+check_at "part.pdf.crdownload" "an unfinished download is left alone"
+check_at ".hidden.pdf" "hidden files are left alone"
+[[ -d "$dl/My folder" ]] && t_ok "Downloads: folders are left alone" || t_fail "Downloads: a folder moved"
+grep -q "report.pdf" "$HOME/Library/Logs/mac-setup/downloads.log" 2>/dev/null && t_ok "Downloads: every move is logged" || t_fail "Downloads: no log"
+mkdir "${TMPDIR:-/tmp}/mac-setup-downloads.lock"; mk late.csv
+"$ROOT/bin/tidy-downloads"; check_at "late.csv" "a second copy waits while one is running"
+rmdir "${TMPDIR:-/tmp}/mac-setup-downloads.lock"
+unset XATTR_SOURCES MAC_SETUP_DOWNLOADS MAC_SETUP_DOWNLOAD_RULES
+
 exit $FAIL
