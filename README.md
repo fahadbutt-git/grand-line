@@ -26,7 +26,7 @@ The first run copies the package to `~/mac-setup`. That copy is the one to edit 
 | `theme pick` | Changes theme (Graphite, Nord, Forest, Paper) |
 | `app install`, `app remove` | Installs or removes an app and updates the Brewfile to match (also in the menu) |
 | `tidy-downloads` | Sorts Downloads now (`--dry-run` shows the plan, `--log` the recent moves) |
-| `default-apps fallback` | LibreOffice, Preview and IINA open documents instead of ArtCraft (`primary` switches back) |
+| `default-apps fallback` | LibreOffice and Preview open documents instead of ArtCraft (`primary` switches back). Videos stay in IINA |
 | `bash ~/mac-setup/setup.sh --only artcraft` | Re-runs one step (`--list` shows them) |
 | `bash ~/mac-setup/setup.sh --dry-run` | Shows what setup would do, changes nothing |
 
@@ -69,6 +69,9 @@ As in Omarchy: mise for language versions, uv for Python packages, Docker, lazyg
 | `uv init`, `uv add pandas` | Starts a Python project and adds packages |
 | `n` | Neovim (LazyVim). Space Space finds a file, Space / searches text, Space g g opens lazygit, Space e the file tree |
 | `cx`, `codex` | Claude Code or Codex in the current folder |
+| `bat file`, `tldr command` | Shows a file with syntax colours, or short examples for a command |
+| `duckdb` | SQL straight over CSV or Parquet files: `duckdb -c "select count(*) from 'export.csv'"` |
+| Caps menu, Toggle, Local AI | Starts or stops Ollama for local models (`ollama run llama3.2`). Nothing runs until you start it |
 | `lzg`, `lzd`, `btop` | Git, containers, and system load in the terminal |
 | `g`, `gcm "message"`, `gcam`, `gcad` | git, commit, commit all, amend |
 
@@ -82,7 +85,7 @@ New files are sorted as they arrive, by the rules in `config/mac-setup/downloads
 
 ## Text shortcuts
 
-Espanso replaces short triggers as you type, in any app: `;date` (October 31, 2026), `;iso` (2026-10-31), `;sig` (your signature), `;br`, `;ty`, `;ci`, `;sd`. Add your own in `config/espanso/match/mac-setup.yml`.
+Espanso replaces short triggers as you type, in any app: `;date` (October 31, 2026), `;iso` (2026-10-31), `;time` (14:05), `;sig` (your signature), `;br`, `;ty`, `;ci`, `;sd`. Add your own in `config/espanso/match/mac-setup.yml`.
 
 ## The Caps Lock layer
 
@@ -207,7 +210,7 @@ Run these before installing on a new Mac, and after any change.
    bash tests/run-all.sh
    ```
 
-2. **GitHub's macOS machines.** Every push runs the quick checks on Linux and on macOS. In the Actions tab, "Run workflow" also runs the full install on a clean Mac, checks the result, and runs setup again to prove it is safe to repeat.
+2. **GitHub's macOS machines.** Every push runs the quick checks on Linux and on macOS. In the Actions tab, "Run workflow" also runs the full install on clean macOS 27 and macOS 26 machines, checks the result, and runs setup again, failing if the second run changes anything. The full install also runs every Monday, to catch apps renamed or removed from Homebrew.
 
 3. **A disposable macOS virtual machine on an Apple silicon Mac, 30 to 60 minutes.** The closest rehearsal to a real install, with a fresh copy of macOS. Needs about 70 GB free.
 
@@ -223,7 +226,15 @@ After setup on any Mac, `bash ~/mac-setup/tests/verify-install.sh` checks every 
 
 ## What runs in the background
 
-Kept deliberately small: Karabiner-Elements (keyboard), AeroSpace (windows), Maccy (clipboard), Espanso (text shortcuts) and Google Drive. Shortcut commands start, act and exit, and long jobs (video compression, keep-awake, app installs) run on their own so they never block the keyboard. The Downloads sorter is not a running process: macOS starts it at low priority when Downloads changes, and once an hour for the age rules, and it exits in well under a second. Nothing in the package indexes. The checklist turns off the apps that open themselves at login.
+Kept deliberately small: Karabiner-Elements (keyboard), AeroSpace (windows), Maccy (clipboard), Espanso (text shortcuts), Handy (waits for the dictation key) and Google Drive. Docker, local AI (Ollama) and the VPNs run only while you turn them on. Shortcut commands start, act and exit, and long jobs (video compression, keep-awake, app installs) run on their own so they never block the keyboard. The Downloads sorter is not a running process: macOS starts it at low priority when Downloads changes, and once an hour for the age rules. Nothing in the package indexes. The checklist shows how to stop other apps opening at login.
+
+## Security
+
+Every run checks that the firewall (in stealth mode) and automatic security updates are on, and warns if FileVault is off. Nothing turns off Gatekeeper or System Integrity Protection. ArtCraft downloads are checked against GitHub's published checksum, and macOS still checks any app whose checksum was not published the first time it opens. Nothing is ever deleted: removed apps, old installers and replaced files go to the Trash, and removing an app keeps its data. No service listens on the network: Ollama and Docker answer only on this Mac.
+
+## Running setup again
+
+Setup only fills in what is missing, so it is safe to run any time, and `update` runs it for you. Settings you change yourself are kept: system settings, the Dock and the checklist are applied on the first run only. To apply one again, name its step, for example `bash ~/mac-setup/setup.sh --only macos-defaults`.
 
 ## Layout
 
@@ -233,8 +244,11 @@ Brewfile            apps and tools
 steps/              one file per setup step
 bin/                commands behind the menus and shortcuts
 lib/                shared helpers and paths
-config/             Karabiner, AeroSpace, Ghostty, menus, themes, data files
+config/             aerospace, karabiner, ghostty, tmux, zsh, starship, nvim, git,
+                    espanso, themes, and mac-setup (menus, rules, data files)
 backgrounds/        theme wallpapers
 tools/              shortcut generator and native helpers (Swift)
 tests/              checks, dry run, VM rehearsal, post-install verification
+.github/workflows/  the GitHub test runs
+publish.sh          first upload of this package to GitHub
 ```

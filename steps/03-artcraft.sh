@@ -63,9 +63,13 @@ artcraft_install_one() {
   if ! curl -fsSL --retry 3 --connect-timeout 10 -o "$work/$name" "$url"; then
     echo "  ! $app: download failed"; rm -rf "$work"; return 1
   fi
-  if [[ "$digest" == sha256:* ]] && [[ "$(shasum -a 256 "$work/$name" | cut -d' ' -f1)" != "${digest#sha256:}" ]]; then
-    echo "  ! $app: the download does not match GitHub's checksum, so it was not installed"
-    rm -rf "$work"; return 1
+  local verified=0
+  if [[ "$digest" == sha256:* ]]; then
+    if [[ "$(shasum -a 256 "$work/$name" | cut -d' ' -f1)" != "${digest#sha256:}" ]]; then
+      echo "  ! $app: the download does not match GitHub's checksum, so it was not installed"
+      rm -rf "$work"; return 1
+    fi
+    verified=1
   fi
 
   local found="" mounted=0
@@ -89,14 +93,19 @@ artcraft_install_one() {
     echo "  ! $app: no app found inside $name"; status=1
   else
     dest="/Applications/$(basename "$found")"
-    rm -rf "$dest"
-    if ditto "$found" "$dest"; then
-      xattr -dr com.apple.quarantine "$dest" 2>/dev/null || true
+    # Copy beside the old version first, then swap: the old one goes to the
+    # Trash, and a failed copy leaves the old one working.
+    rm -rf "$dest.new"   # only ever a leftover of this package's own copy
+    if ditto "$found" "$dest.new" && move_to_trash "$dest" && mv "$dest.new" "$dest"; then
+      # Skip macOS's first-open check only for a download whose checksum was
+      # confirmed. Otherwise macOS checks the app the first time it opens.
+      [[ "$verified" == 1 ]] && { xattr -dr com.apple.quarantine "$dest" 2>/dev/null || true; }
       register_app "$dest"
       printf '%s\n' "$tag" > "$state/$app.tag"
       printf '%s\n' "$dest" > "$state/$app.path"
       echo "  ✓ Installed $(basename "$dest") $tag"
     else
+      rm -rf "$dest.new"
       echo "  ! $app: could not copy into /Applications"; status=1
     fi
   fi

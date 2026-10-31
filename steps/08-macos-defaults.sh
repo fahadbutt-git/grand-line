@@ -2,6 +2,10 @@
 # System settings: keyboard, Finder, screenshots, Dock, and what AeroSpace needs.
 
 step_macos_defaults() {
+  if ! first_time macos-defaults; then
+    ok "System settings were set on the first run (yours are kept)"
+    return 0
+  fi
   # Keyboard: fast key repeat, no accent pop-up when holding a key
   run defaults write NSGlobalDomain KeyRepeat -int 2
   run defaults write NSGlobalDomain InitialKeyRepeat -int 15
@@ -68,13 +72,8 @@ step_macos_defaults() {
   run defaults write com.apple.WindowManager EnableTopTilingByEdgeDrag -bool false
   run defaults write com.apple.WindowManager EnableTilingOptionAccelerator -bool false
 
-  # Dark mode needs an Automation permission prompt, which nobody can answer
-  # on an unattended test machine.
-  if [[ "$CI_MODE" == 0 ]]; then
-    run_sh "osascript -e 'tell application \"System Events\" to tell appearance preferences to set dark mode to true'" \
-      || warn "Could not switch to dark mode. Set it in System Settings, Appearance."
-  fi
 
   run_sh "killall Finder Dock SystemUIServer 2>/dev/null || true"
+  mark_done macos-defaults
   ok "System settings applied"
 }

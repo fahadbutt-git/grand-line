@@ -17,22 +17,17 @@ DECLUTTER_DATA=("/Library/Application Support/GarageBand" "/Library/Application 
 # The Dock starts with these; anything you add later is kept.
 DOCK_APPS=(/Applications/Google\ Chrome.app /Applications/Ghostty.app /Applications/Claude.app /Applications/WordCraft.app)
 
-to_trash() {
-  [[ -e "$1" ]] || return 0
-  local name dest; name="$(basename "$1")"; dest="$HOME/.Trash/$name"
-  [[ -e "$dest" ]] && dest="$HOME/.Trash/$name $(date +%H%M%S)"
-  run sudo mv "$1" "$dest" && echo "  moved to the Trash: $1"
-}
 
 step_declutter() {
   local app path removed=0
   for app in "${DECLUTTER_APPS[@]}"; do
     path="/Applications/$app.app"
     [[ -d "$path" ]] || continue
-    to_trash "$path" && removed=$((removed + 1))
+    trash_path "$path" && removed=$((removed + 1))
   done
-  if [[ ! -d /Applications/GarageBand.app ]]; then
-    for path in "${DECLUTTER_DATA[@]}"; do to_trash "$path"; done
+  # The sound library is shared with Logic Pro and MainStage: keep it if either is here.
+  if [[ ! -d /Applications/GarageBand.app && ! -d "/Applications/Logic Pro.app" && ! -d /Applications/MainStage.app ]]; then
+    for path in "${DECLUTTER_DATA[@]}"; do trash_path "$path"; done
   fi
 
   # The Dock, once: only on the first run, so your own changes stay.

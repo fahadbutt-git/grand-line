@@ -120,7 +120,7 @@ fi
 
 # --- tidy-downloads: rules, sources, age, clashes, never deleting
 dl="$tmp/dl"; src="$tmp/sources"; mkdir -p "$dl/Documents" "$dl/My folder" "$src"
-export XATTR_SOURCES="$src" MAC_SETUP_DOWNLOADS="$dl" MAC_SETUP_DOWNLOAD_RULES="$ROOT/config/mac-setup/downloads-rules.tsv"
+export MAC_SETUP_NO_RESCAN=1 XATTR_SOURCES="$src" MAC_SETUP_DOWNLOADS="$dl" MAC_SETUP_DOWNLOAD_RULES="$ROOT/config/mac-setup/downloads-rules.tsv"
 age() { perl -e '$t = time - shift; utime $t, $t, @ARGV' "$1" "${@:2}"; }   # age SECONDS FILES
 mk() { : > "$dl/$1"; age 120 "$dl/$1"; [[ -n "${2:-}" ]] && printf '%s' "$2" > "$src/$1"; }
 mk report.pdf "https://claude.ai/api/files/x"
@@ -158,5 +158,22 @@ mkdir "${TMPDIR:-/tmp}/mac-setup-downloads.lock"; mk late.csv
 "$ROOT/bin/tidy-downloads"; check_at "late.csv" "a second copy waits while one is running"
 rmdir "${TMPDIR:-/tmp}/mac-setup-downloads.lock"
 unset XATTR_SOURCES MAC_SETUP_DOWNLOADS MAC_SETUP_DOWNLOAD_RULES
+
+# --- app install and remove keep the Brewfile in step
+mkdir -p "$HOME/.mac-setup/config/mac-setup"
+printf 'cask "zoom"\ncask "nikitabobko/tap/aerospace"\n' > "$HOME/.mac-setup/Brewfile"
+printf 'WordCraft\tstorytold/wordcraft\tWord processor\nGridCraft\tstorytold/gridcraft\tSpreadsheets\n' > "$HOME/.mac-setup/config/mac-setup/artcraft.tsv"
+export MAC_SETUP_DETACHED=1 BREW_CASKS="iina zoom" BREW_INSTALLED="zoom aerospace"
+answers "iina"; "$ROOT/bin/app" install
+grep -qx 'cask "iina"' "$HOME/.mac-setup/Brewfile" && t_ok "app install adds the app to the Brewfile" || t_fail "app install did not add to the Brewfile"
+"$ROOT/bin/app" install iina; [[ "$(grep -c 'cask "iina"' "$HOME/.mac-setup/Brewfile")" == 1 ]] && t_ok "app install never adds a line twice" || t_fail "app install added a duplicate line"
+"$ROOT/bin/app" remove aerospace
+grep -q aerospace "$HOME/.mac-setup/Brewfile" && t_fail "app remove left a tap cask in the Brewfile" || t_ok "app remove takes a tap cask off the Brewfile"
+grep -q 'cask "zoom"' "$HOME/.mac-setup/Brewfile" && t_ok "app remove leaves other apps alone" || t_fail "app remove touched other lines"
+"$ROOT/bin/app" remove "GridCraft (ArtCraft)"
+grep -q '^GridCraft' "$HOME/.mac-setup/config/mac-setup/artcraft.tsv" && t_fail "ArtCraft removal kept its row" || t_ok "app remove takes an ArtCraft app off its list"
+grep -q '^WordCraft' "$HOME/.mac-setup/config/mac-setup/artcraft.tsv" && t_ok "ArtCraft removal leaves other rows" || t_fail "ArtCraft removal touched other rows"
+grep -q "brew uninstall --cask aerospace" "$STUB_LOG" && ! grep -q -- "--zap" "$STUB_LOG" && t_ok "app remove keeps the app's data (no --zap)" || t_fail "app remove deleted data"
+unset MAC_SETUP_DETACHED BREW_CASKS BREW_INSTALLED
 
 exit $FAIL

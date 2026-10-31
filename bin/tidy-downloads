@@ -101,19 +101,27 @@ folder_for() {
 }
 
 # 1. Sort loose files. Skip hidden files, unfinished downloads and anything
-#    changed in the last 30 seconds (it may still be arriving).
+#    changed in the last 30 seconds (it may still be arriving), then look
+#    again once those have settled, so a new download is sorted within a minute.
+sort_loose() {
+fresh=0
 while IFS= read -r -d '' f; do
   case "$(basename "$f")" in
     .*|*.crdownload|*.download|*.part|*.partial|*.tmp) continue ;;
   esac
   age=$((now - $(mtime "$f")))
-  [[ $age -lt 30 ]] && continue
+  [[ $age -lt 30 ]] && { fresh=1; continue; }
   if folder="$(folder_for "$f")"; then
     move "$f" "$(dest_dir "$folder")"
   elif [[ $age -gt $((archive_days * 86400)) ]]; then
     move "$f" "$DL/Archive/$(date -r "$(mtime "$f")" +%Y-%m 2>/dev/null || date +%Y-%m)"
   fi
 done < <(find "$DL" -mindepth 1 -maxdepth 1 -type f -print0)
+}
+sort_loose
+if [[ "$fresh" == 1 && "$DRY" == 0 && -z "${MAC_SETUP_NO_RESCAN:-}" ]]; then
+  sleep 35; now="$(date +%s)"; sort_loose
+fi
 
 # 2. Old installers go to the Trash, where they can still be restored.
 while IFS= read -r -d '' f; do

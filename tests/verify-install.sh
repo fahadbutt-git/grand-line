@@ -59,7 +59,8 @@ launchctl print "gui/$(id -u)/mac-setup.downloads" >/dev/null 2>&1 \
   && pass "Downloads sorting is loaded" || fail "Downloads sorting is not loaded"
 [[ -L "$HOME/Library/Application Support/espanso/match/mac-setup.yml" ]] \
   && pass "Espanso has the text shortcuts" || fail "Espanso shortcuts are not linked"
-for name in menu keybindings theme update app tidy-downloads; do
+for cmd_path in "$ROOT"/bin/*; do
+  name="$(basename "$cmd_path")"
   command -v "$name" >/dev/null && pass "command: $name" || fail "command $name is not on the PATH"
 done
 for src in "$ROOT"/tools/*.swift; do
@@ -83,7 +84,9 @@ while IFS=$'\t' read -r app exts _; do
 done < "$ROOT/config/mac-setup/default-apps.tsv"
 
 echo "Preinstalled apps the package replaces"
-for app in Pages Numbers Keynote iMovie GarageBand; do
+# shellcheck source=steps/12-declutter.sh
+source "$ROOT/steps/12-declutter.sh"
+for app in "${DECLUTTER_APPS[@]}"; do
   [[ -d "/Applications/$app.app" ]] && fail "$app is still installed" || pass "$app removed"
 done
 [[ -L "$HOME/.config/nvim" ]] && pass "Neovim uses the package's LazyVim setup" || fail "Neovim config is not linked"
@@ -91,6 +94,13 @@ git config --global --get-all include.path | grep -q "config/git/config" && pass
 
 command -v jq >/dev/null && pass "jq (built into macOS)" || fail "jq is missing (needs macOS 15 or later)"
 tar --version 2>/dev/null | grep -q libarchive && pass "tar opens .7z and .rar (libarchive)" || fail "tar is not libarchive"
+
+echo "Security"
+/usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate 2>/dev/null | grep -q enabled && pass "firewall on" || fail "firewall off"
+[[ "$(defaults read /Library/Preferences/com.apple.SoftwareUpdate CriticalUpdateInstall 2>/dev/null)" == 1 ]] \
+  && pass "security updates install automatically" || fail "automatic security updates are off"
+csrutil status 2>/dev/null | grep -q enabled && pass "System Integrity Protection on" || note "System Integrity Protection is off"
+spctl --status 2>/dev/null | grep -q enabled && pass "Gatekeeper on" || fail "Gatekeeper is off"
 
 echo "System settings"
 [[ "$(defaults read NSGlobalDomain KeyRepeat 2>/dev/null)" == 2 ]] && pass "fast key repeat" || fail "key repeat not set"

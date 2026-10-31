@@ -20,25 +20,38 @@ EOF
   exit 0
 fi
 
+failed=()
+
 echo "== Package"
 if git -C "$REPO" remote get-url origin >/dev/null 2>&1; then
-  if [[ -z "$(git -C "$REPO" status --porcelain)" ]]; then
-    git -C "$REPO" pull --ff-only || echo "Could not pull. Your local copy is kept."
+  # Your own changes (apps added from the menu, edited rules) are kept: they
+  # are replayed on top of the GitHub copy, then sent back to GitHub.
+  if git -C "$REPO" pull --rebase --autostash -q; then
+    git -C "$REPO" push -q 2>/dev/null || true
   else
-    echo "You have local changes in $REPO, so the GitHub copy was not pulled."
+    git -C "$REPO" rebase --abort 2>/dev/null
+    echo "Your local changes clash with GitHub's copy. Kept yours; GitHub's copy was not pulled."
+    failed+=("package")
   fi
 fi
 
 echo "== Homebrew apps and tools"
-brew update && brew upgrade
+{ brew update && brew upgrade; } || failed+=("Homebrew")
 export HOMEBREW_NO_AUTO_UPDATE=1
 
 echo "== New apps, ArtCraft apps and settings"
-bash "$REPO/setup.sh" --update
+bash "$REPO/setup.sh" --update || failed+=("setup")
 
 echo "== Neovim plugins and language versions"
-command -v nvim >/dev/null && nvim --headless '+Lazy! sync' +qa >/dev/null 2>&1 && echo "Neovim plugins updated"
-command -v mise >/dev/null && mise upgrade --yes >/dev/null 2>&1 && echo "mise languages updated"
+if command -v nvim >/dev/null; then
+  nvim --headless '+Lazy! sync' +qa >/dev/null 2>&1 && echo "Neovim plugins updated" || failed+=("Neovim plugins")
+fi
+command -v mise >/dev/null && { mise upgrade --yes >/dev/null 2>&1 || failed+=("mise"); }
 
+if [[ ${#failed[@]} -gt 0 ]]; then
+  notify "Update finished with problems" "Not updated: ${failed[*]}. See the Terminal window."
+  echo "Not updated: ${failed[*]}"
+  exit 1
+fi
 notify "Update finished" "Apps and tools are up to date."
 echo "Done."

@@ -62,7 +62,7 @@ iso2sd() {
 }
 
 # ff: find a file with a live preview, then print its path
-alias ff="fzf --preview 'head -100 {}'"
+alias ff="fzf --preview 'bat --color=always --style=numbers --line-range=:100 {} 2>/dev/null || head -100 {}'"
 
 # Archives
 compress()   { tar -czf "${1%/}.tar.gz" "${1%/}"; }

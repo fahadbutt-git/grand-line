@@ -8,5 +8,7 @@ step_default_apps() {
   fi
   # shellcheck source=lib/default-apps.sh
   source "$REPO_DIR/lib/default-apps.sh"
-  apply_default_apps primary "$REPO_DIR/config/mac-setup/default-apps.tsv"
+  # Keep whichever set you last chose (default-apps primary or fallback).
+  local mode; mode="$(cat "$MAC_SETUP_STATE/default-apps-mode" 2>/dev/null || echo primary)"
+  apply_default_apps "$mode" "$REPO_DIR/config/mac-setup/default-apps.tsv"
 }

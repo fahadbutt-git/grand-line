@@ -52,7 +52,8 @@ macOS requires these clicks from you. Work down the list once.
    for karabiner_console_user_server when macOS asks.
 
 10. Sign in to your apps
-    Chrome, Claude, ChatGPT, Gemini, Notion, WhatsApp, Zoom,
+    Chrome, Claude, Claude Code (claude), Codex (codex), Antigravity
+    (agy), ChatGPT, Gemini, Notion, Anki (AnkiWeb), WhatsApp, Zoom,
     Discord, Spotify, Plaud, Citrix, Horizon, Proton VPN (free
     plan) and Tailscale. Leave the VPN off on hospital and school networks, where it
     can block Citrix and Horizon. Run one VPN at a time: turn Proton
@@ -89,6 +90,9 @@ EOF
     run "write the finishing checklist to $out"
     return 0
   fi
+  if ! first_time checklist; then
+    return 0
+  fi
   printf '%s\n' "$text" > "$out"
   printf '\n%s\n' "$text"
   if [[ "$CI_MODE" == 0 ]]; then
@@ -98,5 +102,6 @@ EOF
     open -a "Maccy" 2>/dev/null
     open -a "Espanso" 2>/dev/null
   fi
+  mark_done checklist
   ok "Checklist saved to your Desktop"
 }

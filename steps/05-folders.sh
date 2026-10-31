@@ -26,6 +26,10 @@ step_folders() {
     info "Google Drive is not signed in yet. After signing in, run: update"
     return 0
   fi
+  if [[ -L "$DRIVE_LINK" && "$(readlink "$DRIVE_LINK")" == "$drive" ]]; then
+    ok "Drive link (in your home folder) opens your Google Drive"
+    return 0
+  fi
   link_into_place "$drive" "$DRIVE_LINK"
   # New Finder windows and the first save dialog in each app open in Drive.
   run defaults write com.apple.finder NewWindowTarget -string PfLo

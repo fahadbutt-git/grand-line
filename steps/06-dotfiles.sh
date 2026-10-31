@@ -30,9 +30,9 @@ step_dotfiles() {
   elif [[ ! -f "$dcfg" ]]; then
     mkdir -p "$HOME/.docker"
     printf '{"cliPluginsExtraDirs": ["%s"], "credsStore": "osxkeychain"}\n' "$plug" > "$dcfg"
-  elif ! grep -qF "$plug" "$dcfg"; then
+  elif [[ ! -L "$dcfg" ]] && ! grep -qF "$plug" "$dcfg"; then
     jq --arg p "$plug" '.cliPluginsExtraDirs = ((.cliPluginsExtraDirs // []) + [$p])' "$dcfg" > "$dcfg.new" \
-      && mv "$dcfg.new" "$dcfg"
+      && mv "$dcfg.new" "$dcfg" || rm -f "$dcfg.new"
   fi
 
   # Espanso: the package's shortcuts are linked, its settings copied once so
@@ -53,7 +53,7 @@ step_dotfiles() {
   local kdir="$HOME/.config/karabiner" kfile="$cfg/karabiner/karabiner.json"
   local sum_file="$MAC_SETUP_STATE/karabiner.sha" sum
   sum="$(shasum -a 256 "$kfile" 2>/dev/null | cut -d' ' -f1)"
-  if [[ -L "$kdir" ]]; then run rm "$kdir"; fi
+  [[ -L "$kdir" ]] && backup_path "$kdir"
   if [[ ! -f "$kdir/karabiner.json" || "$(cat "$sum_file" 2>/dev/null)" != "$sum" ]]; then
     run mkdir -p "$kdir"
     [[ -f "$kdir/karabiner.json" ]] && backup_path "$kdir/karabiner.json"

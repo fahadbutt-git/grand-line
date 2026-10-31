@@ -4,6 +4,8 @@
 
 # shellcheck source=lib/paths.sh
 source "$(dirname "${BASH_SOURCE[0]}")/paths.sh"
+# shellcheck source=lib/trash.sh
+source "$(dirname "${BASH_SOURCE[0]}")/trash.sh"
 
 export PATH="${MAC_SETUP_TEST_PATH:+$MAC_SETUP_TEST_PATH:}$BREW_PREFIX/bin:$MAC_SETUP_BIN:$MAC_SETUP_BUILD:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 export MAC_SETUP_CONFIG="$MAC_SETUP_LINK/config/mac-setup"

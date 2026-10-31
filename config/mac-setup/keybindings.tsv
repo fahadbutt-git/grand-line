@@ -92,9 +92,9 @@ Caps + X	Clipboard	Cut
 Caps + V	Clipboard	Paste	
 Caps + Option + V	Clipboard	Paste as plain text (no formatting)	
 Caps + Ctrl + V	Clipboard	Clipboard history (Maccy)	
+Caps + Ctrl + E	Clipboard	Emoji and symbols	
 Caps + Ctrl + X	Voice	Dictate: hold, speak, release (Handy)	
 Caps + Ctrl + Option + M	Voice	Record and transcribe a meeting (Meetily)	open -a 'Meetily'
-Caps + Ctrl + E	Clipboard	Emoji and symbols	
 Caps + Ctrl + I	Toggles	Keep the Mac awake	$HOME/.mac-setup/bin/toggle awake
 Caps + Ctrl + N	Toggles	Dark and light mode	$HOME/.mac-setup/bin/toggle dark
 Caps + Shift + Space	Toggles	Hide or show the menu bar	$HOME/.mac-setup/bin/toggle menubar

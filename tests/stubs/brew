@@ -1,0 +1,8 @@
+#!/bin/bash
+# Test stub: a pretend Homebrew. Logs calls; lists come from $BREW_CASKS.
+echo "brew $*" >> "${STUB_LOG:-/dev/null}"
+case "$1 ${2:-}" in
+  "casks ") printf '%s\n' ${BREW_CASKS:-} ;;
+  "list --cask") printf '%s\n' ${BREW_INSTALLED:-} ;;
+esac
+exit 0

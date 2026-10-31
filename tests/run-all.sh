@@ -87,7 +87,9 @@ check "default-apps.tsv: three tab-separated fields per entry" bash -c \
 
 check "every native helper has a matching source file" bash -c '
   bad=0
-  for name in ocr pdfshrink; do [[ -f "tools/$name.swift" ]] || { echo "tools/$name.swift missing"; bad=1; }; done
+  for name in $(grep -ohE "MAC_SETUP_BUILD/[a-z]+|pdfshrink|\bocr\b" bin/* lib/*.sh | sed "s#.*/##" | sort -u); do
+    [[ -f "tools/$name.swift" ]] || { echo "tools/$name.swift missing"; bad=1; }
+  done
   exit $bad'
 
 check "every theme has its background and all fields" bash -c '

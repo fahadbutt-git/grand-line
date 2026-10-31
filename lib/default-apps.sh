@@ -5,6 +5,27 @@
 
 # apply_default_apps primary    first app in each row, its fallback if missing
 # apply_default_apps fallback   the fallback app in every row
+# Writes the default app for one type into macOS's own settings file,
+# replacing any earlier entry for that type so the list never grows.
+LS_PREFS=com.apple.LaunchServices/com.apple.launchservices.secure
+set_ls_handler() {
+  local uti="$1" id="$2" work; work="$(mktemp -d)"
+  if defaults export "$LS_PREFS" "$work/ls.plist" 2>/dev/null \
+     && plutil -convert json -o "$work/ls.json" "$work/ls.plist" 2>/dev/null \
+     && jq --arg u "$uti" --arg i "$id" '.LSHandlers = ([.LSHandlers[]? | select(.LSHandlerContentType != $u)]
+          + [{LSHandlerContentType: $u, LSHandlerRoleAll: $i, LSHandlerPreferredVersions: {LSHandlerRoleAll: "-"}}])' \
+          "$work/ls.json" > "$work/new.json" \
+     && plutil -convert xml1 -o "$work/new.plist" "$work/new.json" \
+     && defaults import "$LS_PREFS" "$work/new.plist"; then
+    :
+  else
+    # The settings file holds a value JSON cannot express: add the entry instead.
+    defaults write "$LS_PREFS" LSHandlers -array-add \
+      "{LSHandlerContentType=\"$uti\";LSHandlerRoleAll=\"$id\";LSHandlerPreferredVersions={LSHandlerRoleAll=\"-\";};}"
+  fi
+  rm -rf "$work"
+}
+
 # The app that opens files with this extension now, as "Name.app".
 default_app_for() { duti -x "${1#.}" 2>/dev/null | head -1; }
 
@@ -42,8 +63,7 @@ apply_default_apps() {
         local uti
         for ext in $exts; do
           uti="$("$helper" --uti "${ext#.}")" || continue
-          defaults write com.apple.LaunchServices/com.apple.launchservices.secure LSHandlers -array-add \
-            "{LSHandlerContentType=\"$uti\";LSHandlerRoleAll=\"$id\";LSHandlerPreferredVersions={LSHandlerRoleAll=\"-\";};}"
+          set_ls_handler "$uti" "$id"
         done
         killall lsd 2>/dev/null; sleep 1
       fi

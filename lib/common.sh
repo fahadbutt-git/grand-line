@@ -6,6 +6,8 @@
 
 # shellcheck source=lib/paths.sh
 source "$(dirname "${BASH_SOURCE[0]}")/paths.sh"
+# shellcheck source=lib/trash.sh
+source "$(dirname "${BASH_SOURCE[0]}")/trash.sh"
 
 if [[ -t 1 ]]; then
   C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'; C_RED=$'\033[31m'; C_GREEN=$'\033[32m'
@@ -67,6 +69,25 @@ link_into_place() {
   ok "Linked ${target}"
 }
 
+# Steps that set your preferences do it once, so a later run (or update)
+# never undoes a change you made yourself. Naming the step runs it again:
+#   bash ~/mac-setup/setup.sh --only macos-defaults
+first_time() {
+  local step="$1" flag="$MAC_SETUP_STATE/done-$1"
+  [[ ! -f "$flag" || ",${ONLY:-}," == *",$step,"* ]]
+}
+mark_done() {
+  [[ "$DRY_RUN" == 1 ]] && return 0
+  mkdir -p "$MAC_SETUP_STATE" && touch "$MAC_SETUP_STATE/done-$1"
+}
+
+# Move to the Trash, or print the plan in dry-run mode.
+trash_path() {
+  [[ -e "$1" || -L "$1" ]] || return 0
+  if [[ "$DRY_RUN" == 1 ]]; then run "move $1 to the Trash"; return 0; fi
+  move_to_trash "$1" && echo "  moved to the Trash: $1"
+}
+
 # Append a line to a file once.
 append_once() {
   local line="$1" file="$2"
@@ -94,11 +115,6 @@ app_path_of() {
 }
 
 bundle_id_of() {
-  local app="$1" path
-  for path in "/Applications/${app}.app" "$HOME/Applications/${app}.app" "/System/Applications/${app}.app"; do
-    if [[ -d "$path" ]]; then
-      defaults read "${path}/Contents/Info" CFBundleIdentifier 2>/dev/null && return 0
-    fi
-  done
-  return 1
+  local path; path="$(app_path_of "$1")" || return 1
+  defaults read "$path/Contents/Info" CFBundleIdentifier 2>/dev/null
 }

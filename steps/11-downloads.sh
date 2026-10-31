@@ -26,20 +26,33 @@ PLIST
 }
 
 step_downloads() {
-  local plist="$HOME/Library/LaunchAgents/$DOWNLOADS_LABEL.plist" new
+  local plist="$HOME/Library/LaunchAgents/$DOWNLOADS_LABEL.plist" new domain
+  domain="gui/$(id -u)"
   new="$(downloads_plist)"
-  if [[ -f "$plist" && "$(cat "$plist")" == "$new" ]]; then
+  if [[ "$DRY_RUN" == 1 ]]; then
+    run "write $plist and load it"
+    return 0
+  fi
+  if [[ -f "$plist" && "$(cat "$plist")" == "$new" ]] && launchctl print "$domain/$DOWNLOADS_LABEL" >/dev/null 2>&1; then
     ok "Downloads sorting already on"
     return 0
   fi
-  run mkdir -p "$HOME/Library/LaunchAgents"
-  if [[ "$DRY_RUN" == 1 ]]; then
-    run "write $plist and load it"
-  else
-    printf '%s\n' "$new" > "$plist"
-    launchctl bootout "gui/$(id -u)/$DOWNLOADS_LABEL" 2>/dev/null
-    launchctl bootstrap "gui/$(id -u)" "$plist" 2>/dev/null \
-      || { warn "Downloads sorting could not start. Run: launchctl bootstrap gui/\$(id -u) $plist"; return 1; }
+  mkdir -p "$HOME/Library/LaunchAgents"
+  printf '%s\n' "$new" > "$plist"
+  # Unload any old copy and wait until macOS has finished, then load.
+  launchctl bootout "$domain/$DOWNLOADS_LABEL" 2>/dev/null
+  local _
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    launchctl print "$domain/$DOWNLOADS_LABEL" >/dev/null 2>&1 || break
+    sleep 0.5
+  done
+  for _ in 1 2 3; do
+    launchctl bootstrap "$domain" "$plist" 2>/dev/null && break
+    sleep 1
+  done
+  if ! launchctl print "$domain/$DOWNLOADS_LABEL" >/dev/null 2>&1; then
+    warn "Downloads sorting could not start. Run: bash ~/mac-setup/setup.sh --only downloads"
+    return 1
   fi
   ok "Downloads sorting on (rules: config/mac-setup/downloads-rules.tsv)"
 }

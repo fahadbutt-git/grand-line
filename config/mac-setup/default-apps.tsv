@@ -5,4 +5,4 @@ DeckCraft	.pptx .ppt .odp	LibreOffice
 PdfCraft	.pdf	Preview
 # Videos play in IINA. FilmCraft only opens its own projects, so macOS
 # cannot make it the default for video files. Import clips from inside it.
-IINA	.mp4 .mov .m4v .mkv	QuickTime Player
+IINA	.mp4 .mov .m4v .mkv	IINA

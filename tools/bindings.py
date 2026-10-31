@@ -18,7 +18,8 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BIN = "$HOME/.mac-setup/bin"          # the package's commands (see lib/paths.sh)
-AERO = "/opt/homebrew/bin/aerospace"  # called directly: the fastest path for window keys
+BREW = "/opt/homebrew/bin"            # Homebrew on Apple silicon
+AERO = f"{BREW}/aerospace"  # called directly: the fastest path for window keys
 
 
 def sh(cmd):
@@ -88,7 +89,7 @@ for n in range(1, 10):
 BINDINGS += [
     # Apps
     ("return_or_enter", [], "Apps", "Terminal (Ghostty)", app("Ghostty")),
-    ("return_or_enter", ["option"], "Apps", "Terminal in a tmux session", sh("open -na Ghostty --args -e /opt/homebrew/bin/tmux new-session -A -s main")),
+    ("return_or_enter", ["option"], "Apps", "Terminal in a tmux session", sh(f"open -na Ghostty --args -e {BREW}/tmux new-session -A -s main")),
     ("return_or_enter", ["shift"], "Apps", "Browser (Chrome)", app("Google Chrome")),
     ("b", ["shift", "option"], "Apps", "Private browser window", sh("open -na 'Google Chrome' --args --incognito")),
     ("f", ["shift"], "Apps", "Finder", sh("open \"$HOME\"")),
@@ -118,7 +119,7 @@ BINDINGS += [
     ("b", ["control"], "System", "Bluetooth menu", cmd("bluetooth")),
     ("w", ["control"], "System", "Wi-Fi settings", sh("open 'x-apple.systempreferences:com.apple.wifi-settings-extension'")),
     ("s", ["control"], "System", "Share with AirDrop", sh("open -a AirDrop")),
-    ("t", ["control"], "System", "What is using the Mac (btop)", sh("open -na Ghostty --args -e /opt/homebrew/bin/btop")),
+    ("t", ["control"], "System", "What is using the Mac (btop)", sh(f"open -na Ghostty --args -e {BREW}/btop")),
     ("h", ["control"], "System", "Hardware menu", cmd("menu Hardware")),
     ("o", ["control"], "System", "Toggle menu", cmd("menu Toggle")),
     ("c", ["control"], "Capture", "Capture menu", cmd("menu Capture")),
@@ -130,11 +131,11 @@ BINDINGS += [
     ("v", [], "Clipboard", "Paste", key("v", "command")),
     ("v", ["option"], "Clipboard", "Paste as plain text (no formatting)", key("v", "command", "option", "shift")),
     ("v", ["control"], "Clipboard", "Clipboard history (Maccy)", key("c", "command", "shift")),
+    ("e", ["control"], "Clipboard", "Emoji and symbols", key("spacebar", "control", "command")),
 
     # Voice, as Voxtype in Omarchy. Handy listens for F18, which this sends while held.
     ("x", ["control"], "Voice", "Dictate: hold, speak, release (Handy)", key("f18")),
     ("m", ["control", "option"], "Voice", "Record and transcribe a meeting (Meetily)", app("Meetily")),
-    ("e", ["control"], "Clipboard", "Emoji and symbols", key("spacebar", "control", "command")),
     ("i", ["control"], "Toggles", "Keep the Mac awake", cmd("toggle awake")),
     ("n", ["control"], "Toggles", "Dark and light mode", cmd("toggle dark")),
     ("spacebar", ["shift"], "Toggles", "Hide or show the menu bar", cmd("toggle menubar")),

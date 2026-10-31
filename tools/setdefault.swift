@@ -1,7 +1,6 @@
 // Sets or reads the default app for file types through NSWorkspace, the API
 // Finder itself uses, then reads the result back so a silent refusal shows.
 //   setdefault /Applications/WordCraft.app docx doc odt   set, then confirm
-//   setdefault --get docx                                print the current app
 //   setdefault --uti docx                                print the type identifier
 // Exit codes: 0 done, 1 usage, 2 macOS kept another app, 3 unknown type or app.
 import AppKit
@@ -14,19 +13,13 @@ func current(_ type: UTType) -> String? {
 
 let args = Array(CommandLine.arguments.dropFirst())
 guard args.count >= 2 else {
-  FileHandle.standardError.write("usage: setdefault APP.app EXT... | setdefault --get EXT\n".data(using: .utf8)!)
+  FileHandle.standardError.write("usage: setdefault APP.app EXT... | setdefault --uti EXT\n".data(using: .utf8)!)
   exit(1)
 }
 
 if args[0] == "--uti" {
   guard let type = UTType(filenameExtension: args[1]) else { exit(3) }
   print(type.identifier)
-  exit(0)
-}
-
-if args[0] == "--get" {
-  guard let type = UTType(filenameExtension: args[1]) else { exit(3) }
-  print(current(type) ?? "")
   exit(0)
 }
 

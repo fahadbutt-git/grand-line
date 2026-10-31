@@ -20,6 +20,8 @@ brew "ripgrep"          # rg: search inside files
 brew "fd"               # simpler find
 brew "tmux"             # panes, windows and lasting sessions
 brew "starship"         # the prompt line
+brew "bat"              # cat with syntax colours (also the ff preview)
+brew "tlrc"             # tldr: short worked examples for any command
 brew "rclone"           # Drive from the command line: bulk tidying now, NAS sync later
 cask "font-jetbrains-mono-nerd-font"
 
@@ -35,6 +37,8 @@ brew "docker-credential-helper"  # keeps registry logins in the Keychain
 brew "lazygit"          # git in the terminal (lzg)
 brew "lazydocker"       # containers in the terminal (lzd)
 brew "btop"             # what is using the CPU, memory and disk
+brew "duckdb"           # SQL over large CSV and Parquet exports (TriNetX, All of Us)
+brew "ollama"           # local AI models for private text; runs only when toggled on
 brew "neovim"           # the editor: LazyVim, as in Omarchy (config/nvim)
 brew "tree-sitter-cli"  # code highlighting parsers for Neovim
 

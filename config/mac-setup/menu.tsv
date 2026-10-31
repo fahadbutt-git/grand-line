@@ -3,7 +3,7 @@
 # with the package commands on the PATH. Save, and the menu updates at once.
 Apps/Open an app	menu-apps
 Install/An app	app install
-Remove/An app and its settings	app remove
+Remove/An app (its data is kept)	app remove
 Files/Sort Downloads now	tidy-downloads
 Files/Recent Downloads moves	open -a TextEdit "$MAC_SETUP_LOGS/downloads.log"
 Files/Edit the Downloads rules	open -a TextEdit "$MAC_SETUP_CONFIG/downloads-rules.tsv"
@@ -30,6 +30,7 @@ Toggle/Wi-Fi	toggle wifi
 Toggle/Bluetooth	toggle bluetooth
 Toggle/Microphone mute	toggle mic
 Toggle/Docker (start or stop)	toggle docker
+Toggle/Local AI (Ollama, start or stop)	toggle ollama
 Toggle/Window tiling on or off	aerospace enable toggle
 Style/Pick a theme	theme pick
 Style/Next background	theme next-background
@@ -37,15 +38,13 @@ Style/Open the backgrounds folder	open "$BACKGROUNDS_DIR"
 Setup/Displays	open 'x-apple.systempreferences:com.apple.Displays-Settings.extension'
 Setup/Keyboard	open 'x-apple.systempreferences:com.apple.Keyboard-Settings.extension'
 Setup/Trackpad	open 'x-apple.systempreferences:com.apple.Trackpad-Settings.extension'
-Setup/Sound	open 'x-apple.systempreferences:com.apple.Sound-Settings.extension'
-Setup/Wi-Fi	open 'x-apple.systempreferences:com.apple.wifi-settings-extension'
-Setup/Bluetooth	open 'x-apple.systempreferences:com.apple.BluetoothSettings'
-Setup/Battery	open 'x-apple.systempreferences:com.apple.Battery-Settings.extension'
+Setup/Sound output	audio
+Setup/Bluetooth devices	bluetooth
 Setup/Privacy and Security	open 'x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension'
 Setup/Edit this menu	open -a TextEdit "$MAC_SETUP_CONFIG/menu.tsv"
 Setup/Edit window tiling settings	open -a TextEdit "$HOME/.aerospace.toml"
 Setup/Default apps: ArtCraft and built-in	default-apps primary
-Setup/Default apps: LibreOffice, Preview, IINA	default-apps fallback
+Setup/Default apps: LibreOffice and Preview	default-apps fallback
 Hardware/Battery	notice battery
 Hardware/System information	open -a 'System Information'
 Hardware/Disk space	notice disk

@@ -26,14 +26,26 @@ fi
 detach_self "$0" "$mode" "${files[@]}"
 
 done_count=0
+# A free output name beside the original, never the original itself:
+# photo.jpg -> photo-converted.jpg, then photo-converted 2.jpg and so on.
+out_for() {
+  local f="$1" suffix="$2" ext="$3" dir name stem out n=2
+  dir="$(dirname "$f")"; name="$(basename "$f")"; stem="${name%.*}"
+  [[ "$name" == *.* ]] || stem="$name"
+  out="$dir/$stem$suffix.$ext"
+  [[ "$out" == "$f" ]] && out="$dir/$stem-converted.$ext"
+  local first="$out"
+  while [[ -e "$out" ]]; do out="${first%.*} $n.$ext"; n=$((n + 1)); done
+  echo "$out"
+}
+
 for f in "${files[@]}"; do
   [[ -f "$f" ]] || continue
-  base="${f%.*}"
   case "$mode" in
-    video) avconvert --preset Preset1920x1080 --source "$f" --output "${base}-1080p.mp4" >/dev/null 2>&1 ;;
-    png)   sips -s format png "$f" --out "${base}.png" >/dev/null ;;
-    jpeg)  sips -s format jpeg -s formatOptions 85 "$f" --out "${base}.jpg" >/dev/null ;;
-    pdf)   pdfshrink "$f" "${base}-small.pdf" ;;
+    video) avconvert --preset Preset1920x1080 --source "$f" --output "$(out_for "$f" -1080p mp4)" >/dev/null 2>&1 ;;
+    png)   sips -s format png "$f" --out "$(out_for "$f" "" png)" >/dev/null ;;
+    jpeg)  sips -s format jpeg -s formatOptions 85 "$f" --out "$(out_for "$f" "" jpg)" >/dev/null ;;
+    pdf)   pdfshrink "$f" "$(out_for "$f" -small pdf)" ;;
   esac && done_count=$((done_count + 1))
 done
 notify "Transcode finished" "$done_count of ${#files[@]} files converted."
