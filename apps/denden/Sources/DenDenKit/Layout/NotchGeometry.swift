@@ -101,10 +101,20 @@ public enum NotchGeometry {
         return CGSize(width: NotchMetrics.pillWidth, height: height)
     }
 
-    /// The width of each side wing while music plays: a square for the
-    /// artwork on the left, the same for the playing mark on the right.
+    /// The width of each side wing while music plays: one notch height, a
+    /// square for the artwork on the left and the playing bars on the right.
     public static func wingWidth(collapsedHeight h: CGFloat) -> CGFloat {
-        (h + 6).rounded()
+        h.rounded()
+    }
+
+    /// The artwork's side in the left wing: the same padding above, below
+    /// and to its left.
+    public static func wingArtworkSide(collapsedHeight h: CGFloat) -> CGFloat {
+        max(10, (h - 2 * wingPadding(collapsedHeight: h)).rounded())
+    }
+
+    public static func wingPadding(collapsedHeight h: CGFloat) -> CGFloat {
+        max(4, (h * 0.19).rounded())
     }
 
     /// The closed panel's size, wider when the live activity is showing.

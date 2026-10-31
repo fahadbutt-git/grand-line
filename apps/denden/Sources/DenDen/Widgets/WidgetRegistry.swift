@@ -1,9 +1,9 @@
 import DenDenKit
 
-/// Every built-in widget, by the name used in `denden.toml` (`builtin = [...]`).
+/// Every built-in widget, by the name used in `denden.toml` (`panel = [...]`).
 /// To add one: write `Widgets/<Name>/<Name>Widget.swift` conforming to
-/// `NotchWidget`, add a line here, and add its name to
-/// `DenDenSettings.builtinWidgets` in DenDenKit.
+/// `NotchWidget`, add a line here, and add it to `PanelCatalog.builtins` in
+/// DenDenKit (its title and description for Settings).
 @MainActor
 enum WidgetRegistry {
     static let makers: [String: @MainActor (WidgetContext) -> NotchWidget] = [

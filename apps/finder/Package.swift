@@ -16,12 +16,16 @@ let package = Package(
         .library(name: "LauncherKit", targets: ["LauncherKit"]),
         .executable(name: "Byakugan", targets: ["Byakugan"]),
     ],
+    dependencies: [
+        // The app icons, shared with Den Den.
+        .package(path: "../icons"),
+    ],
     targets: [
         .target(name: "QueryKit"),
         .target(name: "IndexKit"),
         .target(name: "FileKit", dependencies: ["IndexKit"]),
         .target(name: "ArchiveKit"),
-        .target(name: "ThemeKit", dependencies: ["IndexKit"]),
+        .target(name: "ThemeKit", dependencies: ["IndexKit", .product(name: "AppIcon", package: "icons")]),
         .target(name: "LaunchKit"),
         .target(
             name: "BrowserKit",
@@ -30,7 +34,8 @@ let package = Package(
         ),
         .executableTarget(
             name: "LogPose",
-            dependencies: ["BrowserKit", "QueryKit", "IndexKit", "FileKit", "ArchiveKit", "ThemeKit", "LaunchKit"],
+            dependencies: ["BrowserKit", "QueryKit", "IndexKit", "FileKit", "ArchiveKit", "ThemeKit", "LaunchKit",
+                           .product(name: "AppIcon", package: "icons")],
             swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [.linkedFramework("AppKit"), .linkedFramework("SwiftUI"), .linkedFramework("Quartz"), .linkedFramework("QuickLookThumbnailing")]
         ),
@@ -41,7 +46,8 @@ let package = Package(
         ),
         .executableTarget(
             name: "Byakugan",
-            dependencies: ["LauncherKit", "IndexKit", "QueryKit", "ThemeKit", "LaunchKit"],
+            dependencies: ["LauncherKit", "IndexKit", "QueryKit", "ThemeKit", "LaunchKit",
+                           .product(name: "AppIcon", package: "icons")],
             swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [.linkedFramework("AppKit"), .linkedFramework("SwiftUI"), .linkedFramework("Quartz"), .linkedFramework("Carbon"), .linkedFramework("ApplicationServices"), .linkedFramework("CoreServices")]
         ),
@@ -49,7 +55,7 @@ let package = Package(
         .testTarget(name: "IndexKitTests", dependencies: ["IndexKit"]),
         .testTarget(name: "FileKitTests", dependencies: ["FileKit", "IndexKit"]),
         .testTarget(name: "ArchiveKitTests", dependencies: ["ArchiveKit"]),
-        .testTarget(name: "ThemeKitTests", dependencies: ["ThemeKit"]),
+        .testTarget(name: "ThemeKitTests", dependencies: ["ThemeKit", .product(name: "AppIcon", package: "icons")]),
         .testTarget(name: "LaunchKitTests", dependencies: ["LaunchKit"]),
         .testTarget(
             name: "BrowserKitTests",

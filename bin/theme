@@ -1,7 +1,11 @@
 #!/bin/bash
 # grandline:summary=Change the theme (terminal, editor, menus, tools, wallpaper) or background
 # theme pick                    choose a theme from a menu
-# theme set NAME [--no-wallpaper]
+# theme set NAME [--no-wallpaper]   a theme, or a family (harbour, lantern, signal,
+#                               ledger, atlas, paper) in the variant matching the
+#                               current macOS appearance
+# theme mode dark|light|toggle  the other variant of the current family
+#                               (Graphite and Daylight pair up too)
 # theme next-background         cycle through ~/Pictures/Backgrounds
 # theme list
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
@@ -84,8 +88,49 @@ install_theme_outputs() {
   fi
 }
 
+# The macOS appearance now: dark or light.
+system_mode() {
+  if [[ "$(defaults read -g AppleInterfaceStyle 2>/dev/null)" == Dark ]]; then echo dark; else echo light; fi
+}
+
+# resolve_name NAME [MODE]: a theme file's name. A family name (the FAMILY=
+# key, files NAME-dark.theme and NAME-light.theme) becomes the variant for
+# MODE, by default the current macOS appearance.
+resolve_name() {
+  local name="$1" mode="${2:-}"
+  if [[ -f "$THEMES/$name.theme" ]]; then echo "$name"; return 0; fi
+  if [[ -f "$THEMES/$name-dark.theme" || -f "$THEMES/$name-light.theme" ]]; then
+    [[ -n "$mode" ]] || mode="$(system_mode)"
+    if [[ -f "$THEMES/$name-$mode.theme" ]]; then echo "$name-$mode"
+    elif [[ -f "$THEMES/$name-dark.theme" ]]; then echo "$name-dark"
+    else echo "$name-light"; fi
+    return 0
+  fi
+  echo "$name"
+}
+
+# family_of NAME: the FAMILY= of a theme file, or graphite/daylight's pair.
+family_of() {
+  case "$1" in
+    graphite|daylight) echo system; return ;;
+  esac
+  sed -n 's/^FAMILY=//p' "$THEMES/$1.theme" 2>/dev/null | tr -d '"' | head -1
+}
+
+# The list for theme pick and theme list: families first, then every file.
+theme_names() {
+  local f fam seen=" "
+  for f in "$THEMES"/*.theme; do
+    fam="$(sed -n 's/^FAMILY=//p' "$f" | tr -d '"' | head -1)"
+    [[ -n "$fam" && "$seen" != *" $fam "* ]] && { seen="$seen$fam "; echo "$fam"; }
+  done
+  for f in "$THEMES"/*.theme; do basename "$f" .theme; done
+}
+
 apply_theme() {
-  local name="$1" wallpaper="${2:-yes}" file="$THEMES/$1.theme"
+  local name wallpaper="${2:-yes}" file
+  name="$(resolve_name "$1" "${3:-}")"
+  file="$THEMES/$name.theme"
   if [[ ! -f "$file" ]]; then
     echo "No theme called '$name'. Themes: $(cd "$THEMES" && ls ./*.theme | sed -e 's#^\./##' -e 's/\.theme$//' | tr '\n' ' ')" >&2
     return 1
@@ -119,7 +164,7 @@ apply_theme() {
 
 case "${1:-pick}" in
   list)
-    for f in "$THEMES"/*.theme; do basename "$f" .theme; done
+    theme_names
     ;;
   set)
     [[ -n "${2:-}" ]] || { echo "usage: theme set NAME [--no-wallpaper]" >&2; exit 2; }
@@ -127,11 +172,28 @@ case "${1:-pick}" in
     ;;
   pick)
     current="$(cat "$GRAND_LINE_STATE/theme" 2>/dev/null)"
-    choice="$(for f in "$THEMES"/*.theme; do
-                n="$(basename "$f" .theme)"
+    choice="$(theme_names | while IFS= read -r n; do
                 if [[ "$n" == "$current" ]]; then echo "$n (current)"; else echo "$n"; fi
               done | pick)" || exit 0
     [[ -n "$choice" ]] && apply_theme "${choice% (current)}" yes
+    ;;
+  mode)
+    current="$(cat "$GRAND_LINE_STATE/theme" 2>/dev/null)"
+    [[ -n "$current" ]] || current=graphite
+    cur_mode="$(sed -n 's/^MODE=//p' "$THEMES/$current.theme" 2>/dev/null | tr -d '"')"
+    want="${2:-toggle}"
+    if [[ "$want" == toggle ]]; then
+      if [[ "$cur_mode" == dark ]]; then want=light; else want=dark; fi
+    fi
+    [[ "$want" == dark || "$want" == light ]] || { echo "usage: theme mode dark|light|toggle" >&2; exit 2; }
+    family="$(family_of "$current")"
+    case "$family" in
+      "") echo "$current has no $want variant" >&2; exit 1 ;;
+      system) if [[ "$want" == dark ]]; then target=graphite; else target=daylight; fi ;;
+      *) target="$family-$want" ;;
+    esac
+    [[ -f "$THEMES/$target.theme" ]] || { echo "No $want variant of $current" >&2; exit 1; }
+    apply_theme "$target" no
     ;;
   next-background)
     images=()
@@ -150,5 +212,5 @@ case "${1:-pick}" in
     done
     set_wallpaper "$next"
     ;;
-  *) echo "usage: theme pick | set NAME | next-background | list" >&2; exit 2 ;;
+  *) echo "usage: theme pick | set NAME | mode dark|light|toggle | next-background | list" >&2; exit 2 ;;
 esac

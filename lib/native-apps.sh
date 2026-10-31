@@ -6,7 +6,9 @@
 #   product <TAB> app name <TAB> bundle id <TAB> menu-bar only (yes/no)
 # Extra Info.plist keys for a product go in apps/<folder>/Info/<product>.plist
 # (bare <key>/<value> lines), and its icon and other files in
-# apps/<folder>/Resources/<product>/. Dynamic libraries the app loads at run
+# apps/<folder>/Resources/<product>/. The icon is AppIcon.icns, drawn by
+# tools/make-icons.py and named by CFBundleIconFile in the Info fragment; the
+# apps redraw it in the theme's colours when they run (apps/icons). Dynamic libraries the app loads at run
 # time are listed in apps/<folder>/frameworks.tsv (library product <TAB>
 # framework name); each is built and goes in Contents/Frameworks.
 # Needs lib/common.sh (run, ok, warn, move_to_trash).
@@ -30,7 +32,8 @@ build_native_apps() {
 build_app_folder() {
   local dir="$1" stamp product name id agent
   stamp="$GRAND_LINE_STATE/built-$(basename "$dir")"
-  if [[ -f "$stamp" ]] && [[ -z "$(find "$dir" -path "$dir/.build" -prune -o \( -name '*.swift' -o -name '*.[chm]' -o -name '*.tsv' -o -name '*.plist' -o -path '*/Resources/*' \) -newer "$stamp" -print -quit)" ]]; then
+  # apps/icons is a package every app uses, so a change there rebuilds them all.
+  if [[ -f "$stamp" ]] && [[ -z "$(find "$dir" "$REPO_DIR/apps/icons" -path '*/.build' -prune -o \( -name '*.swift' -o -name '*.[chm]' -o -name '*.tsv' -o -name '*.plist' -o -path '*/Resources/*' \) -newer "$stamp" -print -quit 2>/dev/null)" ]]; then
     return 0
   fi
   build_and_install "$dir" || return 1
@@ -85,6 +88,9 @@ install_app_bundle() {
       fi
     done < "$dir/frameworks.tsv"
   fi
+  # A built app is never "downloaded": no quarantine, so macOS runs it from
+  # where it is instead of a translocated copy.
+  have xattr && xattr -cr "$new" 2>/dev/null
   if have codesign && ! codesign --force --sign - "$new" >/dev/null 2>&1; then
     warn "Could not sign $name."; rm -rf "$new"; return 1
   fi

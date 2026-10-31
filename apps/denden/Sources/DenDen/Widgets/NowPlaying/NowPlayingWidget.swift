@@ -16,6 +16,9 @@ final class NowPlayingWidget: ObservableObject, NotchWidget {
     @Published private(set) var state = NowPlayingState()
     @Published private(set) var artwork: NSImage?
     @Published private(set) var appName: String?
+    /// The cover's strongest colour, for the closed notch's bars; nil for a
+    /// grey cover or none.
+    @Published private(set) var artworkTint: RGB?
 
     private var adapter: MediaAdapter?
     private var observers: [NSObjectProtocol] = []
@@ -49,6 +52,8 @@ final class NowPlayingWidget: ObservableObject, NotchWidget {
             artwork = next.artworkBase64
                 .flatMap { Data(base64Encoded: $0, options: .ignoreUnknownCharacters) }
                 .flatMap { NSImage(data: $0) }
+            let tint = artwork.flatMap(Self.coverTint)
+            if tint != artworkTint { artworkTint = tint }
         }
         if next.bundleIdentifier != state.bundleIdentifier {
             appName = next.bundleIdentifier.flatMap(Self.appName(for:))
@@ -78,6 +83,31 @@ final class NowPlayingWidget: ObservableObject, NotchWidget {
             }
             observers.append(token)
         }
+    }
+
+    func shutDown() {
+        adapter?.stop()
+        adapter = nil
+        let center = DistributedNotificationCenter.default()
+        for token in observers { center.removeObserver(token) }
+        observers = []
+    }
+
+    /// The cover drawn small, then its strongest hue (once per track).
+    static func coverTint(_ image: NSImage) -> RGB? {
+        let side = ArtworkTint.sampleSide
+        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let space = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
+        var bytes = [UInt8](repeating: 0, count: side * side * 4)
+        let drawn: Bool = bytes.withUnsafeMutableBytes { buffer in
+            guard let ctx = CGContext(data: buffer.baseAddress, width: side, height: side, bitsPerComponent: 8,
+                                      bytesPerRow: side * 4, space: space,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            ctx.interpolationQuality = .medium
+            ctx.draw(cg, in: CGRect(x: 0, y: 0, width: side, height: side))
+            return true
+        }
+        return drawn ? ArtworkTint.dominant(rgba: bytes) : nil
     }
 
     func send(_ command: MediaCommand) {
@@ -229,24 +259,102 @@ struct ArtworkView: View {
     }
 }
 
-/// The closed notch while music plays: artwork to the left of the camera, a
-/// still playing mark to the right (an animated one would keep the GPU busy).
+/// The closed notch while music plays: the cover in the left wing and
+/// playing bars in the right, each one notch height wide, so the wings read
+/// as part of the notch.
 struct LiveActivityView: View {
     @ObservedObject var model: NowPlayingWidget
     @EnvironmentObject var theme: ThemeStore
+    /// The closed notch's height.
     let height: CGFloat
+    /// The flare at each top corner, which nothing is drawn in.
     let inset: CGFloat
+    let reduceMotion: Bool
 
     var body: some View {
+        let pad = NotchGeometry.wingPadding(collapsedHeight: height)
+        let side = NotchGeometry.wingArtworkSide(collapsedHeight: height)
+        let wing = NotchGeometry.wingWidth(collapsedHeight: height)
+        let tint = ArtworkTint.tint(cover: model.artworkTint, accent: theme.theme.accent).color
         HStack(spacing: 0) {
-            ArtworkView(image: model.artwork, side: max(12, height - 12), radius: 4)
+            CoverThumb(image: model.artwork, side: side)
+                .padding(.leading, pad)
+                .frame(width: wing, height: height, alignment: .leading)
             Spacer(minLength: 0)
-            Image(systemName: "waveform")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(theme.highlight)
+            PlayingBars(playing: model.isPlaying, color: tint, reduceMotion: reduceMotion)
+                .frame(width: side * 0.8, height: side * 0.7)
+                .padding(.trailing, pad)
+                .frame(width: wing, height: height, alignment: .trailing)
         }
         .padding(.horizontal, inset)
         .frame(height: height)
         .help([model.state.title, model.state.artist].compactMap { $0 }.joined(separator: " – "))
+    }
+}
+
+/// The cover in a rounded square (a quarter of its side), filled without
+/// stretching, with a faint inner line so a dark cover still shows on black.
+struct CoverThumb: View {
+    let image: NSImage?
+    let side: CGFloat
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: side * 0.25, style: .continuous)
+        Group {
+            if let image {
+                Image(nsImage: image).resizable().interpolation(.high).aspectRatio(contentMode: .fill)
+            } else {
+                ZStack {
+                    Color.white.opacity(0.12)
+                    Image(systemName: "music.note").font(.system(size: side * 0.5)).foregroundStyle(Color.white.opacity(0.6))
+                }
+            }
+        }
+        .frame(width: side, height: side)
+        .clipShape(shape)
+        .overlay(shape.strokeBorder(Color.white.opacity(0.16), lineWidth: 0.5))
+    }
+}
+
+/// Five thin bars that move while music plays, and rest low when paused.
+/// With Reduce Motion they stay still.
+struct PlayingBars: View {
+    let playing: Bool
+    let color: Color
+    let reduceMotion: Bool
+    static let count = 5
+
+    var body: some View {
+        if playing && !reduceMotion {
+            TimelineView(.animation(minimumInterval: 1.0 / 20, paused: false)) { context in
+                bars(Self.levels(at: context.date.timeIntervalSinceReferenceDate))
+            }
+        } else {
+            bars(playing ? [0.5, 0.8, 0.45, 0.7, 0.5] : Array(repeating: 0.2, count: Self.count))
+        }
+    }
+
+    private func bars(_ levels: [Double]) -> some View {
+        GeometryReader { g in
+            let width = max(1.5, g.size.width / CGFloat(Self.count * 2 - 1))
+            HStack(alignment: .center, spacing: width) {
+                ForEach(0..<Self.count, id: \.self) { i in
+                    Capsule()
+                        .fill(color)
+                        .frame(width: width, height: max(width, g.size.height * CGFloat(levels[i])))
+                }
+            }
+            .frame(width: g.size.width, height: g.size.height)
+        }
+    }
+
+    /// Smooth, uneven heights from a few sine waves, 0.2 to 1.
+    static func levels(at t: Double) -> [Double] {
+        (0..<count).map { i in
+            let d = Double(i)
+            let a = sin(t * (5.3 + d * 1.7) + d * 1.3)
+            let b = sin(t * (2.1 + d * 0.9) + d * 2.1)
+            return 0.2 + 0.8 * abs(a * 0.6 + b * 0.4)
+        }
     }
 }

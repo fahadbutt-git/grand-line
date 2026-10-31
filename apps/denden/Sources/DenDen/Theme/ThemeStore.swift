@@ -1,3 +1,4 @@
+import AppIcon
 import AppKit
 import SwiftUI
 import DenDenKit
@@ -8,6 +9,10 @@ import DenDenKit
 final class ThemeStore: ObservableObject {
     @Published private(set) var theme: Theme = .graphite
     @Published private(set) var issues: [ConfigIssue] = []
+    /// The open panel's surface, chip and line colours (NOTCH_* keys).
+    @Published private(set) var notch = NotchPalette(fields: [:], theme: .graphite)
+    /// The app icon's colours, applied when they change.
+    private var iconTheme: IconTheme?
 
     private let paths: DenDenPaths
     private var watcher: FileWatcher?
@@ -25,6 +30,17 @@ final class ThemeStore: ObservableObject {
         let (loaded, problems) = ThemeLoader.load(paths: paths)
         if loaded != theme { theme = loaded }
         if problems != issues { issues = problems }
+        // The keys Den Den's Theme does not hold: the panel's own colours and the icon's.
+        let file = paths.themeFile(named: ThemeLoader.currentName(paths: paths))
+        let fields = (try? String(contentsOf: file, encoding: .utf8)).map(ThemeLoader.fields) ?? [:]
+        let palette = NotchPalette(fields: fields, theme: loaded)
+        if palette != notch { notch = palette }
+        // Without a file (a built-in theme) the icon keeps the bundled colours.
+        let icon = fields.isEmpty ? IconTheme.bundled : IconTheme(values: fields)
+        if icon != iconTheme {
+            iconTheme = icon
+            AppIconInstaller.apply(.denDen, theme: icon)
+        }
     }
 
     // Shorthands for views.
@@ -35,6 +51,12 @@ final class ThemeStore: ObservableObject {
     var selection: Color { theme.selection.color }
     var raised: Color { theme.backgroundLighter.color }
     var hairline: Color { theme.selection.color }
+    /// The open panel below the camera band.
+    var panel: Color { notch.panel.color }
+    /// Chips and raised things in the open panel.
+    var card: Color { notch.card.color }
+    /// Dividers between the panel's columns.
+    var line: Color { notch.line.color }
     var colorScheme: ColorScheme { theme.mode == .light ? .light : .dark }
 
     func color(_ c: WidgetColor?) -> Color? {

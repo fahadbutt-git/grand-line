@@ -11,7 +11,12 @@ import DenDenKit
 /// widget and none at all while the panel is closed.
 @MainActor
 final class UserWidgets: ObservableObject {
+    /// The widgets the panel shows: those turned on, in the panel's order.
     @Published private(set) var widgets: [WidgetConfig] = []
+    /// Every widget file that loads, for the Settings window.
+    @Published private(set) var available: [WidgetConfig] = []
+    /// Files that say `enabled = false`.
+    @Published private(set) var disabledInFile: [WidgetConfig] = []
     @Published private(set) var displays: [String: WidgetDisplay] = [:]
     @Published private(set) var running: Set<String> = []
     @Published private(set) var issues: [ConfigIssue] = []
@@ -22,6 +27,8 @@ final class UserWidgets: ObservableObject {
     private let pool = CommandPool(maxConcurrent: 4)
     private var watcher: FileWatcher?
     private var timer: Timer?
+    /// The panel's names, in order (`PanelLayout.enabled`).
+    private var selection: [String] = []
 
     init(paths: DenDenPaths, theme: ThemeStore) {
         self.paths = paths
@@ -35,13 +42,28 @@ final class UserWidgets: ObservableObject {
     func reload() {
         let result = WidgetLoader.load(from: paths.widgetsFolder)
         Log.issues(result.issues, context: "widgets")
-        let changed = Set(result.widgets.filter { new in !widgets.contains(new) }.map(\.id))
-        widgets = result.widgets
+        available = result.widgets
+        disabledInFile = result.disabled
         issues = result.issues
-        scheduler.setWidgets(result.widgets.map { (id: $0.id, policy: $0.refresh) })
+        applySelection()
+    }
+
+    /// Shows the widgets named in `names` (the panel's whole list), in its order.
+    func show(_ names: [String]) {
+        guard names != selection else { return }
+        selection = names
+        applySelection()
+    }
+
+    private func applySelection() {
+        let ids = PanelLayout(enabled: selection).widgets(available: available.map(\.id))
+        let shown = ids.compactMap { id in available.first { $0.id == id } }
+        let changed = Set(shown.filter { new in !widgets.contains(new) }.map(\.id))
+        if shown != widgets { widgets = shown }
+        scheduler.setWidgets(shown.map { (id: $0.id, policy: $0.refresh) })
         for id in changed { scheduler.invalidate(id) }
-        let ids = Set(result.widgets.map(\.id))
-        displays = displays.filter { ids.contains($0.key) }
+        let kept = Set(shown.map(\.id))
+        displays = displays.filter { kept.contains($0.key) }
         if scheduler.isOpen { runDue(scheduler.due(at: Date()) + changed.filter { !runsOnInterval($0) }) }
     }
 
@@ -184,6 +206,8 @@ private struct UserWidgetChip: View {
 
     var body: some View {
         let tint = theme.color(display?.color)
+        let shown = display.map { ChipText.shown($0.text) }
+        let quiet = display?.failed == true || shown?.needsSetup == true
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: Self.symbol(display?.icon ?? widget.icon))
@@ -196,9 +220,9 @@ private struct UserWidgetChip: View {
                     .lineLimit(1)
                     .layoutPriority(0)
                 Spacer(minLength: 4)
-                Text(display?.text ?? (busy ? "…" : ""))
+                Text(shown?.text ?? (busy ? "…" : ""))
                     .font(.system(size: 13).monospacedDigit())
-                    .foregroundStyle(display?.failed == true ? theme.muted : (tint ?? theme.foreground))
+                    .foregroundStyle(quiet ? theme.muted : (tint ?? theme.foreground))
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .layoutPriority(1)
@@ -207,7 +231,7 @@ private struct UserWidgetChip: View {
             .frame(height: NotchMetrics.chipHeight)
             .background(
                 RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(hovering ? theme.selection : theme.raised)
+                    .fill(hovering ? theme.selection : theme.card)
             )
             .contentShape(Rectangle())
         }
@@ -218,7 +242,10 @@ private struct UserWidgetChip: View {
 
     var helpText: String {
         var parts = [widget.title]
-        if let d = display { parts.append(d.text) }
+        if let d = display {
+            parts.append(d.text)
+            if ChipText.shown(d.text).needsSetup { parts.append("See the widget's file for what it needs") }
+        }
         if widget.click != nil { parts.append("Click to run its action") }
         return parts.joined(separator: "\n")
     }

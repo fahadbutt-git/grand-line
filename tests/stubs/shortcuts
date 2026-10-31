@@ -1,0 +1,5 @@
+#!/bin/bash
+# Test stub: the shortcuts named in SHORTCUTS_LIST (one per line) exist.
+echo "shortcuts $*" >> "${STUB_LOG:-/dev/null}"
+[[ "${1:-}" == list ]] && printf '%s\n' "${SHORTCUTS_LIST:-}"
+exit 0

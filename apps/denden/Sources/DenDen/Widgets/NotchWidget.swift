@@ -15,6 +15,9 @@ struct WidgetContext {
     let theme: ThemeStore
     let events: SharedEventStore
     let settings: DenDenSettings
+    /// Call when `isAvailable` changes (a permission granted or taken
+    /// away), so the panel adds or drops the widget.
+    let availabilityChanged: @MainActor () -> Void
 }
 
 /// A built-in widget: one small module in `Widgets/`, listed once in
@@ -24,19 +27,23 @@ struct WidgetContext {
 protocol NotchWidget: AnyObject {
     var id: String { get }
     var placement: WidgetPlacement { get }
-    /// False hides the widget (Battery on a Mac without one).
+    /// False hides the widget (Battery on a Mac without one, Today when
+    /// Calendars access was turned down).
     var isAvailable: Bool { get }
     func makeView() -> AnyView
     /// The panel is about to open: refresh anything stale.
     func panelWillOpen()
     /// Every panel is closed: stop anything that only matters while open.
     func panelDidClose()
+    /// Turned off in Settings: stop everything; the widget is let go.
+    func shutDown()
 }
 
 extension NotchWidget {
     var isAvailable: Bool { true }
     func panelWillOpen() {}
     func panelDidClose() {}
+    func shutDown() {}
 }
 
 /// The small caption above a section ("Today"), 11 pt and muted.

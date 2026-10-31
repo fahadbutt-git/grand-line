@@ -1,3 +1,4 @@
+import AppIcon
 import AppKit
 import SwiftUI
 import ThemeKit
@@ -23,10 +24,19 @@ final class ThemeStore: ObservableObject {
     }
 
     private func apply(_ theme: Theme) {
+        let iconChanged = iconTheme != theme.icon
         self.theme = theme
         let appearance = NSAppearance(named: theme.appearanceName)
         NSApp.appearance = appearance
+        if iconChanged {
+            iconTheme = theme.icon
+            AppIconInstaller.apply(.logPose, theme: theme.icon)
+        }
     }
+
+    /// The icon colours last applied, so a theme change that leaves them
+    /// alone does not redraw the icon.
+    private var iconTheme: IconTheme?
 
     var palette: Palette { Palette(theme) }
 }

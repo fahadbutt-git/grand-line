@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 import DenDenKit
@@ -6,8 +7,10 @@ import DenDenKit
 @MainActor
 final class NotchModel: ObservableObject {
     @Published var isOpen = false
-    /// Artwork beside the closed notch while music plays.
+    /// Artwork and playing bars beside the closed notch.
     @Published var showsLiveActivity = false
+    /// System Settings, Accessibility, Display, Reduce motion.
+    @Published var reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     @Published private(set) var screen: ScreenInfo
     @Published private(set) var style: PanelStyle
     @Published private(set) var content = PanelContent(sections: 0, userWidgets: 0)

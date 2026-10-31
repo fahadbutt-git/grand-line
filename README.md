@@ -23,7 +23,9 @@ The first run copies the package to `~/grand-line`. That copy is the one to edit
 | --- | --- |
 | `update` | Updates every app, tool and this package, then runs any one-time changes and your post-update hook. One run at a time, the Mac stays awake, and the whole run is saved to `~/Library/Logs/grand-line/update-<date>.log`. It also records what was installed before (`~/.local/state/grand-line/brew-before-update.Brewfile`) and says when Karabiner-Elements or AeroSpace need a restart. `update --window` runs it in its own terminal window |
 | `keybindings --print` | Prints every shortcut |
-| `theme pick` | Changes theme (Graphite, Nord, Forest, Daylight): terminal, editor, menus, tmux, btop, lazygit, Claude Code, accent and wallpaper together. Rules in `DESIGN.md` |
+| `theme pick` | Changes theme (Graphite, Daylight, Nord, Forest, and the Harbour, Lantern, Signal, Ledger, Atlas and Paper families, each dark and light): terminal, editor, menus, tmux, btop, lazygit, Claude Code, the apps and their icons, accent and wallpaper together. Rules in `DESIGN.md` |
+| `theme set harbour` | A family in the variant that matches the current macOS appearance (`theme set harbour-light` names one) |
+| `theme mode toggle` | The other variant of the current family (Graphite and Daylight pair up too). `toggle dark` does this when the theme has a pair |
 | `grandline commands` | Lists every command in the package with what it does |
 | `migrate --pending` | Lists the one-time changes an update has not run yet (`migrate` runs them) |
 | `app install`, `app remove` | Installs or removes an app and updates the Brewfile to match (also in the menu) |
@@ -206,7 +208,9 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 
 ## The package's own apps
 
-Log Pose (files), Byakugan (search) and Den Den (the notch) are built on this Mac from `apps/`, by the native-tools step, and installed in `/Applications`. Each app folder is a Swift package with an `apps.tsv` that names what it makes (product, app name, bundle id, and whether it lives in the menu bar only). Setup rebuilds an app only when its sources change, and the old copy goes to the Trash.
+Log Pose (files), Byakugan (search) and Den Den (the notch) are built on this Mac from `apps/`, by the native-tools step, and installed in `/Applications`. Each app folder is a Swift package with an `apps.tsv` that names what it makes (product, app name, bundle id, and whether it lives in the menu bar only). Setup rebuilds an app only when its sources change (or the shared `apps/icons` package does), and the old copy goes to the Trash.
+
+Each app draws its icon in the theme's colours when it starts and whenever the theme changes (the `ICON_*` keys in `DESIGN.md`), for the Dock and for Finder. The bundles also carry a fixed `AppIcon.icns` in Graphite's colours, drawn by `python3 tools/make-icons.py` from the same glyph table (`apps/icons/Sources/AppIcon/Glyphs.swift`), so an app has an icon before it first runs. After changing a glyph, run the script and commit the `.icns` files; `tests/run-all.sh` checks they are sound.
 
 Once installed, Log Pose opens folders and every "Show in Finder", and Byakugan answers Command + Space (so Caps + Space too). Both switch back from the Toggle menu, or with `toggle files` and `toggle search`, and the choice is kept across updates.
 
@@ -220,7 +224,7 @@ Once installed, Log Pose opens folders and every "Show in Finder", and Byakugan 
 | A shortcut | Add a line to `BINDINGS` in `tools/bindings.py`, run `python3 tools/bindings.py`, then `--only dotfiles` |
 | A menu entry | Add a line to `config/grand-line/menu.tsv`. It works at once. A third column `?test` shows it only when the test succeeds, a fourth `✓test` gives it a check mark (helpers in `lib/toggle-state.sh`) |
 | A command | Add an executable script to `bin/` with a `# grandline:summary=` line under the first. It is on the PATH at once, and `grandline commands` and Byakugan list it. Arguments Byakugan should ask for go in `# grandline:arg1=` lines (up to three), as `{"type":"text"\|"dropdown","placeholder":"…","data":[…],"optional":true}` |
-| A theme | Add `config/themes/name.theme` (copy an existing one), its image to `backgrounds/`, and a `Style/` line to `config/grand-line/menu.tsv` with `✓theme_is name` |
+| A theme | Add `config/themes/name.theme` (copy an existing one), its image to `backgrounds/`, and a `Style/` line to `config/grand-line/menu.tsv` with `✓theme_is name`. For a dark and light pair, name the files `name-dark.theme` and `name-light.theme` with `FAMILY=name` in both |
 | An app that takes theme colours | Add `config/themed/<file>.tpl` with `{{ KEY }}` placeholders, then have `bin/theme` put the rendered file where the app reads it |
 | A one-time change for Macs already set up | Add `migrations/<unix time>-<what>.sh` (`date +%s` gives the time). `update` runs it once on each Mac |
 | An R package | Add a line to `config/grand-line/r-packages.txt`, then `--only r-packages` |
@@ -303,7 +307,7 @@ config/             aerospace, karabiner, ghostty, tmux, zsh, starship, nvim, gi
                     and grand-line (menus, rules, data files, hook samples)
 backgrounds/        theme wallpapers
 migrations/         one-time changes for Macs already set up (bin/migrate)
-tools/              shortcut generator and native helpers (Swift)
+tools/              shortcut generator, app icon drawer and native helpers (Swift)
 DESIGN.md           the type, colour and layout rules every part follows
 tests/              checks, dry run, VM rehearsal, post-install verification
 .github/workflows/  the GitHub test runs

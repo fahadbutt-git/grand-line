@@ -24,9 +24,18 @@ public struct DenDenSettings: Equatable, Sendable {
     public var closeDelay: TimeInterval = 0.35
     /// Artwork and a playing mark beside the closed notch while music plays.
     public var liveActivity = true
+    /// The older way to choose built-in widgets; `panel` replaces it.
     public var builtin: [String] = DenDenSettings.builtinWidgets
+    /// True when the file sets `builtin`, so a file from before `panel`
+    /// keeps the widgets it chose.
+    public var builtinIsSet = false
+    /// What the panel shows, in order: built-in sections by name and script
+    /// widgets by file name. Nil when the file does not say (see `PanelLayout`).
+    public var panel: [String]?
     /// Opens Den Den when you log in (macOS Login Items).
     public var launchAtLogin = true
+    /// A Den Den item in the menu bar, with Settings and the panel's menu.
+    public var menuBarIcon = true
 
     public init() {}
 
@@ -65,6 +74,15 @@ public struct DenDenSettings: Equatable, Sendable {
                 settings.liveActivity = b
             case ("launch_at_login", .bool(let b)):
                 settings.launchAtLogin = b
+            case ("menu_bar_icon", .bool(let b)):
+                settings.menuBarIcon = b
+            case ("panel", .array(let items)):
+                var list: [String] = []
+                for item in items {
+                    guard case .string(let name) = item, !name.isEmpty else { warn("panel lists names in quotes"); continue }
+                    if !list.contains(name) { list.append(name) }
+                }
+                settings.panel = list
             case ("builtin", .array(let items)):
                 var list: [String] = []
                 for item in items {
@@ -73,6 +91,7 @@ public struct DenDenSettings: Equatable, Sendable {
                     else { warn("\"\(name)\" is not a built-in widget (\(builtinWidgets.joined(separator: ", ")))") }
                 }
                 settings.builtin = list
+                settings.builtinIsSet = true
             default:
                 warn("unknown or mistyped setting \"\(key)\" is ignored")
             }

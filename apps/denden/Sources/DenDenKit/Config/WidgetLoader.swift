@@ -6,6 +6,8 @@ public enum WidgetLoader {
     public struct Result: Sendable {
         public var widgets: [WidgetConfig]
         public var issues: [ConfigIssue]
+        /// Files that load but say `enabled = false`, for the Settings window.
+        public var disabled: [WidgetConfig] = []
     }
 
     /// Files larger than this are refused (a widget file is a few lines).
@@ -26,6 +28,7 @@ public enum WidgetLoader {
         }
 
         var widgets: [WidgetConfig] = []
+        var disabled: [WidgetConfig] = []
         var issues: [ConfigIssue] = []
         var seen: [String: String] = [:]
         let files = names
@@ -57,13 +60,13 @@ public enum WidgetLoader {
             issues += fileIssues
             if let config {
                 seen[id] = name
-                if config.enabled { widgets.append(config) }
+                if config.enabled { widgets.append(config) } else { disabled.append(config) }
             }
         }
         // Stable: by `order`, then by file name (the order they were read in).
         let indexed = widgets.enumerated().sorted { a, b in
             a.element.order != b.element.order ? a.element.order < b.element.order : a.offset < b.offset
         }
-        return Result(widgets: indexed.map(\.element), issues: issues)
+        return Result(widgets: indexed.map(\.element), issues: issues, disabled: disabled)
     }
 }

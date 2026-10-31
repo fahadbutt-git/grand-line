@@ -98,6 +98,19 @@ check "every package command used by menus and shortcuts exists in bin/" bash -c
 check "default-apps.tsv: three tab-separated fields per entry" bash -c \
   "grep -v '^#' config/grand-line/default-apps.tsv | awk -F'\t' 'NF != 3 { print NR\": \"\$0; bad=1 } END { exit bad }'"
 
+check "every app names an icon in its Info fragment, and the icon is in its Resources" bash -c '
+  bad=0
+  for list in apps/*/apps.tsv; do
+    dir="${list%/apps.tsv}"
+    while IFS=$'"'"'\t'"'"' read -r product _; do
+      [[ -z "$product" || "$product" == \#* ]] && continue
+      icon="$(sed -n "s#.*<key>CFBundleIconFile</key><string>\([^<]*\)</string>.*#\1#p" "$dir/Info/$product.plist" 2>/dev/null)"
+      [[ -n "$icon" ]] || { echo "$dir/Info/$product.plist: no CFBundleIconFile"; bad=1; continue; }
+      [[ -f "$dir/Resources/$product/$icon.icns" ]] || { echo "$dir/Resources/$product/$icon.icns missing"; bad=1; }
+    done < "$list"
+  done; exit $bad'
+check "app icons: the glyph table parses and every AppIcon.icns is sound (tools/make-icons.py --check)" python3 tools/make-icons.py --check
+
 check "every native helper has a matching source file" bash -c '
   bad=0
   for name in $(grep -ohE "GRAND_LINE_BUILD/[a-z]+|pdfshrink|\bocr\b" bin/* lib/*.sh | sed "s#.*/##" | sort -u); do
@@ -108,9 +121,21 @@ check "every native helper has a matching source file" bash -c '
 check "every theme has its background and all fields" bash -c '
   bad=0
   for t in config/themes/*.theme; do
-    for k in LABEL MODE ACCENT ACCENT_HEX BACKGROUND TERM_BG TERM_FG TERM_CURSOR TERM_SELECTION MUTED BG_LIGHTER BG_DARKER PALETTE HIGHLIGHT NVIM; do
+    for k in LABEL MODE ACCENT ACCENT_HEX BACKGROUND TERM_BG TERM_FG TERM_CURSOR TERM_SELECTION MUTED BG_LIGHTER BG_DARKER PALETTE HIGHLIGHT NVIM \
+             ICON_STYLE KIND_STYLE KIND_FOLDER KIND_DOCUMENT KIND_PDF KIND_PRESENTATION KIND_SPREADSHEET KIND_IMAGE KIND_VIDEO KIND_CODE KIND_ARCHIVE KIND_TEXT; do
       grep -q "^$k=" "$t" || { echo "$t: no $k"; bad=1; }
     done
+    grep -qE "^ICON_STYLE=(line|solid|mono)$" "$t" || { echo "$t: ICON_STYLE must be line, solid or mono"; bad=1; }
+    grep -qE "^KIND_STYLE=(tag|dot|solid|text)$" "$t" || { echo "$t: KIND_STYLE must be tag, dot, solid or text"; bad=1; }
+    for k in $(grep -oE "^(TERM_[A-Z]+|ACCENT_HEX|MUTED|BG_[A-Z]+|HIGHLIGHT|SIDEBAR|FIELD|LINE|NOTCH_[A-Z]+|ICON_(TILE|INK|ACCENT|SOFT|FILES|SEARCH|NOTCH)|KIND_[A-Z]+)=" "$t" | tr -d =); do
+      [[ "$k" == KIND_STYLE ]] && continue
+      grep -qE "^$k=[0-9a-fA-F]{6}$" "$t" || { echo "$t: $k is not a six-digit hex colour"; bad=1; }
+    done
+    fam=$(sed -n "s/^FAMILY=//p" "$t")
+    if [[ -n "$fam" ]]; then
+      [[ "${t##*/}" == "$fam-dark.theme" || "${t##*/}" == "$fam-light.theme" ]] || { echo "$t: FAMILY=$fam needs the file named $fam-dark or $fam-light"; bad=1; }
+      [[ -f "config/themes/$fam-dark.theme" && -f "config/themes/$fam-light.theme" ]] || { echo "$t: family $fam needs both a dark and a light file"; bad=1; }
+    fi
     [[ "$(sed -n "s/^PALETTE=//p" "$t" | tr -d \" | wc -w | tr -d " ")" == 16 ]] || { echo "$t: PALETTE needs 16 colours"; bad=1; }
     nv=$(sed -n "s/^NVIM=//p" "$t")
     grep -q "\"$nv\"" config/nvim/lua/plugins/theme.lua || { echo "$t: Neovim scheme $nv missing from config/nvim/lua/plugins/theme.lua"; bad=1; }

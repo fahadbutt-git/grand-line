@@ -11,3 +11,4 @@
     <key>CFBundleURLSchemes</key><array><string>denden</string></array>
   </dict>
 </array>
+<key>CFBundleIconFile</key><string>AppIcon</string>

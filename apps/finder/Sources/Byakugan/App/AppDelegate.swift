@@ -57,7 +57,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// macOS applies the switch from Spotlight's shortcut at the next login.
+    /// Shown once, after launch has finished, so whatever started the app
+    /// (setup, login) never waits on the dialog.
     private func explainBusyShortcut() {
+        let key = "ExplainedBusyShortcut"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        DispatchQueue.main.async { Self.showBusyShortcutAlert() }
+    }
+
+    private static func showBusyShortcutAlert() {
         let alert = NSAlert()
         alert.messageText = "Command + Space still opens Spotlight"
         alert.informativeText = "Restart the Mac or log out and in once, and Command + Space opens Byakugan. Its menu bar icon opens it until then."

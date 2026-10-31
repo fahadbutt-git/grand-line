@@ -42,8 +42,15 @@ takeover_search() {
   defaults write "$BYAKUGAN_ID" TakesCommandSpace -bool "$takes"
   # Byakugan reads the setting when it starts, so restart it.
   pkill -x Byakugan 2>/dev/null
-  open -g -b "$BYAKUGAN_ID" 2>/dev/null
+  launch_quietly "$BYAKUGAN_ID"
   mkdir -p "$GRAND_LINE_STATE" && printf '%s\n' "$1" > "$GRAND_LINE_STATE/takeover-search"
+}
+
+# launch_quietly ID: start an app in the background without waiting for it.
+# `open` waits until the app has finished launching, so an app showing a
+# dialog at launch would otherwise hold up setup for good.
+launch_quietly() {
+  open -g -b "$1" </dev/null >/dev/null 2>&1 &
 }
 
 # app_runs ID PROCESS: start the app in the background and check it is still
@@ -51,7 +58,7 @@ takeover_search() {
 # cannot open them.
 app_runs() {
   pgrep -x "$2" >/dev/null 2>&1 && return 0
-  open -g -b "$1" 2>/dev/null || return 1
+  launch_quietly "$1"
   local _
   for _ in 1 2 3 4 5; do sleep 1; pgrep -x "$2" >/dev/null 2>&1 && return 0; done
   return 1

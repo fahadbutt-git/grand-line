@@ -16,11 +16,15 @@ let package = Package(
         .library(name: "DenDenKit", targets: ["DenDenKit"]),
         .library(name: "MediaRemoteAdapter", type: .dynamic, targets: ["MediaRemoteAdapter"]),
     ],
+    dependencies: [
+        // The app icons, shared with Log Pose and Byakugan.
+        .package(path: "../icons"),
+    ],
     targets: [
         .target(name: "DenDenKit"),
         .executableTarget(
             name: "DenDen",
-            dependencies: ["DenDenKit"],
+            dependencies: ["DenDenKit", .product(name: "AppIcon", package: "icons")],
             linkerSettings: [
                 .linkedFramework("AppKit"),
                 .linkedFramework("SwiftUI"),

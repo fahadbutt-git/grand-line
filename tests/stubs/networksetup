@@ -1,0 +1,8 @@
+#!/bin/bash
+# Test stub: one Wi-Fi port, en0, whose power is WIFI_POWER (On or Off).
+echo "networksetup $*" >> "${STUB_LOG:-/dev/null}"
+case "${1:-}" in
+  -listallhardwareports) printf 'Hardware Port: Wi-Fi\nDevice: en0\nEthernet Address: 00:00:00:00:00:00\n' ;;
+  -getairportpower) echo "Wi-Fi Power (${2:-en0}): ${WIFI_POWER:-On}" ;;
+esac
+exit 0

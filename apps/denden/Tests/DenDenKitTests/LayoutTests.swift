@@ -33,7 +33,10 @@ final class LayoutTests: XCTestCase {
         XCTAssertEqual(plain, CGSize(width: 185 + 2 * NotchMetrics.collapsedTopRadius, height: 32))
         let live = NotchGeometry.collapsedPanelSize(of: builtin, liveActivity: true)
         XCTAssertEqual(live.width - plain.width, 2 * NotchGeometry.wingWidth(collapsedHeight: 32))
-        XCTAssertEqual(NotchGeometry.wingWidth(collapsedHeight: 32), 38)
+        // About one notch height each side, and the artwork fits with equal padding.
+        XCTAssertEqual(NotchGeometry.wingWidth(collapsedHeight: 32), 32)
+        let pad = NotchGeometry.wingPadding(collapsedHeight: 32)
+        XCTAssertEqual(NotchGeometry.wingArtworkSide(collapsedHeight: 32) + 2 * pad, 32)
     }
 
     func testCollapsedFrameSitsOverTheNotch() {

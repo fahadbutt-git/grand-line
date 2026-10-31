@@ -1,7 +1,7 @@
 import AppKit
 
-/// Den Den, the notch app of Grand Line. It has no Dock icon and no menu bar
-/// item (LSUIElement): right-click the notch for its menu.
+/// Den Den, the notch app of Grand Line. It has no Dock icon (LSUIElement):
+/// its menu bar item, or a right-click on the notch, has its menu and Settings.
 @main
 enum DenDenApp {
     @MainActor

@@ -8,3 +8,4 @@
   </dict>
 </array>
 <key>NSAppleEventsUsageDescription</key><string>Log Pose asks Finder to empty the Trash when you choose Empty Trash.</string>
+<key>CFBundleIconFile</key><string>AppIcon</string>

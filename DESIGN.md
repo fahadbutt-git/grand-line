@@ -22,6 +22,31 @@ Apple's own type for every letter and number. The one exception is a few termina
 - Apps built for the package read the theme from `~/.local/state/grand-line/theme` (the theme's name) and the theme file, and follow light or dark mode from it.
 - Text keeps at least 4.5:1 contrast against its background in every theme, including Daylight, where every terminal colour reads at 4.5:1 on white (the tests check it).
 
+### Theme keys
+
+Every theme file holds the keys below (the tests check them). A key marked optional may be left out, and the apps then use what it falls back to, so a theme written before a key existed still works.
+
+| Key | Meaning |
+| --- | --- |
+| `LABEL`, `MODE` | The name shown in menus, and `dark` or `light` |
+| `FAMILY` | Optional. The family a dark and light pair belongs to, in files named `FAMILY-dark.theme` and `FAMILY-light.theme`. `theme set FAMILY` picks the variant for the current macOS appearance, and `theme mode toggle` switches between them (Graphite and Daylight pair up without it) |
+| `ACCENT` | The macOS accent colour number (-1 graphite, 0 red, 1 orange, 2 yellow, 3 green, 4 blue, 5 purple, 6 pink) |
+| `BACKGROUND`, `NVIM` | The wallpaper in `backgrounds/` and the Neovim scheme |
+| `TERM_BG`, `TERM_FG`, `TERM_SELECTION`, `TERM_CURSOR` | Surface, text, selected row and cursor, for every surface |
+| `PALETTE` | The 16 terminal colours |
+| `ACCENT_HEX`, `HIGHLIGHT`, `MUTED` | The accent as a colour, matches and the focused item, secondary text |
+| `BG_LIGHTER`, `BG_DARKER` | Raised surfaces (cards, chips) and sunken ones (the desk behind windows) |
+| `SIDEBAR`, `FIELD`, `LINE` | Optional. The sidebar, text fields and dividers. Missing: `BG_LIGHTER`, then colours mixed from the surface and text |
+| `NOTCH_PANEL`, `NOTCH_CARD`, `NOTCH_LINE` | Optional. Den Den's open panel, its chips and its column dividers. Missing: `TERM_BG`, then `FIELD` or `BG_LIGHTER`, then `LINE`. The part of the panel under the camera, and the closed notch, are always black so they meet the hardware |
+| `KIND_STYLE` | How Log Pose and Byakugan mark a file's kind: `tag` (a tinted tag with the extension), `dot`, `solid` (a filled tag) or `text` (the kind's name in its colour) |
+| `KIND_FOLDER`, `KIND_DOCUMENT`, `KIND_PDF`, `KIND_PRESENTATION`, `KIND_SPREADSHEET`, `KIND_IMAGE`, `KIND_VIDEO`, `KIND_CODE`, `KIND_ARCHIVE`, `KIND_TEXT` | The colour of each kind. Missing: the accent and terminal colours |
+| `ICON_STYLE` | The app icons: `line` (a dark tile, a light glyph and the app's colour as its hot point), `solid` (the app's colour as the tile, a dark glyph) or `mono` (a black tile, the glyph in the app's colour). Missing: `line` |
+| `ICON_TILE`, `ICON_INK` | Optional. The tile (line and mono) and the glyph (line and solid). Missing: a dark tile (the theme's surface when it is dark) and light ink; mono is black, solid ink is near black |
+| `ICON_ACCENT`, `ICON_SOFT` | Optional. Every app's colour, and the quiet fills (the sea, the iceberg under water). Missing: `ACCENT_HEX`, then `HIGHLIGHT`; soft is the tile with a quarter of the accent |
+| `ICON_FILES`, `ICON_SEARCH`, `ICON_NOTCH` | Optional. One app's own colour: the file browser (Log Pose), search (Byakugan, also the warm tone of its eye) and the notch app (Den Den). Missing: `ICON_ACCENT` |
+
+The icons are original, generic glyphs drawn from one table (`apps/icons`): a sailing ship for the file browser, the back of an eye (optic disc, vessels arching around the macula) for search, and an iceberg for the notch app. They sit on Apple's icon grid (an 824 point tile on a 1024 canvas, corners of 185), use no gradients or shadows, and leave fine detail out at 16 and 32 pixels.
+
 ## Shape and density
 
 - Dense and calm, like the search window: compact rows, hairline dividers, no gradients, no drop shadows beyond the window's own, no emoji.
@@ -30,4 +55,4 @@ Apple's own type for every letter and number. The one exception is a few termina
 
 ## Adding a theme
 
-Copy an existing `.theme` file, fill in every field (the tests check all of them), add its wallpaper to `backgrounds/`, and add its Neovim scheme to `config/nvim/lua/plugins/theme.lua` if it is not one already there (vscode.nvim covers both a dark and a light theme, through `MODE`). `theme pick` then restyles the terminal, editor, menus, wallpaper, accent colour and the package's own apps together.
+Copy an existing `.theme` file, fill in every field (the tests check all of them, and that every colour is a six-digit hex value), add its wallpaper to `backgrounds/`, and add its Neovim scheme to `config/nvim/lua/plugins/theme.lua` if it is not one already there (vscode.nvim covers both a dark and a light theme, through `MODE`). `theme pick` then restyles the terminal, editor, menus, wallpaper, accent colour and the package's own apps together.

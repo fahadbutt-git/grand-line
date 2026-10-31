@@ -1,0 +1,5 @@
+#!/bin/bash
+# Test stub: Bluetooth power is BLUEUTIL_POWER (1 or 0).
+echo "blueutil $*" >> "${STUB_LOG:-/dev/null}"
+[[ "$*" == "-p" ]] && echo "${BLUEUTIL_POWER:-1}"
+exit 0

@@ -3,7 +3,7 @@ import SwiftUI
 import DenDenKit
 
 /// The whole panel: the closed notch (black, to match the camera housing,
-/// or a themed pill on other displays) growing into the open panel, whose
+/// or a black pill on other displays) growing into the open panel, whose
 /// colours all come from the theme.
 struct NotchRootView: View {
     @ObservedObject var model: NotchModel
@@ -13,21 +13,23 @@ struct NotchRootView: View {
     var body: some View {
         let open = model.isOpen
         let size = model.currentSize
-        let top = open ? NotchMetrics.expandedTopRadius : NotchMetrics.collapsedTopRadius
-        let bottom = open ? NotchMetrics.expandedBottomRadius : NotchMetrics.collapsedBottomRadius
+        let pill = model.style == .pill
+        let top = open ? NotchMetrics.expandedTopRadius : (pill ? 0 : NotchMetrics.collapsedTopRadius)
+        let bottom = open ? NotchMetrics.expandedBottomRadius : (pill ? size.height / 2 : NotchMetrics.collapsedBottomRadius)
         let shape = NotchShape(topRadius: top, bottomRadius: bottom)
 
         ZStack(alignment: .top) {
-            shape.fill(fill(open: open))
-            if open || model.style == .pill {
-                shape.stroke(theme.hairline, lineWidth: 0.5)
+            surface(open: open)
+            if open {
+                shape.stroke(theme.line, lineWidth: 0.5)
             }
             Group {
                 if open {
                     ExpandedPanel(model: model, host: host, user: host.user)
                         .transition(.opacity.animation(.easeOut(duration: 0.14).delay(0.06)))
                 } else if model.showsLiveActivity, let nowPlaying = host.nowPlaying {
-                    LiveActivityView(model: nowPlaying, height: model.bandHeight, inset: top + 6)
+                    LiveActivityView(model: nowPlaying, height: model.bandHeight,
+                                     inset: pill ? 0 : NotchMetrics.collapsedTopRadius, reduceMotion: model.reduceMotion)
                         .transition(.opacity)
                 }
             }
@@ -43,9 +45,20 @@ struct NotchRootView: View {
         .preferredColorScheme(theme.colorScheme)
     }
 
-    private func fill(open: Bool) -> Color {
-        if open { return theme.background }
-        return model.style == .notch ? .black : theme.raised
+    /// Closed, all black like the camera housing (the pill too, so the
+    /// wings look the same everywhere). Open, the theme's panel fades in over
+    /// it, and only the piece under the camera stays black.
+    private func surface(open: Bool) -> some View {
+        ZStack(alignment: .top) {
+            Color.black
+            theme.panel.opacity(open ? 1 : 0)
+            if model.style == .notch {
+                NotchShape(topRadius: 0, bottomRadius: NotchMetrics.collapsedBottomRadius)
+                    .fill(Color.black)
+                    .frame(width: model.cameraWidth, height: model.bandHeight)
+                    .opacity(open ? 1 : 0)
+            }
+        }
     }
 }
 
@@ -53,6 +66,8 @@ struct NotchRootView: View {
 struct PanelMenu: View {
     let host: PanelHost
     var body: some View {
+        Button("Settings…") { host.openSettings?() }
+        Divider()
         Button("Reload widgets and theme") { host.reloadEverything() }
         Button("Open widgets folder") { host.user.openFolder() }
         Button("Open the log") { NSWorkspace.shared.open(Log.file) }
@@ -79,7 +94,7 @@ struct ExpandedPanel: View {
                 HStack(alignment: .top, spacing: 0) {
                     ForEach(Array(sections.enumerated()), id: \.offset) { index, widget in
                         if index > 0 {
-                            Rectangle().fill(theme.hairline).frame(width: 0.5).padding(.horizontal, 12)
+                            Rectangle().fill(theme.line).frame(width: 0.5).padding(.horizontal, 12)
                         }
                         widget.makeView()
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -93,13 +108,8 @@ struct ExpandedPanel: View {
                     .frame(height: gridHeight)
             }
             if sections.isEmpty && user.widgets.isEmpty {
-                EmptyNote(text: "No widgets yet. Add one to ~/.config/grand-line/denden/widgets", action: user.openFolder)
+                EmptyNote(text: "Nothing is turned on. Choose what shows in Settings.", action: { host.openSettings?() })
                     .frame(height: 44, alignment: .center)
-            }
-            let issues = host.allIssues
-            if let first = issues.first {
-                IssuesLine(first: first, count: issues.count, all: issues) { NSWorkspace.shared.open(Log.file) }
-                    .frame(height: NotchMetrics.issuesHeight, alignment: .bottomLeading)
             }
             Spacer(minLength: 0)
         }
@@ -116,11 +126,17 @@ struct ExpandedPanel: View {
     /// nothing under the camera.
     private var header: some View {
         HStack(spacing: 0) {
-            Text(Self.dateText(Date()))
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(theme.muted)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            Group {
+                if host.showsDate {
+                    Text(Self.dateText(Date()))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(theme.muted)
+                        .lineLimit(1)
+                } else {
+                    Color.clear
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             Color.clear.frame(width: model.cameraWidth + 16)
             HStack(spacing: 10) {
                 ForEach(Array(host.headerWidgets.enumerated()), id: \.offset) { _, widget in
@@ -135,30 +151,5 @@ struct ExpandedPanel: View {
         let f = DateFormatter()
         f.setLocalizedDateFormatFromTemplate("EEEEdMMMM")
         return f.string(from: date)
-    }
-}
-
-/// One line naming the first config problem; the tooltip lists them all.
-private struct IssuesLine: View {
-    @EnvironmentObject var theme: ThemeStore
-    let first: ConfigIssue
-    let count: Int
-    let all: [ConfigIssue]
-    let action: @MainActor () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 11))
-                Text(count == 1 ? first.description : "\(count) problems. \(first.description)")
-                    .font(.system(size: 11))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-            .foregroundStyle(theme.muted)
-        }
-        .buttonStyle(.plain)
-        .help(all.map(\.description).joined(separator: "\n"))
     }
 }

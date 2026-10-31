@@ -132,10 +132,11 @@ public actor FileIndex {
         if Date().timeIntervalSince(boostsRefreshed) > 3_600 { refreshBoosts() }
         let storage = self.storage
         let generation = self.generation
-        var candidates: [Int32]? = nil
+        var narrowed: [Int32]? = nil
         if let last = lastScan, last.generation == generation, query.narrows(last.query) {
-            candidates = last.matched
+            narrowed = last.matched
         }
+        let candidates = narrowed
         let count = candidates?.count ?? storage.count
         let chunks = max(1, min(ProcessInfo.processInfo.activeProcessorCount * 2, count / 8_192 + 1))
         let size = (count + chunks - 1) / chunks

@@ -11,13 +11,20 @@ final class TodayWidget: ObservableObject, NotchWidget {
     let placement = WidgetPlacement.section
 
     @Published private(set) var events: [AgendaEvent] = []
-    @Published private(set) var access: SharedEventStore.Access
+    @Published private(set) var access: SharedEventStore.Access {
+        didSet { if access != oldValue { availabilityChanged() } }
+    }
+    private let availabilityChanged: @MainActor () -> Void
+
+    /// Hidden while access is turned down; Settings says how to allow it.
+    var isAvailable: Bool { access != .denied }
     private let store: SharedEventStore
     private var stale = true
     private var isOpen = false
 
     init(context: WidgetContext) {
         store = context.events
+        availabilityChanged = context.availabilityChanged
         access = context.events.access(for: .event)
         store.onChange { [weak self] in
             guard let self else { return }
@@ -31,7 +38,8 @@ final class TodayWidget: ObservableObject, NotchWidget {
     func panelWillOpen() {
         isOpen = true
         // Past events drop off as the day goes on, so filter again each open.
-        if stale { reload() } else { events = Agenda.upcoming(events, now: Date()) }
+        // Without access, look again: it may have been allowed since.
+        if stale || access != .granted { reload() } else { events = Agenda.upcoming(events, now: Date()) }
     }
 
     func panelDidClose() { isOpen = false }

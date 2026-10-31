@@ -19,10 +19,27 @@ final class NotchController {
     private var openWork: DispatchWorkItem?
     private var closeWork: DispatchWorkItem?
     private var shrinkWork: DispatchWorkItem?
+    private var pauseWork: DispatchWorkItem?
     private var bag: Set<AnyCancellable> = []
+    private var nowPlayingSink: AnyCancellable?
+    private weak var watchedNowPlaying: NowPlayingWidget?
+    /// When the music paused, so the wings stay a little after.
+    private var pausedAt: Date?
+    private var wasPlaying = false
 
-    private static let openAnimation = Animation.spring(response: 0.34, dampingFraction: 0.86)
-    private static let closeAnimation = Animation.spring(response: 0.28, dampingFraction: 1)
+    /// How long the wings stay, with still bars, after the music pauses.
+    private static let pauseGrace: TimeInterval = 20
+
+    // Springs, or short fades with Reduce Motion.
+    private var openAnimation: Animation {
+        model.reduceMotion ? .easeOut(duration: 0.12) : .spring(response: 0.34, dampingFraction: 0.86)
+    }
+    private var closeAnimation: Animation {
+        model.reduceMotion ? .easeOut(duration: 0.1) : .spring(response: 0.28, dampingFraction: 1)
+    }
+    private var wingAnimation: Animation? {
+        model.reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.88)
+    }
 
     init(screen: ScreenInfo, style: PanelStyle, host: PanelHost) {
         self.host = host
@@ -54,7 +71,7 @@ final class NotchController {
         openWork?.cancel()
         closeWork?.cancel()
         if animated {
-            withAnimation(Self.closeAnimation) { model.isOpen = false }
+            withAnimation(closeAnimation) { model.isOpen = false }
         } else {
             model.isOpen = false
         }
@@ -67,7 +84,7 @@ final class NotchController {
             }
         }
         shrinkWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + (animated ? 0.32 : 0), execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + (animated ? (model.reduceMotion ? 0.12 : 0.32) : 0), execute: work)
     }
 
     func open() {
@@ -76,7 +93,7 @@ final class NotchController {
         closeWork?.cancel()
         model.update(content: host.content)
         panel.setFrame(model.frame(open: true), display: true)
-        withAnimation(Self.openAnimation) { model.isOpen = true }
+        withAnimation(openAnimation) { model.isOpen = true }
         host.panelWillOpen()
     }
 
@@ -89,6 +106,8 @@ final class NotchController {
 
     func tearDown() {
         close(animated: false)
+        pauseWork?.cancel()
+        nowPlayingSink = nil
         bag.removeAll()
         panel.orderOut(nil)
         panel.close()
@@ -137,6 +156,7 @@ final class NotchController {
                 guard let self else { return }
                 let before = self.model.expandedPanelSize
                 self.model.update(content: self.host.content)
+                self.watchNowPlaying()
                 self.syncLiveActivity()
                 if self.model.isOpen, self.model.expandedPanelSize != before {
                     self.panel.setFrame(self.model.frame(open: true), display: true)
@@ -145,15 +165,47 @@ final class NotchController {
             .store(in: &bag)
 
         // Music starting or stopping widens or narrows the closed notch.
-        host.nowPlaying?.objectWillChange
-            .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
-            .sink { [weak self] _ in self?.syncLiveActivity() }
+        watchNowPlaying()
+        NSWorkspace.shared.notificationCenter
+            .publisher(for: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification)
+            .sink { [weak self] _ in
+                self?.model.reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            }
             .store(in: &bag)
         syncLiveActivity()
     }
 
+    /// Follows the Now Playing widget, which comes and goes as it is turned
+    /// on and off in Settings.
+    private func watchNowPlaying() {
+        let current = host.nowPlaying
+        guard current !== watchedNowPlaying || (current != nil && nowPlayingSink == nil) else { return }
+        watchedNowPlaying = current
+        nowPlayingSink = current?.objectWillChange
+            .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
+            .sink { [weak self] _ in self?.syncLiveActivity() }
+    }
+
+    /// The wings show while music plays, and for a short while after it
+    /// pauses (with still, low bars). Nothing playing, or Now Playing
+    /// turned off, and the notch is its own width again.
     private func syncLiveActivity() {
-        let wanted = host.settings.liveActivity && (host.nowPlaying?.isPlaying ?? false)
+        pauseWork?.cancel()
+        let player = host.nowPlaying
+        let playing = player?.isPlaying ?? false
+        if wasPlaying && !playing { pausedAt = Date() }
+        if playing { pausedAt = nil }
+        wasPlaying = playing
+        var wanted = host.settings.liveActivity && player != nil && playing
+        if !wanted, host.settings.liveActivity, player?.state.hasMedia == true, let paused = pausedAt {
+            let left = Self.pauseGrace - Date().timeIntervalSince(paused)
+            if left > 0 {
+                wanted = true
+                let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.syncLiveActivity() } }
+                pauseWork = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + left + 0.05, execute: work)
+            }
+        }
         guard wanted != model.showsLiveActivity else { return }
         if model.isOpen {
             model.showsLiveActivity = wanted
@@ -161,12 +213,13 @@ final class NotchController {
         }
         if wanted {
             // Grow the window, then the shape.
-            model.showsLiveActivity = true
-            let size = model.collapsedPanelSize
+            let size = NotchGeometry.collapsedPanelSize(of: model.screen, liveActivity: true)
             panel.setFrame(NotchGeometry.topCentred(size, on: model.screen), display: true)
+            withAnimation(wingAnimation) { model.showsLiveActivity = true }
         } else {
-            withAnimation(Self.closeAnimation) { model.showsLiveActivity = false }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            withAnimation(wingAnimation) { model.showsLiveActivity = false }
+            let delay = model.reduceMotion ? 0 : 0.3
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 MainActor.assumeIsolated {
                     guard let self, !self.model.isOpen, !self.model.showsLiveActivity else { return }
                     self.panel.setFrame(self.model.frame(open: false), display: true)
