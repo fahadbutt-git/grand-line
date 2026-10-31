@@ -88,6 +88,7 @@ for n in range(1, 10):
 BINDINGS += [
     # Apps
     ("return_or_enter", [], "Apps", "Terminal (Ghostty)", app("Ghostty")),
+    ("return_or_enter", ["option"], "Apps", "Terminal in a tmux session", sh("open -na Ghostty --args -e /opt/homebrew/bin/tmux new-session -A -s main")),
     ("return_or_enter", ["shift"], "Apps", "Browser (Chrome)", app("Google Chrome")),
     ("b", ["shift", "option"], "Apps", "Private browser window", sh("open -na 'Google Chrome' --args --incognito")),
     ("f", ["shift"], "Apps", "Finder", sh("open \"$HOME\"")),

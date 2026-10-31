@@ -937,6 +937,29 @@
          "key_code": "return_or_enter",
          "modifiers": {
           "mandatory": [
+           "option"
+          ]
+         }
+        },
+        "to": [
+         {
+          "shell_command": "open -na Ghostty --args -e /opt/homebrew/bin/tmux new-session -A -s main"
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "return_or_enter",
+         "modifiers": {
+          "mandatory": [
            "shift"
           ]
          }

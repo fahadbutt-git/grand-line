@@ -11,6 +11,9 @@ step_dotfiles() {
 
   link_into_place "$cfg/aerospace/aerospace.toml" "$HOME/.aerospace.toml"
   link_into_place "$cfg/ghostty" "$HOME/.config/ghostty"
+  link_into_place "$cfg/tmux" "$HOME/.config/tmux"
+  link_into_place "$cfg/starship.toml" "$HOME/.config/starship.toml"
+  append_once "source \"$MAC_SETUP_LINK/config/zsh/mac-setup.zsh\"" "$HOME/.zshrc"
 
   # Karabiner rewrites and backs up its own settings file, so it gets a copy
   # rather than a link. The copy is replaced only when the package's shortcuts

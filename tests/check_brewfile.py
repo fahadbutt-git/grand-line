@@ -27,6 +27,8 @@ def url_for(kind, name):
     if name.count("/") == 2:
         user, repo, n = name.split("/")
         return TAP.format(user=user, repo=repo, kind="Casks" if kind == "cask" else "Formula", n=n)
+    if kind == "cask" and name.startswith("font-"):
+        return CASK.replace("Casks/{l}/", "Casks/font/font-{l}/").format(l=name[5].lower(), n=name)
     return (CASK if kind == "cask" else CORE).format(l=name[0].lower(), n=name)
 
 

@@ -53,6 +53,7 @@ Caps + 9	Workspaces	Go to workspace 9	/opt/homebrew/bin/aerospace workspace 9
 Caps + Shift + 9	Workspaces	Move window to workspace 9 and follow	/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 9
 Caps + Option + Shift + 9	Workspaces	Move window to workspace 9, stay here	/opt/homebrew/bin/aerospace move-node-to-workspace 9
 Caps + Return	Apps	Terminal (Ghostty)	open -a 'Ghostty'
+Caps + Option + Return	Apps	Terminal in a tmux session	open -na Ghostty --args -e /opt/homebrew/bin/tmux new-session -A -s main
 Caps + Shift + Return	Apps	Browser (Chrome)	open -a 'Google Chrome'
 Caps + Option + Shift + B	Apps	Private browser window	open -na 'Google Chrome' --args --incognito
 Caps + Shift + F	Apps	Finder	open "$HOME"

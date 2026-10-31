@@ -20,7 +20,9 @@ expect() {
 }
 
 [[ $status -eq 0 ]] || { echo "setup.sh --dry-run exited with $status"; fail=1; }
-expect "Homebrew/install/HEAD/install.sh"
+# A test machine may already have Homebrew; either path is correct.
+grep -qF "Homebrew/install/HEAD/install.sh" "$out" || grep -qF "Homebrew already installed" "$out" \
+  || { echo "dry run neither installed nor found Homebrew"; fail=1; }
 expect "brew bundle --file="
 expect "install WordCraft from the latest release of github.com/storytold/wordcraft"
 expect "install PdfCraft from the latest release of github.com/storytold/pdfcraft"
@@ -28,6 +30,8 @@ expect "install.packages"
 expect "ln -s $ROOT $tmp/home/.mac-setup"
 expect "ln -s $ROOT/config/aerospace/aerospace.toml $tmp/home/.aerospace.toml"
 expect "cp $ROOT/config/karabiner/karabiner.json $tmp/home/.config/karabiner/karabiner.json"
+expect "ln -s $ROOT/config/tmux $tmp/home/.config/tmux"
+expect "config/zsh/mac-setup.zsh"
 expect "swiftc -O $ROOT/tools/ocr.swift"
 expect "swiftc -O $ROOT/tools/pdfshrink.swift"
 expect "defaults write NSGlobalDomain KeyRepeat -int 2"

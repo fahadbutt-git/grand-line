@@ -13,6 +13,16 @@ brew "choose-gui"       # the pop-up menu behind every Omarchy-style menu
 brew "blueutil"         # Bluetooth menu (Caps + Ctrl + B)
 brew "switchaudio-osx"  # audio output menu (Caps + Ctrl + A, M)
 
+# Terminal, as in Omarchy (see config/zsh/mac-setup.zsh for the shortcuts)
+brew "eza"              # ls with colour and icons
+brew "fzf"              # fuzzy finder: ff, Ctrl+R history
+brew "zoxide"           # cd that remembers folders
+brew "ripgrep"          # rg: search inside files
+brew "fd"               # simpler find
+brew "tmux"             # panes, windows and lasting sessions
+brew "starship"         # the prompt line
+cask "font-jetbrains-mono-nerd-font"
+
 # AI
 cask "claude"
 cask "claude-code"

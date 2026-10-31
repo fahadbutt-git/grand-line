@@ -1,4 +1,5 @@
 # Ghostty terminal. Colours come from the active theme (see: theme pick).
+font-family = "JetBrainsMono Nerd Font"
 font-size = 14
 window-padding-x = 12
 window-padding-y = 10

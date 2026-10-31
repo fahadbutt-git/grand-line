@@ -28,6 +28,22 @@ The first run copies the package to `~/mac-setup`. That copy is the one to edit 
 | `bash ~/mac-setup/setup.sh --only artcraft` | Re-runs one step (`--list` shows them) |
 | `bash ~/mac-setup/setup.sh --dry-run` | Shows what setup would do, changes nothing |
 
+## The terminal
+
+Ghostty with Omarchy's shell tools, set up in `config/zsh/mac-setup.zsh`, `config/tmux/tmux.conf` and `config/starship.toml`.
+
+| Type | Does |
+| --- | --- |
+| `cd res` | Jumps to the folder you use most that matches "res" (zoxide) |
+| `ff` | Finds a file by name with a live preview (fzf) |
+| Ctrl + R | Searches your command history as you type |
+| `ls`, `lt`, `lsa` | Lists files with icons, as a tree, or including hidden files (eza) |
+| `rg word`, `fd name` | Searches inside files, or for files by name |
+| `compress folder`, `decompress file.tar.gz` | Makes or opens a .tar.gz archive |
+| `tdl` | Splits the window: terminal on the left, Claude Code on the right (`tdl codex` for Codex) |
+| Caps + Option + Return | Opens a terminal inside a lasting tmux session |
+| Ctrl + Space, then ? | Lists every tmux key: Option + Return splits, Option + Escape closes a pane |
+
 ## The Caps Lock layer
 
 Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps + K lists every shortcut and runs the one you pick. The table is generated from `tools/bindings.py` (workspaces 2 to 8 follow the same pattern as 1 and 9).
@@ -69,6 +85,7 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + Shift + 9 | Move window to workspace 9 and follow |
 | Caps + Option + Shift + 9 | Move window to workspace 9, stay here |
 | Caps + Return | Terminal (Ghostty) |
+| Caps + Option + Return | Terminal in a tmux session |
 | Caps + Shift + Return | Browser (Chrome) |
 | Caps + Option + Shift + B | Private browser window |
 | Caps + Shift + F | Finder |

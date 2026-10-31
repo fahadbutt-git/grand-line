@@ -40,6 +40,13 @@ check "executable bits set" bash -c '
   for f in bin/* setup.sh publish.sh tests/*.sh tests/stubs/*; do [[ -x "$f" ]] || { echo "$f"; bad=1; }; done
   exit $bad' 
 
+if command -v zsh >/dev/null 2>&1; then
+  check "syntax: config/zsh/mac-setup.zsh" zsh -n config/zsh/mac-setup.zsh
+fi
+if command -v tmux >/dev/null 2>&1; then
+  check "tmux.conf loads" tmux -f config/tmux/tmux.conf -L mac-setup-test start-server \; kill-server
+fi
+
 echo "Config files"
 check "aerospace.toml parses" python3 -c "
 try:
