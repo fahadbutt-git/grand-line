@@ -77,6 +77,13 @@ enum Input {
             event.post(tap: .cghidEventTap)
             pause(0.012)
         }
+        // Let go of the modifiers too, so nothing sent next inherits them.
+        if !flags.subtracting([.maskNumericPad, .maskSecondaryFn]).isEmpty,
+           let release = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: false) {
+            release.type = .flagsChanged
+            release.flags = []
+            release.post(tap: .cghidEventTap)
+        }
         pause(0.03)
     }
 
@@ -96,6 +103,10 @@ enum Input {
                 guard let event = CGEvent(mouseEventSource: source, mouseType: type, mouseCursorPosition: point, mouseButton: button)
                 else { continue }
                 event.setIntegerValueField(.mouseEventClickState, value: Int64(n))
+                // A click never carries a modifier left over from a shortcut
+                // just sent (the system keeps Command "down" otherwise, and
+                // the click becomes Command-click).
+                event.flags = []
                 event.post(tap: .cghidEventTap)
                 pause(0.02)
             }

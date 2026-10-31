@@ -138,7 +138,7 @@ Executables in `~/.config/grand-line/sight/scripts/` become commands named after
 1. Typing the name lists the command (also under `>`). Return types "name " and Sight runs the script with no arguments.
 2. The script prints one JSON object per line: `{"title": "…", "subtitle": "…", "icon": "SF Symbol name", "value": "…", "keywords": ["…"]}`. Only `title` is required. `value` defaults to the title, and `keywords` are hidden words the row is also found by. Lines that are not JSON objects with a title are skipped. Words typed after the name narrow the rows.
 3. Choosing a row runs the script again with the row's value as its only argument. Sight never builds a shell line: the script is run directly with an argument list, from the home folder, with the Grand Line commands on the PATH.
-4. The script answers with rows again, which replace the list (the next step), or with a line `{"close": true}`, which closes the window. No rows, a non-zero exit or more than 5 seconds (the script is then stopped) show a message instead.
+4. The script answers with rows again, which replace the list (the next step), or with a line `{"close": true}`, which closes the window. No rows, a non-zero exit or more than 10 seconds (the script is then stopped) show a message instead.
 
 The rows of the current step are kept until you search for something else. `config/grand-line/sight-scripts/downloads.sh` is an example in two steps (the newest files in Downloads, then Open, Show in Nexus or Copy path). It does nothing where it is, so copy it to use it:
 

@@ -180,7 +180,8 @@ final class FallbackAndScriptTests: XCTestCase {
         try Make.write("x", to: home.appendingPathComponent("Downloads/report \"v2\".pdf"))
         var environment = ShellRunner.environment()
         environment["HOME"] = home.path
-        let provider = ScriptCommandProvider(ScriptCommand(name: "downloads", path: script), runner: ShellRunner(environment: environment))
+        // A script run for the first time can wait on macOS checking it (seconds on CI).
+        let provider = ScriptCommandProvider(ScriptCommand(name: "downloads", path: script), runner: ShellRunner(environment: environment), timeout: 30)
         let rows = try await provider.results(for: LaunchQuery(raw: "downloads ", term: ""))
         XCTAssertEqual(rows.map(\.title), ["report \"v2\".pdf"])
         guard case .script(_, let value) = rows[0].primary?.command else { return XCTFail("not a script row") }

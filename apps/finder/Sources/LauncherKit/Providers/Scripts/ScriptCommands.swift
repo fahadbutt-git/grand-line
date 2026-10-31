@@ -106,7 +106,7 @@ public final class ScriptCommandProvider: LaunchProvider, @unchecked Sendable {
     private let lock = NSLock()
     private var page: [ScriptRow]?
 
-    public init(_ script: ScriptCommand, runner: any CommandRunning, timeout: TimeInterval = 5) {
+    public init(_ script: ScriptCommand, runner: any CommandRunning, timeout: TimeInterval = 10) {
         self.script = script
         self.runner = runner
         self.timeout = timeout
