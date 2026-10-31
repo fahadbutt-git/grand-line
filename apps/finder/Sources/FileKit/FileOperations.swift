@@ -1,6 +1,7 @@
 import Foundation
 
-/// Copy, move, duplicate, rename, new folder and move to Trash, each undoable.
+/// Copy, move, duplicate, rename, new folder and move to Trash, each undoable
+/// and redoable.
 /// Nothing is ever deleted outright: replaced items and undone copies go to the Trash.
 /// Operations run one at a time, in the order asked, the way Nimble Commander
 /// queues them.
@@ -19,6 +20,7 @@ public actor FileOperations {
     private let progressContinuation: AsyncStream<OperationProgress>.Continuation
     private let trash: Trash
     private var undoStack: [UndoRecord] = []
+    private var redoStack: [RedoRecord] = []
     private var cutItems: [URL] = []
     static let undoLimit = 50
 
@@ -147,30 +149,98 @@ public actor FileOperations {
         return moves.map(\.to)
     }
 
-    // MARK: Undo
+    // MARK: Undo and Redo
 
     /// The operation Undo would reverse, for the Edit menu ("Undo Copy").
     public var undoKind: FileOperationKind? { undoStack.last?.kind }
+
+    /// The operation Redo would do again, for the Edit menu ("Redo Copy").
+    public var redoKind: FileOperationKind? { redoStack.last?.kind }
 
     /// Reverses the last operation. Returns what was undone, nil when there was nothing.
     @discardableResult
     public func undo() throws -> FileOperationKind? {
         guard let record = undoStack.popLast() else { return nil }
+        let action: RedoRecord.Action
         switch record.action {
         case .created(let items):
+            var trashed: [UndoRecord.Move] = []
             for item in items.reversed() where FileTree.exists(item) {
-                _ = try trash(item)
+                trashed.append(.init(from: item, to: try trash(item)))
             }
-        case .moved(let moves), .trashed(let moves):
+            action = .restore(trashed)
+        case .moved(let moves):
+            var back: [UndoRecord.Move] = []
             for move in moves.reversed() {
-                try Self.place(move.to, at: Self.freeSpot(for: move.from))
+                let spot = Self.freeSpot(for: move.from)
+                try Self.place(move.to, at: spot)
+                back.append(.init(from: spot, to: move.to))
             }
+            action = .move(back)
+        case .trashed(let moves):
+            var restored: [URL] = []
+            for move in moves.reversed() {
+                let spot = Self.freeSpot(for: move.from)
+                try Self.place(move.to, at: spot)
+                restored.append(spot)
+            }
+            action = .trash(restored)
         case .renamed(let move):
             try Self.place(move.to, at: move.from)
+            action = .rename(move)
         }
+        var replaced: [URL] = []
         for item in record.replaced.reversed() {
-            try Self.place(item.to, at: Self.freeSpot(for: item.from))
+            let spot = Self.freeSpot(for: item.from)
+            try Self.place(item.to, at: spot)
+            replaced.append(spot)
         }
+        redoStack.append(RedoRecord(kind: record.kind, action: action, replaced: replaced))
+        if redoStack.count > Self.undoLimit { redoStack.removeFirst() }
+        return record.kind
+    }
+
+    /// Does the last undone operation again, and makes it undoable once more.
+    /// Returns what was redone, nil when there was nothing.
+    @discardableResult
+    public func redo() throws -> FileOperationKind? {
+        guard let record = redoStack.popLast() else { return nil }
+        var replaced: [UndoRecord.Move] = []
+        for item in record.replaced where FileTree.exists(item) {
+            replaced.append(.init(from: item, to: try trash(item)))
+        }
+        let action: UndoRecord.Action
+        switch record.action {
+        case .restore(let moves):
+            var created: [URL] = []
+            for move in moves.reversed() {
+                let spot = Self.freeSpot(for: move.from)
+                try Self.place(move.to, at: spot)
+                created.append(spot)
+            }
+            action = .created(created)
+        case .move(let moves):
+            var done: [UndoRecord.Move] = []
+            for move in moves.reversed() {
+                let spot = Self.freeSpot(for: move.to)
+                try Self.place(move.from, at: spot)
+                done.append(.init(from: move.from, to: spot))
+            }
+            action = .moved(done)
+        case .rename(let move):
+            if FileTree.exists(move.to), !Self.isSameItem(move.from, move.to) {
+                throw FileOperationError.nameTaken(move.to.lastPathComponent)
+            }
+            try Self.place(move.from, at: move.to)
+            action = .renamed(move)
+        case .trash(let items):
+            var trashed: [UndoRecord.Move] = []
+            for item in items {
+                trashed.append(.init(from: item, to: try trash(item)))
+            }
+            action = .trashed(trashed)
+        }
+        push(UndoRecord(kind: record.kind, action: action, replaced: replaced), clearingRedo: false)
         return record.kind
     }
 
@@ -236,7 +306,9 @@ public actor FileOperations {
         return created
     }
 
-    private func push(_ record: UndoRecord) {
+    /// A new operation ends what Redo could do again, as in every Mac app.
+    private func push(_ record: UndoRecord, clearingRedo: Bool = true) {
+        if clearingRedo { redoStack.removeAll() }
         undoStack.append(record)
         if undoStack.count > Self.undoLimit { undoStack.removeFirst() }
     }

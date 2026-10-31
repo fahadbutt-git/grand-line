@@ -1,0 +1,58 @@
+import Foundation
+
+/// What a key does in the search window. Keys that are not listed type into the field.
+public enum KeyCommand: Sendable, Equatable {
+    case moveUp
+    case moveDown
+    case pageUp
+    case pageDown
+    /// Return: the row's first action.
+    case primary
+    /// Command+Return: the row's second action.
+    case secondary
+    /// Command+K: the action panel.
+    case actions
+    /// Command+1…9: run that row.
+    case runRow(Int)
+    case escape
+    /// Tab: complete the query from the selected row.
+    case complete
+    /// Command+Y: the Quick Look preview pane.
+    case togglePreview
+    /// Command+C with nothing selected in the field: copy the row's path or text.
+    case copy
+    /// Command+Shift+C, Command+O and other shortcuts an action lists.
+    case shortcut(KeyShortcut)
+
+    public static func command(for key: KeyPress) -> KeyCommand? {
+        let plain = !key.command && !key.option && !key.control
+        switch key.keyCode {
+        case KeyPress.Code.up where plain: return .moveUp
+        case KeyPress.Code.down where plain: return .moveDown
+        case KeyPress.Code.pageUp: return .pageUp
+        case KeyPress.Code.pageDown: return .pageDown
+        case KeyPress.Code.returnKey, KeyPress.Code.enter:
+            if key.command && !key.shift && !key.option { return .secondary }
+            if plain && !key.shift { return .primary }
+        case KeyPress.Code.escape: return .escape
+        case KeyPress.Code.tab where plain && !key.shift: return .complete
+        default: break
+        }
+        if key.control && !key.command, key.characters == "n" { return .moveDown }
+        if key.control && !key.command, key.characters == "p" { return .moveUp }
+        guard key.command else { return nil }
+        if !key.shift && !key.option && !key.control {
+            switch key.characters {
+            case "k": return .actions
+            case "y": return .togglePreview
+            case "c": return .copy
+            case "1", "2", "3", "4", "5", "6", "7", "8", "9": return .runRow(Int(key.characters)!)
+            // Editing keys stay with the text field.
+            case "a", "v", "x", "z": return nil
+            default: break
+            }
+        }
+        guard let character = key.characters.first, character.isLetter || character.isNumber else { return nil }
+        return .shortcut(KeyShortcut(String(character), command: true, shift: key.shift, option: key.option, control: key.control))
+    }
+}
