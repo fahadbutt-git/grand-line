@@ -109,23 +109,25 @@ final class FileInfoTests: XCTestCase {
 
     // MARK: Clutter
 
+    /// "._" files show up on shared and external drives; on the Mac's own disk
+    /// macOS keeps them out of listings, so the disk part uses .DS_Store.
     func testClutterGoesToTheTrash() async throws {
         try box.file("c/.DS_Store")
-        try box.file("c/._report.docx")
         try box.file("c/report.docx")
         try box.file("c/deep/.DS_Store")
         XCTAssertTrue(Clutter.isClutter(".DS_Store"))
-        XCTAssertTrue(Clutter.isClutter("._x"))
+        XCTAssertTrue(Clutter.isClutter("._report.docx"))
         XCTAssertFalse(Clutter.isClutter("report.docx"))
-        XCTAssertEqual(Clutter.find(in: box.url("c"), recursive: false).map(\.lastPathComponent), [".DS_Store", "._report.docx"])
-        XCTAssertEqual(Clutter.find(in: box.url("c")).count, 3)
+        XCTAssertFalse(Clutter.isClutter("_report.docx"))
+        XCTAssertEqual(Clutter.find(in: box.url("c"), recursive: false).map(\.lastPathComponent), [".DS_Store"])
+        XCTAssertEqual(Clutter.find(in: box.url("c")).count, 2)
 
         let ops = box.operations()
         let trashed = try await Clutter.clean(in: box.url("c"), using: ops)
-        XCTAssertEqual(trashed.count, 3)
+        XCTAssertEqual(trashed.count, 2)
         XCTAssertEqual(box.names("c"), ["deep", "report.docx"])
         try await ops.undo()
-        XCTAssertEqual(box.names("c"), [".DS_Store", "._report.docx", "deep", "report.docx"])
+        XCTAssertEqual(box.names("c"), [".DS_Store", "deep", "report.docx"])
     }
 
     // MARK: Recents

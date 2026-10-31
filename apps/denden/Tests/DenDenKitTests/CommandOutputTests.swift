@@ -26,7 +26,7 @@ final class CommandOutputTests: XCTestCase {
         XCTAssertEqual(CommandOutputParser.parse(#"{"text": 4.5}"#).text, "4.5")
         XCTAssertEqual(CommandOutputParser.parse(#"{"label": "x"}"#).text, "x")
         XCTAssertEqual(CommandOutputParser.parse(#"{"text": "a", "color": "warning"}"#).color, .theme(.yellow))
-        XCTAssertEqual(CommandOutputParser.parse(#"{"text": "a", "color": "#ff0000"}"#).color, .hex(RGB(red: 1, green: 0, blue: 0)))
+        XCTAssertEqual(CommandOutputParser.parse(##"{"text": "a", "color": "#ff0000"}"##).color, .hex(RGB(red: 1, green: 0, blue: 0)))
         XCTAssertNil(CommandOutputParser.parse(#"{"text": "a", "color": "sparkly"}"#).color)
         XCTAssertNil(CommandOutputParser.parse(#"{"text": "a", "icon": "  "}"#).icon)
     }

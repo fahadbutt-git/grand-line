@@ -68,7 +68,8 @@ final class StressTests: XCTestCase {
 
         let budget = await index.search("budget", limit: 50)
         XCTAssertEqual(budget.count, 50)
-        XCTAssertTrue(budget.allSatisfy { $0.tier == .prefix || $0.tier == .wordStart })
+        let weak = budget.filter { $0.tier > .wordStart }
+        XCTAssertTrue(weak.isEmpty, "weaker matches ranked in: \(weak.prefix(5).map { "\($0.name) \($0.tier)" })")
         let nothing = await index.search("qzx")
         XCTAssertTrue(nothing.isEmpty)
     }
