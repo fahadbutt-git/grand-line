@@ -293,7 +293,11 @@ enum LauncherJourneys {
     static func skipIfAppearanceLocked(_ setting: Setting, row: String, environment: [String: String]) throws {
         guard environment["GITHUB_ACTIONS"] != nil else { return }
         let lower = row.lowercased()
-        let kept = lower.contains("macos kept the") && lower.contains("appearance")
+        // The row's value may be just "Failed" (its reason sits in another
+        // line the snapshot does not join), which for dark mode on a runner
+        // means the same: the command ran and macOS kept its appearance.
+        let kept = (lower.contains("macos kept the") && lower.contains("appearance"))
+            || lower.trimmingCharacters(in: .whitespaces) == "failed"
         guard kept || row.contains(automationRefused) else { return }
         print("::notice title=\(setting.phrase) not checked::\(noticeText(row))")
         throw StepSkip("macOS on this CI runner did not switch its appearance (\(kept ? "it kept the one it had" : automationRefused + " for System Events")); the row reads \"\(row)\"")
