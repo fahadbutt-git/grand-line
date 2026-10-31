@@ -54,6 +54,9 @@ extension BrowserModel {
         case .viewIcons, .viewList, .viewColumns, .viewGallery, .viewPanes: setMode(for: command)
         case .sortName, .sortKind, .sortLastOpened, .sortAdded, .sortModified, .sortCreated, .sortSize, .sortTags, .sortManual:
             sort(by: command)
+        case .keepFoldersOnTop: toggleFoldersOnTop()
+        case .groupNone: group(by: .none)
+        case .groupKind: group(by: .kind)
         case .showViewOptions: showViewOptions.toggle()
         case .rememberView: rememberView()
         case .useAsDefaultView: useAsDefaultView()
@@ -175,7 +178,8 @@ extension BrowserModel {
 
     /// A tick beside the current view and sort.
     func isChecked(_ command: BrowserCommand) -> Bool {
-        let sort = focused.state.settings.sort.field
+        let order = focused.state.settings.sort
+        let sort = order.field
         switch command {
         case .viewIcons: return mode == .icons
         case .viewList: return mode == .list
@@ -191,6 +195,9 @@ extension BrowserModel {
         case .sortCreated: return sort == .created
         case .sortSize: return sort == .size
         case .sortManual: return sort == .manual
+        case .keepFoldersOnTop: return order.foldersFirst
+        case .groupNone: return order.grouping == .none
+        case .groupKind: return order.grouping == .kind
         case .onePane: return layout.count == 1
         case .twoPanes: return layout.count == 2
         case .threePanes: return layout.count == 3

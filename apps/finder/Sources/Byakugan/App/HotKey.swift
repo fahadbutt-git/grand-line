@@ -17,7 +17,8 @@ final class HotKey {
         let installed = InstallEventHandler(GetApplicationEventTarget(), { _, _, userData -> OSStatus in
             guard let userData else { return OSStatus(eventNotHandledErr) }
             let hotKey = Unmanaged<HotKey>.fromOpaque(userData).takeUnretainedValue()
-            DispatchQueue.main.async { hotKey.action() }
+            // Carbon calls this on the main thread: act now rather than a turn later.
+            hotKey.action()
             return noErr
         }, 1, &spec, me, &handlerRef)
         guard installed == noErr else { return nil }

@@ -69,6 +69,21 @@ final class FilesTests: XCTestCase {
         XCTAssertEqual(own.map(\.title), ["a.pdf", "A.app", "b.pdf"])
     }
 
+    func testFoldersTheIndexMayNotReadAreExplained() async throws {
+        let provider = FilesProvider(
+            paths: paths,
+            names: { _, _ in [] },
+            spotlight: { _, _ in [] },
+            unreadable: { ["/Users/me/Downloads", "/Users/me/Projects/app/secret", "/Users/me/Library/CloudStorage/GoogleDrive-me@example.com"] }
+        )
+        let rows = try await provider.results(for: LaunchQuery(raw: "conj"))
+        XCTAssertEqual(rows.map(\.title), ["Allow Byakugan to read Downloads", "Allow Byakugan to read Google Drive"])
+        XCTAssertEqual(rows.first?.primary?.command, .openURL(FileResults.filesAndFoldersPane, bundleID: nil))
+        XCTAssertTrue(rows.allSatisfy(\.isFallback), "below every real match")
+        let empty = try await provider.results(for: LaunchQuery(raw: ""))
+        XCTAssertTrue(empty.isEmpty, "nothing before a search is typed")
+    }
+
     func testPathCompletion() throws {
         let home = try Make.folder()
         for name in ["Drive/", "Downloads/", "Documents/", ".hidden/", "Dates.txt"] {

@@ -91,4 +91,24 @@ final class ThemeTests: XCTestCase {
         XCTAssertEqual(t.resolve(.theme(.highlight)), t.highlight)
         XCTAssertEqual(t.resolve(.hex(RGB(red: 0, green: 0, blue: 0))).hex, "000000")
     }
+
+    func testMissingFilesWarnOnlyForThemesDenDenDoesNotCarry() {
+        let home = TempFolder()
+        let paths = DenDenPaths(home: home.url)
+        // No state file and no theme files, as in a build run before setup.
+        let (fresh, quiet) = ThemeLoader.load(paths: paths)
+        XCTAssertEqual(fresh.name, "graphite")
+        XCTAssertEqual(quiet, [])
+
+        home.write(".local/state/grand-line/theme", "daylight\n")
+        let (daylight, none) = ThemeLoader.load(paths: paths)
+        XCTAssertEqual(daylight.mode, .light)
+        XCTAssertEqual(none, [])
+
+        home.write(".local/state/grand-line/theme", "ocean\n")
+        let (fallback, issues) = ThemeLoader.load(paths: paths)
+        XCTAssertEqual(fallback.name, "graphite")
+        XCTAssertEqual(issues.map(\.file), ["ocean.theme"])
+        XCTAssertTrue(issues.first?.message.contains("not found") ?? false)
+    }
 }

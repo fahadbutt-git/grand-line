@@ -20,45 +20,71 @@ struct Hit: Sendable {
     }
 }
 
+/// What one slice of a search found: the best hits, and every entry that matched,
+/// which the next keystroke can search again instead of the whole index.
+struct ScanResult: Sendable {
+    var hits: [Hit] = []
+    var matched: [Int32] = []
+}
+
 /// Scans a slice of the index. The search runs one of these per core.
 enum IndexSearch {
-    static func scan(_ storage: IndexStorage, _ query: SearchQuery, _ range: Range<Int>, limit: Int) -> [Hit] {
-        var hits: [Hit] = []
+    /// Scans `range` of the index, or of `candidates` when given (entries a
+    /// shorter query matched).
+    static func scan(
+        _ storage: IndexStorage, _ query: SearchQuery, _ range: Range<Int>,
+        candidates: [Int32]? = nil, limit: Int
+    ) -> ScanResult {
+        var result = ScanResult()
         let cap = limit * 4 + 64
         var noRanges: [Range<Int>]? = nil
         let wanted = query.mask
+        let words = query.words
+        let ids = candidates ?? []
         query.bytes.withUnsafeBufferPointer { queryBytes in
-            storage.folded.withUnsafeBufferPointer { folded in
-                storage.names.withUnsafeBufferPointer { names in
-                    for i in range {
-                        let flags = storage.flags[i]
-                        if flags & IndexStorage.removedFlag != 0 { continue }
-                        if storage.mask[i] & wanted != wanted { continue }
-                        let foldStart = Int(storage.foldStart[i])
-                        let name = UnsafeBufferPointer(rebasing: folded[foldStart..<(foldStart + Int(storage.foldLength[i]))])
-                        var original: UnsafeBufferPointer<UInt8>? = nil
-                        if flags & IndexStorage.asciiFlag != 0 {
-                            let nameStart = Int(storage.nameStart[i])
-                            original = UnsafeBufferPointer(rebasing: names[nameStart..<(nameStart + Int(storage.nameLength[i]))])
-                        }
-                        guard let rank = NameMatcher.match(
-                            name, original: original, query: queryBytes, words: query.words, ranges: &noRanges
-                        ) else { continue }
-                        hits.append(Hit(
-                            index: Int32(i), tier: rank.tier, quality: rank.quality,
-                            boost: storage.boost[i], depth: storage.depth[i], length: storage.foldLength[i]
-                        ))
-                        if hits.count >= cap {
-                            hits.sort(by: Hit.ranksBefore)
-                            hits.removeSubrange(limit...)
-                        }
-                    }
+        storage.folded.withUnsafeBufferPointer { folded in
+        storage.names.withUnsafeBufferPointer { names in
+        storage.flags.withUnsafeBufferPointer { flagList in
+        storage.mask.withUnsafeBufferPointer { masks in
+        storage.foldStart.withUnsafeBufferPointer { foldStarts in
+        storage.foldLength.withUnsafeBufferPointer { foldLengths in
+        ids.withUnsafeBufferPointer { ids in
+            for k in range {
+                let i = candidates == nil ? k : Int(ids[k])
+                let flags = flagList[i]
+                if flags & IndexStorage.removedFlag != 0 { continue }
+                if masks[i] & wanted != wanted { continue }
+                let foldStart = Int(foldStarts[i])
+                let name = UnsafeBufferPointer(rebasing: folded[foldStart..<(foldStart + Int(foldLengths[i]))])
+                var original: UnsafeBufferPointer<UInt8>? = nil
+                if flags & IndexStorage.asciiFlag != 0 {
+                    let nameStart = Int(storage.nameStart[i])
+                    original = UnsafeBufferPointer(rebasing: names[nameStart..<(nameStart + Int(storage.nameLength[i]))])
+                }
+                guard let rank = NameMatcher.match(
+                    name, original: original, query: queryBytes, words: words, ranges: &noRanges
+                ) else { continue }
+                result.matched.append(Int32(i))
+                result.hits.append(Hit(
+                    index: Int32(i), tier: rank.tier, quality: rank.quality,
+                    boost: storage.boost[i], depth: storage.depth[i], length: foldLengths[i]
+                ))
+                if result.hits.count >= cap {
+                    result.hits.sort(by: Hit.ranksBefore)
+                    result.hits.removeSubrange(limit...)
                 }
             }
         }
-        hits.sort(by: Hit.ranksBefore)
-        if hits.count > limit { hits.removeSubrange(limit...) }
-        return hits
+        }
+        }
+        }
+        }
+        }
+        }
+        }
+        result.hits.sort(by: Hit.ranksBefore)
+        if result.hits.count > limit { result.hits.removeSubrange(limit...) }
+        return result
     }
 
     /// The matched byte ranges of one result, as UTF-16 offsets into its name.

@@ -23,12 +23,19 @@ public enum ThemeLoader {
         return name
     }
 
+    /// Themes Den Den carries itself, so they need no file.
+    public static let builtIn: [String: Theme] = ["graphite": .graphite, "daylight": .daylight]
+
+    /// A missing file is only an issue for a theme Den Den does not carry: with no
+    /// theme chosen yet (a build run before setup), or a built-in one, it uses
+    /// its own copy and says nothing.
     public static func load(paths: DenDenPaths) -> (Theme, [ConfigIssue]) {
         let name = currentName(paths: paths)
         let url = paths.themeFile(named: name)
         guard let data = FileManager.default.contents(atPath: url.path),
               let text = String(data: data, encoding: .utf8) else {
-            let fallback = name == "daylight" ? Theme.daylight : Theme.graphite
+            if let own = builtIn[name] { return (own, []) }
+            let fallback = Theme.graphite
             return (fallback, [ConfigIssue(file: "\(name).theme", message: "theme file not found; using \(fallback.label)", severity: .warning)])
         }
         return parse(text, name: name)

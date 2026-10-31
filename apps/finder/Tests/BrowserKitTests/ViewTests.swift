@@ -41,10 +41,40 @@ final class ViewTests: XCTestCase {
 
     func testSortingKeepsFoldersFirstAndUsesNaturalOrder() {
         let items = [item("file 10.txt"), item("Zeta", folder: true), item("file 2.txt"), item("alpha", folder: true)]
-        let sorted = ItemSorter.sorted(items, by: ItemSort(field: .name))
+        let sorted = ItemSorter.sorted(items, by: ItemSort(field: .name, foldersFirst: true))
         XCTAssertEqual(sorted.map(\.name), ["alpha", "Zeta", "file 2.txt", "file 10.txt"])
-        let mixed = ItemSorter.sorted(items, by: ItemSort(field: .name, foldersFirst: false))
-        XCTAssertEqual(mixed.map(\.name), ["alpha", "file 2.txt", "file 10.txt", "Zeta"])
+        let mixed = ItemSorter.sorted(items, by: ItemSort(field: .name))
+        XCTAssertEqual(mixed.map(\.name), ["alpha", "file 2.txt", "file 10.txt", "Zeta"], "one sort key by default")
+    }
+
+    func testDateSortMixesFoldersAndFilesUnlessAskedToStack() {
+        func at(_ seconds: Double) -> Date { Date(timeIntervalSince1970: seconds) }
+        let items = [
+            item("old folder", folder: true, modified: at(1_000), kind: "Folder"),
+            item("new.pdf", modified: at(9_000), kind: "PDF document"),
+            item("mid folder", folder: true, modified: at(5_000), kind: "Folder"),
+            item("mid.docx", modified: at(4_000), kind: "Word document"),
+            item("old.pdf", modified: at(2_000), kind: "PDF document"),
+        ]
+        let byDate = ItemSort(field: .modified)
+        XCTAssertEqual(ItemSorter.sorted(items, by: byDate).map(\.name), ["new.pdf", "mid folder", "mid.docx", "old.pdf", "old folder"])
+        var stacked = byDate
+        stacked.grouping = .kind
+        XCTAssertEqual(ItemSorter.sorted(items, by: stacked).map(\.name), ["mid folder", "old folder", "new.pdf", "old.pdf", "mid.docx"])
+        stacked.foldersFirst = true
+        stacked.grouping = .none
+        XCTAssertEqual(ItemSorter.sorted(items, by: stacked).map(\.name), ["mid folder", "old folder", "new.pdf", "mid.docx", "old.pdf"])
+        XCTAssertTrue(stacked.clicking(.name).foldersFirst, "changing the column keeps the stacked choices")
+    }
+
+    func testSortChoicesAreSavedAndOldSettingsLoadAsOneKey() throws {
+        var sort = ItemSort(field: .added, foldersFirst: true, grouping: .kind)
+        let data = try JSONEncoder().encode(sort)
+        XCTAssertEqual(try JSONDecoder().decode(ItemSort.self, from: data), sort)
+        let old = Data(#"{"field":"added","ascending":false,"foldersFirst":true}"#.utf8)
+        sort = try JSONDecoder().decode(ItemSort.self, from: old)
+        XCTAssertEqual(sort, ItemSort(field: .added))
+        XCTAssertFalse(sort.foldersFirst)
     }
 
     func testSortBySizeUsesFolderSizes() {

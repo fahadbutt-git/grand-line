@@ -28,6 +28,40 @@ public struct FileHit: Sendable, Equatable {
 /// Rows for files, with every file action: open (folders in Log Pose), show in
 /// Log Pose, Quick Look, open with, copy path or file, move, AirDrop, transcode.
 public enum FileResults {
+    /// System Settings › Privacy & Security › Files and Folders.
+    public static let filesAndFoldersPane = "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders"
+
+    /// A row for each folder macOS would not let the name index read, so missing
+    /// files are explained instead of silently absent: folders right in the home
+    /// folder (Desktop, Documents, Downloads) and Google Drive's folders.
+    public static func permissionRows(_ folders: [String], home: String) -> [LaunchResult] {
+        let homes = Set([home, FolderWatcher.realPath(home)])
+        var rows: [LaunchResult] = []
+        for folder in folders {
+            let parent = (folder as NSString).deletingLastPathComponent
+            let name: String
+            if homes.contains(parent) {
+                name = (folder as NSString).lastPathComponent
+            } else if homes.contains(where: { FolderChange.isInside(folder, $0 + "/Library/CloudStorage") }) {
+                name = "Google Drive"
+            } else {
+                continue
+            }
+            if rows.contains(where: { $0.title.hasSuffix(" " + name) }) { continue }
+            rows.append(LaunchResult(
+                id: "allow:" + folder,
+                title: "Allow Byakugan to read " + name,
+                subtitle: "macOS is keeping Byakugan out of \(name), so its files are missing here",
+                icon: .symbol("lock"),
+                section: .files,
+                actions: [LaunchAction("Open Privacy Settings", symbol: "gear", .openURL(filesAndFoldersPane, bundleID: nil))],
+                isFallback: true,
+                providerID: "files"
+            ))
+        }
+        return rows
+    }
+
     public static func symbol(for hit: FileHit) -> String {
         if hit.isFolder { return "folder" }
         switch hit.ext {

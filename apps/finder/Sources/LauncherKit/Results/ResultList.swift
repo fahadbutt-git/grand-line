@@ -6,17 +6,24 @@ import Foundation
 /// shown disappears or changes order, and new rows in a section already on screen
 /// go below the selected row. Only a section that was not on screen yet can open
 /// above the selection, and then the selection moves with its row.
+///
+/// One exception: when the list may have a top hit but the first batch had none
+/// good enough, and the person has not moved the selection yet, the first good
+/// match to arrive becomes the top hit and is selected.
 public struct ResultList: Sendable, Equatable {
     public private(set) var groups: [ResultGroup] = []
     public private(set) var selectedIndex: Int?
     var limitScale = 1
+    /// Whether a late result may still open Top hit.
+    var awaitsTopHit = false
 
     public init() {}
 
-    public init(groups: [ResultGroup], limitScale: Int = 1) {
+    public init(groups: [ResultGroup], limitScale: Int = 1, topHit: Bool = false) {
         self.groups = groups
         self.limitScale = limitScale
         selectedIndex = rows.isEmpty ? nil : 0
+        awaitsTopHit = topHit && !groups.contains { $0.section == .topHit }
     }
 
     /// Every row in display order.
@@ -43,11 +50,12 @@ public struct ResultList: Sendable, Equatable {
         return index + 1
     }
 
-    public mutating func replace(with groups: [ResultGroup], limitScale: Int = 1) {
-        self = ResultList(groups: groups, limitScale: limitScale)
+    public mutating func replace(with groups: [ResultGroup], limitScale: Int = 1, topHit: Bool = false) {
+        self = ResultList(groups: groups, limitScale: limitScale, topHit: topHit)
     }
 
     public mutating func moveSelection(by delta: Int) {
+        awaitsTopHit = false
         let count = rows.count
         guard count > 0 else { selectedIndex = nil; return }
         let current = selectedIndex ?? 0
@@ -55,6 +63,7 @@ public struct ResultList: Sendable, Equatable {
     }
 
     public mutating func select(id: String) {
+        awaitsTopHit = false
         if let index = rows.firstIndex(where: { $0.id == id }) { selectedIndex = index }
     }
 
@@ -64,14 +73,20 @@ public struct ResultList: Sendable, Equatable {
             replace(with: ResultGrouping.group(incoming, limitScale: limitScale), limitScale: limitScale)
             return
         }
+        var shown = Set(rows.map(\.id))
+        if awaitsTopHit, let best = incoming.first(where: { !shown.contains($0.id) }), ResultGrouping.canBeTopHit(best) {
+            awaitsTopHit = false
+            groups.insert(ResultGroup(section: .topHit, rows: [best]), at: 0)
+            selectedIndex = 0
+            shown.insert(best.id)
+        }
         let selectedID = selected?.id
         let selectedPosition = selectedIndex ?? -1
-        var shown = Set(rows.map(\.id))
         for result in incoming where !shown.contains(result.id) {
             insert(result, frozenThrough: selectedPosition)
             shown.insert(result.id)
         }
-        if let selectedID { select(id: selectedID) }
+        if let selectedID, let index = rows.firstIndex(where: { $0.id == selectedID }) { selectedIndex = index }
     }
 
     /// Puts one row in its section, by rank, but never at or above the frozen row.

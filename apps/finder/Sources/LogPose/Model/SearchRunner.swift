@@ -5,6 +5,8 @@ import IndexKit
 
 /// Runs one search: IndexKit's name matches first (R1), then Spotlight through
 /// QueryKit's predicate (R2), merged without moving what is already shown.
+/// Spotlight's name matches lead its content matches, and content matches from
+/// app data (caches, ~/Library, hidden folders, app bundles) are left out.
 @MainActor
 final class SearchRunner {
     private unowned let services: Services
@@ -47,7 +49,8 @@ final class SearchRunner {
                 guard let self, let query = self.query else { return }
                 query.disableUpdates()
                 var paths: [String] = []
-                for i in 0..<min(query.resultCount, 2_000) {
+                // Content matches from app data are dropped below, so read past them.
+                for i in 0..<min(query.resultCount, 10_000) {
                     if let item = query.result(at: i) as? NSMetadataItem,
                        let path = item.value(forAttribute: NSMetadataItemPathKey) as? String,
                        plan.accepts(path) {
@@ -55,7 +58,7 @@ final class SearchRunner {
                     }
                 }
                 query.enableUpdates()
-                results(SearchResults.merge(names: self.names, spotlight: paths))
+                results(SearchResults.merge(names: self.names, spotlight: paths, plan: plan))
             }
         }
         observers = [

@@ -1,5 +1,6 @@
 import FileKit
 import Foundation
+import IndexKit
 import QueryKit
 
 /// One search as typed (R2, R3): QueryKit's parse, chips and Spotlight query,
@@ -15,6 +16,9 @@ public struct SearchPlan {
     public let scopes: [String]
     /// Words for IndexKit, when the query is only names and words; nil otherwise.
     public let nameText: String?
+    /// The plain words of the query (not text:, name: or other filters), which
+    /// Spotlight matches by name or by content.
+    public let words: [String]
     let postFilter: @Sendable (String) -> Bool
     let home: String
     let drives: [GoogleDrive]
@@ -28,7 +32,7 @@ public struct SearchPlan {
         let scopes = compiled.scopes.isEmpty ? scope.spotlightScopes(home: home, drives: drives) : compiled.scopes
         return SearchPlan(
             text: text, scope: scope, parsed: parsed, chips: QueryChips.describe(parsed),
-            predicate: compiled.predicate, scopes: scopes, nameText: nameWords(parsed),
+            predicate: compiled.predicate, scopes: scopes, nameText: nameWords(parsed), words: plainWords(parsed),
             postFilter: compiled.postFilter, home: home, drives: drives
         )
     }
@@ -40,6 +44,33 @@ public struct SearchPlan {
         let inScope = scopes != scope.spotlightScopes(home: home, drives: drives)
             || scope.contains(path, home: home, drives: drives)
         return inScope && postFilter(path)
+    }
+
+    /// Whether a Spotlight result matched by its name: its name holds every plain
+    /// word. False means it was found only by what is inside it.
+    public func matchesName(_ path: String) -> Bool {
+        let name = (path as NSString).lastPathComponent
+        return words.allSatisfy { name.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
+    }
+
+    /// Whether to show a result found only by its contents. Not from app data:
+    /// ~/Library (except Google Drive), hidden folders, the insides of apps and
+    /// other packages, .git, node_modules and caches, unless the search was
+    /// limited to a folder inside such a place.
+    public func keepsContentMatch(_ path: String) -> Bool {
+        let roots = scopes.filter { $0.hasPrefix("/") && Backstage.isInside(path, $0) }
+        let scope = roots.max { $0.count < $1.count }
+        return !Backstage.contains(path, home: home, scope: scope, hidden: true)
+    }
+
+    static func plainWords(_ query: ParsedQuery) -> [String] {
+        guard let root = query.root else { return [] }
+        let parts: [Node]
+        if case .and(let children) = root { parts = children } else { parts = [root] }
+        return parts.compactMap { part in
+            if case .term(.text(let pattern)) = part { return pattern.text }
+            return nil
+        }
     }
 
     static func nameWords(_ query: ParsedQuery) -> String? {

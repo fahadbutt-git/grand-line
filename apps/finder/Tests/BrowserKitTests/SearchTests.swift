@@ -88,4 +88,42 @@ final class SearchTests: XCTestCase {
         ]
         XCTAssertEqual(SearchResults.names(matches, plan: plan), ["/Users/me/Documents/notes.md"])
     }
+
+    func testNameMatchesLeadAndAppDataContentMatchesAreDropped() {
+        let plan = SearchPlan.make("conj", scope: .mac, home: home.path, drives: [])
+        let spotlight = [
+            "/Users/me/Library/Application Support/Code/Cache/733.js",
+            "/Users/me/Documents/notes.md",
+            "/Users/me/Downloads/Conj Flap",
+            "/Users/me/.vscode/extensions/server.mjs",
+            "/Users/me/Projects/site/node_modules/pkg/index.js",
+            "/Applications/Tool.app/Contents/Resources/app.js",
+            "/System/Library/Frameworks/x.js",
+            "/Users/me/Library/CloudStorage/GoogleDrive-me@example.com/My Drive/eye exam.docx",
+            "/Users/me/Downloads/Plemel - CONJ",
+        ]
+        let merged = SearchResults.merge(names: [], spotlight: spotlight, plan: plan)
+        XCTAssertEqual(merged, [
+            "/Users/me/Downloads/Conj Flap",
+            "/Users/me/Downloads/Plemel - CONJ",
+            "/Users/me/Documents/notes.md",
+            "/Users/me/Library/CloudStorage/GoogleDrive-me@example.com/My Drive/eye exam.docx",
+        ])
+    }
+
+    func testContentMatchesStayWhenTheSearchIsInsideAppData() {
+        let cache = "/Users/me/Library/Application Support/Code"
+        let plan = SearchPlan.make("conj", scope: .folder(cache), home: home.path, drives: [])
+        XCTAssertTrue(plan.keepsContentMatch(cache + "/Cache/733.js"))
+        XCTAssertFalse(plan.keepsContentMatch(cache + "/node_modules/a.js"), "still skips what IndexKit skips below the scope")
+        let hidden = SearchPlan.make("conj in:~/.config", scope: .home, home: home.path, drives: [])
+        XCTAssertTrue(hidden.keepsContentMatch("/Users/me/.config/app/settings.json"))
+        XCTAssertFalse(SearchPlan.make("conj", scope: .home, home: home.path, drives: []).keepsContentMatch("/Users/me/.config/app/settings.json"))
+    }
+
+    func testNameMatchesIgnoreCaseAndAccents() {
+        let plan = SearchPlan.make("cafe menu", scope: .home, home: home.path, drives: [])
+        XCTAssertTrue(plan.matchesName("/Users/me/Café Menu.pdf"))
+        XCTAssertFalse(plan.matchesName("/Users/me/Café.pdf"))
+    }
 }

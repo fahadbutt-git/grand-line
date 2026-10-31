@@ -1,7 +1,7 @@
 import BrowserKit
 import SwiftUI
 
-/// View Options (Cmd+J), as in Finder: sort, icon size, hidden files, and
+/// View Options (Cmd+J), as in Finder: sort, grouping, folders on top, icon size, hidden files, and
 /// whether this folder keeps its own view (R6).
 struct ViewOptionsView: View {
     @ObservedObject var model: BrowserModel
@@ -21,6 +21,14 @@ struct ViewOptionsView: View {
                 }
             }
             .font(.system(size: 13))
+            Picker("Group By", selection: orderBinding(\.grouping)) {
+                ForEach(ItemGrouping.allCases, id: \.self) { grouping in
+                    Text(grouping.title).tag(grouping)
+                }
+            }
+            .font(.system(size: 13))
+            Toggle("Keep folders on top", isOn: orderBinding(\.foldersFirst))
+                .font(.system(size: 13))
             HStack(spacing: 8) {
                 Text("Icon size").font(.system(size: 13)).foregroundStyle(palette.text).lineLimit(1).fixedSize()
                 Slider(value: iconBinding, in: ViewSettings.iconSizes, step: 16)
@@ -45,6 +53,18 @@ struct ViewOptionsView: View {
         Binding(
             get: { pane.state.settings.sort.field },
             set: { field in model.sort(pane, by: field) }
+        )
+    }
+
+    /// One part of the sort, changed on its own.
+    private func orderBinding<Value>(_ part: WritableKeyPath<ItemSort, Value>) -> Binding<Value> {
+        Binding(
+            get: { pane.state.settings.sort[keyPath: part] },
+            set: { value in
+                var settings = pane.state.settings
+                settings.sort[keyPath: part] = value
+                pane.setSettings(settings)
+            }
         )
     }
 

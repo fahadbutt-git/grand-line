@@ -33,7 +33,8 @@ final class Services: ObservableObject {
     private(set) var drives: [GoogleDrive]
 
     private init() {
-        index = (try? FileIndex.load(from: paths.nameIndex)) ?? FileIndex(roots: [paths.home.path])
+        let order = ScanOrder.home(paths.home.path)
+        index = (try? FileIndex.load(from: paths.nameIndex, order: order)) ?? FileIndex(roots: [paths.home.path], order: order)
         selectionFile = SelectionFile(url: paths.selectionFile)
         workspaces = WorkspaceStore(folder: paths.workspaces)
         viewPreferences = JSONFile<ViewPreferences>(paths.viewPreferences).read() ?? ViewPreferences()
@@ -48,8 +49,10 @@ final class Services: ObservableObject {
 
     func start() {
         let index = self.index
+        let file = paths.nameIndex
         Task {
-            if await index.count == 0 { await index.build() }
+            // Searchable while it builds; saved along the way and when done.
+            if await index.count == 0 || !(await index.isComplete) { await index.build(savingTo: file, every: 30) }
             await index.startWatching()
         }
         let progress = operations.progress
