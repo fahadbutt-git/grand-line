@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""The Super key (Right Command): every shortcut is defined once, in BINDINGS below.
+"""The Caps Lock layer: every shortcut is defined once, in BINDINGS below.
 
 To add or change a shortcut, edit BINDINGS, then run:
     python3 tools/bindings.py
 
 That writes three things, which must not be edited by hand:
   config/karabiner/karabiner.json      the keyboard layer (Karabiner-Elements)
-  config/mac-setup/keybindings.tsv     the searchable list (Super + K)
+  config/mac-setup/keybindings.tsv     the searchable list (Caps + K)
   README.md                            the shortcut table, between its markers
 
     python3 tools/bindings.py --check  exits 1 if any of them is out of date
@@ -18,10 +18,6 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BIN = "$HOME/.mac-setup/bin"          # the package's commands (see lib/paths.sh)
-# Omarchy's Super key. Held with a letter, it runs the shortcut below. Any
-# Right Command combination not listed here still works as plain Command,
-# and Left Command is never touched.
-LAYER_KEY = "right_command"
 BREW = "/opt/homebrew/bin"            # Homebrew on Apple silicon
 AERO = f"{BREW}/aerospace"  # called directly: the fastest path for window keys
 
@@ -52,7 +48,7 @@ def aero(args):
 
 ARROWS = [("left_arrow", "left"), ("down_arrow", "down"), ("up_arrow", "up"), ("right_arrow", "right")]
 
-# (key, extra modifiers held with Super, group, description, action)
+# (key, extra modifiers held with Caps Lock, group, description, action)
 BINDINGS = [
     # Menus
     ("spacebar", [], "Menus", "Search (Spotlight until the search app ships)", key("spacebar", "command")),
@@ -61,6 +57,7 @@ BINDINGS = [
     ("escape", [], "Menus", "System menu (lock, sleep, restart, shut down)", cmd("menu System")),
 
     # Windows and workspaces
+    ("w", [], "Windows", "Close window", key("w", "command")),
     ("l", ["control"], "Windows", "Lock screen", key("q", "control", "command")),
     ("t", [], "Windows", "Toggle tiling and floating", aero("layout floating tiling")),
     ("j", [], "Windows", "Toggle split direction", aero("layout horizontal vertical")),
@@ -128,8 +125,10 @@ BINDINGS += [
     ("c", ["control"], "Capture", "Capture menu", cmd("menu Capture")),
     ("x", ["control", "shift"], "Capture", "Copy text from a screen area", cmd("capture text")),
     ("period", ["control"], "Capture", "Transcode menu (video, images, PDF)", cmd("menu Transcode")),
-    # Copy, cut, paste and close are Super + C, X, V, W as in Omarchy: Right Command
-    # is Command, so these are the Mac's own and work in the terminal too.
+    # Universal copy and paste, as Super + C, X, V in Omarchy (works in the terminal too)
+    ("c", [], "Clipboard", "Copy", key("c", "command")),
+    ("x", [], "Clipboard", "Cut", key("x", "command")),
+    ("v", [], "Clipboard", "Paste", key("v", "command")),
     ("v", ["option"], "Clipboard", "Paste as plain text (no formatting)", key("v", "command", "option", "shift")),
     ("v", ["control"], "Clipboard", "Clipboard history (Maccy)", key("c", "command", "shift")),
     ("e", ["control"], "Clipboard", "Emoji and symbols", key("spacebar", "control", "command")),
@@ -163,14 +162,15 @@ README_END = "<!-- shortcuts:end -->"
 
 
 def label(code, mods):
-    parts = ["Super"] + [MOD_LABEL[m] for m in MOD_ORDER if m in mods]
+    parts = ["Caps"] + [MOD_LABEL[m] for m in MOD_ORDER if m in mods]
     parts.append(KEY_LABEL.get(code, code.upper()))
     return " + ".join(parts)
 
 
 def manipulator(code, mods, action):
     frm = {"key_code": code}
-    frm["modifiers"] = {"mandatory": [LAYER_KEY] + mods}
+    if mods:
+        frm["modifiers"] = {"mandatory": mods}
     if action[0] == "sh":
         to = [{"shell_command": action[1]}]
     else:
@@ -179,6 +179,7 @@ def manipulator(code, mods, action):
             to[0]["modifiers"] = action[2]
     return {
         "type": "basic",
+        "conditions": [{"type": "variable_if", "name": "caps_layer", "value": 1}],
         "from": frm,
         "to": to,
     }
@@ -194,6 +195,13 @@ def check_duplicates():
 
 
 def karabiner_json():
+    caps = {
+        "type": "basic",
+        "from": {"key_code": "caps_lock", "modifiers": {"optional": ["any"]}},
+        "to": [{"set_variable": {"name": "caps_layer", "value": 1}}],
+        "to_after_key_up": [{"set_variable": {"name": "caps_layer", "value": 0}}],
+        "to_if_alone": [{"key_code": "escape"}],
+    }
     ordered = sorted(BINDINGS, key=lambda b: -len(b[1]))  # most specific first
     config = {
         "global": {"show_in_menu_bar": False},
@@ -204,8 +212,10 @@ def karabiner_json():
             "complex_modifications": {
                 "parameters": {"basic.to_if_alone_timeout_milliseconds": 250},
                 "rules": [
-                    {"description": "Shortcuts on Right Command, Omarchy's Super key. "
+                    {"description": "Caps Lock: hold for the shortcut layer, tap for Escape. "
                                     "Generated by tools/bindings.py, do not edit.",
+                     "manipulators": [caps]},
+                    {"description": "Shortcuts on the Caps Lock layer. Generated by tools/bindings.py.",
                      "manipulators": [manipulator(c, m, a) for c, m, _, _, a in ordered]},
                 ],
             },

@@ -1,4 +1,4 @@
-# Main menu (Super + Option + Space). One entry per line:
+# Main menu (Caps + Option + Space). One entry per line:
 # Group/Item<TAB>command. Groups can nest (A/B/Item). Commands run in bash
 # with the package commands on the PATH. Save, and the menu updates at once.
 Apps/Open an app	menu-apps
