@@ -97,7 +97,7 @@ struct SidebarRow: View {
             .accessibilityLabel(item.title)
             .accessibilityValue(value)
             .accessibilityAddTraits(traits)
-            .accessibilityAction(perform: open)
+            .accessibilityAction { open() }
             .accessibilityActions { ejectAction }
     }
 
