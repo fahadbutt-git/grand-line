@@ -32,6 +32,10 @@ final class SearchModel: ObservableObject {
     private(set) var settingsRunningOpen = 0
     /// The window lost the keys while such a change ran.
     var keysLostDuringSetting = false
+    /// When the last change that keeps the window open finished.
+    private(set) var lastSettingEnded: Date?
+    /// The apps a setting change restarts, which come to the front as they start.
+    static let restartedBySettings: Set<String> = ["com.apple.finder", "com.apple.dock"]
     private var task: Task<Void, Never>?
     private var query = LaunchQuery(raw: "")
     /// Keeps the top row still while the query grows.
@@ -340,11 +344,12 @@ final class SearchModel: ObservableObject {
                     self.show()
                 } else if !closes {
                     self.settingsRunningOpen -= 1
+                    self.lastSettingEnded = Date()
                     // A change that restarts Finder or the Dock (hidden files,
                     // desktop icons, Dock hiding) brings that app to the front;
                     // the window comes back, as it was, so the change can be seen.
                     // A click into any other app is left alone.
-                    let restarted: Set<String> = ["com.apple.finder", "com.apple.dock"]
+                    let restarted = SearchModel.restartedBySettings
                     if self.settingsRunningOpen == 0, self.keysLostDuringSetting {
                         self.keysLostDuringSetting = false
                         if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier, restarted.contains(front) {

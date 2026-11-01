@@ -103,8 +103,43 @@ final class PanelController: NSObject, NSWindowDelegate {
         // Clicking another app hides the window, unless a sheet or open panel took the keys.
         if NSApp.modalWindow == nil, panel.attachedSheet == nil {
             if model.settingsRunningOpen > 0 { model.keysLostDuringSetting = true }
+            let justChanged = model.lastSettingEnded.map { Date().timeIntervalSince($0) < 3 } ?? false
+            if model.settingsRunningOpen > 0 || justChanged { comeBackIfFinderRestarts() }
             hide()
         }
+    }
+
+    private var restartWatch: NSObjectProtocol?
+
+    /// Finder relaunched by a setting change (hidden files, desktop icons)
+    /// takes the front a moment after the change ends. When that is what took
+    /// the keys, the window comes back; any other app taking them is left alone.
+    private func comeBackIfFinderRestarts() {
+        if let restartWatch { NSWorkspace.shared.notificationCenter.removeObserver(restartWatch) }
+        let center = NSWorkspace.shared.notificationCenter
+        restartWatch = center.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] note in
+            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            let bundle = app?.bundleIdentifier ?? ""
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.stopRestartWatch()
+                if SearchModel.restartedBySettings.contains(bundle), !self.panel.isVisible { self.show() }
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in self?.stopRestartWatch() }
+        // Finder may already be in front by the time the keys go.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.restartWatch != nil, !self.panel.isVisible,
+                  let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+                  SearchModel.restartedBySettings.contains(front) else { return }
+            self.stopRestartWatch()
+            self.show()
+        }
+    }
+
+    private func stopRestartWatch() {
+        if let restartWatch { NSWorkspace.shared.notificationCenter.removeObserver(restartWatch) }
+        restartWatch = nil
     }
 
     private func route(_ event: NSEvent) -> Bool {
