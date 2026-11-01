@@ -54,4 +54,32 @@ final class HangWatchdogFreezeTests: XCTestCase {
         Thread.sleep(forTimeInterval: 0.5)
         XCTAssertFalse(FreezeReport.found(in: text(log)))
     }
+
+    func testStallLinesNameWhatTheAppWasDoing() {
+        XCTAssertEqual(StallReport.line(delay: 1.985, phases: ["first show", "search"]),
+                       "main thread stalled 1985 ms (during: first show, search)")
+        XCTAssertEqual(StallReport.line(delay: 0.3, phases: [""]), "main thread stalled 300 ms")
+        XCTAssertEqual(FreezeReport.line(waited: 5, phases: ["launch"]), "main thread not answering for 5 s (during: launch)")
+        // The perf report and the journeys still read the length.
+        XCTAssertEqual(StallReport.longest(in: "2026-10-31T10:00:00Z main thread stalled 1985 ms (during: search)\n"), 1985)
+        XCTAssertTrue(FreezeReport.found(in: "x main thread not answering for 5 s (during: launch)\n"))
+    }
+
+    func testAStallIsWrittenWithThePhasesNamedWhileItLasted() {
+        let log = AppLog(name: "phases", home: home)
+        let stuck = DispatchQueue(label: "test.phases")
+        let release = DispatchSemaphore(value: 0)
+        let dog = HangWatchdog(log: log, target: stuck, freezeAfter: 5)
+        dog.setPhase("first show")
+        stuck.async { release.wait() }
+        dog.pingNow()
+        dog.setPhase("search")
+        dog.setPhase("search")
+        XCTAssertEqual(dog.currentPhase, "search")
+        Thread.sleep(forTimeInterval: 0.4)
+        release.signal()
+        Thread.sleep(forTimeInterval: 0.2)
+        let written = text(log)
+        XCTAssertTrue(written.contains("(during: first show, search)"), written)
+    }
 }

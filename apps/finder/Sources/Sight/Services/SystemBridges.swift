@@ -67,18 +67,64 @@ enum Keystrokes {
     }
 }
 
-/// App icons, read once per path. At most `limit` are kept (apps and
+/// App icons, read once per path, off the main thread: asking Launch
+/// Services for an icon and drawing it can take a moment each on a slow
+/// disk, and a list of app rows asks for several at once. Until an icon is
+/// read the row shows a plain symbol; the window redraws, once per turn of
+/// the run loop, when icons arrive. At most `limit` are kept (apps and
 /// running processes only, so it rarely fills); past it, it starts over.
 @MainActor
 enum IconCache {
     private static var icons: [String: NSImage] = [:]
+    private static var loading: Set<String> = []
+    private static var redrawPending = false
     static let limit = 400
+    /// Redraws the window; set by the panel.
+    static var onLoad: () -> Void = {}
 
-    static func icon(_ path: String) -> NSImage {
+    /// The icon when it has been read; otherwise nil, and it is read now in the background.
+    static func cached(_ path: String) -> NSImage? {
         if let icon = icons[path] { return icon }
-        if icons.count >= limit { icons.removeAll(keepingCapacity: true) }
-        let icon = NSWorkspace.shared.icon(forFile: path)
-        icons[path] = icon
-        return icon
+        load(path)
+        return nil
     }
+
+    private static func load(_ path: String) {
+        guard loading.insert(path).inserted else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let drawn = LoadedIcon(image: IconCache.render(NSWorkspace.shared.icon(forFile: path)))
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    IconCache.loading.remove(path)
+                    if IconCache.icons.count >= IconCache.limit { IconCache.icons.removeAll(keepingCapacity: true) }
+                    IconCache.icons[path] = drawn.image
+                    IconCache.redrawSoon()
+                }
+            }
+        }
+    }
+
+    /// Draws the icon at the size rows show it (20 points, 2x), so nothing is
+    /// decoded later on the main thread.
+    nonisolated private static func render(_ icon: NSImage) -> NSImage {
+        var rect = NSRect(x: 0, y: 0, width: 40, height: 40)
+        guard let cg = icon.cgImage(forProposedRect: &rect, context: nil, hints: nil) else { return icon }
+        return NSImage(cgImage: cg, size: NSSize(width: 20, height: 20))
+    }
+
+    private static func redrawSoon() {
+        guard !redrawPending else { return }
+        redrawPending = true
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                IconCache.redrawPending = false
+                IconCache.onLoad()
+            }
+        }
+    }
+}
+
+/// An icon read in the background, handed to the main thread.
+private struct LoadedIcon: @unchecked Sendable {
+    let image: NSImage
 }

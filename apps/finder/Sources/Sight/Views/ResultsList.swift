@@ -20,7 +20,8 @@ struct ResultsList: View {
                             .frame(maxWidth: .infinity, minHeight: Metrics.header, alignment: .leading)
                             .padding(.horizontal, 14)
                         ForEach(group.rows) { row in
-                            ResultRow(row: row, selected: row.id == selectedID, number: model.list.shortcutNumber(of: row.id), theme: theme)
+                            ResultRow(row: row, selected: row.id == selectedID, number: model.list.shortcutNumber(of: row.id),
+                                      held: row.id == selectedID ? model.held : .none, theme: theme)
                                 .modifier(SettingRowAccessibility(row: row))
                                 .id(row.id)
                                 .contentShape(Rectangle())
@@ -64,6 +65,8 @@ struct ResultRow: View {
     let row: LaunchResult
     let selected: Bool
     let number: Int?
+    /// Command or Option held on the selected row: the subtitle says what Return does then.
+    var held: HeldModifier = .none
     let theme: Theme
 
     var body: some View {
@@ -77,9 +80,9 @@ struct ResultRow: View {
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .layoutPriority(1)
-            Text(row.subtitle)
+            Text(ModifierPreview.subtitle(for: row, held: held) ?? row.subtitle)
                 .font(.system(size: 11))
-                .foregroundStyle(Color(theme.dim))
+                .foregroundStyle(Color(held == .none ? theme.dim : theme.highlight))
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .frame(width: 150, alignment: .leading)
@@ -145,9 +148,15 @@ struct ResultIconView: View {
                 .font(.system(size: 14))
                 .foregroundStyle(Color(theme.dim))
         case .app(let path):
-            Image(nsImage: IconCache.icon(path))
-                .resizable()
-                .frame(width: 20, height: 20)
+            if let image = IconCache.cached(path) {
+                Image(nsImage: image)
+                    .resizable()
+                    .frame(width: 20, height: 20)
+            } else {
+                Image(systemName: "app")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(theme.faint))
+            }
         case .glyph(let character):
             Text(character)
                 .font(.system(size: 16))

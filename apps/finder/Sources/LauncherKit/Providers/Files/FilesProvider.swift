@@ -90,11 +90,15 @@ public struct FilesProvider: LaunchProvider {
         let now = Date()
         // The index gives the tier; fzf's score (the same matcher every other
         // provider uses) orders files within it.
+        // A name the index found only by scattered letters is dropped unless
+        // the matcher finds those letters close together too (TextMatcher.isTight).
         let matcher = plan.names.map { TextMatcher($0) }
-        let rows = hits.map { hit -> LaunchResult in
+        let rows = hits.compactMap { hit -> LaunchResult? in
             var row = FileResults.result(hit, paths: paths, now: now)
-            if let matcher, let scored = matcher.match(FoldedText(hit.name, stripsExtension: !hit.isFolder)) {
-                row.match.quality = scored.quality
+            if let matcher {
+                let scored = matcher.match(FoldedText(hit.name, stripsExtension: !hit.isFolder))
+                if hit.tier == .fuzzy, scored.map({ $0.tier < .typo }) != true { return nil }
+                if let scored { row.match.quality = scored.quality }
             }
             return row
         }

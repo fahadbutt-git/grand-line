@@ -1,22 +1,28 @@
 import Foundation
 
-/// The sections of the result list, in the order they are shown.
+/// The sections of the result list, in the order they are shown: the top
+/// hit, then what Return runs on the Mac (answers, apps, settings, commands,
+/// windows), then files, then bookmarks and other text, then the web, with the
+/// rows offered when nothing matches last.
+///
+/// The raw values are saved with recents and favourites, so each keeps the
+/// number it was given; the order of the cases is the display order.
 public enum ResultSection: Int, Codable, CaseIterable, Comparable, Sendable {
-    case favourites
-    case recents
-    case topHit
-    case answers
-    case apps
-    case grandLine
-    case windows
-    case system
-    case bookmarks
-    case snippets
-    case symbols
-    case files
-    case web
+    case favourites = 0
+    case recents = 1
+    case topHit = 2
+    case answers = 3
+    case apps = 4
+    case system = 7
+    case grandLine = 5
+    case windows = 6
+    case files = 11
+    case bookmarks = 8
+    case snippets = 9
+    case symbols = 10
+    case web = 12
     /// Offered when nothing matches: create a file, run in Terminal, calculate.
-    case otherActions
+    case otherActions = 13
 
     public var title: String {
         switch self {
@@ -49,7 +55,12 @@ public enum ResultSection: Int, Codable, CaseIterable, Comparable, Sendable {
         }
     }
 
+    /// The default display order (the order of the cases), not the raw values.
     public static func < (lhs: ResultSection, rhs: ResultSection) -> Bool {
-        lhs.rawValue < rhs.rawValue
+        position(lhs) < position(rhs)
+    }
+
+    private static func position(_ section: ResultSection) -> Int {
+        allCases.firstIndex(of: section) ?? section.rawValue
     }
 }

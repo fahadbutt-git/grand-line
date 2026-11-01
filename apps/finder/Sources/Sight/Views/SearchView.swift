@@ -159,17 +159,21 @@ struct ChipsRow: View {
     }
 }
 
-/// The selected row's shortcuts, or the pending confirmation, and the result count.
+/// What Return does on the selected row, then its other keys ("Open ↵ ·
+/// Show in Nexus ⌘↵ · Actions ⌘K"), or the pending confirmation; on the
+/// right, a message such as a script's progress.
 struct FooterRow: View {
     @ObservedObject var model: SearchModel
     let theme: Theme
 
     var body: some View {
-        HStack(spacing: 16) {
-            ForEach(FooterHints.hints(for: model.list.selected, confirming: model.gate.pending), id: \.self) { hint in
+        let hints = FooterHints.hints(for: model.list.selected, confirming: model.gate.pending, held: model.held)
+        HStack(spacing: 8) {
+            ForEach(Array(hints.enumerated()), id: \.offset) { index, hint in
+                if index > 0 { Text("\u{00B7}").foregroundStyle(Color(theme.faint)) }
                 HStack(spacing: 4) {
-                    Text(hint.keys).foregroundStyle(Color(theme.text))
                     Text(hint.label).lineLimit(1).truncationMode(.tail)
+                    Text(hint.keys).foregroundStyle(Color(theme.text))
                 }
                 .foregroundStyle(Color(model.gate.isConfirming ? theme.highlight : theme.dim))
             }

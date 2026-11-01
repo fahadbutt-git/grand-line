@@ -13,7 +13,7 @@ public struct RankKey: Hashable, Sendable, Comparable {
     /// other row that answers the same words: a menu entry or shortcut that
     /// runs something close to it, a pane, an app, a symbol, an alias.
     public var settingPhrase: Bool
-    /// MatchTier raw value, or 5 for no title match.
+    /// MatchTier raw value, or `noMatch` for no title match.
     public var title: Int
     public var keyword: Int
     public var frecency: Double
@@ -33,7 +33,10 @@ public struct RankKey: Hashable, Sendable, Comparable {
         self.learned = learned
     }
 
-    public static let unranked = RankKey(fallback: true, alias: .none, title: 5, keyword: 5, frecency: 0, quality: 0)
+    /// The tier value of "did not match": after every MatchTier.
+    public static let noMatch = MatchTier.allCases.count
+
+    public static let unranked = RankKey(fallback: true, alias: .none, title: noMatch, keyword: noMatch, frecency: 0, quality: 0)
 
     /// How much one doubling of frecency is worth against fzf's score, where a
     /// matched letter is 16: a habit outweighs a slightly tidier match, not a

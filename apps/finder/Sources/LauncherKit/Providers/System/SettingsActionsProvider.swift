@@ -310,7 +310,7 @@ public final class SettingsActionsProvider: InstantProvider, @unchecked Sendable
             switch found.kind {
             case .power(let what, let confirm):
                 primary = LaunchAction(found.title, symbol: found.symbol, confirmation: confirm, .run(paths.command("power"), arguments: [what]))
-                subtitle = confirm == nil ? "Return does it now" : "Asks first"
+                subtitle = Self.powerSubtitle(confirm: confirm)
             case .capture(let what):
                 primary = LaunchAction(found.title, symbol: found.symbol, .run(paths.command("capture"), arguments: [what]))
                 subtitle = "Capture"
@@ -363,6 +363,15 @@ public final class SettingsActionsProvider: InstantProvider, @unchecked Sendable
                 ? MatchInfo(alias: .exact, title: .exact, quality: Self.qualityBase + match.order)
                 : MatchInfo(title: .prefix, quality: Self.qualityBase + match.order)
         )
+    }
+
+    /// What Return does on a power row, in plain words: "Return asks, then
+    /// Return again will put the Mac to sleep" for one that confirms first.
+    static func powerSubtitle(confirm: String?) -> String {
+        guard let confirm else { return "Return does it now" }
+        let lead = "Press Return again to "
+        let what = confirm.hasPrefix(lead) ? String(confirm.dropFirst(lead.count)) : ""
+        return what.isEmpty ? "Return asks, then Return again does it" : "Return asks, then Return again will \(what)"
     }
 
     static func volumeNote(_ state: SettingsState?, after: (Int) -> Int) -> String {

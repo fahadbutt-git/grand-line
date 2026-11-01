@@ -29,6 +29,6 @@ final class ThemeStore: ObservableObject {
     private func applyIcon(_ theme: Theme) {
         guard iconTheme != theme.icon else { return }
         iconTheme = theme.icon
-        AppIconInstaller.apply(.sight, theme: theme.icon)
+        AppIconInstaller.applyInBackground(.sight, theme: theme.icon)
     }
 }

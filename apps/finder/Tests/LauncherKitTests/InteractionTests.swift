@@ -56,8 +56,9 @@ final class InteractionTests: XCTestCase {
         row.actions += [LaunchAction("Reveal", symbol: "folder", .reveal("/x")), LaunchAction("Copy", symbol: "doc", .copyText("x"))]
         row.previewPath = "/x"
         let hints = FooterHints.hints(for: row, confirming: nil)
-        XCTAssertEqual(hints.map(\.keys), ["↩", "⌘↩", "⌘K", "⌘Y"])
-        XCTAssertEqual(hints[1].label, "reveal")
+        // "Open ↵ · Reveal ⌘↵ · Actions ⌘K": Quick Look is in the action panel.
+        XCTAssertEqual(hints.map(\.keys), ["↵", "⌘↵", "⌘K"])
+        XCTAssertEqual(hints.map(\.label), ["Open", "Reveal", "Actions"])
         var gate = ConfirmationGate()
         _ = gate.shouldRun(LaunchAction("Quit", symbol: "x", confirmation: "Quit Safari?", .quit(pid: 1, force: false)), on: "p")
         XCTAssertEqual(FooterHints.hints(for: row, confirming: gate.pending).first?.label, "Quit Safari?")

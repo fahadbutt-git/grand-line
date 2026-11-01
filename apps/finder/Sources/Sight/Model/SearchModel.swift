@@ -20,6 +20,10 @@ final class SearchModel: ObservableObject {
     @Published var actionPanel: ActionPanelState?
     @Published private(set) var gate = ConfirmationGate()
     @Published var previewOpen = false
+    /// Command or Option held: the selected row and the footer say what Return does with it.
+    @Published private(set) var held = HeldModifier.none
+    /// The empty field's example, a different one each opening.
+    @Published private(set) var placeholder = SearchPlaceholder.text(opening: 0)
 
     let services: Services
     let performer: ActionPerformer
@@ -40,6 +44,11 @@ final class SearchModel: ObservableObject {
     private var query = LaunchQuery(raw: "")
     /// Keeps the top row still while the query grows.
     private var hold = TopRowHold()
+    /// Queries something was run from, for Up on an empty field.
+    private(set) var history = QueryHistory()
+    /// When the window last closed, to decide whether its query stays.
+    private var hiddenAt: Date?
+    private var openings = 0
 
     init(services: Services) {
         self.services = services
@@ -61,8 +70,10 @@ final class SearchModel: ObservableObject {
 
     /// Instant providers answer on the keystroke; slower ones merge in below.
     func setText(_ newText: String, fromField: Bool = true) {
+        StallPhase.begin("search")
+        defer { StallPhase.end() }
         text = newText
-        if !fromField { field?.stringValue = newText; moveCursorToEnd() }
+        if fromField { history.leave() } else { field?.stringValue = newText; moveCursorToEnd() }
         gate.cancel()
         actionPanel = nil
         let engine = services.engine
@@ -70,28 +81,30 @@ final class SearchModel: ObservableObject {
         query = plan.query
         scopeChip = plan.chip
         chips = plan.query.prefix == .files ? QueryChips.describe(QueryParser.parse(plan.query.term)) : []
-        let started = Date()
         list.replace(with: engine.instantGroups(plan, hold: &hold), limitScale: plan.limitScale, topHit: plan.topHit)
-        status = statusText(milliseconds: Int(Date().timeIntervalSince(started) * 1000))
+        // The footer shows what Return does, not counts or timings.
+        status = ""
         readSettingsIfShown()
         task?.cancel()
         task = Task { [weak self] in
             for await update in engine.search(plan, includeInstant: false) {
                 guard let self, !Task.isCancelled else { return }
-                switch update {
-                case .merge(let rows): self.list.merge(rows)
-                case .replace(let groups, let scale): self.list.replace(with: groups, limitScale: scale, topHit: plan.topHit)
-                case .finished(let ms): self.status = self.statusText(milliseconds: ms)
+                StallPhase.during("merge results") {
+                    switch update {
+                    case .merge(let rows): self.list.merge(rows)
+                    case .replace(let groups, let scale): self.list.replace(with: groups, limitScale: scale, topHit: plan.topHit)
+                    case .finished: break
+                    }
                 }
             }
         }
     }
 
-    func refresh() { setText(text, fromField: true) }
-
-    private func statusText(milliseconds: Int) -> String {
-        let count = list.rows.filter { !$0.isFallback }.count
-        return count == 0 ? "" : "\(count) result\(count == 1 ? "" : "s") · \(milliseconds) ms"
+    /// Searches the same text again; Up keeps walking back through the history.
+    func refresh() {
+        let walking = history
+        setText(text, fromField: true)
+        history = walking
     }
 
     private func moveCursorToEnd() {
@@ -107,12 +120,24 @@ final class SearchModel: ObservableObject {
         if actionPanel != nil, command == .toggleBuffer { return true }
         if gate.isConfirming, command != .primary, command != .escape { gate.cancel() }
         switch command {
-        case .moveUp: list.moveSelection(by: -1)
+        case .moveUp:
+            // Up with nothing typed (or on the query it brought back) recalls
+            // the queries before; anywhere else it moves the selection.
+            if let recalled = history.up(text: text, atTop: (list.selectedIndex ?? 0) == 0) {
+                setText(recalled, fromField: false)
+            } else {
+                list.moveSelection(by: -1)
+            }
         case .moveDown: list.moveSelection(by: 1)
         case .pageUp: list.moveSelection(by: -8)
         case .pageDown: list.moveSelection(by: 8)
         case .primary: runSelected(index: 0)
         case .secondary: runSelected(index: 1)
+        case .alternate:
+            guard let row = list.selected, let action = ActionPanel.alternate(for: row) else { NSSound.beep(); return true }
+            run(action, on: row)
+        case .drillIn:
+            return drillIn()
         case .runRow(let n):
             guard let row = list.row(shortcut: n), let action = row.primary else { return true }
             // Selected, so a row that asks first is confirmed by Return on it.
@@ -176,6 +201,45 @@ final class SearchModel: ObservableObject {
         }
     }
 
+    /// Right arrow at the end of the field: into a folder, or the row's
+    /// actions. Anywhere else in the text it moves the cursor.
+    private func drillIn() -> Bool {
+        guard actionPanel == nil, buffer.isEmpty, let editor = field?.currentEditor() else { return false }
+        let range = editor.selectedRange
+        guard range.length == 0, range.location == (text as NSString).length else { return false }
+        switch DrillIn.target(for: list.selected, paths: services.paths) {
+        case .browse(let path)?:
+            setText(path, fromField: false)
+        case .actions?:
+            openActionPanel()
+        case nil:
+            return false
+        }
+        return true
+    }
+
+    /// Command or Option went down or up.
+    func setHeld(_ modifier: HeldModifier) {
+        if held != modifier { held = modifier }
+    }
+
+    /// The window is about to show: a query left more than `QueryResume.keepFor`
+    /// ago goes (Up brings it back), and the placeholder shows its next example.
+    func prepareToShow(now: Date = Date()) {
+        openings += 1
+        placeholder = SearchPlaceholder.text(opening: openings)
+        held = .none
+        if !text.isEmpty, !QueryResume.keepsQuery(hiddenAt: hiddenAt, now: now) {
+            history.record(text)
+            setText("", fromField: false)
+        }
+    }
+
+    func didHide() {
+        hiddenAt = Date()
+        held = .none
+    }
+
     private func complete() {
         guard let row = list.selected else { return }
         if let action = row.actions.first(where: { if case .setQuery = $0.command { return true } else { return false } }),
@@ -223,6 +287,8 @@ final class SearchModel: ObservableObject {
     ///   - files: the buffer's files when the action came from the buffer's panel.
     func run(_ action: LaunchAction, on row: LaunchResult, confirmed: Bool = false, files: [String] = []) {
         guard confirmed || gate.shouldRun(action, on: row.id) else { return }
+        StallPhase.begin("run action")
+        defer { StallPhase.end() }
         if row.providerID == SettingsActionsProvider.providerID, runSetting(action, on: row) { return }
         switch action.command {
         case .buffer(let paths):
@@ -266,6 +332,7 @@ final class SearchModel: ObservableObject {
         if UsagePolicy.mayRecord(row) {
             services.usage.record(row, query: query)
         }
+        history.record(text)
         if let path = row.previewPath { services.names.noteOpened(path) }
         // Alfred empties the buffer once something was done with it.
         if !files.isEmpty, action.closesWindow, files == buffer.paths { buffer.clear() }
@@ -317,7 +384,9 @@ final class SearchModel: ObservableObject {
 
     /// Redraws the settings rows in place, so nothing else on screen moves.
     private func updateSettingRows() {
-        list.update(services.settingsActions.instantResults(for: query))
+        StallPhase.during("settings read") {
+            list.update(services.settingsActions.instantResults(for: query))
+        }
     }
 
     /// Runs a setting change off the main thread: the row says it is working,

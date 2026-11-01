@@ -303,6 +303,10 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
     /// one caller makes it: the check and the new connection are under the lock.
     func shouldAskService() -> Bool {
         guard serviceName != nil else { return false }
+        // Reading this program's own signature can take a while on a slow
+        // disk the first time; it is read here, before the lock, so nothing
+        // that only wants the lock (the main thread among them) waits on it.
+        let requirement = Self.serviceRequirement
         let now = Date()
         lock.lock()
         var fresh: NSXPCConnection?
@@ -313,7 +317,7 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
             return false
         case .up, .unknown:
             if connection == nil {
-                fresh = newConnection()
+                fresh = newConnection(requirement: requirement)
                 connection = fresh
             }
         case .down(let since, let retried):
@@ -323,7 +327,7 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
             }
             state = .down(since: since, retried: now)
             old = connection
-            fresh = newConnection()
+            fresh = newConnection(requirement: requirement)
             connection = fresh
         }
         fresh?.resume()
@@ -340,13 +344,16 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
 
     /// A configured connection, not yet resumed. Called under the lock; it
     /// only sets properties, and the handlers run later on XPC's own queue.
-    private func newConnection() -> NSXPCConnection? {
+    /// What the service must be signed as, read once.
+    static let serviceRequirement: String? = CodeSigning.requirement(allowing: [IndexServiceName.bundleID], signer: CodeSigning.own)
+
+    private func newConnection(requirement: String?) -> NSXPCConnection? {
         guard let serviceName else { return nil }
         let connection = NSXPCConnection(machServiceName: serviceName, options: [])
         connection.remoteObjectInterface = IndexXPC.serviceInterface()
         connection.exportedInterface = IndexXPC.eventsInterface()
         connection.exportedObject = EventReceiver(client: self)
-        if let requirement = CodeSigning.requirement(allowing: [IndexServiceName.bundleID], signer: CodeSigning.own) {
+        if let requirement {
             connection.setCodeSigningRequirement(requirement)
         }
         connection.invalidationHandler = { [weak self, weak connection] in

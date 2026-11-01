@@ -30,5 +30,7 @@ public struct KeyPress: Sendable, Equatable {
         public static let pageUp: UInt16 = 116
         public static let pageDown: UInt16 = 121
         public static let space: UInt16 = 49
+        public static let left: UInt16 = 123
+        public static let right: UInt16 = 124
     }
 }

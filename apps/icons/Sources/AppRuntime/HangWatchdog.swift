@@ -21,10 +21,15 @@ public enum StallReport {
     /// Stalls shorter than this are not written down.
     public static let threshold: TimeInterval = 0.25
 
-    /// The log line for a ping answered `delay` seconds late, or nil.
-    public static func line(delay: TimeInterval) -> String? {
+    /// The log line for a ping answered `delay` seconds late, or nil. With
+    /// `phases` (what the app said it was doing while the ping waited, such as
+    /// "first show" or "search"), the line ends with them, so a stall can be
+    /// traced: "main thread stalled 1985 ms (during: launch, first show)".
+    public static func line(delay: TimeInterval, phases: [String] = []) -> String? {
         guard delay >= threshold else { return nil }
-        return "main thread stalled \(Int((delay * 1000).rounded())) ms"
+        let base = "main thread stalled \(Int((delay * 1000).rounded())) ms"
+        let named = phases.filter { !$0.isEmpty }
+        return named.isEmpty ? base : base + " (during: " + named.joined(separator: ", ") + ")"
     }
 
     /// The longest stall in a log's text, in milliseconds (the journeys use it).
@@ -46,8 +51,10 @@ public enum FreezeReport {
     /// A ping unanswered this long counts as a freeze.
     public static let after: TimeInterval = 5
 
-    public static func line(waited: TimeInterval) -> String {
-        "main thread not answering for \(Int(waited.rounded())) s"
+    public static func line(waited: TimeInterval, phases: [String] = []) -> String {
+        let base = "main thread not answering for \(Int(waited.rounded())) s"
+        let named = phases.filter { !$0.isEmpty }
+        return named.isEmpty ? base : base + " (during: " + named.joined(separator: ", ") + ")"
     }
 
     /// True when a log's text records a freeze (the journeys use it).
@@ -86,6 +93,10 @@ public final class HangWatchdog: @unchecked Sendable {
     private var freezeWritten = false
     private let target: DispatchQueue
     private let freezeAfter: TimeInterval
+    /// What the app says it is doing ("launch", "first show", "search"), and
+    /// every phase named while the ping out waits for its answer.
+    private var phase = ""
+    private var phasesDuringPing: [String] = []
 
     /// `target` is the queue watched (the main queue; tests pass their own).
     public init(log: AppLog, target: DispatchQueue = .main, freezeAfter: TimeInterval = FreezeReport.after) {
@@ -96,6 +107,24 @@ public final class HangWatchdog: @unchecked Sendable {
 
     /// Sends one ping now, outside the timer (tests).
     public func pingNow() { tick() }
+
+    /// Names what the main thread is about to do, for the stall line. Cheap:
+    /// a lock and a string, so the app can call it on every keystroke.
+    public func setPhase(_ label: String) {
+        lock.lock()
+        phase = label
+        if waiting, !label.isEmpty, phasesDuringPing.last != label, phasesDuringPing.count < 8 {
+            phasesDuringPing.append(label)
+        }
+        lock.unlock()
+    }
+
+    /// The phase named last (tests).
+    public var currentPhase: String {
+        lock.lock()
+        defer { lock.unlock() }
+        return phase
+    }
 
     /// The app came to the front or left it.
     public func setActive(_ isActive: Bool) {
@@ -155,6 +184,7 @@ public final class HangWatchdog: @unchecked Sendable {
         waiting = true
         pingNumber += 1
         freezeWritten = false
+        phasesDuringPing = phase.isEmpty ? [] : [phase]
         let number = pingNumber
         lock.unlock()
         let sent = DispatchTime.now()
@@ -163,8 +193,10 @@ public final class HangWatchdog: @unchecked Sendable {
             guard let self else { return }
             self.lock.lock()
             self.waiting = false
+            let phases = self.phasesDuringPing
+            self.phasesDuringPing = []
             self.lock.unlock()
-            if let line = StallReport.line(delay: delay) { self.log.write(line) }
+            if let line = StallReport.line(delay: delay, phases: phases) { self.log.write(line) }
         }
         // The second check: this ping still out after freezeAfter seconds.
         let wait = freezeAfter
@@ -173,8 +205,9 @@ public final class HangWatchdog: @unchecked Sendable {
             self.lock.lock()
             let frozen = self.waiting && self.pingNumber == number && !self.freezeWritten
             if frozen { self.freezeWritten = true }
+            let phases = self.phasesDuringPing
             self.lock.unlock()
-            if frozen { self.log.write(FreezeReport.line(waited: wait)) }
+            if frozen { self.log.write(FreezeReport.line(waited: wait, phases: phases)) }
         }
     }
 }

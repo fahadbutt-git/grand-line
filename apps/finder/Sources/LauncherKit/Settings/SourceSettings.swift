@@ -2,17 +2,18 @@ import Foundation
 
 /// A kind of result that can be turned off or moved in Settings, Sources.
 public enum LauncherSource: String, CaseIterable, Sendable, Codable {
-    // In the default order, which gives the sections their default order.
+    // In the default order, which gives the sections their default order:
+    // what runs on the Mac first, then files, then bookmarks and the web.
     case calculator
     case units
     case apps
+    case settingsActions = "settings"
     case commands
     case menu
     case windows
-    case settingsActions = "settings"
+    case files
     case bookmarks
     case snippets
-    case files
     case webFallbacks = "fallbacks"
 
     public var title: String {
@@ -131,9 +132,17 @@ public struct SourceSettings: Sendable, Equatable {
 
     public static let standard = SourceSettings()
 
+    /// The default order before files came above bookmarks. Settings writes
+    /// the order whenever it saves, so a stored copy of this old default is
+    /// read as "never reordered" and gets the current default.
+    public static let previousDefaultOrder = [
+        "calculator", "units", "apps", "commands", "menu", "windows", "settings", "bookmarks", "snippets", "files", "fallbacks",
+    ]
+
     /// From the stored lists, as `defaultsValue` writes them.
     public init(order stored: [String]?, disabled storedOff: [String]?) {
-        self.init(order: (stored ?? []).compactMap(LauncherSource.init(rawValue:)),
+        let order = stored == Self.previousDefaultOrder ? nil : stored
+        self.init(order: (order ?? []).compactMap(LauncherSource.init(rawValue:)),
                   disabled: Set((storedOff ?? []).compactMap(LauncherSource.init(rawValue:))))
     }
 

@@ -1,4 +1,5 @@
 import Foundation
+import IndexKit
 
 /// A section header and its rows.
 public struct ResultGroup: Sendable, Equatable, Identifiable {
@@ -13,12 +14,13 @@ public struct ResultGroup: Sendable, Equatable, Identifiable {
 public enum ResultGrouping {
     /// Whether a row is a good enough match to be the top hit: a fallback is not,
     /// nor a row found only by letters scattered through one of its keywords (a
-    /// bookmark's host, say), which says little about what was meant.
+    /// bookmark's host, say) or by a keyword one letter off, which says little
+    /// about what was meant.
     public static func canBeTopHit(_ result: LaunchResult) -> Bool {
         guard !result.isFallback else { return false }
         let match = result.match
         if match.alias != .none || match.title != nil { return true }
-        if let keyword = match.keyword { return keyword != .fuzzy }
+        if let keyword = match.keyword { return keyword < .fuzzy }
         return true
     }
 

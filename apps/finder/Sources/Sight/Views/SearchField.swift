@@ -29,7 +29,7 @@ struct SearchField: NSViewRepresentable {
     private func style(_ field: NSTextField) {
         field.textColor = NSColor(theme.strong)
         field.placeholderAttributedString = NSAttributedString(
-            string: "Search apps, files, commands. / for prefixes",
+            string: model.placeholder,
             attributes: [.foregroundColor: NSColor(theme.faint), .font: NSFont.systemFont(ofSize: 17)]
         )
     }

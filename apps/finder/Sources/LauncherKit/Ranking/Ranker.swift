@@ -19,8 +19,8 @@ public struct Ranker: Sendable {
         return RankKey(
             fallback: result.isFallback,
             alias: alias,
-            title: match.title?.rawValue ?? 5,
-            keyword: match.keyword?.rawValue ?? 5,
+            title: match.title?.rawValue ?? RankKey.noMatch,
+            keyword: match.keyword?.rawValue ?? RankKey.noMatch,
             frecency: learnable ? frecencies[result.id] ?? 0 : 0,
             quality: match.quality,
             learned: learnable && learned != nil && learned == result.id && match.matched && !result.isFallback,

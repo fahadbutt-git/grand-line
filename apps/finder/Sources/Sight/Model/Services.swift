@@ -68,9 +68,16 @@ final class Services {
         reloadSources(force: true)
     }
 
-    /// Writes what Sight learned, only when it learned something.
-    func save() {
-        try? usage.saveIfChanged()
+    /// Writes what Sight learned, only when it learned something. Quitting
+    /// waits for it; the half-hourly save (`inBackground`) encodes and writes
+    /// off the main thread.
+    func save(inBackground: Bool = false) {
+        let usage = self.usage
+        if inBackground {
+            BlockingWork.start { try? usage.saveIfChanged() }
+        } else {
+            try? usage.saveIfChanged()
+        }
         names.save()
     }
 
@@ -186,7 +193,9 @@ final class Services {
         let selection = self.selection
         switch frontApp?.bundleIdentifier {
         case ActionPerformer.nexus:
-            selection.set(SelectionProvider.readNexus(paths.nexusSelection), from: "Nexus")
+            // A small file, but on the disk: read off the main thread.
+            let file = paths.nexusSelection
+            BlockingWork.start(qos: .userInitiated) { selection.set(SelectionProvider.readNexus(file), from: "Nexus") }
         case "com.apple.finder":
             selection.set([], from: "Finder")
             Task.detached(priority: .userInitiated) {

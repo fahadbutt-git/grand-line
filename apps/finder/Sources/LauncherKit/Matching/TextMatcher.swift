@@ -3,10 +3,16 @@ import IndexKit
 
 /// Matches a query against folded titles and keywords, in IndexKit's tiers:
 /// exact, prefix, word start, substring, then fuzzy (letters in order, the first
-/// at a word start, so "vsc" finds "Visual Studio Code"). The tier decides the
-/// rank; inside a tier, fzf's score (FuzzyScore) is the quality. A bitmask of
-/// the letters in each text skips texts that lack one of the query's letters
-/// before any matching is done.
+/// at a word start, so "vsc" finds "Visual Studio Code"), then typo (one letter
+/// off at a word start, for words of four letters or more: "safri" finds
+/// "Safari"). The tier decides the rank; inside a tier, fzf's score
+/// (FuzzyScore) is the quality. A bitmask of the letters in each text skips
+/// texts that lack one of the query's letters before any matching is done.
+///
+/// A fuzzy match must be tight (see `isTight`): each word it touches is
+/// entered at its first letter, letters inside a word are close together, and
+/// it skips at most two words between the words it uses. Letters scattered
+/// through a long title ("sleep" in "How to study for USMLE Step 1") are not a match.
 public struct TextMatcher: Sendable {
     public let query: FoldedText
     let words: [[UInt8]]
@@ -38,9 +44,19 @@ public struct TextMatcher: Sendable {
         lettersMask & ~text.mask == 0
     }
 
+    /// Whether a text missing some of the query's letters could still match
+    /// with a typo: at most one letter missing for each word long enough to
+    /// have one.
+    func mayMatchWithTypo(_ text: FoldedText) -> Bool {
+        guard !exactOnly else { return false }
+        let typoWords = words.filter { $0.count >= Self.typoMinimum }.count
+        guard typoWords > 0 else { return false }
+        return (lettersMask & ~text.mask).nonzeroBitCount <= typoWords
+    }
+
     /// Matches the whole query first, then each word on its own (all must match).
     public func match(_ text: FoldedText) -> Hit? {
-        guard !words.isEmpty, mayMatch(text) else { return nil }
+        guard !words.isEmpty, mayMatch(text) || mayMatchWithTypo(text) else { return nil }
         if let whole = matchWord(query.bytes, in: text, fuzzy: words.count == 1) {
             return whole
         }
@@ -77,7 +93,9 @@ public struct TextMatcher: Sendable {
     func matchWord(_ word: [UInt8], in text: FoldedText, fuzzy: Bool) -> Hit? {
         let name = text.bytes
         let length = word.count
-        guard length > 0, length <= name.count else { return nil }
+        guard length > 0 else { return nil }
+        // One letter longer than the whole text can still be a typo ("safarri").
+        guard length <= name.count else { return fuzzy && length == name.count + 1 ? typo(word, in: text) : nil }
 
         if occurs(word, in: name, at: 0) {
             let whole = length == name.count || length == text.stemLength
@@ -100,12 +118,13 @@ public struct TextMatcher: Sendable {
             return Hit(tier: atStart ? .wordStart : .substring, quality: best.score, ranges: [best.index..<(best.index + length)])
         }
         guard fuzzy, !exactOnly else { return nil }
-        return subsequence(word, in: text)
+        return subsequence(word, in: text) ?? typo(word, in: text)
     }
 
-    /// Letters in order, the first at a word start, placed where fzf's score is highest.
+    /// Letters in order, the first at a word start, placed where fzf's score
+    /// is highest, and close together (`isTight`).
     func subsequence(_ word: [UInt8], in text: FoldedText) -> Hit? {
-        guard let found = FuzzyScore.best(word, in: text) else { return nil }
+        guard let found = FuzzyScore.best(word, in: text), Self.isTight(found.positions, in: text) else { return nil }
         var runs: [Range<Int>] = []
         for position in found.positions {
             if let last = runs.last, last.upperBound == position {
@@ -115,6 +134,104 @@ public struct TextMatcher: Sendable {
             }
         }
         return Hit(tier: .fuzzy, quality: found.score, ranges: runs)
+    }
+
+    // MARK: Tight fuzzy matches
+
+    /// Letters inside one word may skip at most this many letters between them
+    /// ("spf" in "System Preferences" skips two).
+    static let maxGapInWord = 3
+    /// Words skipped between two words the match uses ("pdf ex" style
+    /// abbreviations of "PDF to Excel"), at most.
+    static let maxSkippedWords = 2
+
+    /// Whether letters at `positions` (ascending) form a tight match: the
+    /// first letter of each word touched is that word's first letter, letters
+    /// in the same word are at most `maxGapInWord` apart, and no more than
+    /// `maxSkippedWords` words lie between two words touched.
+    static func isTight(_ positions: [Int], in text: FoldedText) -> Bool {
+        guard let first = positions.first, text.starts[first] else { return false }
+        var word = 0
+        var cursor = 0
+        // The word index of each byte up to `position`, counted as we go.
+        func wordIndex(_ position: Int) -> Int {
+            while cursor < position {
+                cursor += 1
+                if text.starts[cursor] { word += 1 }
+            }
+            return word
+        }
+        var previous = first
+        var previousWord = wordIndex(first)
+        for position in positions.dropFirst() {
+            let current = wordIndex(position)
+            if current == previousWord {
+                if position - previous - 1 > maxGapInWord { return false }
+            } else {
+                if !text.starts[position] { return false }
+                if current - previousWord - 1 > maxSkippedWords { return false }
+            }
+            previous = position
+            previousWord = current
+        }
+        return true
+    }
+
+    // MARK: Typos
+
+    /// Words shorter than this are never matched with a typo: too many short
+    /// words are one letter apart.
+    static let typoMinimum = 4
+
+    /// The word one edit away from what was typed (a letter missed, added,
+    /// changed, or two swapped), at the start of a word in the text, with the
+    /// same first letter. Ranked below every other tier.
+    func typo(_ word: [UInt8], in text: FoldedText) -> Hit? {
+        guard !exactOnly, word.count >= Self.typoMinimum else { return nil }
+        let name = text.bytes
+        var best: (start: Int, length: Int, score: Int)?
+        for start in name.indices where text.starts[start] && name[start] == word[0] {
+            guard let length = Self.prefixWithinOneEdit(word, of: name, from: start) else { continue }
+            let score = FuzzyScore.contiguous(start, length: length, in: text) - FuzzyScore.scoreMatch * 2
+            if best == nil || score > best!.score { best = (start, length, score) }
+        }
+        guard let best else { return nil }
+        return Hit(tier: .typo, quality: best.score, ranges: [best.start..<(best.start + best.length)])
+    }
+
+    /// The length of the shortest stretch of `name` from `start` that is one
+    /// edit (Damerau: insert, delete, change, swap two neighbours) from `word`,
+    /// or nil when every stretch is further. Distance 0 is not a typo (an
+    /// earlier tier has it).
+    static func prefixWithinOneEdit(_ word: [UInt8], of name: [UInt8], from start: Int) -> Int? {
+        let m = word.count
+        let available = name.count - start
+        guard available >= m - 1 else { return nil }
+        let n = min(available, m + 1)
+        // d[i][j]: edits between word[..<i] and name[start..<start+j].
+        let width = n + 1
+        var d = [Int](repeating: 0, count: (m + 1) * width)
+        for i in 0...m { d[i * width] = i }
+        for j in 0...n { d[j] = j }
+        if m >= 1, n >= 1 {
+            for i in 1...m {
+                var rowMinimum = Int.max
+                for j in 1...n {
+                    let same = word[i - 1] == name[start + j - 1]
+                    var value = min(d[(i - 1) * width + j] + 1, d[i * width + j - 1] + 1, d[(i - 1) * width + j - 1] + (same ? 0 : 1))
+                    if i > 1, j > 1, word[i - 1] == name[start + j - 2], word[i - 2] == name[start + j - 1] {
+                        value = min(value, d[(i - 2) * width + j - 2] + 1)
+                    }
+                    d[i * width + j] = value
+                    rowMinimum = min(rowMinimum, value)
+                }
+                if rowMinimum > 1 { return nil }
+            }
+        }
+        for j in max(m - 1, 1)...n where d[m * width + j] == 1 {
+            return j
+        }
+        return nil
     }
 
     @inline(__always)

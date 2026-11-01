@@ -8,8 +8,13 @@ public enum KeyCommand: Sendable, Equatable {
     case pageDown
     /// Return: the row's first action.
     case primary
-    /// Command+Return: the row's second action.
+    /// Command+Return: the row's second action (Show in Nexus for files).
     case secondary
+    /// Option+Return: the row's alternate, a copy (path, URL, answer, name).
+    case alternate
+    /// Right arrow with the cursor at the end of the field: into a folder, or
+    /// the actions of any other row.
+    case drillIn
     /// Command+K: the action panel.
     case actions
     /// Command+1…9: run that row.
@@ -35,9 +40,11 @@ public enum KeyCommand: Sendable, Equatable {
         case KeyPress.Code.pageDown: return .pageDown
         case KeyPress.Code.returnKey, KeyPress.Code.enter:
             if key.command && !key.shift && !key.option { return .secondary }
+            if key.option && !key.command && !key.shift && !key.control { return .alternate }
             if plain && !key.shift { return .primary }
         case KeyPress.Code.escape: return .escape
         case KeyPress.Code.tab where plain && !key.shift: return .complete
+        case KeyPress.Code.right where plain && !key.shift: return .drillIn
         default: break
         }
         if key.control && !key.command, key.characters == "n" { return .moveDown }

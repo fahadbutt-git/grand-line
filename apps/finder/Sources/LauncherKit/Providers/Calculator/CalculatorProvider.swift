@@ -1,4 +1,5 @@
 import Foundation
+import IndexKit
 
 /// The calculator as a row: the answer on top, Return copies it.
 public final class CalculatorProvider: InstantProvider, @unchecked Sendable {
@@ -41,7 +42,17 @@ public final class CalculatorProvider: InstantProvider, @unchecked Sendable {
             section: .answers,
             actions: actions,
             providerID: id,
-            match: .answer
+            match: Self.match(for: query.term)
         )]
+    }
+
+    /// How the answer ranks: as good as an exact title, except for a short
+    /// word ("pi", "mar", "now"), where an app or a setting that starts with
+    /// those letters is more likely what was meant. There the answer ranks as
+    /// a word start, below every exact or prefix match, and still shows.
+    public static func match(for term: String) -> MatchInfo {
+        let letters = term.filter { !$0.isWhitespace }
+        let isShortWord = letters.count <= 3 && letters.contains(where: \.isLetter)
+        return isShortWord ? MatchInfo(title: .wordStart) : .answer
     }
 }

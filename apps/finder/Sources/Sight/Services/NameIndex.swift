@@ -39,7 +39,11 @@ final class NameIndex: IndexStatusProviding, @unchecked Sendable {
         lock.lock()
         let due = gate.shouldWarm()
         lock.unlock()
-        if due { client.warm() }
+        guard due else { return }
+        // Making a connection takes the client's lock and, the first time,
+        // reads this program's signature: never on the main thread.
+        let client = self.client
+        DispatchQueue.global(qos: .userInitiated).async { client.warm() }
     }
 
     /// A search answered from the local copy because the service was slow

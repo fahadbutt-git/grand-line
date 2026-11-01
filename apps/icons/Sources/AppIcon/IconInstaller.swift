@@ -23,6 +23,31 @@ public enum AppIconInstaller {
         setFinderIcon(image, palette: palette, isBundled: palette == IconTheme.bundled.palette(for: glyph), bundle: bundle)
     }
 
+    /// The newest icon asked for in the background; an older drawing that
+    /// finishes later is dropped.
+    private static var backgroundGeneration = 0
+
+    /// As `apply`, with the drawing (seven bitmaps up to 1024 pixels across)
+    /// done off the main thread, so a launch or a theme change never holds up
+    /// the window; the icon is set on the main thread once it is drawn.
+    public static func applyInBackground(_ glyph: IconGlyph, theme: IconTheme) {
+        backgroundGeneration += 1
+        let generation = backgroundGeneration
+        let palette = theme.palette(for: glyph)
+        let isBundled = palette == IconTheme.bundled.palette(for: glyph)
+        DispatchQueue.global(qos: .utility).async {
+            let drawn = DrawnIcon(image: IconRenderer.image(glyph, palette: palette))
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard generation == AppIconInstaller.backgroundGeneration else { return }
+                    NSApp.applicationIconImage = drawn.image
+                    guard UserDefaults.standard.bool(forKey: "WriteFinderIcon") else { return }
+                    AppIconInstaller.setFinderIcon(drawn.image, palette: palette, isBundled: isBundled, bundle: .main)
+                }
+            }
+        }
+    }
+
     /// A short key for a palette, to tell whether Finder's icon is current.
     static func key(_ p: IconPalette) -> String {
         [p.tile, p.ink, p.accent, p.soft, p.shade, p.ice].map(\.hex).joined(separator: "-")
@@ -48,5 +73,9 @@ public enum AppIconInstaller {
             defaults.set(wanted, forKey: defaultsKey)
         }
     }
+}
+/// A finished drawing handed to the main thread; nothing else holds it.
+private struct DrawnIcon: @unchecked Sendable {
+    let image: NSImage
 }
 #endif

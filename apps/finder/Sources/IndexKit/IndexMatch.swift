@@ -10,6 +10,10 @@ public enum MatchTier: Int, Sendable, Comparable, CaseIterable {
     case substring
     /// The letters in order, the first at a word start: "gl rev" finds "Glaucoma Review".
     case fuzzy
+    /// One letter off (missed, extra, wrong or two swapped) at the start of a
+    /// word, for words of four letters or more: "safri" finds "Safari". Only
+    /// Sight's matcher gives it; the name index never does.
+    case typo
 
     public static func < (lhs: MatchTier, rhs: MatchTier) -> Bool {
         lhs.rawValue < rhs.rawValue

@@ -26,6 +26,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // After three crashes in ten minutes Sight stays closed (and says so once).
         guard crashRecord.launch(displayName: "Sight") else { exit(0) }
+        let dog = watchdog
+        StallPhase.report = { dog.setPhase($0) }
+        StallPhase.begin("launch")
+        defer { StallPhase.end() }
         termination = TerminationSignal.handle { DispatchQueue.main.async { MainActor.assumeIsolated { NSApp.terminate(nil) } } }
         services = Services()
         // Connect to the index service first, so the first search finds it ready.
@@ -44,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Every half hour, writing only when something was learned; macOS
         // may fold the wake-up in with others (tolerance a tenth of it).
         let timer = Timer(timeInterval: 1_800, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.services.save() }
+            MainActor.assumeIsolated { self?.services.save(inBackground: true) }
         }
         timer.tolerance = 180
         RunLoop.main.add(timer, forMode: .common)
@@ -193,8 +197,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func startAtLogin() {
         // A test run starts a temporary copy that must not become a login item.
         guard ProcessInfo.processInfo.environment["GRAND_LINE_JOURNEY"] != "1" else { return }
-        guard SMAppService.mainApp.status != .enabled else { return }
-        try? SMAppService.mainApp.register()
+        // Asking launchd's login items service waits on another process: off
+        // the main thread, so a launch at login never holds up the shortcut.
+        DispatchQueue.global(qos: .utility).async {
+            guard SMAppService.mainApp.status != .enabled else { return }
+            try? SMAppService.mainApp.register()
+        }
     }
 
     /// macOS applies the switch from Spotlight's shortcut at the next login.
@@ -208,5 +216,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(true, forKey: key)
         QuietNotice.post(title: "Command + Space still opens Spotlight",
                          message: "Restart the Mac or log out and in once, and it opens Sight. The menu bar icon opens Sight until then.")
+    }
+}
+
+/// What the main thread is doing, for the hang watchdog's log line
+/// ("main thread stalled 1985 ms (during: first show, search)"), so a stall
+/// can be traced to the work that caused it. Each unit of main-thread work
+/// names itself as it starts and ends; units inside one another (a search
+/// inside the first show) give the outer name back when they end.
+@MainActor
+enum StallPhase {
+    static var report: (String) -> Void = { _ in }
+    private static var stack: [String] = []
+
+    static func begin(_ label: String) {
+        stack.append(label)
+        report(label)
+    }
+
+    static func end() {
+        if !stack.isEmpty { stack.removeLast() }
+        report(stack.last ?? "idle")
+    }
+
+    /// Names `label` for the length of `body`.
+    static func during<T>(_ label: String, _ body: () throws -> T) rethrows -> T {
+        begin(label)
+        defer { end() }
+        return try body()
     }
 }

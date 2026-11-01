@@ -64,7 +64,7 @@ public final class Catalog: @unchecked Sendable {
             found.append(result)
         }
         if found.count > limit {
-            found.sort { ($0.match.alias, $0.match.title?.rawValue ?? 5, $0.match.keyword?.rawValue ?? 5) < ($1.match.alias, $1.match.title?.rawValue ?? 5, $1.match.keyword?.rawValue ?? 5) }
+            found.sort { ($0.match.alias, $0.match.title?.rawValue ?? RankKey.noMatch, $0.match.keyword?.rawValue ?? RankKey.noMatch) < ($1.match.alias, $1.match.title?.rawValue ?? RankKey.noMatch, $1.match.keyword?.rawValue ?? RankKey.noMatch) }
             found.removeLast(found.count - limit)
         }
         return found

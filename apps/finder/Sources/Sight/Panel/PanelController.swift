@@ -29,6 +29,11 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.delegate = self
         model.hide = { [weak self] in self?.hide() }
         model.show = { [weak self] in self?.show() }
+        // App icons are read in the background; the rows redraw when they arrive.
+        IconCache.onLoad = { [weak self] in
+            guard let self, self.panel.isVisible else { return }
+            self.model.objectWillChange.send()
+        }
         // The window is clear, so its shadow follows what is drawn: redraw it
         // as rows change, once per turn of the run loop however many changes
         // came, and never while the window is hidden.
@@ -41,8 +46,15 @@ final class PanelController: NSObject, NSWindowDelegate {
                 if self.panel.isVisible { self.panel.invalidateShadow() }
             }
         }
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
             guard let self, event.window === self.panel else { return event }
+            if event.type == .flagsChanged {
+                // Command or Option held: the row and the footer say what Return does then.
+                let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                self.model.setHeld(HeldModifier(command: flags.contains(.command), option: flags.contains(.option),
+                                                shift: flags.contains(.shift), control: flags.contains(.control)))
+                return event
+            }
             return self.route(event) ? nil : event
         }
         // Lay SwiftUI out now, while hidden, so the first open does not pay for it.
@@ -55,9 +67,17 @@ final class PanelController: NSObject, NSWindowDelegate {
         isVisible ? hide() : show()
     }
 
-    /// Shows the window first, with the last results, and refreshes them on the
+    /// Whether the window was shown before, for the stall log's label.
+    private var shownOnce = false
+
+    /// Shows the window first, with the last results (or an empty field when
+    /// they are older than QueryResume allows), and refreshes them on the
     /// next turn of the run loop, so nothing waits on the providers.
     func show() {
+        StallPhase.begin(shownOnce ? "show" : "first show")
+        defer { StallPhase.end() }
+        shownOnce = true
+        model.prepareToShow()
         let front = NSWorkspace.shared.frontmostApplication
         if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
             model.performer.previousApp = front
@@ -75,6 +95,8 @@ final class PanelController: NSObject, NSWindowDelegate {
         let shownText = model.text
         DispatchQueue.main.async { [weak self] in
             guard let self, self.panel.isVisible else { return }
+            StallPhase.begin("open refresh")
+            defer { StallPhase.end() }
             self.services.windowWillOpen(frontApp: self.model.performer.previousApp)
             self.model.panelDidOpen()
             // Typing since the window opened has already searched.
@@ -83,7 +105,10 @@ final class PanelController: NSObject, NSWindowDelegate {
     }
 
     func hide() {
+        StallPhase.begin("hide")
+        defer { StallPhase.end() }
         model.actionPanel = nil
+        model.didHide()
         let wasVisible = panel.isVisible
         panel.orderOut(nil)
         if wasVisible { onVisibilityChange?(false) }
