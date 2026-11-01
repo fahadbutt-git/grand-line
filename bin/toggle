@@ -115,7 +115,8 @@ case "$name" in
     ;;
   hidden)
     defaults write com.apple.finder AppleShowAllFiles -bool "$yes"
-    killall Finder
+    # Finder may not be running (Nexus open instead): nothing to restart then.
+    killall Finder 2>/dev/null || true
     say "Hidden files $want"
     ;;
   menubar)

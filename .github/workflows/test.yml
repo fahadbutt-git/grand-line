@@ -147,6 +147,11 @@ jobs:
           else
             echo "::warning title=journeys permissions::$("$DRIVER" --check-permissions | tr '\n' ' '); the journeys report what this stops"
           fi
+      - name: Link the package where the apps look for its commands
+        # Sight runs ~/.grand-line/bin/toggle, power and the rest, as setup
+        # links them on a real Mac; without the link every settings action
+        # would fail here for that reason alone.
+        run: ln -sfn "$GITHUB_WORKSPACE" "$HOME/.grand-line"
       - name: "Journeys: the files app"
         if: always() && steps.build.outcome == 'success'
         timeout-minutes: 15
