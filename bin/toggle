@@ -84,6 +84,27 @@ case "$arg" in
 esac
 if [[ "$want" == on ]]; then yes=true; else yes=false; fi
 
+# Writes a Finder setting and restarts Finder so it shows it. A Finder that
+# is quitting (or still starting from a restart moments ago) can write its old
+# value back as it goes, so the value is read again once Finder is back and
+# written once more if it was lost. Finder not running: nothing to restart.
+finder_setting() { # KEY VALUE_WHEN_UNSET
+  local key="$1" unset_value="$2" want_num=0 got
+  [[ "$yes" == true ]] && want_num=1
+  for _ in 1 2; do
+    defaults write com.apple.finder "$key" -bool "$yes"
+    pgrep -x Finder >/dev/null || return 0
+    killall Finder 2>/dev/null || return 0
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+      sleep 0.1
+      pgrep -x Finder >/dev/null && break
+    done
+    sleep 0.3
+    got=$(defaults read com.apple.finder "$key" 2>/dev/null || echo "$unset_value")
+    [[ "$got" == "$want_num" ]] && return 0
+  done
+}
+
 case "$name" in
   awake)
     # Run caffeinate as its own background job so later shortcuts cannot stop it.
@@ -116,9 +137,7 @@ case "$name" in
     [[ "$now" == "$want" ]] || fail 1 "macOS kept the $( [[ "$want" == on ]] && echo light || echo dark ) appearance"
     ;;
   hidden)
-    defaults write com.apple.finder AppleShowAllFiles -bool "$yes"
-    # Finder may not be running (Nexus open instead): nothing to restart then.
-    killall Finder 2>/dev/null || true
+    finder_setting AppleShowAllFiles 0
     say "Hidden files $want"
     ;;
   menubar)
@@ -162,8 +181,7 @@ case "$name" in
     fi
     ;;
   desktop-icons)
-    defaults write com.apple.finder CreateDesktop -bool "$yes"
-    killall Finder 2>/dev/null || true
+    finder_setting CreateDesktop 1
     if [[ "$want" == on ]]; then say "Desktop icons shown"; else say "Desktop icons hidden"; fi
     ;;
   dock)

@@ -708,9 +708,12 @@ grep -q "output volume 30 without" "$STUB_LOG" && t_ok "toggle volume down steps
 grep -q "osascript -e set volume with output muted" "$STUB_LOG" && t_ok "toggle mute mutes the sound" || t_fail "mute" "$(cat "$STUB_LOG")"
 : > "$STUB_LOG"; OSASCRIPT_REPLY=true "$T" mute off
 grep -q "set volume without output muted" "$STUB_LOG" && t_ok "toggle mute off unmutes" || t_fail "unmute"
-: > "$STUB_LOG"; "$T" hidden on
+: > "$STUB_LOG"; printf 'Finder\n' > "$tmp/running-finder"; STUB_RUNNING="$tmp/running-finder" "$T" hidden on
 grep -q "defaults write com.apple.finder AppleShowAllFiles -bool true" "$STUB_LOG" && grep -q "killall Finder" "$STUB_LOG" \
   && t_ok "toggle hidden on shows hidden files and restarts Finder" || t_fail "hidden on" "$(cat "$STUB_LOG")"
+: > "$STUB_LOG"; STUB_RUNNING=/dev/null "$T" hidden on
+grep -q "defaults write com.apple.finder AppleShowAllFiles -bool true" "$STUB_LOG" && ! grep -q "killall Finder" "$STUB_LOG" \
+  && t_ok "toggle hidden on with Finder closed writes the setting and restarts nothing" || t_fail "hidden on, Finder closed" "$(cat "$STUB_LOG")"
 : > "$STUB_LOG"; "$T" dock off
 grep -q "defaults write com.apple.dock autohide -bool true" "$STUB_LOG" && t_ok "toggle dock off hides the Dock automatically" || t_fail "dock off"
 # Dark mode is macOS's appearance (System Events), read back from AppleInterfaceStyle.
