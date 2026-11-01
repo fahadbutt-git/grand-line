@@ -6,9 +6,12 @@
 # app in /Applications that Apple has not approved (notarized) and that is no
 # longer flagged gets the flag back, so macOS asks before it first opens.
 restore_gatekeeper() {
-  local app stamp
+  local app stamp since="${1:-}"
   stamp="0081;$(printf %x "$(date +%s)");grand-line;"
   for app in /Applications/*.app; do
+    # Only apps this run installed or changed: checking every app (Xcode
+    # takes minutes) on every run is what made repeat runs crawl.
+    [[ -n "$since" && ! "$app" -nt "$since" ]] && continue
     # The package's own apps are built on this Mac, never downloaded: flagging
     # them would make macOS stop every launch (and setup itself) to ask.
     case "$(defaults read "$app/Contents/Info" CFBundleIdentifier 2>/dev/null)" in com.grandline.*) continue ;; esac
@@ -60,7 +63,8 @@ step_apps() {
   fi
 
   info "Installing apps and tools. The first run takes 20 to 40 minutes."
-  local status=0
+  local status=0 marker="$work/before-bundle"
+  : > "$marker"
   if ! run brew bundle --file="$effective" --no-upgrade; then
     status=1
     warn "Some apps did not install:"
@@ -68,7 +72,7 @@ step_apps() {
   else
     ok "Every app in the Brewfile is installed"
   fi
-  [[ "$DRY_RUN" == 0 ]] && restore_gatekeeper
+  [[ "$DRY_RUN" == 0 ]] && restore_gatekeeper "$marker"
   [[ "$DRY_RUN" == 0 ]] && brew cleanup --prune=all -q >/dev/null 2>&1
   rm -rf "$work"
   return "$status"

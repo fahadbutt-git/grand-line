@@ -274,6 +274,13 @@ enum LauncherJourneys {
     static let automationRefused = "Automation not allowed"
 
     static func skipIfAutomationRefused(_ setting: Setting, row: String) throws {
+        // Runners have no Bluetooth or Wi-Fi radio to switch: a plain
+        // "Failed" there is the hardware, reported as a skip in CI only.
+        if ["bluetooth", "wifi"].contains(setting.id), ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] != nil,
+           row.lowercased().trimmingCharacters(in: .whitespaces) == "failed" {
+            print("::notice title=\(setting.phrase) not checked::this CI runner has no \(setting.phrase) hardware; the row reads \(noticeText(row))")
+            throw StepSkip("this CI runner has no \(setting.phrase) hardware to switch; the row reads \"\(row)\"")
+        }
         if setting.id == "darkmode" {
             try skipIfAppearanceLocked(setting, row: row, environment: ProcessInfo.processInfo.environment)
             return
