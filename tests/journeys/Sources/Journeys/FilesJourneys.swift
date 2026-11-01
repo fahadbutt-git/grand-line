@@ -768,7 +768,7 @@ enum FilesJourneys {
         if let count = statusCount(snap), count > 0 {
             let area = pane ?? contentArea(snap, window)
             let shown = snap.nodes.filter { node in
-                ["AXRow", "AXStaticText", "AXTextField", "AXImage", "AXCell"].contains(node.role) && node.isVisibleSize
+                ["AXRow", "AXStaticText", "AXTextField", "AXImage", "AXCell", "AXButton"].contains(node.role) && node.isVisibleSize
                     && area.intersects(node.frame!) && !["No matches", "Searching…", "Empty folder"].contains(node.text)
             }
             if shown.isEmpty { problems.append("the status bar says \(count) items but the file area is empty") }

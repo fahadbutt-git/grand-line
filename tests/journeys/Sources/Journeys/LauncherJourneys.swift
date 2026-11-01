@@ -310,6 +310,7 @@ enum LauncherJourneys {
         // means the same: the command ran and macOS kept its appearance.
         let kept = (lower.contains("macos kept the") && lower.contains("appearance"))
             || lower.trimmingCharacters(in: .whitespaces) == "failed"
+            || lower.contains("working") || lower.contains("not changed")
         guard kept || row.contains(automationRefused) else { return }
         print("::notice title=\(setting.phrase) not checked::\(noticeText(row))")
         throw StepSkip("macOS on this CI runner did not switch its appearance (\(kept ? "it kept the one it had" : automationRefused + " for System Events")); the row reads \"\(row)\"")
@@ -494,6 +495,9 @@ extension Ctx {
                     }
                     newSystem = readSetting(setting).map(LauncherJourneys.normalise)
                     if newSystem == nil || newSystem == system {
+                        // The row may have scrolled from view or the query
+                        // changed under it: show it again and read what it says.
+                        if row.isEmpty, panelVisible(), let again = try? showSetting(setting) { row = again }
                         try LauncherJourneys.skipIfAutomationRefused(setting, row: row)
                         // Return on a settings row keeps the panel open; a closed
                         // panel means another row (a menu or shortcut copy) ran,

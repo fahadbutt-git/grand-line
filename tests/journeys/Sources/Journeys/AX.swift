@@ -271,6 +271,17 @@ final class Snapshot {
                 out.append((name: text.text, node: text))
             }
         }
+        // Rows combined into one button for VoiceOver (the columns view) keep
+        // their name in AXDescription and have no text under them. Only those
+        // inside the file area count, so a sidebar row of the same name never
+        // stands in for a file.
+        if let pane = nodes.firstIndex(where: { $0.identifier.hasSuffix(".pane") }) {
+            let seen = Set(out.map(\.name))
+            for (index, node) in nodes.enumerated() where node.role == "AXButton" && !node.label.isEmpty
+                && node.isVisibleSize && !seen.contains(node.label) && isDescendant(index, of: pane) {
+                out.append((name: node.label, node: node))
+            }
+        }
         return out
     }
 }
