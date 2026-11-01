@@ -276,10 +276,14 @@ enum LauncherJourneys {
     static func skipIfAutomationRefused(_ setting: Setting, row: String) throws {
         // Runners have no Bluetooth or Wi-Fi radio to switch: a plain
         // "Failed" there is the hardware, reported as a skip in CI only.
-        if ["bluetooth", "wifi"].contains(setting.id), ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] != nil,
+        // Do Not Disturb needs two Shortcuts the owner makes once (README),
+        // which a runner does not have.
+        let ciReason: [String: String] = ["bluetooth": "has no Bluetooth hardware", "wifi": "has no Wi-Fi hardware",
+                                          "dnd": "has no Do Not Disturb shortcuts (made once by hand, see README)"]
+        if let reason = ciReason[setting.id], ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] != nil,
            row.lowercased().trimmingCharacters(in: .whitespaces) == "failed" {
-            print("::notice title=\(setting.phrase) not checked::this CI runner has no \(setting.phrase) hardware; the row reads \(noticeText(row))")
-            throw StepSkip("this CI runner has no \(setting.phrase) hardware to switch; the row reads \"\(row)\"")
+            print("::notice title=\(setting.phrase) not checked::this CI runner \(reason); the row reads \(noticeText(row))")
+            throw StepSkip("this CI runner \(reason); the row reads \"\(row)\"")
         }
         if setting.id == "darkmode" {
             try skipIfAppearanceLocked(setting, row: row, environment: ProcessInfo.processInfo.environment)
@@ -503,6 +507,9 @@ extension Ctx {
             return (latest, newSystem)
         }
         let (rowOn, systemOn) = try flip("first Return", from: rowBefore, system: systemBefore)
+        // A row that turned "Failed" on the first Return (a setting a runner
+        // cannot switch) ends the check here, as a reported skip in CI.
+        try LauncherJourneys.skipIfAutomationRefused(setting, row: rowOn)
         let (rowBack, systemBack) = try flip("second Return", from: rowOn, system: systemOn)
         try check(rowBack == rowBefore, "the row reads \"\(rowBack)\" after switching back, \"\(rowBefore)\" before")
         if let systemBefore { try check(systemBack == systemBefore, "the system reads \(systemBack ?? "?") after switching back, \(systemBefore) before") }
