@@ -87,6 +87,27 @@ struct SidebarRow: View {
     @Local private var hovering = false
 
     var body: some View {
+        let traits: AccessibilityTraits = isCurrent ? [.isButton, .isSelected] : .isButton
+        let value: String = item.badge ?? item.detail ?? ""
+        let help: String = item.detail.map { "\(item.title), \($0)" } ?? item.title
+        return row
+            .help(help)
+            // A button to VoiceOver and Full Keyboard Access: VO-Space opens it.
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(item.title)
+            .accessibilityValue(value)
+            .accessibilityAddTraits(traits)
+            .accessibilityAction(perform: open)
+            .accessibilityActions { ejectAction }
+    }
+
+    @ViewBuilder private var ejectAction: some View {
+        if let volume = item.ejectable {
+            Button("Eject \(item.title)") { eject(volume) }
+        }
+    }
+
+    private var row: some View {
         HStack(spacing: 8) {
             Image(systemName: item.symbol)
                 .font(.system(size: 14))
@@ -118,17 +139,5 @@ struct SidebarRow: View {
         .contentShape(Rectangle())
         .onTapGesture(perform: open)
         .onHover { hovering = $0 }
-        .help(item.detail.map { "\(item.title), \($0)" } ?? item.title)
-        // A button to VoiceOver and Full Keyboard Access: VO-Space opens it.
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(item.title)
-        .accessibilityValue(item.badge ?? item.detail ?? "")
-        .accessibilityAddTraits(isCurrent ? [.isButton, .isSelected] : .isButton)
-        .accessibilityAction(perform: open)
-        .accessibilityActions {
-            if let volume = item.ejectable {
-                Button("Eject \(item.title)") { eject(volume) }
-            }
-        }
     }
 }

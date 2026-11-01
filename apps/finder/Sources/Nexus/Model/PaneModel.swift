@@ -201,8 +201,8 @@ final class PaneModel: ObservableObject, Identifiable {
 
     /// Work off the main thread that stops when the task awaiting it is
     /// cancelled (`FolderReader` checks as it reads).
-    nonisolated static func offMain<T: Sendable>(_ priority: TaskPriority = .userInitiated,
-                                       _ work: @escaping @Sendable () throws -> T) async throws -> T {
+    nonisolated static func offMain<T: Sendable>(priority: TaskPriority = .userInitiated,
+                                                 _ work: @escaping @Sendable () throws -> T) async throws -> T {
         let task = Task.detached(priority: priority) { try work() }
         return try await withTaskCancellationHandler {
             try await task.value
@@ -231,7 +231,7 @@ final class PaneModel: ObservableObject, Identifiable {
         loadTask = Task { [weak self] in
             let result: Result<([FileItem], [String: DriveBadge], Int64?), Error>
             do {
-                result = .success(try await Self.offMain {
+                result = .success(try await Self.offMain { () -> ([FileItem], [String: DriveBadge], Int64?) in
                     let items = try FolderReader.items(in: url, showHidden: hidden)
                     var badges: [String: DriveBadge] = [:]
                     if drives.contains(where: { $0.contains(url) }) {
@@ -303,7 +303,7 @@ final class PaneModel: ObservableObject, Identifiable {
             }
             // An index still building (or a folder it skips) is read from disk.
             let found = indexed
-            guard let items = try? await Self.offMain({ () -> [FileItem] in
+            let readItems: @Sendable () throws -> [FileItem] = {
                 let paths = found.isEmpty ? FlatListing.walk(url, home: home, showHidden: hidden) : found
                 var read: [FileItem] = []
                 for (i, path) in paths.enumerated() {
@@ -311,7 +311,8 @@ final class PaneModel: ObservableObject, Identifiable {
                     if let item = FileItem.read(URL(fileURLWithPath: path)) { read.append(item) }
                 }
                 return read
-            }) else { return }
+            }
+            guard let items = try? await Self.offMain(readItems) else { return }
             guard let self, !Task.isCancelled else { return }
             self.reading = false
             self.badges = [:]

@@ -860,7 +860,12 @@ logged() { local _; for _ in 1 2 3 4 5 6 7 8 9 10; do grep -qF -- "$1" "$STUB_LO
   grep -qF "defaults write com.grandline.byakugan TakesCommandSpace -bool false" "$STUB_LOG" || exit 11
   [[ ! -s "$STUB_RUNNING" ]] && grep -qF "pkill -x DenDen" "$STUB_LOG" || exit 12     # the old apps were stopped first
   # files stay with Finder as chosen; Command + Space goes to Sight
-  grep -qF "defaults delete -g NSFileViewer" "$STUB_LOG" && grep -q "public.folder.*com.apple.finder" "$STUB_LOG" && [[ "$(cat "$st/takeover-files")" == off ]] || exit 13
+  # (takeover changes nothing when folders already open in Finder, as on a
+  # macOS runner, so either the switch back is logged or nothing names Nexus)
+  [[ "$(cat "$st/takeover-files")" == off ]] || exit 13
+  if ! { grep -qF "defaults delete -g NSFileViewer" "$STUB_LOG" && grep -q "public.folder.*com.apple.finder" "$STUB_LOG"; }; then
+    grep -q "NSFileViewer.*com.grandline.nexus\|public.folder.*com.grandline.nexus" "$STUB_LOG" && exit 13
+  fi
   grep -qF "defaults write com.grandline.sight TakesCommandSpace -bool true" "$STUB_LOG" || exit 14
   grep -q "zen" "$STUB_LOG" && exit 15                                                  # the default browser is left alone
   logged "open -g -b com.grandline.iceberg" && logged "open -g -b com.grandline.nexus" && logged "open -g -b com.grandline.sight" || exit 16

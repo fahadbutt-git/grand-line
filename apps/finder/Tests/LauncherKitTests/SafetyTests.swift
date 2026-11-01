@@ -149,9 +149,9 @@ final class SafetyTests: XCTestCase {
         let url = tempFile()
         defer { try? FileManager.default.removeItem(at: url) }
         let usage = UsageStore(fileURL: url)
-        let secret = "hunter2-token-9f8e7d"
+        let secret = "clipboard text that must stay private"
         let row = clip(secret)
-        usage.record(row, query: router.parse(":hunt"))
+        usage.record(row, query: router.parse(":clip"))
         usage.toggleFavourite(row)
         XCTAssertTrue(usage.recents().isEmpty)
         XCTAssertTrue(usage.favourites().isEmpty)
