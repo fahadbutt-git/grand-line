@@ -26,6 +26,13 @@ final class PaneModel: ObservableObject, Identifiable {
     private var loadTask: Task<Void, Never>?
     private var sizeTask: Task<Void, Never>?
     private var search: SearchRunner?
+    /// A folder read is in flight; changes meanwhile ask for one more after it.
+    private var reading = false
+    private var readAgain = false
+    /// The rows the list has on screen, for folder sizes.
+    private var visibleIDs: Set<String> = []
+    /// A new folder whose name is edited once it shows, selected.
+    private var renameOnShow: (url: URL, begin: () -> Void)?
     /// The window's setting, used in every folder without an exception (R6).
     private var windowSettings: ViewSettings
 
@@ -86,8 +93,11 @@ final class PaneModel: ObservableObject, Identifiable {
     }
 
     func setSettings(_ settings: ViewSettings) {
+        let bySize = settings.sort.field == .size && state.settings.sort.field != .size
         state.setSettings(settings)
         readLastOpened()
+        // Sorting by size needs every folder's size, not only those on screen.
+        if bySize { measureSizes() }
         if let folder = location.folderURL, services.viewPreferences.change(settings, in: folder.path) {
             services.saveViewPreferences()
         } else {
@@ -141,6 +151,8 @@ final class PaneModel: ObservableObject, Identifiable {
 
     func reload() {
         loadTask?.cancel()
+        reading = false
+        readAgain = false
         search?.stop()
         problem = nil
         isLoading = true
@@ -167,6 +179,36 @@ final class PaneModel: ObservableObject, Identifiable {
         isLoading = false
         onSelectionChange?()
         readLastOpened()
+        // Only the load that follows the task: if the item is not the one
+        // selected then (the pane went elsewhere), the rename is dropped.
+        if let wanted = renameOnShow {
+            renameOnShow = nil
+            if state.selectedItems.count == 1, state.selectedItems[0].url.standardizedFileURL == wanted.url.standardizedFileURL {
+                wanted.begin()
+            }
+        }
+    }
+
+    /// Calls `begin` once `url` is listed here and is the one item selected
+    /// (a new folder after its task), so its name, and no other, is edited.
+    func renameWhenShown(_ url: URL, begin: @escaping () -> Void) {
+        renameOnShow = (url, begin)
+        if state.selectedItems.count == 1, state.selectedItems[0].url.standardizedFileURL == url.standardizedFileURL {
+            renameOnShow = nil
+            begin()
+        }
+    }
+
+    /// Work off the main thread that stops when the task awaiting it is
+    /// cancelled (`FolderReader` checks as it reads).
+    nonisolated static func offMain<T: Sendable>(_ priority: TaskPriority = .userInitiated,
+                                       _ work: @escaping @Sendable () throws -> T) async throws -> T {
+        let task = Task.detached(priority: priority) { try work() }
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 
     /// Spotlight's last-opened dates, read in the background and only while the
@@ -185,30 +227,56 @@ final class PaneModel: ObservableObject, Identifiable {
     private func loadFolder(_ url: URL) {
         let hidden = showHidden
         let drives = GoogleDrive.accounts(home: services.paths.home)
+        reading = true
         loadTask = Task { [weak self] in
-            let result = await Task.detached(priority: .userInitiated) { () -> Result<([FileItem], [String: DriveBadge]), Error> in
-                do {
+            let result: Result<([FileItem], [String: DriveBadge], Int64?), Error>
+            do {
+                result = .success(try await Self.offMain {
                     let items = try FolderReader.items(in: url, showHidden: hidden)
                     var badges: [String: DriveBadge] = [:]
                     if drives.contains(where: { $0.contains(url) }) {
                         for item in items { badges[item.id] = DriveBadge.read(item.url, drives: drives) }
                     }
-                    return .success((items, badges))
-                } catch {
-                    return .failure(error)
-                }
-            }.value
+                    return (items, badges, VolumeInfo.containing(url)?.availableBytes)
+                })
+            } catch is CancellationError {
+                return
+            } catch {
+                result = .failure(error)
+            }
             guard let self, !Task.isCancelled else { return }
+            self.reading = false
             switch result {
-            case .success(let (items, badges)):
+            case .success(let (items, badges, free)):
                 self.badges = badges
                 self.finish(items)
-                self.freeSpace = VolumeInfo.containing(url)?.availableBytes
+                self.freeSpace = free
                 self.measureSizes()
+                if self.inTrash { self.services.refreshFinderPutBack() }
             case .failure(let error):
                 self.problem = error.localizedDescription
                 self.finish([])
             }
+            self.readAgainIfAsked()
+        }
+    }
+
+    /// Changes on disk while a read was in flight: one more read after it, never
+    /// a pile of reads running at once.
+    private func readAgainIfAsked() {
+        guard readAgain, case .folder(let url) = location else { return }
+        readAgain = false
+        if state.isFlat { loadFlat(url) } else { loadFolder(url) }
+    }
+
+    /// A change on disk: read again now, or once the read in flight ends.
+    private func refresh(_ url: URL) {
+        if reading {
+            readAgain = true
+        } else if state.isFlat {
+            loadFlat(url)
+        } else {
+            loadFolder(url)
         }
     }
 
@@ -219,6 +287,7 @@ final class PaneModel: ObservableObject, Identifiable {
         let home = services.paths.home.path
         let index = services.index
         let folder = url.standardizedFileURL.path
+        reading = true
         loadTask = Task { [weak self] in
             var indexed: [String] = []
             if !FlatListing.needsDisk(folder, home: home) {
@@ -234,14 +303,21 @@ final class PaneModel: ObservableObject, Identifiable {
             }
             // An index still building (or a folder it skips) is read from disk.
             let found = indexed
-            let items = await Task.detached(priority: .userInitiated) { () -> [FileItem] in
+            guard let items = try? await Self.offMain({ () -> [FileItem] in
                 let paths = found.isEmpty ? FlatListing.walk(url, home: home, showHidden: hidden) : found
-                return paths.compactMap { FileItem.read(URL(fileURLWithPath: $0)) }
-            }.value
+                var read: [FileItem] = []
+                for (i, path) in paths.enumerated() {
+                    if i & 511 == 0 { try Task.checkCancellation() }
+                    if let item = FileItem.read(URL(fileURLWithPath: path)) { read.append(item) }
+                }
+                return read
+            }) else { return }
             guard let self, !Task.isCancelled else { return }
+            self.reading = false
             self.badges = [:]
             self.finish(items)
             self.freeSpace = VolumeInfo.containing(url)?.availableBytes
+            self.readAgainIfAsked()
         }
     }
 
@@ -287,13 +363,32 @@ final class PaneModel: ObservableObject, Identifiable {
         }
     }
 
+    /// The list's rows on screen changed (a scroll, a resize): folders that
+    /// came into view get their sizes.
+    func setVisible(_ ids: [String]) {
+        let shown = Set(ids)
+        guard shown != visibleIDs else { return }
+        let added = shown.subtracting(visibleIDs)
+        visibleIDs = shown
+        let unmeasured = state.items.contains { $0.isFolder && added.contains($0.id) && state.folderSizes[$0.path] == nil }
+        if unmeasured { measureSizes(after: 0.15) }
+    }
+
     /// Cached sizes come back at once; the rest arrive one by one.
-    /// Measures the folders shown. `after` waits first, so a stream of
-    /// changes deep inside them (an app writing its caches below the home
-    /// folder) measures once when it calms down, not on every event.
+    /// Measures the folders on screen (all of them when sorted by size), as
+    /// Settings' "Calculate folder sizes" allows: never past their volume,
+    /// network and cloud folders only when chosen, within
+    /// `FolderSizeLimits.listing`, and a new place or a new set of rows
+    /// cancels the walk at once. `after` waits first, so a stream of changes
+    /// deep inside them (an app writing its caches below the home folder)
+    /// measures once when it calms down, not on every event.
     private func measureSizes(after delay: TimeInterval = 0) {
         sizeTask?.cancel()
-        let folders = state.items.filter(\.isFolder).map(\.url)
+        let prefs = NexusPreferencesStore.shared.current
+        guard prefs.calculateFolderSizes, case .folder = location, !state.isFlat else { return }
+        let folders = SizeScope.folders(state.items, visible: visibleIDs, sortedBySize: state.settings.sort.field == .size)
+        guard !folders.isEmpty else { return }
+        let limits = prefs.folderSizeLimits
         let sizes = services.folderSizes
         sizeTask = Task { [weak self] in
             if delay > 0 {
@@ -302,7 +397,8 @@ final class PaneModel: ObservableObject, Identifiable {
             }
             for url in folders {
                 if Task.isCancelled { return }
-                let result = await sizes.size(of: url)
+                guard let result = await sizes.size(of: url, limits: limits) else { continue }
+                if Task.isCancelled { return }
                 self?.state.setSize(result.bytes, for: url.path)
             }
         }
@@ -330,9 +426,9 @@ final class PaneModel: ObservableObject, Identifiable {
         let real = FolderWatcher.realPath(folder.path)
         let direct = batch.contains { $0.path == real || $0.recursive }
         if state.isFlat, location.folderURL == folder, !batch.isEmpty {
-            loadFlat(folder)
+            refresh(folder)
         } else if direct, location.folderURL == folder {
-            loadFolder(folder)
+            refresh(folder)
         } else {
             measureSizes(after: Self.deepChangeDelay)
         }
@@ -351,6 +447,7 @@ final class PaneModel: ObservableObject, Identifiable {
     func tearDown() {
         stopWatching()
         loadTask?.cancel()
+        reading = false
         sizeTask?.cancel()
         search?.stop()
     }

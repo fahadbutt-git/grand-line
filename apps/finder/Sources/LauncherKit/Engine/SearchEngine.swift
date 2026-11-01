@@ -57,6 +57,8 @@ public final class SearchEngine: Sendable {
         for case let provider as any InstantProvider in plan.providers {
             results += provider.instantResults(for: plan.query)
         }
+        // "dark mode" is the Dark mode settings row, not that and the menu's copy.
+        results = MenuProvider.withoutSettingDuplicates(results)
         let query = plan.query
         if !query.term.isEmpty, query.prefix == nil || query.prefix == .exact, !query.isPath,
            results.allSatisfy(\.isFallback) {

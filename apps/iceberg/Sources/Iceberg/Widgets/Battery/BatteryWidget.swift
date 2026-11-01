@@ -11,7 +11,7 @@ final class BatteryWidget: ObservableObject, NotchWidget {
     let placement = WidgetPlacement.header
 
     @Published private(set) var reading: BatteryReading?
-    private var source: CFRunLoopSource?
+    private var subscription: RunLoopSubscription?
     private var stale = true
     private var isOpen = false
 
@@ -20,13 +20,20 @@ final class BatteryWidget: ObservableObject, NotchWidget {
     init() {
         reading = Self.read()
         stale = false
-        // The widget lives as long as the app (PanelHost keeps it), so an
-        // unretained pointer is safe.
-        let context = Unmanaged.passUnretained(self).toOpaque()
-        if let src = IOPSNotificationCreateRunLoopSource(powerSourceChanged, context)?.takeRetainedValue() {
-            CFRunLoopAddSource(CFRunLoopGetMain(), src, .commonModes)
-            source = src
-        }
+        // The run-loop source points at the subscription, not at the widget.
+        // The subscription removes the source before it is freed (shutDown, or
+        // the widget let go), so the callback never reaches freed memory.
+        subscription = RunLoopSubscription(make: { context in
+            IOPSNotificationCreateRunLoopSource(powerSourceChanged, context)?.takeRetainedValue()
+        }, onFire: { [weak self] in
+            MainActor.assumeIsolated { self?.powerChanged() }
+        })
+    }
+
+    /// Turned off in Settings: the power-source callback is removed now.
+    func shutDown() {
+        subscription?.cancel()
+        subscription = nil
     }
 
     func makeView() -> AnyView { AnyView(BatteryView(model: self)) }
@@ -62,11 +69,9 @@ final class BatteryWidget: ObservableObject, NotchWidget {
 }
 
 /// IOKit's callback, on the main run loop. A plain function, because a C
-/// callback cannot carry the main actor.
+/// callback cannot carry context of its own.
 private func powerSourceChanged(_ context: UnsafeMutableRawPointer?) {
-    guard let context else { return }
-    let widget = Unmanaged<BatteryWidget>.fromOpaque(context).takeUnretainedValue()
-    MainActor.assumeIsolated { widget.powerChanged() }
+    RunLoopSubscription.fire(context: context)
 }
 
 struct BatteryView: View {

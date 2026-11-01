@@ -156,13 +156,16 @@ signing_ensure() {
   return 1
 }
 
-# sign_code PATH [ENTITLEMENTS] [BUNDLE ID]: sign with hardened runtime, with
-# the identity when there is one, otherwise ad hoc. With a bundle id, the
-# designated requirement pins the certificate itself (its hash, not its name).
+# sign_code PATH [ENTITLEMENTS] [ID]: sign with hardened runtime, with the
+# identity when there is one, otherwise ad hoc. With an id (a bundle's id, or
+# the name a bare program is signed under), the designated requirement pins
+# the certificate itself (its hash, not its name).
 sign_code() {
   local path="$1" ent="${2:-}" id="${3:-}" hash args
   args=(--force --options runtime)
   [[ -n "$ent" && -f "$ent" ]] && args+=(--entitlements "$ent")
+  # A bare program (not a bundle) takes its name from the file unless given one.
+  [[ -n "$id" && ! -d "$path" ]] && args+=(--identifier "$id")
   if hash="$(signing_identity)"; then
     signing_unlock || return 1
     args+=(--timestamp=none --keychain "$SIGN_KEYCHAIN" --sign "$hash")

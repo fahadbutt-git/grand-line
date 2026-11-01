@@ -214,6 +214,50 @@ final class IndexServiceTests: XCTestCase {
         )
         XCTAssertNil(CodeSigning.requirement(allowing: ids, signer: nil), "an unsigned development build sets none")
     }
+
+    func testAdHocSigningIsSaidToProveOnlyTheUser() {
+        XCTAssertEqual(CodeSigning.trust(CodeSigning.Signer(teamID: "ABCDE12345")), .certificate)
+        XCTAssertEqual(CodeSigning.trust(CodeSigning.Signer(leafSHA1: "0A1B")), .certificate)
+        XCTAssertEqual(CodeSigning.trust(CodeSigning.Signer(isAdHoc: true)), .sameUserOnly)
+        XCTAssertEqual(CodeSigning.trust(nil), .sameUserOnly)
+        XCTAssertNil(CodeSigning.trustWarning(CodeSigning.Signer(leafSHA1: "0A1B")))
+        XCTAssertTrue(CodeSigning.trustWarning(CodeSigning.Signer(isAdHoc: true))?.contains("signed ad hoc") == true)
+        XCTAssertTrue(CodeSigning.trustWarning(nil)?.contains("unsigned") == true)
+    }
+
+    func testOnlyThisUsersProcessesAreAccepted() {
+        XCTAssertTrue(CodeSigning.acceptsPeer(uid: getuid()))
+        XCTAssertTrue(CodeSigning.acceptsPeer(uid: 501, ownUID: 501))
+        XCTAssertFalse(CodeSigning.acceptsPeer(uid: 502, ownUID: 501))
+        XCTAssertFalse(CodeSigning.acceptsPeer(uid: 0, ownUID: 501), "not even root's")
+    }
+
+    func testAServiceProblemTravelsWithTheStatus() throws {
+        var status = IndexStatus(files: 3, lastSync: nil, building: false, unreadable: [])
+        status.problem = SharedIndexClient.signatureProblem
+        let back = try XCTUnwrap(IndexStatus(encoded: status.encoded()))
+        XCTAssertEqual(back.problem, SharedIndexClient.signatureProblem)
+        // A status from a service built before the field still reads.
+        let old = Data(#"{"files":1,"building":false,"unreadable":[],"complete":true,"roots":[],"source":"service"}"#.utf8)
+        let decoded = try XCTUnwrap(IndexStatus(encoded: old))
+        XCTAssertNil(decoded.problem)
+        XCTAssertEqual(decoded.files, 1)
+    }
+
+    func testAnAdoptedSnapshotLosesWhatTheRulesLeaveOut() async throws {
+        // Nexus indexed all of ~/Library, including a folder made after any
+        // list of ~/Library's names would have been read.
+        let locations = IndexLocations(home: home)
+        try make("Library/Vendor/conj vendor.db")
+        let nexus = FileIndex(roots: [home])
+        await nexus.build(savingTo: locations.nexusSnapshot)
+        let core = IndexServiceCore(locations: locations, saveEvery: 3_600, latency: 0.1)
+        let index = await core.index()
+        let names = await index.search("conj").map(\.name).sorted()
+        XCTAssertEqual(names, ["Conj Flap", "Lid Study - CONJ.docx", "conj notes.txt"], "~/Library/Vendor is left out")
+        await index.stopWatching()
+        core.stop()
+    }
 }
 
 final class Counter: @unchecked Sendable {

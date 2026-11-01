@@ -88,7 +88,7 @@ final class RecoveryTests: XCTestCase {
         let index = FileIndex(roots: [folder])
         await index.build()
         try Fixture.make("Docs/second.txt", in: folder)
-        await index.applyWatched([FolderChange(path: folder, recursive: true)])
+        await index.applyWatched(WatchBatch(changes: [FolderChange(path: folder, recursive: true)], eventID: 0))
         var found: [String] = []
         for _ in 0..<100 where found.isEmpty {
             try await Task.sleep(nanoseconds: 50_000_000)

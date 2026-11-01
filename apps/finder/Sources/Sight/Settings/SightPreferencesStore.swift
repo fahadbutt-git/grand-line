@@ -46,16 +46,25 @@ final class SightPreferencesStore: ObservableObject {
 
     // MARK: The shortcut
 
-    /// nil goes back to Command+Space (when setup handed it over).
+    /// nil goes back to Command+Space (when setup handed it over). The new
+    /// shortcut is registered first and saved only when macOS took it; a
+    /// refused one leaves the old shortcut working and nothing saved.
     func setHotkey(_ new: LauncherHotkey?) {
+        let wanted = HotkeySetting.resolved(new, defaults)
+        let registered = onHotkeyChange?(wanted) ?? true
+        guard registered else {
+            hotkeyProblem = "\((wanted ?? new)?.display ?? "That shortcut") is taken by macOS or another app. Choose another shortcut."
+            return
+        }
         HotkeySetting.setHotkey(new, defaults)
         hotkey = HotkeySetting.hotkey(defaults)
-        let registered = onHotkeyChange?(hotkey) ?? true
-        if let hotkey, !registered {
-            hotkeyProblem = "\(hotkey.display) is taken by macOS or another app. Choose another shortcut."
-        } else {
-            hotkeyProblem = nil
-        }
+        hotkeyProblem = nil
+    }
+
+    /// The saved shortcut could not be registered when Sight started.
+    func noteRefusedAtLaunch() {
+        guard let hotkey else { return }
+        hotkeyProblem = "\(hotkey.display) is taken by macOS or another app, so it does not open Sight. Choose another shortcut."
     }
 
     var takesCommandSpace: Bool { HotkeySetting.takesCommandSpace(defaults) }

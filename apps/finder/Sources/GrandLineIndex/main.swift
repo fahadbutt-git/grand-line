@@ -68,6 +68,9 @@ func serve() -> Never {
     let watcher = CrashWatcher(apps: [.init(name: "sight", bundleID: "com.grandline.sight"),
                                       .init(name: "iceberg", bundleID: "com.grandline.iceberg")], log: log)
     if environment["GRAND_LINE_JOURNEY"] != "1" { watcher.start() }
+    // Ad hoc or unsigned: said once per start, in the log, so it is not taken
+    // for the certificate check (see CodeSigning.Trust).
+    if let warning = CodeSigning.trustWarning(CodeSigning.own) { log.write(warning) }
     let delegate = IndexListenerDelegate(core: core, clientRequirement: IndexListenerDelegate.standardRequirement())
     let listener = NSXPCListener(machServiceName: serviceName)
     listener.delegate = delegate

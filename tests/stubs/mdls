@@ -1,0 +1,13 @@
+#!/bin/bash
+# Test stub: `mdls -raw -name kMDItemDateAdded FILE` answers from
+# $MDLS_DATES/<file name> (a line such as "2026-10-31 09:15:02 +0000"),
+# or "(null)" as macOS does when it does not know.
+f="${!#}"
+echo "mdls $*" >> "${STUB_LOG:-/dev/null}"
+src="${MDLS_DATES:-/nonexistent}/$(basename "$f")"
+if [[ "$*" == *kMDItemDateAdded* && -f "$src" ]]; then
+  printf '%s' "$(cat "$src")"
+else
+  printf '(null)'
+fi
+exit 0

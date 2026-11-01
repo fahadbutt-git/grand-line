@@ -92,4 +92,47 @@ final class CommandRunnerTests: XCTestCase {
         let r = broken.run("echo hi", timeout: 2)
         XCTAssertNotNil(r.launchError)
     }
+
+    /// A command that ends normally but left `helper &` running: the helper
+    /// goes with it, so refreshes cannot pile up orphans.
+    func testBackgroundChildOfANormalRunIsKilled() throws {
+        let r = runner.run("sleep 30 & echo $!", timeout: 5)
+        XCTAssertFalse(r.timedOut)
+        XCTAssertEqual(r.exitCode, 0)
+        let child = try XCTUnwrap(pid_t(r.stdout.trimmingCharacters(in: .whitespacesAndNewlines)))
+        let deadline = Date().addingTimeInterval(2)
+        while kill(child, 0) == 0 && Date() < deadline { usleep(20_000) }
+        XCTAssertNotEqual(kill(child, 0), 0, "the background sleep is still running")
+    }
+
+    /// A child that leaves the group on purpose (a new session) outlives the run.
+    func testChildInItsOwnSessionOutlivesTheRun() throws {
+        guard FileManager.default.isExecutableFile(atPath: "/usr/bin/perl") else { throw XCTSkip("no perl") }
+        let r = runner.run("/usr/bin/perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' sleep 3 >/dev/null 2>&1 </dev/null & echo $!; sleep 0.5", timeout: 5)
+        let child = try XCTUnwrap(pid_t(r.stdout.trimmingCharacters(in: .whitespacesAndNewlines)))
+        usleep(300_000)
+        XCTAssertEqual(kill(child, 0), 0)
+        kill(child, SIGKILL)
+    }
+
+    /// After the leader is reaped its bare pid may belong to someone else:
+    /// only its group is signalled then. Stand-in for "someone else": a live
+    /// process that is not a group leader.
+    func testReapedLeaderIsNeverSignalledByBarePid() throws {
+        let other = Process()
+        other.executableURL = URL(fileURLWithPath: "/bin/sleep")
+        other.arguments = ["30"]
+        try other.run()
+        defer { other.terminate(); other.waitUntilExit() }
+        let pid = other.processIdentifier
+        guard getpgid(pid) != pid else { throw XCTSkip("the stand-in leads its own group here") }
+
+        XCTAssertFalse(ProcessGroup.signal(pid, SIGKILL, leaderReaped: true))
+        usleep(100_000)
+        XCTAssertTrue(other.isRunning, "a reaped leader's pid must not be signalled")
+
+        // Before reaping, the fallback to the pid is allowed.
+        XCTAssertTrue(ProcessGroup.signal(pid, 0, leaderReaped: false))
+        XCTAssertFalse(ProcessGroup.signal(0, SIGKILL, leaderReaped: false), "pid 0 is never signalled")
+    }
 }

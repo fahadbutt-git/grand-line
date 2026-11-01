@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import IcebergKit
 
 /// Play, pause, next and previous for whatever is playing.
 ///
@@ -50,11 +51,11 @@ enum MediaRemote {
             if !NSRunningApplication.runningApplications(withBundleIdentifier: "com.spotify.client").isEmpty { app = "Spotify" }
             else { app = "Music" }
         }
-        let source = "tell application \"\(app)\" to \(command.appleScriptVerb)"
-        // NSAppleScript belongs on the main thread.
-        DispatchQueue.main.async {
-            var error: NSDictionary?
-            NSAppleScript(source: source)?.executeAndReturnError(&error)
+        let source = "with timeout of 2 seconds\ntell application \"\(app)\" to \(command.appleScriptVerb)\nend timeout"
+        // Off the main thread, with a time limit: a busy player must not
+        // freeze the panel (AppleScriptCall).
+        DispatchQueue.global(qos: .userInitiated).async {
+            _ = AppleScriptCall.run(source)
         }
     }
 }

@@ -68,12 +68,15 @@ final class FileTests: XCTestCase {
     func testCompressPlans() throws {
         let a = try temp.file("a.txt")
         let b = try temp.file("b.txt")
+        let out = temp.url("out.zip")
         let one = try XCTUnwrap(CompressPlan.make(for: [a]))
-        XCTAssertEqual(one.destination.lastPathComponent, "a.txt.zip")
-        XCTAssertEqual(one.command.executable, "/usr/bin/ditto")
+        XCTAssertEqual(one.name, "a.txt.zip")
+        XCTAssertEqual(one.folder.standardizedFileURL, temp.root.standardizedFileURL)
+        XCTAssertEqual(one.command(writingTo: out).executable, "/usr/bin/ditto")
+        XCTAssertEqual(one.command(writingTo: out).arguments.last, out.path)
         let many = try XCTUnwrap(CompressPlan.make(for: [a, b]))
-        XCTAssertEqual(many.destination.lastPathComponent, "Archive.zip")
-        XCTAssertEqual(Array(many.command.arguments.suffix(2)), ["a.txt", "b.txt"])
+        XCTAssertEqual(many.name, "Archive.zip")
+        XCTAssertEqual(Array(many.command(writingTo: out).arguments.suffix(2)), [temp.root.path, "b.txt"])
         XCTAssertNil(CompressPlan.make(for: []))
     }
 
@@ -82,9 +85,9 @@ final class FileTests: XCTestCase {
         let a = try temp.file("a.txt")
         let b = try temp.file("b.txt")
         let plan = try XCTUnwrap(CompressPlan.make(for: [a, b]))
-        let result = try await ProcessRunner.run(plan.command)
-        XCTAssertTrue(result.succeeded, result.errorText)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: plan.destination.path))
+        let made = try await Compressor.run(plan, operations: FileOperations(trash: { $0 }))
+        XCTAssertEqual(made.lastPathComponent, "Archive.zip")
+        XCTAssertGreaterThan((try FileManager.default.attributesOfItem(atPath: made.path)[.size] as? Int) ?? 0, 0)
     }
 
     func testAliasPointsToTheOriginal() throws {
@@ -135,6 +138,6 @@ final class FileTests: XCTestCase {
         try temp.file("Drive/.DS_Store")
         try temp.file("Drive/sub/.DS_Store")
         try temp.file("Drive/sub/a")
-        XCTAssertEqual(Clutter.find(in: temp.url("Drive")).count, 2)
+        XCTAssertEqual(try Clutter.find(in: temp.url("Drive")).count, 2)
     }
 }

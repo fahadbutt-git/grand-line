@@ -13,37 +13,31 @@ public enum ArchiveError: Error, Equatable {
 enum BsdTar {
     static let tool = URL(fileURLWithPath: "/usr/bin/bsdtar")
 
-    static func run(_ arguments: [String]) throws -> Data {
-        let process = Process()
-        process.executableURL = tool
-        process.arguments = arguments
+    /// A UTF-8 locale prints names as they are and months in English.
+    static var environment: [String: String] {
         var environment = ProcessInfo.processInfo.environment
-        // A UTF-8 locale prints names as they are and months in English.
         environment["LC_ALL"] = "en_US.UTF-8"
         environment["LANG"] = "en_US.UTF-8"
-        process.environment = environment
+        return environment
+    }
 
-        // stderr goes to a file, so a long error cannot block the process while stdout is read.
-        let errorURL = FileManager.default.temporaryDirectory.appendingPathComponent("bsdtar-\(UUID().uuidString).log")
-        FileManager.default.createFile(atPath: errorURL.path, contents: nil)
-        let errorHandle = try FileHandle(forWritingTo: errorURL)
-        defer {
-            try? errorHandle.close()
-            try? FileManager.default.removeItem(at: errorURL)
-        }
-        let output = Pipe()
-        process.standardOutput = output
-        process.standardError = errorHandle
-        process.standardInput = FileHandle.nullDevice
+    /// Runs bsdtar to the end on this thread. stdout and stderr are both
+    /// read while it runs, so a long error cannot block it.
+    static func run(_ arguments: [String]) throws -> Data {
+        try checked(ChildProcess.runAndWait(tool.path, arguments, environment: environment))
+    }
 
-        try process.run()
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            let message = (try? String(contentsOf: errorURL, encoding: .utf8)) ?? ""
-            throw ArchiveError.toolFailed(process.terminationStatus, message.trimmingCharacters(in: .whitespacesAndNewlines))
+    /// Runs bsdtar as part of a task: cancelling the task stops it (and
+    /// anything it started) and throws CancellationError.
+    static func runCancellable(_ arguments: [String]) async throws -> Data {
+        try checked(await ChildProcess.run(tool.path, arguments, environment: environment))
+    }
+
+    static func checked(_ output: ChildProcess.Output) throws -> Data {
+        guard output.succeeded else {
+            throw ArchiveError.toolFailed(output.status, output.errorText.trimmingCharacters(in: .whitespacesAndNewlines))
         }
-        return data
+        return output.output
     }
 
     static func lines(_ data: Data) -> [String] {

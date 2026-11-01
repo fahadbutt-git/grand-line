@@ -117,7 +117,12 @@ final class FilesTests: XCTestCase {
             try Make.write("x", to: URL(fileURLWithPath: home + "/" + file))
         }
         let rules = HomeIndexScope.exclusions(home: home)
-        XCTAssertEqual(rules.paths, [home + "/Library/Mail", home + "/Library/glaucoma prefs.plist"])
+        // A rule on ~/Library, not a list of what was there when it was read.
+        XCTAssertEqual(rules.paths, [])
+        XCTAssertEqual(rules.keptOnly, [home + "/Library": ["CloudStorage"]])
+        XCTAssertTrue(rules.skips(path: home + "/Library/Mail"))
+        XCTAssertTrue(rules.skips(path: home + "/Library/Made Next Week"))
+        XCTAssertFalse(rules.skips(path: home + "/Library/CloudStorage"))
         let index = FileIndex(roots: [home], exclusions: rules)
         await index.build()
         let found = await index.search("glaucoma", limit: 50).map(\.name).sorted()

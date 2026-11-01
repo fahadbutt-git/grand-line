@@ -62,6 +62,8 @@ extension BrowserModel {
     }
 
     /// Items in an archive are extracted to a temporary folder, then opened.
+    /// A copy that is then edited and saved there is not lost: the cleanup at
+    /// a later launch sends a changed copy to the Trash (`TemporaryFolder.clean`).
     func openFromArchive(_ items: [FileItem], in pane: PaneModel, app: URL?) {
         guard case .archive(let archive, _) = pane.location else { return }
         let entries = ArchiveRows.entries(items)
@@ -97,11 +99,12 @@ extension BrowserModel {
         let names = entries.map { URL(fileURLWithPath: "/" + $0) }
         Task {
             do {
+                // bsdtar runs as part of the task: Stop ends it at once, and
+                // what it had unpacked goes to the Trash.
                 let made = try await services.run(.extract, TaskTitles.title(.extract, names, to: target)) { operations in
-                    try Task.checkCancellation()
-                    let extracted = try await Task.detached(priority: .userInitiated) {
-                        try Archive.extract(entries, from: archive, to: target)
-                    }.value
+                    let extracted = try await Archive.extract(entries, from: archive, to: target) { staging in
+                        _ = try FileOperations.systemTrash(staging)
+                    }
                     await operations.recordCreated(extracted, kind: .extract)
                     return extracted
                 }

@@ -34,6 +34,9 @@ final class BrowserModel: ObservableObject {
     @Published var batchRenameItems: [URL] = []
     /// Increments to ask the focused list to start renaming its selection.
     @Published var renameRequest = 0
+    /// The item that rename is for (a new folder), so the list never edits
+    /// another one; nil for F2, which renames the selection.
+    var renameTarget: String?
     weak var window: NSWindow?
 
     init(services: Services, location: BrowserLocation, select: [URL] = []) {

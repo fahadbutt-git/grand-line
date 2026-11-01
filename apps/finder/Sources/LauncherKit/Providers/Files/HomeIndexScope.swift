@@ -10,15 +10,13 @@ public enum HomeIndexScope {
 
     /// - Parameters:
     ///   - home: the home folder as the index sees it (a real path).
-    ///   - libraryNames: the names in ~/Library.
+    ///   - libraryNames: no longer used: ~/Library is a rule, whatever it holds.
     public static func exclusions(home: String, libraryNames: [String]) -> IndexExclusions {
         IndexExclusions.home(home, libraryNames: libraryNames)
     }
 
-    /// Reads ~/Library once; call it off the main thread.
+    /// The rules for a home folder, by its real path.
     public static func exclusions(home: String, fileManager: FileManager = .default) -> IndexExclusions {
-        let real = FolderWatcher.realPath(home)
-        let names = (try? fileManager.contentsOfDirectory(atPath: real + "/Library")) ?? []
-        return exclusions(home: real, libraryNames: names)
+        IndexExclusions.home(home)
     }
 }

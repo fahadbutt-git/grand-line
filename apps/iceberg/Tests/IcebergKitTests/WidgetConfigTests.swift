@@ -75,6 +75,22 @@ final class WidgetConfigTests: XCTestCase {
         XCTAssertTrue(issues.contains { $0.message.contains("raised") })
     }
 
+    /// "Never" written as a huge number used to crash Settings and
+    /// Diagnostics (Int(Double) traps past Int.max). It is brought down to a
+    /// week, with a warning, and every interval prints safely.
+    func testHugeRefreshIsClamped() throws {
+        for raw in ["1e19", "\"999999999999d\"", "1.7976931348623157e308"] {
+            let (w, issues) = parse("command = \"date\"\ntitle = \"Clock\"\nrefresh = \(raw)")
+            let config = try XCTUnwrap(w, raw)
+            XCTAssertEqual(config.refresh, .interval(RefreshPolicy.maximumInterval), raw)
+            XCTAssertTrue(issues.contains { $0.message.contains("lowered") }, raw)
+            XCTAssertEqual(config.refresh.description, "every 604800 s")
+        }
+        XCTAssertEqual(RefreshPolicy.interval(1e300).description, "every \(String(format: "%.0f", 1e300)) s")
+        XCTAssertEqual(RefreshPolicy.interval(.infinity).description, "every ? s")
+        XCTAssertEqual(RefreshPolicy.interval(300).description, "every 300 s")
+    }
+
     func testTimeoutIsClamped() throws {
         let (w, _) = parse("command = \"date\"\ntitle = \"T\"\ntimeout = 900")
         XCTAssertEqual(try XCTUnwrap(w).timeout, 120)

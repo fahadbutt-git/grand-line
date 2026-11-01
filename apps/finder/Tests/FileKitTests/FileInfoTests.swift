@@ -119,8 +119,8 @@ final class FileInfoTests: XCTestCase {
         XCTAssertTrue(Clutter.isClutter("._report.docx"))
         XCTAssertFalse(Clutter.isClutter("report.docx"))
         XCTAssertFalse(Clutter.isClutter("_report.docx"))
-        XCTAssertEqual(Clutter.find(in: box.url("c"), recursive: false).map(\.lastPathComponent), [".DS_Store"])
-        XCTAssertEqual(Clutter.find(in: box.url("c")).count, 2)
+        XCTAssertEqual(try Clutter.find(in: box.url("c"), recursive: false).map(\.lastPathComponent), [".DS_Store"])
+        XCTAssertEqual(try Clutter.find(in: box.url("c")).count, 2)
 
         let ops = box.operations()
         let trashed = try await Clutter.clean(in: box.url("c"), using: ops)

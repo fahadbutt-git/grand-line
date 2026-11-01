@@ -101,4 +101,14 @@ if [[ -z "$cmd" ]]; then
   notify "Menu" "No command for '$full' in $MENU_FILE"
   exit 1
 fi
+# Entries that cannot be undone (restart, log out...) carry a "!" column:
+# ask before running them, as Sight does.
+question="$(printf '%s\n' "$ALL" | awk -F'\t' -v p="$full" '$1 == p { for (i = 3; i <= NF; i++) if (substr($i, 1, 1) == "!") { print substr($i, 2); exit } }')"
+if [[ -n "$question" ]]; then
+  osascript - "$choice" <<'APPLESCRIPT' >/dev/null 2>&1 || exit 0
+on run argv
+  display dialog ((item 1 of argv) & "?") buttons {"Cancel", item 1 of argv} default button 1 cancel button 1 with icon caution
+end run
+APPLESCRIPT
+fi
 exec /bin/bash -c "$cmd"

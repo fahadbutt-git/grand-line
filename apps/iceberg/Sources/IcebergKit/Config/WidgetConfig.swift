@@ -9,12 +9,21 @@ public enum RefreshPolicy: Equatable, Sendable, CustomStringConvertible {
 
     /// No widget runs more often than this, however its file is written.
     public static let minimumInterval: TimeInterval = 5
+    /// Nor less often than this (a week): a huge value meaning "never" is
+    /// brought down, so no later arithmetic or formatting can overflow.
+    public static let maximumInterval: TimeInterval = 7 * 86400
 
     public var description: String {
         switch self {
         case .onOpen: return "on open"
-        case .interval(let s): return "every \(Int(s)) s"
+        case .interval(let s): return "every \(Self.wholeSeconds(s)) s"
         }
+    }
+
+    /// `s` as a whole number of seconds for display, for any Double.
+    static func wholeSeconds(_ s: TimeInterval) -> String {
+        guard s.isFinite else { return "?" }
+        return String(format: "%.0f", s)
     }
 
     /// Reads `300`, `"30s"`, `"5m"`, `"1h"`, `"1d"` or `"on open"`.
@@ -33,6 +42,7 @@ public enum RefreshPolicy: Equatable, Sendable, CustomStringConvertible {
         }
         guard seconds.isFinite, seconds > 0 else { return nil }
         if seconds < minimumInterval { return (.interval(minimumInterval), true) }
+        if seconds > maximumInterval { return (.interval(maximumInterval), true) }
         return (.interval(seconds), false)
     }
 
@@ -289,7 +299,10 @@ public struct WidgetConfig: Equatable, Sendable, Identifiable {
         if let v = table["refresh"] {
             if let parsed = RefreshPolicy.parse(v) {
                 refresh = parsed.0
-                if parsed.clamped {
+                if parsed.clamped, parsed.0 == .interval(RefreshPolicy.maximumInterval) {
+                    warn("refresh", "refresh is lowered to \(Int(RefreshPolicy.maximumInterval)) seconds (7 days), the longest allowed",
+                         fix: "Use refresh = \"7d\" or less, or signal = true to run only when asked.")
+                } else if parsed.clamped {
                     warn("refresh", "refresh is raised to \(Int(RefreshPolicy.minimumInterval)) seconds, the shortest allowed",
                          fix: "Use refresh = \(Int(RefreshPolicy.minimumInterval)) or more, or signal = true to run only when asked.")
                 }

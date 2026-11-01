@@ -3,6 +3,9 @@
 # keeps setup and updates from running at the same time.
 # Sourced by setup.sh (through steps/15-auto-update.sh) and bin/update.
 
+# shellcheck source=lib/lock.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lock.sh"
+
 UPDATE_AGENT_LABEL="com.grandline.update"
 UPDATE_AGENT_PLIST="$HOME/Library/LaunchAgents/$UPDATE_AGENT_LABEL.plist"
 # shellcheck disable=SC2034  # read by setup.sh, the step and bin/update
@@ -70,27 +73,18 @@ update_agent_unload() {
   return 0
 }
 
-# update_lock_take: one setup or update at a time. A lock left by a run that
-# no longer exists is taken over, once. Fails when another run holds it.
+# update_lock_take: one setup or update at a time (lib/lock.sh). A lock left
+# by a run that no longer exists is taken over. Fails when another run holds
+# it, naming its process in UPDATE_LOCK_HOLDER.
 update_lock_take() {
-  local holder
-  mkdir -p "$(dirname "$UPDATE_LOCK")"
-  if ! mkdir "$UPDATE_LOCK" 2>/dev/null; then
-    holder="$(cat "$UPDATE_LOCK/pid" 2>/dev/null)"
-    if [[ -z "$holder" ]] || kill -0 "$holder" 2>/dev/null; then
-      # shellcheck disable=SC2034  # the caller names it in its message
-      UPDATE_LOCK_HOLDER="$holder"
-      return 1
-    fi
-    rm -f "$UPDATE_LOCK/pid"; rmdir "$UPDATE_LOCK" 2>/dev/null
-    mkdir "$UPDATE_LOCK" 2>/dev/null || return 1
+  if ! lock_take "$UPDATE_LOCK"; then
+    # shellcheck disable=SC2034  # the caller names it in its message
+    UPDATE_LOCK_HOLDER="$LOCK_HOLDER"
+    return 1
   fi
-  echo "$$" > "$UPDATE_LOCK/pid"
   export GRAND_LINE_LOCK_HELD=1
 }
 
 update_lock_release() {
-  [[ "$(cat "$UPDATE_LOCK/pid" 2>/dev/null)" == "$$" ]] || return 0
-  rm -f "$UPDATE_LOCK/pid"; rmdir "$UPDATE_LOCK" 2>/dev/null
-  return 0
+  lock_release "$UPDATE_LOCK"
 }

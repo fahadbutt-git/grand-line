@@ -73,7 +73,68 @@ public final class UsageStore: @unchecked Sendable {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .secondsSince1970
             data = (try? decoder.decode(Stored.self, from: raw)) ?? Stored()
+            // Files written before UsagePolicy may hold clipboard text, pids or
+            // rows that restart the Mac without asking: they go, and the next
+            // save writes the file without them.
+            if Self.sanitize(&data) { revision += 1 }
         }
+    }
+
+    /// Removes everything UsagePolicy does not allow in the file. Returns
+    /// whether anything was removed.
+    @discardableResult
+    static func sanitize(_ data: inout Stored) -> Bool {
+        let favourites = Set(data.favourites)
+        var unsafe = Set<String>()
+        for (id, snapshot) in data.snapshots {
+            let allowed = favourites.contains(id) ? UsagePolicy.mayFavourite(snapshot) : UsagePolicy.mayRecord(snapshot)
+            if !allowed { unsafe.insert(id) }
+        }
+        let ids = Set(data.global.keys).union(data.queries.values.flatMap(\.keys)).union(data.abbreviations.values.map(\.id))
+        for id in ids where UsagePolicy.unrecordedIDPrefixes.contains(where: { id.hasPrefix($0) }) { unsafe.insert(id) }
+        // A favourite that is fine as a favourite stays one, but is not learned from.
+        let learnedUnsafe = Set(data.snapshots.filter { !UsagePolicy.mayRecord($0.value) }.keys).union(unsafe)
+        // Queries typed into clipboard history (the `:` prefix) are not kept either.
+        let clipboardKey = Prefix.clipboardHistory.rawValue
+        let clipboardQueries = data.queries.keys.filter { !clipboardKey.isEmpty && $0.hasPrefix(clipboardKey) }
+        guard !unsafe.isEmpty || !learnedUnsafe.isEmpty || !clipboardQueries.isEmpty else { return false }
+        var changed = false
+        for id in unsafe {
+            if data.snapshots.removeValue(forKey: id) != nil { changed = true }
+            if data.global.removeValue(forKey: id) != nil { changed = true }
+            let before = data.favourites.count
+            data.favourites.removeAll { $0 == id }
+            if data.favourites.count != before { changed = true }
+        }
+        for key in clipboardQueries {
+            data.queries[key] = nil
+            data.abbreviations[key] = nil
+            changed = true
+        }
+        for key in Array(data.queries.keys) {
+            guard var picks = data.queries[key] else { continue }
+            let before = picks.count
+            for id in learnedUnsafe { picks[id] = nil }
+            if picks.count != before {
+                changed = true
+                data.queries[key] = picks.isEmpty ? nil : picks
+            }
+        }
+        for (key, entry) in data.abbreviations {
+            if learnedUnsafe.contains(entry.id) {
+                data.abbreviations[key] = nil
+                changed = true
+            } else if let challenger = entry.challenger, learnedUnsafe.contains(challenger) {
+                data.abbreviations[key]?.challenger = nil
+                data.abbreviations[key]?.challenges = 0
+                changed = true
+            }
+        }
+        // Scores of a favourite that asks first: it stays a favourite, out of recents.
+        for id in learnedUnsafe where favourites.contains(id) && !unsafe.contains(id) {
+            if data.global.removeValue(forKey: id) != nil { changed = true }
+        }
+        return changed
     }
 
     func decayed(_ record: Record, at date: Date) -> Double {
@@ -111,8 +172,10 @@ public final class UsageStore: @unchecked Sendable {
 
     public var fileLocation: URL? { fileURL }
 
-    /// Records that `result` was run from `query`.
+    /// Records that `result` was run from `query`. Rows UsagePolicy keeps out
+    /// (clipboard entries, pids, anything that restarts or quits) are not recorded.
     public func record(_ result: LaunchResult, query: LaunchQuery) {
+        guard UsagePolicy.mayRecord(result) else { return }
         let date = now()
         lock.lock()
         defer { lock.unlock() }
@@ -140,7 +203,7 @@ public final class UsageStore: @unchecked Sendable {
 
     /// LaunchBar's rule: the first pick assigns the abbreviation, the same
     /// pick confirms it, and a different row picked twice in a row takes it over.
-    private func learn(_ key: String, picked id: String, at date: Date) {
+    func learn(_ key: String, picked id: String, at date: Date) {
         guard var entry = data.abbreviations[key] else {
             data.abbreviations[key] = Abbreviation(id: id, last: date, challenger: nil, challenges: 0)
             return
@@ -198,7 +261,7 @@ public final class UsageStore: @unchecked Sendable {
         defer { lock.unlock() }
         let favourites = Set(data.favourites)
         return data.global
-            .filter { !favourites.contains($0.key) && data.snapshots[$0.key] != nil }
+            .filter { !favourites.contains($0.key) && data.snapshots[$0.key].map(UsagePolicy.mayRecord) == true }
             .sorted { $0.value.last > $1.value.last }
             .prefix(limit)
             .compactMap { data.snapshots[$0.key] }
@@ -207,7 +270,7 @@ public final class UsageStore: @unchecked Sendable {
     public func favourites() -> [LaunchResult] {
         lock.lock()
         defer { lock.unlock() }
-        return data.favourites.compactMap { data.snapshots[$0] }
+        return data.favourites.compactMap { data.snapshots[$0] }.filter(UsagePolicy.mayFavourite)
     }
 
     public func isFavourite(_ id: String) -> Bool {
@@ -216,13 +279,14 @@ public final class UsageStore: @unchecked Sendable {
         return data.favourites.contains(id)
     }
 
+    /// Rows UsagePolicy keeps out of the file cannot be favourites; removing one always works.
     public func toggleFavourite(_ result: LaunchResult) {
         lock.lock()
         revision += 1
         defer { lock.unlock() }
         if let index = data.favourites.firstIndex(of: result.id) {
             data.favourites.remove(at: index)
-        } else {
+        } else if UsagePolicy.mayFavourite(result) {
             var snapshot = result
             snapshot.match = .unmatched
             snapshot.rank = .unranked

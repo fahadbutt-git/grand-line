@@ -50,6 +50,9 @@ public final class SettingsActionsProvider: InstantProvider, @unchecked Sendable
     private var state: SettingsState?
     private var reading = false
     private var generation = 0
+    /// Numbers each read as it starts, and which read each value came from.
+    private var reads = 0
+    private var stamps: [String: Int] = [:]
     private var phases: [String: SettingPhase] = [:]
 
     /// The runner should set GRAND_LINE_QUIET, so the commands report through
@@ -80,6 +83,7 @@ public final class SettingsActionsProvider: InstantProvider, @unchecked Sendable
         locked {
             generation += 1
             state = nil
+            stamps = [:]
             reading = false
             phases = phases.filter { if case .running = $0.value { return true } else { return false } }
         }
@@ -95,15 +99,20 @@ public final class SettingsActionsProvider: InstantProvider, @unchecked Sendable
         }
     }
 
-    /// Reads every setting, or only `names`, with `toggle status`.
+    /// Reads every setting, or only `names`, with `toggle status`. A read
+    /// that ends after a later one (the full read from the window opening,
+    /// after a change read its setting back) keeps the later values.
     public func readState(_ names: [String] = []) async {
-        let started = locked { generation }
+        let (started, read) = locked { () -> (Int, Int) in
+            reads += 1
+            return (generation, reads)
+        }
         let output = try? await runner.run(paths.command("toggle"), ["status"] + names, timeout: 6)
         let fresh = output.flatMap { $0.status == 0 ? SettingsState.parse($0.stdout) : nil } ?? SettingsState()
         locked {
             guard generation == started else { return }
             if names.isEmpty { reading = false }
-            state = names.isEmpty ? fresh : (state ?? SettingsState()).merging(fresh)
+            state = (state ?? SettingsState()).merging(fresh, started: read, stamps: &stamps)
         }
     }
 

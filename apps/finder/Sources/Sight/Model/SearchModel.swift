@@ -107,6 +107,8 @@ final class SearchModel: ObservableObject {
         case .secondary: runSelected(index: 1)
         case .runRow(let n):
             guard let row = list.row(shortcut: n), let action = row.primary else { return true }
+            // Selected, so a row that asks first is confirmed by Return on it.
+            list.select(id: row.id)
             run(action, on: row)
         case .actions: openActionPanel()
         case .escape: escape()
@@ -228,6 +230,8 @@ final class SearchModel: ObservableObject {
             previewOpen.toggle()
             return
         case .toggleFavourite:
+            // Clipboard entries and pids are never kept (UsagePolicy).
+            guard UsagePolicy.mayFavourite(row) || services.usage.isFavourite(row.id) else { NSSound.beep(); return }
             services.usage.toggleFavourite(row)
             refresh()
             return
@@ -240,11 +244,18 @@ final class SearchModel: ObservableObject {
         case .openWith(let path):
             actionPanel = ActionPanelState(title: "Open with", actions: performer.openWithActions(path), result: row)
             return
+        case .quit(let pid, let force):
+            // Only while the pid still runs the app the row named.
+            if action.closesWindow { hide() }
+            performer.quit(pid, force: force, expectedName: ProcessProvider.expectedName(of: row))
+            return
         default:
             break
         }
-        // The buffer and the selection are not rows to come back to.
-        if row.id != "buffer", row.providerID != SelectionProvider.providerID {
+        // UsagePolicy keeps out the buffer, the selection, clipboard entries
+        // (what was copied never reaches usage.json), pids and anything that
+        // restarts or quits.
+        if UsagePolicy.mayRecord(row) {
             services.usage.record(row, query: query)
         }
         if let path = row.previewPath { services.names.noteOpened(path) }

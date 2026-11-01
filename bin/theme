@@ -8,7 +8,10 @@
 #                               (Graphite and Daylight pair up too)
 # theme apply                   render every template for the current theme again
 #                               and reload the terminal, tmux, btop, Neovim and
-#                               the apps (refresh is the same)
+#                               the apps
+# theme refresh                 the same, but the tools and apps are reloaded
+#                               only when the rendered theme changed (the
+#                               updates use it, so they never interrupt you)
 # theme check [--strict] [NAME|FILE...]   check themes (all of them by default):
 #                               FILE:LINE messages, fails on an error (with
 #                               --strict, on a warning too)
@@ -32,6 +35,24 @@ source "$REPO/lib/templates.sh"
 source "$REPO/lib/signing.sh"
 # shellcheck source=lib/app-icons.sh
 source "$REPO/lib/app-icons.sh"
+# shellcheck source=lib/lock.sh
+source "$REPO/lib/lock.sh"
+
+# One theme change at a time: two of them share the rendered folders, and
+# one could remove the other's work. A change waits a few seconds for one
+# already running (they take well under a second).
+THEME_LOCK="$GRAND_LINE_STATE/theme.lock"
+theme_lock() {
+  local _
+  for _ in $(seq 1 50); do
+    lock_take "$THEME_LOCK" && return 0
+    sleep 0.2
+  done
+  echo "Another theme change is still running${LOCK_HOLDER:+ (process $LOCK_HOLDER)}; nothing changed." >&2
+  return 1
+}
+theme_unlock() { lock_release "$THEME_LOCK"; }
+trap theme_unlock EXIT
 
 # The apps' icons are redrawn in their own session, so the theme change
 # returns at once and a following shortcut cannot stop it. Nothing starts
@@ -54,11 +75,15 @@ EOF
 }
 
 # Render every template into a fresh folder, then swap it in whole, so an
-# app never reads a half-written theme.
+# app never reads a half-written theme. THEME_CHANGED is 1 when the result
+# differs from what was in place.
 render_theme() {
   local name="$1" file="$2" next="$CURRENT/next-theme"
+  THEME_CHANGED=1
   rm -rf "$next" "$CURRENT/theme.old"
-  render_templates "$file" "$name" "$next" "$USER_TEMPLATES" "$REPO/config/themed" || return 1
+  mkdir -p "$CURRENT"
+  render_templates "$file" "$name" "$next" "$USER_TEMPLATES" "$REPO/config/themed" || { rm -rf "$next"; return 1; }
+  [[ -d "$THEME_OUT" ]] && diff -rq "$next" "$THEME_OUT" >/dev/null 2>&1 && THEME_CHANGED=0
   if [[ -d "$THEME_OUT" ]]; then
     mv "$THEME_OUT" "$CURRENT/theme.old" || { rm -rf "$next"; return 1; }
   fi
@@ -71,19 +96,23 @@ render_theme() {
   fi
 }
 
+# put SRC DEST: copy only when different, so a file an app watches is
+# rewritten only when it changed.
+put() { cmp -s "$1" "$2" || cp "$1" "$2"; }
+
 # Put the rendered files where each app looks for them.
 install_theme_outputs() {
   local out="$THEME_OUT"
   # ~/.config/ghostty links to the package; theme.conf is listed in .gitignore.
   if [[ -f "$out/ghostty.conf" ]]; then
     [[ -d "$HOME/.config/ghostty" ]] || mkdir -p "$HOME/.config/ghostty"
-    cp "$out/ghostty.conf" "$HOME/.config/ghostty/theme.conf"
+    put "$out/ghostty.conf" "$HOME/.config/ghostty/theme.conf"
   fi
 
   # btop: the theme file always, the setting only if you have not chosen one.
   if [[ -f "$out/btop.theme" ]]; then
     local btop="$HOME/.config/btop"
-    mkdir -p "$btop/themes" && cp "$out/btop.theme" "$btop/themes/grand-line.theme"
+    mkdir -p "$btop/themes" && put "$out/btop.theme" "$btop/themes/grand-line.theme"
     if [[ ! -f "$btop/btop.conf" ]] || ! grep -q '^color_theme' "$btop/btop.conf"; then
       printf 'color_theme = "grand-line"\n' >> "$btop/btop.conf"
     elif grep -qE '^color_theme *= *"Default"' "$btop/btop.conf"; then
@@ -100,7 +129,7 @@ install_theme_outputs() {
   # Claude Code lists ~/.claude/themes in /theme and reloads it on change.
   # Choosing it there (once) is left to you.
   if [[ -f "$out/claude.json" && -d "$HOME/.claude" ]]; then
-    mkdir -p "$HOME/.claude/themes" && cp "$out/claude.json" "$HOME/.claude/themes/grand-line.json"
+    mkdir -p "$HOME/.claude/themes" && put "$out/claude.json" "$HOME/.claude/themes/grand-line.json"
   fi
 }
 
@@ -220,13 +249,20 @@ value() {
   line="${line#*=}"; line="${line#\"}"; printf '%s\n' "${line%\"}"
 }
 
-# apply_outputs NAME FILE: render the templates, put them in place, reload
-# every tool and tell the apps. Used by set, mode and apply.
+# apply_outputs NAME FILE [changed]: render the templates, put them in
+# place, reload every tool and tell the apps (apply). With "changed" (refresh),
+# the tools and apps are reloaded only when the rendered theme changed.
 apply_outputs() {
-  local name="$1" file="$2" resolved
+  local name="$1" file="$2" when="${3:-always}" resolved
   resolved="$(theme_resolve "$file" "$REPO" 2>/dev/null)" || resolved=""
-  render_theme "$name" "$file" || return 1
+  theme_lock || return 1
+  if ! render_theme "$name" "$file"; then
+    echo "theme $name could not be rendered; nothing changed" >&2
+    theme_unlock; return 1
+  fi
   install_theme_outputs
+  theme_unlock
+  [[ "$when" == changed && "$THEME_CHANGED" == 0 ]] && return 0
   reload_tools "$(value MODE)" "$(value NVIM)"
   post_theme_changed "$name"
 }
@@ -244,6 +280,14 @@ apply_theme() {
   local label mode accent background
   label="$(value LABEL)"; mode="$(value MODE)"; accent="$(value ACCENT)"; background="$(value BACKGROUND)"
 
+  # The theme's files first: if they cannot be made, nothing else changes
+  # (not the appearance, not the accent), and the reason is shown.
+  theme_lock || return 1
+  if ! render_theme "$name" "$file"; then
+    echo "theme $name could not be rendered; nothing changed" >&2
+    theme_unlock; return 1
+  fi
+
   # Test machines cannot answer macOS's Automation prompt, so they skip it.
   if [[ -z "${GRAND_LINE_NO_APPLEEVENTS:-}" ]]; then
     local dark=false; [[ "$mode" == dark ]] && dark=true
@@ -256,13 +300,13 @@ apply_theme() {
     defaults write -g AppleAccentColor -int "$accent"
   fi
 
-  render_theme "$name" "$file" 2>/dev/null || return 1
   install_theme_outputs
 
   if [[ "$wallpaper" == yes && -z "${GRAND_LINE_NO_APPLEEVENTS:-}" ]]; then
     set_wallpaper "$BACKGROUNDS/$background" || set_wallpaper "$REPO/backgrounds/$background"
   fi
   printf '%s\n' "$name" > "$GRAND_LINE_STATE/theme"
+  theme_unlock
   reload_tools "$mode" "$(value NVIM)"
   post_theme_changed "$name"
   notify "Theme: $label" "Accent colour applies to newly opened windows."
@@ -421,7 +465,8 @@ case "${1:-pick}" in
     current="$(cat "$GRAND_LINE_STATE/theme" 2>/dev/null)"
     [[ -n "$current" ]] || exit 0
     [[ -f "$THEMES/$current.theme" ]] || current=daylight
-    apply_outputs "$current" "$THEMES/$current.theme"
+    when=always; [[ "$1" == refresh ]] && when=changed
+    apply_outputs "$current" "$THEMES/$current.theme" "$when"
     ;;
   check)
     shift

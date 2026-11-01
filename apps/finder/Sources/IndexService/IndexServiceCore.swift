@@ -99,9 +99,12 @@ public final class IndexServiceCore: @unchecked Sendable {
         }
         if let found = adopted {
             index = found.index
-            if found.origin != .own {
-                // Nexus indexed all of ~/Library; this index leaves most of it out.
-                await index.prune(exclusions.paths)
+            // Nexus indexed all of ~/Library, and this index's own snapshot
+            // may predate a rule (or hold a folder made in ~/Library since):
+            // whatever the rules leave out goes, from every snapshot.
+            let pruned = await index.pruneExcluded()
+            if pruned > 0 { log.info("Left out \(pruned) entries the rules exclude") }
+            if found.origin != .own || pruned > 0 {
                 do {
                     try await index.save(to: locations.snapshot)
                     log.info("Adopted the \(found.origin.rawValue, privacy: .public) snapshot")
@@ -175,11 +178,14 @@ public final class IndexServiceCore: @unchecked Sendable {
         try? await index.save(to: locations.snapshot)
     }
 
-    /// For SIGTERM from launchd: saves, then exits. Waits at most 20 s
+    /// For SIGTERM from launchd: stops following FSEvents, saves, then exits.
+    /// The saved event is the last one applied, so changes still queued are
+    /// replayed at the next start rather than skipped. Waits at most 20 s
     /// (the agent's ExitTimeOut is 30).
     public func saveAndExit() -> Never {
         let done = DispatchSemaphore(value: 0)
         Task.detached(priority: .userInitiated) {
+            await self.index().stopWatching()
             await self.saveNow()
             done.signal()
         }

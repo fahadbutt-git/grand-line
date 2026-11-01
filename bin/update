@@ -88,11 +88,14 @@ fi
 LAST_RUN="$GRAND_LINE_STATE/auto-update-last"
 if [[ "$EXPLICIT" == unattended ]]; then
   [[ -f "$UPDATE_AGENT_OFF" ]] && exit 0
-  # At login, a copy left waiting goes in before its app starts again.
-  if compgen -G "${GRAND_LINE_APPS_DEST:-/Applications}/.*.app.staged" >/dev/null; then
+  # At login, a copy left waiting goes in before its app starts again. Only
+  # while holding the update lock, so a setup or update you started is never
+  # swapping the same app at the same moment; if one is running, it waits.
+  if compgen -G "${GRAND_LINE_APPS_DEST:-/Applications}/.*.app.staged" >/dev/null && update_lock_take; then
     mkdir -p "$GRAND_LINE_LOGS"
     REPO_DIR="$REPO" DRY_RUN=0 bash -c 'source "$1/lib/common.sh" && source "$1/lib/native-apps.sh" && apply_staged_apps' _ "$REPO" \
       >> "$GRAND_LINE_LOGS/update.log" 2>&1 || true
+    update_lock_release; unset GRAND_LINE_LOCK_HELD
   fi
   sleep "$DELAY"
   # At most every 12 hours, so a day with several logins checks once.
@@ -137,12 +140,30 @@ failed=()    # parts that did not update
 changed=()   # what this run changed, for the one notification
 needs=()     # what is waiting for you
 
-# own_app_sources_checked: the apps' sources at HEAD are GitHub's checked
-# copy (no commits made on this Mac change them), so the unattended run may
-# build them.
-own_app_sources_checked() {
-  git -C "$REPO" rev-parse -q --verify '@{u}' >/dev/null 2>&1 || return 1
-  git -C "$REPO" diff --quiet '@{u}' HEAD -- apps lib tools
+# app_sources: whether the unattended run may build the apps' sources.
+#   checked  they are GitHub's checked copy (no commits or edits made on this
+#            Mac change them)
+#   local    commits or edits made on this Mac change them
+#   none     there is no GitHub copy to compare with (a package copied
+#            without git, or a branch with no GitHub copy, such as a
+#            grandline try experiment)
+app_sources() {
+  if ! git -C "$REPO" rev-parse -q --verify '@{u}' >/dev/null 2>&1; then echo none; return 0; fi
+  if git -C "$REPO" diff --quiet '@{u}' HEAD -- apps lib tools && git -C "$REPO" diff --quiet HEAD -- apps lib tools; then
+    echo checked
+  else
+    echo local
+  fi
+}
+
+# no_upstream_note: with no GitHub copy the apps are rebuilt only by an
+# update you run; say so once, not every day.
+no_upstream_note() {
+  local stamp="$GRAND_LINE_STATE/told-no-upstream"
+  echo "No GitHub copy to check the apps' sources against, so they are rebuilt only by an update you run."
+  [[ -f "$stamp" ]] && return 0
+  mkdir -p "$GRAND_LINE_STATE" && touch "$stamp"
+  needs+=("this package has no GitHub copy, so the apps are rebuilt only when you run update")
 }
 
 # rebuild_apps: build the apps whose sources changed, replace them (the old
@@ -167,9 +188,12 @@ package_update "$REPO" || pkg=$?
 
 case "$MODE" in
   apps)
+    sources="$(app_sources)"
     if [[ "$pkg" == 2 ]]; then
       :   # the apps are not rebuilt from changes that were not applied
-    elif ! own_app_sources_checked && [[ "$STRICT" == 1 ]]; then
+    elif [[ "$STRICT" == 1 && "$sources" == none ]]; then
+      no_upstream_note
+    elif [[ "$STRICT" == 1 && "$sources" == local ]]; then
       needs+=("the apps' sources have changes made on this Mac; run update in a terminal")
     else
       echo "== Apps"
@@ -181,10 +205,11 @@ case "$MODE" in
       echo "== Apps, settings and one-time changes (no password needed)"
       report="$(mktemp)"
       skip=()
-      if ! own_app_sources_checked; then
-        skip=(--skip native-tools)
-        needs+=("the apps' sources have changes made on this Mac; run update to rebuild them")
-      fi
+      case "$(app_sources)" in
+        local) skip=(--skip native-tools)
+               needs+=("the apps' sources have changes made on this Mac; run update to rebuild them") ;;
+        none)  skip=(--skip native-tools); no_upstream_note ;;
+      esac
       GRAND_LINE_APPS_REPORT="$report" bash "$REPO/setup.sh" --unattended "${skip[@]+"${skip[@]}"}" || failed+=("setup")
       if [[ -s "$report" ]]; then
         changed+=("rebuilt $(sort -u "$report" | tr '\n' ' ' | sed 's/ $//; s/ /, /g')")
@@ -194,6 +219,8 @@ case "$MODE" in
       "$REPO/bin/migrate" --unattended; rc=$?
       [[ "$rc" == 3 ]] && needs+=("one-time changes wait for: update")
       [[ "$rc" == 1 ]] && failed+=("migrations")
+      # Only when the theme, its templates or the package changed: the tools
+      # and apps are reloaded only then, never mid-task for nothing.
       "$REPO/bin/theme" refresh || failed+=("theme")
     fi
     ;;

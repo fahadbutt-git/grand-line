@@ -89,6 +89,13 @@ public enum HotkeySetting {
         return takesCommandSpace(store) ? .commandSpace : nil
     }
 
+    /// The shortcut `setHotkey(hotkey)` would make current, without saving it:
+    /// what to register first, before anything is saved.
+    public static func resolved(_ hotkey: LauncherHotkey?, _ defaults: UserDefaults? = nil) -> LauncherHotkey? {
+        if let hotkey { return hotkey }
+        return takesCommandSpace(defaults ?? sightDefaults) ? .commandSpace : nil
+    }
+
     /// nil goes back to the default (Command+Space when setup handed it over).
     public static func setHotkey(_ hotkey: LauncherHotkey?, _ defaults: UserDefaults? = nil) {
         let store = defaults ?? sightDefaults
@@ -99,5 +106,36 @@ public enum HotkeySetting {
     static var sightDefaults: UserDefaults {
         if Bundle.main.bundleIdentifier == suiteName { return .standard }
         return UserDefaults(suiteName: suiteName) ?? .standard
+    }
+}
+
+/// The registered launcher shortcut. A new one is registered while the old
+/// one is still held, and the old one goes only once the new one took: a
+/// shortcut macOS refuses leaves the old one working.
+public struct HotkeyRegistration<Handle> {
+    public private(set) var shortcut: LauncherHotkey?
+    public private(set) var handle: Handle?
+
+    public init() {}
+
+    /// Makes `new` the shortcut. Returns false, keeping the current one, when
+    /// `register` refuses it (another app or Spotlight holds it).
+    public mutating func change(to new: LauncherHotkey?, register: (LauncherHotkey) -> Handle?) -> Bool {
+        guard let new else {
+            handle = nil
+            shortcut = nil
+            return true
+        }
+        if new == shortcut, handle != nil { return true }
+        guard let fresh = register(new) else { return false }
+        handle = fresh
+        shortcut = new
+        return true
+    }
+
+    /// Lets the shortcut go while a new one is recorded (it must reach the field).
+    public mutating func suspend() {
+        handle = nil
+        shortcut = nil
     }
 }

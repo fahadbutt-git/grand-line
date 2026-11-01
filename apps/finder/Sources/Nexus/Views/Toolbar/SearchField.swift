@@ -28,6 +28,8 @@ struct SearchField: View {
                     Image(systemName: "xmark.circle.fill").font(.system(size: 12)).foregroundStyle(palette.faint)
                 }
                 .buttonStyle(.plain)
+                .help("End the search")
+                .accessibilityLabel("End the search")
             }
         }
         .padding(.horizontal, 8)

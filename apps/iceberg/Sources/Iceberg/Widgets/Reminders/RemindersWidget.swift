@@ -21,6 +21,8 @@ final class RemindersWidget: ObservableObject, NotchWidget {
     /// Ticked in this session, shown struck through until the panel closes.
     @Published private(set) var ticked: Set<String> = []
     private let store: SharedEventStore
+    /// EventKit saves run here, never on the main thread.
+    private let saveQueue = DispatchQueue(label: "com.grandline.iceberg.reminders.save", qos: .userInitiated)
     private var stale = true
     private var isOpen = false
 
@@ -82,16 +84,30 @@ final class RemindersWidget: ObservableObject, NotchWidget {
         }
     }
 
-    /// Completes (or, ticked again before closing, reopens) a reminder.
+    /// Completes (or, ticked again before closing, reopens) a reminder. The
+    /// tick shows at once; EventKit saves on a background queue (a save
+    /// commits to the database and can be slow), and a failed save undoes it.
     func toggle(_ item: AgendaReminder) {
-        guard let reminder = store.store.calendarItem(withIdentifier: item.id) as? EKReminder else { return }
         let done = !ticked.contains(item.id)
-        reminder.isCompleted = done
-        do {
-            try store.store.save(reminder, commit: true)
-            if done { ticked.insert(item.id) } else { ticked.remove(item.id) }
-        } catch {
-            Log.info("Could not save reminder: \(error.localizedDescription)")
+        if done { ticked.insert(item.id) } else { ticked.remove(item.id) }
+        let eventStore = store.store
+        let id = item.id
+        saveQueue.async { [weak self] in
+            var problem: String?
+            if let reminder = eventStore.calendarItem(withIdentifier: id) as? EKReminder {
+                reminder.isCompleted = done
+                do { try eventStore.save(reminder, commit: true) } catch { problem = error.localizedDescription }
+            } else {
+                problem = "it is no longer there"
+            }
+            guard let problem else { return }
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    Log.info("Could not save reminder: \(problem)")
+                    guard let self else { return }
+                    if done { self.ticked.remove(id) } else { self.ticked.insert(id) }
+                }
+            }
         }
     }
 

@@ -235,8 +235,12 @@ grep -q "background = ffffff" "$HOME/.config/ghostty/theme.conf" 2>/dev/null && 
   && t_ok "theme apply renders again, reloads Ghostty and btop, and tells the apps" || t_fail "theme apply" "$(cat "$STUB_LOG")"
 printf '#!/bin/bash\necho "Ghostty 1.1.3"\n' > "$tmp/tools/ghostty"
 printf 'ghostty\nbtop\n' > "$tmp/running"; : > "$STUB_LOG"
+PATH="$PATH:$tmp/tools" STUB_RUNNING="$tmp/running" "$ROOT/bin/theme" apply >/dev/null 2>&1
+! grep -q "USR2 -x ghostty" "$STUB_LOG" && grep -q "USR2 -x btop" "$STUB_LOG" \
+  && t_ok "theme apply leaves a Ghostty too old to reload (it would quit)" || t_fail "old Ghostty signalled"
+printf '#!/bin/bash\necho "Ghostty 1.2.3"\n' > "$tmp/tools/ghostty"; : > "$STUB_LOG"
 PATH="$PATH:$tmp/tools" STUB_RUNNING="$tmp/running" "$ROOT/bin/theme" refresh >/dev/null 2>&1
-! grep -q "USR2 -x ghostty" "$STUB_LOG" && t_ok "theme apply leaves a Ghostty too old to reload (it would quit)" || t_fail "old Ghostty signalled"
+! grep -qE "USR2|theme.changed" "$STUB_LOG" && t_ok "theme refresh reloads nothing when the rendered theme did not change" || t_fail "refresh reloaded" "$(cat "$STUB_LOG")"
 
 # base16 import (into the copy of the package).
 if "$pkg/bin/theme" import-base16 "$ROOT/tests/fixtures/base16-flat.yaml" tide >/dev/null 2>&1; then
@@ -301,26 +305,38 @@ else
 fi
 
 # --- tidy-downloads: rules, sources, age, clashes, never deleting
-dl="$tmp/dl"; src="$tmp/sources"; mkdir -p "$dl/Documents" "$dl/My folder" "$src"
+# A file's age is when it arrived in Downloads (the mdls stub answers from
+# $MDLS_DATES/<name>; with no answer, the inode change time), never its
+# modification time. The clock is set two minutes ahead, so every file made
+# here has settled.
+dl="$tmp/dl"; src="$tmp/sources"; mdates="$tmp/mdls"; mkdir -p "$dl/Documents" "$dl/My folder" "$src" "$mdates"
 export GRAND_LINE_NO_RESCAN=1 XATTR_SOURCES="$src" GRAND_LINE_DOWNLOADS="$dl" GRAND_LINE_DOWNLOAD_RULES="$ROOT/config/grand-line/downloads-rules.tsv"
-age() { perl -e '$t = time - shift; utime $t, $t, @ARGV' "$1" "${@:2}"; }   # age SECONDS FILES
-mk() { : > "$dl/$1"; age 120 "$dl/$1"; [[ -n "${2:-}" ]] && printf '%s' "$2" > "$src/$1"; }
+export MDLS_DATES="$mdates" GRAND_LINE_NOW="$(( $(date +%s) + 120 ))" GRAND_LINE_DOWNLOADS_LOCK="$tmp/downloads.lock"
+age() { perl -e '$t = time - shift; utime $t, $t, @ARGV' "$1" "${@:2}"; }   # age SECONDS FILES (modification time)
+added() { perl -MPOSIX -e 'print strftime("%Y-%m-%d %H:%M:%S +0000", gmtime(time - shift))' "$2" > "$mdates/$1"; }   # added NAME SECONDS-AGO
+mk() { printf 'x' > "$dl/$1"; [[ -n "${2:-}" ]] && printf '%s' "$2" > "$src/$1"; return 0; }
+tidy() { "$ROOT/bin/tidy-downloads" "$@"; }
 mk report.pdf "https://claude.ai/api/files/x"
 mk paper.pdf "https://pmc.ncbi.nlm.nih.gov/articles/x.pdf"
 mk guide.docx "https://jamanetwork.com/author-guide"
 mk data.csv
 mk Notes.TXT; : > "$dl/Documents/Notes.TXT"
 mk odd.xyz
-mk old.xyz; age $((40 * 86400)) "$dl/old.xyz"
+mk old.xyz; added old.xyz $((40 * 86400))
 mk new.dmg
-mk setup.dmg; age $((10 * 86400)) "$dl/setup.dmg"
-: > "$dl/fresh.pdf"
+mk setup.dmg; added setup.dmg $((10 * 86400))
+# Unpacked from a zip, sent by AirDrop or fetched with curl -R: an old
+# modification time, but it arrived just now.
+mk Foo.dmg; age $((500 * 86400)) "$dl/Foo.dmg"
+mk unpacked.xyz; age $((400 * 86400)) "$dl/unpacked.xyz"
 mk part.pdf.crdownload; mk .hidden.pdf
+# Firefox and Zen: an empty file with the final name beside NAME.part.
+: > "$dl/big.pdf"; mk big.pdf.part
 before="$(cd "$dl" && find . | sort)"
-plan="$("$ROOT/bin/tidy-downloads" --dry-run)"
+plan="$(tidy --dry-run)"
 [[ "$(cd "$dl" && find . | sort)" == "$before" ]] && t_ok "Downloads: dry run moves nothing" || t_fail "Downloads: dry run moved files"
 grep -qx "report.pdf -> AI/Claude/report.pdf" <<<"$plan" && t_ok "Downloads: dry run shows the plan" || t_fail "Downloads: plan was" "$plan"
-"$ROOT/bin/tidy-downloads"
+tidy
 check_at() { [[ -f "$dl/$1" ]] && t_ok "Downloads: $2" || t_fail "Downloads: $2" "$(cd "$dl" && find . -type f | sort | tr '\n' ' ')"; }
 check_at "AI/Claude/report.pdf" "a file from Claude goes to AI/Claude"
 check_at "Papers/paper.pdf" "a PDF from PubMed Central goes to Papers"
@@ -328,18 +344,117 @@ check_at "Documents/guide.docx" "the Papers rule only takes PDFs"
 check_at "Data/data.csv" "a file with no source is sorted by type"
 check_at "Documents/Notes 2.TXT" "a name clash keeps both files"
 check_at "odd.xyz" "an unknown new file stays put"
-[[ -n "$(find "$dl/Archive" -name old.xyz 2>/dev/null)" ]] && t_ok "Downloads: an old loose file is archived by month" || t_fail "Downloads: old file not archived"
+check_at "old.xyz" "a file the sorter sees for the first time is never archived, however old"
 check_at "Installers/new.dmg" "a new installer goes to Installers"
-[[ -f "$HOME/.Trash/setup.dmg" ]] && t_ok "Downloads: an installer older than a week goes to the Trash" || t_fail "Downloads: old installer not trashed"
-check_at "fresh.pdf" "a file still arriving is left alone"
+check_at "Installers/setup.dmg" "an installer seen for the first time is never sent to the Trash"
+check_at "Installers/Foo.dmg" "an installer with an old modification time is sorted, not trashed"
+check_at "unpacked.xyz" "a file with an old modification time is not archived"
 check_at "part.pdf.crdownload" "an unfinished download is left alone"
+check_at "big.pdf" "a Firefox placeholder beside its .part is left alone"
+check_at "big.pdf.part" "the .part it belongs to is left alone"
 check_at ".hidden.pdf" "hidden files are left alone"
 [[ -d "$dl/My folder" ]] && t_ok "Downloads: folders are left alone" || t_fail "Downloads: a folder moved"
 grep -q "report.pdf" "$HOME/Library/Logs/grand-line/downloads.log" 2>/dev/null && t_ok "Downloads: every move is logged" || t_fail "Downloads: no log"
-mkdir "${TMPDIR:-/tmp}/grand-line-downloads.lock"; mk late.csv
-"$ROOT/bin/tidy-downloads"; check_at "late.csv" "a second copy waits while one is running"
-rmdir "${TMPDIR:-/tmp}/grand-line-downloads.lock"
-unset XATTR_SOURCES GRAND_LINE_DOWNLOADS GRAND_LINE_DOWNLOAD_RULES
+# Later runs: what was seen before may now be moved by age, by when it arrived.
+tidy; tidy
+[[ -n "$(find "$dl/Archive" -name old.xyz 2>/dev/null)" ]] && t_ok "Downloads: an old loose file is archived by the month it arrived" || t_fail "Downloads: old file not archived"
+[[ -f "$HOME/.Trash/setup.dmg" ]] && t_ok "Downloads: an installer that arrived over a week ago goes to the Trash" || t_fail "Downloads: old installer not trashed"
+check_at "Installers/Foo.dmg" "an installer that arrived just now stays, whatever its modification time"
+check_at "unpacked.xyz" "a file that arrived just now is never archived, whatever its modification time"
+[[ ! -e "$HOME/.Trash/Foo.dmg" ]] && t_ok "Downloads: the new installer is not in the Trash" || t_fail "Downloads: a new installer was trashed"
+# An empty file that just appeared (it may be a placeholder) waits.
+: > "$dl/empty.pdf"; tidy; check_at "empty.pdf" "a new empty file waits"
+# A name taken by another run between the check and the move: nothing is
+# replaced, the file takes the next free name (mv -n, then checked).
+mkdir -p "$tmp/racebin"
+printf '%s\n' '#!/bin/bash' \
+  '# Another run takes the free name just before this move.' \
+  'if [[ "$1" == -n && ! -e "$RACE_DONE" ]]; then : > "$RACE_DONE"; printf theirs > "$3"; fi' \
+  'exec /bin/mv "$@"' > "$tmp/racebin/mv"
+chmod +x "$tmp/racebin/mv"
+printf 'mine' > "$dl/clash.csv"
+GRAND_LINE_TEST_PATH="$tmp/racebin:$GRAND_LINE_TEST_PATH" RACE_DONE="$tmp/race-done" tidy
+[[ "$(cat "$dl/Data/clash.csv" 2>/dev/null)" == theirs && "$(cat "$dl/Data/clash 2.csv" 2>/dev/null)" == mine ]] \
+  && t_ok "Downloads: a name taken during the move is never overwritten" || t_fail "Downloads: race" "$(cd "$dl/Data" && ls)"
+# One run at a time: a lock held by a running sorter is kept however long it
+# has run; one left by a run that ended is taken over.
+lockd="$GRAND_LINE_DOWNLOADS_LOCK"
+sleep 300 & holder=$!
+mkdir "$lockd"; printf '%s %s\n' "$holder" "$(LC_ALL=C ps -o lstart= -p "$holder" | sed 's/^ *//; s/ *$//')" > "$lockd/owner"
+perl -e '$t = time - 3600; utime $t, $t, @ARGV' "$lockd"
+mk late.csv; tidy; check_at "late.csv" "a second copy waits while one is running, even an hour on"
+kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null
+tidy; check_at "Data/late.csv" "a lock left by a run that ended is taken over"
+[[ ! -e "$lockd" ]] && t_ok "Downloads: the lock is given back" || t_fail "Downloads: lock left behind"
+mkdir "$lockd"; mk later.csv; tidy; check_at "later.csv" "a lock just being taken (no owner yet) is respected"
+rmdir "$lockd"
+unset XATTR_SOURCES GRAND_LINE_DOWNLOADS GRAND_LINE_DOWNLOAD_RULES MDLS_DATES GRAND_LINE_NOW GRAND_LINE_DOWNLOADS_LOCK
+
+# --- locks: held while the holder runs, taken over once it is gone, one winner
+(
+  source "$ROOT/lib/lock.sh"
+  L="$tmp/locks/a.lock"; mkdir -p "$tmp/locks"
+  lock_take "$L" || exit 1
+  [[ "$(cut -d' ' -f1 "$L/owner")" == "$$" && "$(cat "$L/owner")" == "$(lock_proc_id $$)" ]] || exit 2   # ID and start time
+  ( lock_take "$L" ) && exit 3                       # held by a running process
+  lock_release "$L"; [[ ! -e "$L" ]] || exit 4
+  # (a) No owner written yet: held for a minute, then stale.
+  mkdir "$L"; lock_take "$L" && exit 5
+  perl -e '$t = time - 120; utime $t, $t, @ARGV' "$L"
+  lock_take "$L" || exit 6
+  lock_release "$L"
+  # A process that has ended.
+  bash -c 'exit 0' & dead=$!; wait "$dead"
+  mkdir "$L"; printf '%s Thu Jan  1 00:00:00 1970\n' "$dead" > "$L/owner"
+  lock_take "$L" || exit 7
+  lock_release "$L"
+  # (b) The ID now belongs to another process (a reused PID): stale.
+  sleep 30 & other=$!
+  mkdir "$L"; printf '%s Thu Jan  1 00:00:00 1970\n' "$other" > "$L/owner"
+  lock_take "$L" || exit 8
+  lock_release "$L"
+  # ...but that same process, with its own start time, holds it, however old.
+  mkdir "$L"; lock_proc_id "$other" > "$L/owner"; perl -e '$t = time - 7200; utime $t, $t, @ARGV' "$L"
+  lock_take "$L" && exit 9
+  [[ "$LOCK_HOLDER" == "$other" ]] || exit 10
+  # The older format (a pid file with just the ID) still counts.
+  rm -f "$L/owner"; echo "$other" > "$L/pid"; lock_take "$L" && exit 11
+  kill "$other" 2>/dev/null; wait "$other" 2>/dev/null
+  lock_take "$L" || exit 12
+  lock_release "$L"
+  # (c) Many takers at once on a stale lock: exactly one wins, every time.
+  for round in 1 2 3 4; do
+    mkdir "$L"; printf '%s x\n' "$dead" > "$L/owner"; : > "$tmp/locks/won"
+    for _ in 1 2 3 4 5 6; do
+      bash -c 'source "$1"; lock_take "$2" && echo won >> "$3"; sleep 2' _ "$ROOT/lib/lock.sh" "$L" "$tmp/locks/won" &
+    done
+    wait
+    [[ "$(grep -c won "$tmp/locks/won")" == 1 ]] || exit $((20 + round))
+    rm -rf "$L" "$L.break"
+  done
+  exit 0
+) && t_ok "locks: a running holder keeps it, a dead or reused PID or an unwritten owner frees it, and one taker wins" \
+  || t_fail "locks (step $?)"
+
+# --- the first-open check comes back on the apps this run installed
+(
+  export REPO_DIR="$ROOT" DRY_RUN=0 GRAND_LINE_APPS_DEST="$tmp/gk-apps" MDLS_DATES="$tmp/gk-dates"
+  mkdir -p "$GRAND_LINE_APPS_DEST" "$MDLS_DATES"
+  source "$ROOT/lib/common.sh"; source "$ROOT/steps/02-apps.sh"
+  for a in Old Replaced; do mkdir -p "$GRAND_LINE_APPS_DEST/$a.app/Contents"; done
+  echo "2020-01-01 00:00:00 +0000" > "$MDLS_DATES/Old.app"
+  before="$tmp/gk-before"; apps_now > "$before"; start="$(date +%s)"
+  # The installs: Homebrew and pkg payloads keep the app's own (old) times.
+  for a in New Approved Flagged; do mkdir -p "$GRAND_LINE_APPS_DEST/$a.app/Contents"; done
+  perl -e '$t = time - 400 * 86400; utime $t, $t, @ARGV' "$GRAND_LINE_APPS_DEST"/*.app
+  perl -MPOSIX -e 'print strftime("%Y-%m-%d %H:%M:%S +0000", gmtime(time + 5))' > "$MDLS_DATES/Replaced.app"
+  : > "$STUB_LOG"
+  SPCTL_APPROVED="Approved.app" XATTR_QUARANTINED="Flagged.app" restore_gatekeeper "$before" "$start" >/dev/null
+  flagged="$(sed -n 's#^xattr -w com.apple.quarantine [^ ]* .*/\([^/]*\)\.app$#\1#p' "$STUB_LOG" | sort | tr '\n' ' ')"
+  [[ "$flagged" == "New Replaced " ]] || { echo "$flagged"; exit 1; }
+  exit 0
+) && t_ok "the first-open check comes back on apps new to /Applications or added during the run, whatever their modification time" \
+  || t_fail "restore_gatekeeper (step $?)" "$(grep xattr "$STUB_LOG")"
 
 # --- app install and remove keep the Brewfile in step
 mkdir -p "$HOME/.grand-line/config/grand-line"
@@ -373,6 +488,10 @@ tag="$(git -C "$r" tag -l 'good-*' | head -1)"
 [[ "$(cat "$r/a.txt")" == one && "$(git -C "$r" branch --show-current)" == main ]] && t_ok "grandline try drop throws an experiment away" || t_fail "grandline try drop"
 "$ROOT/bin/grandline" try start better >/dev/null; echo better > "$r/a.txt"; "$ROOT/bin/grandline" try keep >/dev/null
 [[ "$(cat "$r/a.txt")" == better && "$(git -C "$r" branch --show-current)" == main ]] && t_ok "grandline try keep keeps an experiment" || t_fail "grandline try keep"
+git -C "$r" switch -q -c fixes; "$ROOT/bin/grandline" try start side >/dev/null; echo side > "$r/a.txt"; "$ROOT/bin/grandline" try keep >/dev/null
+[[ "$(git -C "$r" branch --show-current)" == fixes && "$(git -C "$r" show main:a.txt)" == better && "$(cat "$r/a.txt")" == side ]] \
+  && t_ok "grandline try keep goes back to the branch the experiment came from" || t_fail "grandline try keep on another branch"
+git -C "$r" switch -q main
 cmds="$("$ROOT/bin/grandline" commands)"
 if grep -q "^migrate  *Run the package" <<<"$cmds" && [[ "$(grep -c . <<<"$cmds")" == "$(find "$ROOT/bin" -type f | wc -l | tr -d ' ')" ]] && ! grep -qE '^[^ ]+ *$' <<<"$cmds"; then
   t_ok "grandline commands lists each command with its summary"; else t_fail "grandline commands" "$cmds"; fi
@@ -636,7 +755,9 @@ chmod +x "$tmp/bin-apps/"*
   grep -q 'LSUIElement' "$app/Contents/Info.plist" && grep -q NSAppleEventsUsageDescription "$app/Contents/Info.plist" || exit 4
   : > "$STUB_LOG"; build_native_apps >/dev/null 2>&1
   grep -q "^swift " "$STUB_LOG" && exit 5          # nothing changed, so no rebuild
-  sleep 1; touch "$apps_root/apps/demo/Sources/main.swift"; build_native_apps >/dev/null 2>&1
+  touch "$apps_root/apps/demo/Sources/main.swift"; : > "$STUB_LOG"; build_native_apps >/dev/null 2>&1
+  grep -q "^swift " "$STUB_LOG" && exit 11         # touched, not changed: no rebuild
+  echo '// v2' >> "$apps_root/apps/demo/Sources/main.swift"; build_native_apps >/dev/null 2>&1
   compgen -G "$HOME/.Trash/Demo App*" >/dev/null || exit 6  # the old copy went to the Trash
   [[ -x "$app/Contents/MacOS/Demo" ]] || exit 7
   sleep 1; printf 'DemoLib\tDemoKit\n' > "$apps_root/apps/demo/frameworks.tsv"; : > "$STUB_LOG"
@@ -644,7 +765,29 @@ chmod +x "$tmp/bin-apps/"*
   grep -q -- "--product DemoLib" "$STUB_LOG" || exit 9
   fw="$app/Contents/Frameworks/DemoKit.framework"
   [[ -f "$fw/Versions/A/DemoKit" && -L "$fw/DemoKit" ]] && grep -q "com.example.demo.DemoKit" "$fw/Versions/A/Resources/Info.plist" || exit 10
-) && t_ok "own apps are built, bundled, signed, rebuilt only on change, old copy trashed" || t_fail "native apps (step $?)"
+  # A deleted source file is a change too.
+  echo '// extra' > "$apps_root/apps/demo/Sources/extra.swift"; build_native_apps >/dev/null 2>&1
+  rm "$apps_root/apps/demo/Sources/extra.swift"; : > "$STUB_LOG"; build_native_apps >/dev/null 2>&1
+  grep -q "^swift " "$STUB_LOG" || exit 12
+  # When the old copy cannot go to the Trash, it stays as it was and nothing
+  # is put inside it; the run fails, so the next one tries again.
+  echo old > "$app/Contents/marker"
+  move_to_trash() { return 1; }
+  echo '// v3' >> "$apps_root/apps/demo/Sources/main.swift"
+  build_native_apps >/dev/null 2>&1 && exit 13
+  [[ "$(cat "$app/Contents/marker")" == old && -z "$(find "$app" -name '*.app*' -mindepth 1)" ]] || exit 14
+  [[ ! -e "$tmp/Applications/.Demo App.app.new" ]] || exit 15
+  : > "$STUB_LOG"; build_native_apps >/dev/null 2>&1; grep -q "^swift " "$STUB_LOG" || exit 16   # tried again
+  # The same for a copy left waiting.
+  mkdir -p "$tmp/Applications/.Demo App.app.staged/Contents"; echo staged > "$tmp/Applications/.Demo App.app.staged/Contents/marker"
+  pgrep() { return 1; }
+  apply_staged_apps >/dev/null 2>&1
+  [[ "$(cat "$app/Contents/marker")" == old && -d "$tmp/Applications/.Demo App.app.staged" && -z "$(find "$app" -name '*.app*' -mindepth 1)" ]] || exit 17
+  unset -f move_to_trash pgrep; source "$ROOT/lib/trash.sh"
+  apply_staged_apps >/dev/null 2>&1
+  [[ "$(cat "$app/Contents/marker")" == staged && ! -e "$tmp/Applications/.Demo App.app.staged" ]] || exit 18
+  build_native_apps >/dev/null 2>&1 && [[ -x "$app/Contents/MacOS/Demo" ]] || exit 19
+) && t_ok "own apps are built, bundled, signed, rebuilt on any change (a deletion too), old copy trashed or kept whole" || t_fail "native apps (step $?)"
 
 # --- Nexus and Sight take over Finder and Spotlight, and switch back
 (
@@ -856,7 +999,7 @@ EOF
   grep -q "Allow in the Background, Svc Index" <<<"$out" || exit 4
   grep -q "sudo" "$STUB_LOG" && exit 5
   grep -q "launchctl kickstart" "$STUB_LOG" && exit 6       # first install: nothing to restart
-  sleep 1; touch "$srv/apps/svc/Sources/main.swift"
+  echo '// svc v2' > "$srv/apps/svc/Sources/main.swift"
   : > "$STUB_LOG"; build_native_apps >/dev/null 2>&1
   grep -q "^launchctl kickstart -k gui/501/com.example.svc$" "$STUB_LOG" || exit 7
   grep -q "^open -g" "$STUB_LOG" && exit 8                   # launchd restarts it, not open
@@ -919,6 +1062,7 @@ then t_ok "make-icons reads a theme with what it inherits through EXTENDS (and s
 if command -v ssh-keygen >/dev/null 2>&1; then
 (
   source "$ROOT/lib/update-trust.sh"
+  us="$tmp/upstate"; UPSTREAM_APPLIED="$us/upstream-applied"; UPDATE_TOLD="$us/update-told"
   ssh-keygen -q -t ed25519 -N "" -C test -f "$tmp/signkey" && ssh-keygen -q -t ed25519 -N "" -C other -f "$tmp/otherkey" || exit 1
   export GIT_CONFIG_GLOBAL="$tmp/gitconfig"
   git config --global user.name t; git config --global user.email t@example.com
@@ -946,21 +1090,45 @@ if command -v ssh-keygen >/dev/null 2>&1; then
   git -C "$tmp/up" reset -q --hard HEAD~1
   echo 3 > "$tmp/up/f"; git -C "$tmp/up" -c user.signingkey="$tmp/otherkey.pub" commit -q -S -am three-other
   git -C "$tmp/up" push -q -f 2>/dev/null
-  # (the unsigned commit was only fetched, never applied, so this is not a rewrite of what this Mac has)
+  # (the unsigned commit was only fetched, never applied, so dropping it is not a rewrite of what this Mac has)
   git -C "$tmp/mac" fetch -q 2>/dev/null
   changed=(); needs=(); package_update "$tmp/mac" >/dev/null; [[ $? == 2 && "$(cat "$tmp/mac/f")" == 2 ]] || exit 10
   commit_trusted "$tmp/mac" "$(git -C "$tmp/mac" rev-parse origin/main)" && exit 11
-  # A rewritten (force-pushed) history is never applied, even when signed.
-  git -C "$tmp/up" reset -q --hard HEAD~1; echo 4 > "$tmp/up/g"; git -C "$tmp/up" add g; git -C "$tmp/up" commit -q -S -m four
+  # A rewritten (force-pushed) history is never applied, even when signed:
+  # here "two", which this Mac applied, is dropped.
+  git -C "$tmp/up" reset -q --hard HEAD~2; echo 4 > "$tmp/up/g"; git -C "$tmp/up" add g; git -C "$tmp/up" commit -q -S -m four
   git -C "$tmp/up" push -q -f 2>/dev/null
   changed=(); needs=(); package_update "$tmp/mac" >/dev/null; [[ $? == 2 && ! -e "$tmp/mac/g" ]] || exit 12
   grep -q rewritten <<<"${needs[*]}" || exit 13
-  # Your own commits not yet on GitHub are kept on top of GitHub's.
-  git -C "$tmp/mac" reset -q --hard origin/main
-  echo mine > "$tmp/mac/local"; git -C "$tmp/mac" add local; git -C "$tmp/mac" commit -q --no-gpg-sign -m mine
+  # The unattended run says so once, not every day.
+  changed=(); needs=(); package_update "$tmp/mac" >/dev/null; [[ $? == 2 && ${#needs[@]} == 0 && ! -e "$tmp/mac/g" ]] || exit 20
+  # A fetch made by something else first (lazygit, grandline publish) does not hide it.
+  git -C "$tmp/mac" fetch -q 2>/dev/null; rm -f "$UPDATE_TOLD"
+  changed=(); needs=(); package_update "$tmp/mac" >/dev/null; [[ $? == 2 && ! -e "$tmp/mac/g" ]] || exit 21
+  grep -q rewritten <<<"${needs[*]}" || exit 22
+  # Without the record (a Mac updated before it existed), the remote ref's history still tells.
+  rm -rf "$us"
+  changed=(); needs=(); package_update "$tmp/mac" >/dev/null; [[ $? == 2 && ! -e "$tmp/mac/g" ]] || exit 23
+  # Once you have moved this clone onto GitHub's copy yourself, updates carry on.
+  git -C "$tmp/mac" reset -q --keep origin/main
   echo 5 > "$tmp/up/f"; git -C "$tmp/up" commit -q -S -am five; git -C "$tmp/up" push -q 2>/dev/null
-  changed=(); needs=(); package_update "$tmp/mac" >/dev/null || exit 14
-  [[ "$(cat "$tmp/mac/f")" == 5 && -f "$tmp/mac/local" && "$(git -C "$tmp/mac" log -1 --format=%s)" == mine ]] || exit 15
+  changed=(); needs=(); package_update "$tmp/mac" >/dev/null || exit 24
+  [[ "$(cat "$tmp/mac/f")" == 5 && -e "$tmp/mac/g" ]] || exit 25
+  # Your own commits not yet on GitHub: unattended, nothing is rebased or
+  # signed again; it stops and says so once.
+  git config --global commit.gpgsign true
+  echo mine > "$tmp/mac/local"; git -C "$tmp/mac" add local; git -C "$tmp/mac" commit -q -m mine
+  mine="$(git -C "$tmp/mac" rev-parse HEAD)"
+  echo 6 > "$tmp/up/f"; git -C "$tmp/up" commit -q -S -am six; git -C "$tmp/up" push -q 2>/dev/null
+  changed=(); needs=(); package_update "$tmp/mac" >/dev/null; rc=$?
+  [[ $rc == 2 && "$(git -C "$tmp/mac" rev-parse HEAD)" == "$mine" && "$(cat "$tmp/mac/f")" == 5 ]] || exit 26
+  grep -q "commits of its own" <<<"${needs[*]}" || exit 27
+  changed=(); needs=(); package_update "$tmp/mac" >/dev/null; [[ $? == 2 && ${#needs[@]} == 0 ]] || exit 28
+  git config --global --unset commit.gpgsign
+  # Run by you, they are kept on top of GitHub's.
+  STRICT=0; changed=(); needs=(); package_update "$tmp/mac" </dev/null >/dev/null || exit 14
+  [[ "$(cat "$tmp/mac/f")" == 6 && -f "$tmp/mac/local" && "$(git -C "$tmp/mac" log -1 --format=%s)" == mine ]] || exit 15
+  STRICT=1
   # GPG-style signatures are not accepted (only keys in the allowed list count).
   git -C "$tmp/mac" cat-file commit HEAD~1 | grep -q "BEGIN SSH SIGNATURE" || exit 16
   exit 0
@@ -997,13 +1165,16 @@ grep -q '^UNATTENDED_STEPS="folders,dotfiles,native-tools,downloads"$' "$ROOT/se
   mrepo="$tmp/mig"; mkdir -p "$mrepo/migrations"
   printf '# grandline:unattended\necho a >> "%s"\n' "$tmp/mig.out" > "$mrepo/migrations/1800000000-quiet.sh"
   printf 'echo b >> "%s"\n' "$tmp/mig.out" > "$mrepo/migrations/1800000001-asks.sh"
+  # A later quiet one may rely on the one that asks, so it waits for it.
+  printf '# grandline:unattended\necho c >> "%s"\n' "$tmp/mig.out" > "$mrepo/migrations/1800000002-quiet-later.sh"
   rm -rf "$HOME/.local/state/grand-line/migrations"
-  GRAND_LINE_REPO="$mrepo" "$ROOT/bin/migrate" --unattended >/dev/null; rc=$?
+  out="$(GRAND_LINE_REPO="$mrepo" "$ROOT/bin/migrate" --unattended)"; rc=$?
   [[ "$rc" == 3 && "$(cat "$tmp/mig.out")" == a ]] || exit 1
+  grep -q "^2 one-time change(s) wait" <<<"$out" || exit 4
   GRAND_LINE_REPO="$mrepo" "$ROOT/bin/migrate" >/dev/null || exit 2
-  [[ "$(tr -d '\n' < "$tmp/mig.out")" == ab ]] || exit 3
+  [[ "$(tr -d '\n' < "$tmp/mig.out")" == abc ]] || exit 3
   rm -rf "$HOME/.local/state/grand-line/migrations"
-) && t_ok "unattended migrations run only those marked # grandline:unattended" || t_fail "migrate --unattended (step $?)"
+) && t_ok "unattended migrations run strictly oldest first, stopping at the first not marked # grandline:unattended" || t_fail "migrate --unattended (step $?)"
 
 # --- nothing is sent to GitHub by itself
 ! grep -nE 'git[^|;&]* push|git_ push|push_\b' "$ROOT/bin/update" "$ROOT/bin/app" "$ROOT/lib/"*.sh "$ROOT/setup.sh" "$ROOT/steps/"*.sh \

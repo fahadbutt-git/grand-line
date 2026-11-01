@@ -12,7 +12,13 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
     var pane: PaneModel
     weak var table: FileTableView?
     private var shownIDs: [String] = []
+    /// The rows as last drawn. The table reads these, not the pane's live
+    /// items, so a row number always means the item drawn there, even while
+    /// a reload is held back for a name being edited.
+    private var shown: [FileItem] = []
     private var shownCut: Set<String> = []
+    /// A reload that waited for a name being edited to end.
+    private var heldReload = false
     private var theme: Theme?
     /// Kind colours, extensions and row height from Settings, as last drawn.
     private var display: FileCellView.Display?
@@ -39,11 +45,11 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
         self.pane = pane
     }
 
-    var items: [FileItem] { pane.items }
+    var items: [FileItem] { shown }
 
     // MARK: Updates from the model
 
-    func update(theme: Theme, cut: Set<String>, renameRequest request: Int) {
+    func update(theme: Theme, cut: Set<String>, renameRequest request: Int, isFocused: Bool = true) {
         guard let table else { return }
         let ids = pane.state.ids
         let themeChanged = self.theme != theme
@@ -67,19 +73,60 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
             discardRename()
         }
         shownLocation = pane.location
-        if ids != shownIDs || cut != shownCut || themeChanged || displayChanged || columnsChanged {
-            let scrollToTop = shownIDs.isEmpty || ids.first != shownIDs.first && ids.count != shownIDs.count
-            shownIDs = ids
-            shownCut = cut
-            table.reloadData()
-            fitNameColumn()
-            if scrollToTop { table.scrollRowToVisible(0) }
+        if ids != shownIDs || cut != shownCut || themeChanged || displayChanged || columnsChanged || heldReload {
+            if editingField() != nil {
+                // A name is being edited (a download finished, a file changed
+                // nearby): reloading now would end the edit or move the row
+                // under it. The rows stay as they are until the edit ends.
+                heldReload = true
+            } else {
+                reloadRows(ids: ids, cut: cut)
+            }
         }
-        syncSelection()
+        if !heldReload { syncSelection() }
         if request != renameRequest {
             renameRequest = request
-            beginRename()
+            // Only the focused list renames, and only the item it was asked for.
+            if isFocused { beginRename(target: model.renameTarget) }
         }
+    }
+
+    private func reloadRows(ids: [String], cut: Set<String>) {
+        guard let table else { return }
+        heldReload = false
+        let scrollToTop = shownIDs.isEmpty || ids.first != shownIDs.first && ids.count != shownIDs.count
+        shownIDs = ids
+        shown = pane.items
+        shownCut = cut
+        table.reloadData()
+        fitNameColumn()
+        if scrollToTop { table.scrollRowToVisible(0) }
+        visibleRowsChanged()
+    }
+
+    /// The held reload, once the edit has ended.
+    private func reloadIfHeld() {
+        guard heldReload, editingField() == nil else { return }
+        reloadRows(ids: pane.state.ids, cut: model.services.clipboard.cutPaths)
+        syncSelection()
+    }
+
+    /// The name field being edited in this table, if any.
+    private func editingField() -> NSTextField? {
+        guard let table, let window = table.window, let editor = window.firstResponder as? NSText,
+              let field = editor.delegate as? NSTextField, field.isDescendant(of: table) else { return nil }
+        return field
+    }
+
+    /// Scrolling or resizing: the pane measures the folders now on screen.
+    @objc func visibleRowsChanged(_ notification: Notification? = nil) {
+        guard let table else { return }
+        let range = table.rows(in: table.visibleRect)
+        guard range.length > 0 else { return }
+        let lower = max(0, range.location)
+        let upper = min(shown.count, range.location + range.length)
+        guard lower < upper else { return }
+        pane.setVisible(shown[lower..<upper].map(\.id))
     }
 
     private func syncSelection() {
@@ -116,9 +163,10 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
         NexusLog.note("list: a rename in progress was dropped because the pane changed place")
     }
 
-    func beginRename() {
+    func beginRename(target: String? = nil) {
         guard let table, table.selectedRowIndexes.count == 1, let row = table.selectedRowIndexes.first,
               row < items.count, !items[row].isInArchive else { return }
+        if let target, items[row].id != target { return }
         renaming = true
         table.editColumn(0, row: row, with: nil, select: true)
         renaming = false
@@ -181,8 +229,15 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
 
     func controlTextDidEndEditing(_ notification: Notification) {
         guard let field = notification.object as? NSTextField, let table else { return }
+        defer { DispatchQueue.main.async { [weak self] in self?.reloadIfHeld() } }
         let row = table.row(for: field)
-        guard !discarding, row >= 0, row < items.count else {
+        // The item the field was showing when editing began: rows are not
+        // reloaded while a name is edited, and the cell says which item it is.
+        var cell: NSView? = field.superview
+        while let view = cell, !(view is FileCellView) { cell = view.superview }
+        let id = (cell as? FileCellView)?.itemID ?? (row >= 0 && row < items.count ? items[row].id : nil)
+        let item = id.flatMap { id in pane.items.first { $0.id == id } ?? items.first { $0.id == id } }
+        guard !discarding, row >= 0, let item else {
             // The row has gone (reloaded away): nothing to rename, but the keys
             // must not stay with an editor that is no longer on screen.
             DispatchQueue.main.async { [weak table] in
@@ -192,7 +247,6 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
             return
         }
         let allExtensions = NexusPreferencesStore.shared.current.showAllExtensions
-        let item = items[row]
         let typed = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         let shown = item.shownName(allExtensions: allExtensions)
         if typed.isEmpty || typed == shown || typed == item.name {
@@ -217,6 +271,17 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
             return true
         }
         let context = model.context
+        // Tab and Shift+Tab move between panes only where there are panes to
+        // move between; otherwise they select the next or previous item by
+        // name, as in Finder.
+        if shortcut.key == .tab, shortcut.modifiers.isEmpty || shortcut.modifiers == [.shift],
+           !model.isEnabled(shortcut.modifiers.isEmpty ? .nextPane : .previousPane) {
+            let names = items.map { (id: $0.id, name: $0.name) }
+            if let id = TabSelect.target(items: names, selected: Set(pane.selectedItems.map(\.id)), backwards: shortcut.modifiers == [.shift]) {
+                pane.select(ids: [id])
+            }
+            return true
+        }
         if let found = KeyMap.command(for: shortcut, inArchive: context.inArchive, inTrash: context.inTrash) {
             let command = NexusPreferencesStore.shared.current.returnKey.command(found, for: shortcut)
             switch shortcut.key {
@@ -287,6 +352,8 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
         if operation == .on, row < items.count, !items[row].isFolder {
             tableView.setDropRow(row, dropOperation: .above)
         }
+        // A file promise (Mail, Photos, Safari, an archive pane) is always a copy.
+        if FilePasteboard.read(info.draggingPasteboard).isEmpty, Self.promises(in: info.draggingPasteboard) != nil { return .copy }
         if (info.draggingSource as AnyObject?) === tableView, operation == .above { return .move }
         return NSEvent.modifierFlags.contains(.option) ? .copy : .generic
     }
@@ -295,7 +362,12 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
                    dropOperation: NSTableView.DropOperation) -> Bool {
         guard let folder = pane.location.folderURL else { return false }
         let urls = FilePasteboard.read(info.draggingPasteboard)
-        guard !urls.isEmpty else { return false }
+        guard !urls.isEmpty else {
+            guard let promises = Self.promises(in: info.draggingPasteboard) else { return false }
+            let target = dropOperation == .on && row < items.count && items[row].isFolder ? items[row].url : folder
+            model.receive(promises, into: target)
+            return true
+        }
         if (info.draggingSource as AnyObject?) === tableView, dropOperation == .above {
             pane.moveManually(urls.map(\.lastPathComponent), to: row)
             return true
@@ -303,6 +375,14 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
         let target = dropOperation == .on && row < items.count && items[row].isFolder ? items[row].url : folder
         model.drop(urls, into: target, forceCopy: NSEvent.modifierFlags.contains(.option))
         return true
+    }
+}
+
+extension FileListCoordinator {
+    /// The file promises on a drag's pasteboard, nil when there are none.
+    static func promises(in pasteboard: NSPasteboard) -> [NSFilePromiseReceiver]? {
+        let found = pasteboard.readObjects(forClasses: [NSFilePromiseReceiver.self], options: nil) as? [NSFilePromiseReceiver]
+        return found?.isEmpty == false ? found : nil
     }
 }
 

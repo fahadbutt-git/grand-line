@@ -101,6 +101,8 @@ public struct NexusPreferences: Equatable, Sendable {
         public static let showAllExtensions = "ShowAllExtensions"
         public static let warnBeforeEmptyingTrash = "WarnBeforeEmptyingTrash"
         public static let warnBeforeChangingExtension = "WarnBeforeChangingExtension"
+        public static let calculateFolderSizes = "CalculateFolderSizes"
+        public static let remoteFolderSizes = "RemoteFolderSizes"
     }
 
     public var newWindowTarget = NewWindowTarget.currentFolder
@@ -119,6 +121,14 @@ public struct NexusPreferences: Equatable, Sendable {
     public var showAllExtensions = true
     public var warnBeforeEmptyingTrash = true
     public var warnBeforeChangingExtension = true
+    /// Finder's "Calculate all sizes": folders on screen in the list get a
+    /// size, measured in the background within their own volume and within
+    /// `FolderSizeLimits.listing`.
+    public var calculateFolderSizes = true
+    /// Sizes for folders on network volumes and in cloud folders (Google
+    /// Drive, iCloud Drive) too, which reads them over the network. Off
+    /// unless chosen.
+    public var remoteFolderSizes = false
     public var sidebar = SidebarLayout()
 
     public init() {}
@@ -137,6 +147,8 @@ public struct NexusPreferences: Equatable, Sendable {
         showAllExtensions = flag(Key.showAllExtensions, true)
         warnBeforeEmptyingTrash = flag(Key.warnBeforeEmptyingTrash, true)
         warnBeforeChangingExtension = flag(Key.warnBeforeChangingExtension, true)
+        calculateFolderSizes = flag(Key.calculateFolderSizes, true)
+        remoteFolderSizes = flag(Key.remoteFolderSizes, false)
         sidebar = SidebarLayout(defaults: defaults)
     }
 
@@ -153,7 +165,18 @@ public struct NexusPreferences: Equatable, Sendable {
         defaults.set(showAllExtensions, forKey: Key.showAllExtensions)
         defaults.set(warnBeforeEmptyingTrash, forKey: Key.warnBeforeEmptyingTrash)
         defaults.set(warnBeforeChangingExtension, forKey: Key.warnBeforeChangingExtension)
+        defaults.set(calculateFolderSizes, forKey: Key.calculateFolderSizes)
+        defaults.set(remoteFolderSizes, forKey: Key.remoteFolderSizes)
         sidebar.save(to: defaults)
+    }
+}
+
+public extension NexusPreferences {
+    /// The limits a listing's folder sizes are measured within.
+    var folderSizeLimits: FolderSizeLimits {
+        var limits = FolderSizeLimits.listing
+        limits.includeRemote = remoteFolderSizes
+        return limits
     }
 }
 

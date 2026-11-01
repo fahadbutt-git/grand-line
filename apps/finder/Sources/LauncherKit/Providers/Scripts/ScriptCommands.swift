@@ -74,10 +74,14 @@ public enum ScriptOutput {
         var close: Bool?
     }
 
+    /// Rows past this are not read: a script printing without end does not
+    /// fill the window (or the memory) with them.
+    public static let maxRows = 1_000
+
     public static func parse(_ text: String, status: Int32 = 0) -> ScriptReply {
         let decoder = JSONDecoder()
         var rows: [ScriptRow] = []
-        for raw in text.split(whereSeparator: \.isNewline) {
+        for raw in text.split(whereSeparator: \.isNewline) where rows.count < maxRows {
             let line = raw.trimmingCharacters(in: .whitespaces)
             guard line.hasPrefix("{"), let decoded = try? decoder.decode(Line.self, from: Data(line.utf8)) else { continue }
             if decoded.close == true { return .close }
@@ -120,7 +124,9 @@ public final class ScriptCommandProvider: LaunchProvider, @unchecked Sendable {
     func run(_ arguments: [String]) async -> ScriptReply {
         do {
             let output = try await runner.run(script.path, arguments, timeout: timeout)
-            return ScriptOutput.parse(output.stdout, status: output.status)
+            let reply = ScriptOutput.parse(output.stdout, status: output.status)
+            if output.truncated, case .failed = reply { return .failed("The script printed more than 1 MB and was stopped") }
+            return reply
         } catch is CancellationError {
             return .failed("Stopped")
         } catch {

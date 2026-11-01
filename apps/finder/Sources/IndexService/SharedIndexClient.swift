@@ -237,7 +237,35 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
             }
             markDown()
         }
-        return await local.status()
+        var status = await local.status()
+        if signatureRefused { status.problem = Self.signatureProblem }
+        return status
+    }
+
+    // MARK: Why the service is not used
+
+    /// NSXPCConnectionCodeSigningRequirementFailure: the other end is not
+    /// signed the way this app is (one app re-signed, the others not).
+    static let codeSigningFailure = 4102
+    static let signatureProblem = "The index service is signed differently from this app, so the app searches its own copy. Run: update"
+
+    private var signatureRefusedFlag = false
+
+    /// Whether the service was turned away for its signature.
+    var signatureRefused: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return signatureRefusedFlag
+    }
+
+    /// Notes why a call failed, so Settings can say it rather than show the
+    /// service as merely down.
+    fileprivate func noteFailure(_ error: Error) {
+        let error = error as NSError
+        guard error.domain == NSCocoaErrorDomain, error.code == Self.codeSigningFailure else { return }
+        lock.lock()
+        signatureRefusedFlag = true
+        lock.unlock()
     }
 
     public func rebuild() async {
@@ -338,7 +366,9 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
             service.hello(home) { accepted, status in done((accepted, status)) }
         }
         guard let reply else { return false }
-        if !reply.0 {
+        // The service must run as this user (read from the audit token, which
+        // it cannot forge); otherwise it is never asked again.
+        if !reply.0 || !CodeSigning.acceptsPeer(uid: connection.effectiveUserIdentifier) {
             lock.lock()
             state = .refused
             self.connection = nil
@@ -362,6 +392,7 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
 
     func markUp() {
         lock.lock()
+        signatureRefusedFlag = false
         if state != .refused { state = .up }
         lock.unlock()
         scheduleCopyRelease()
@@ -448,7 +479,10 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
         guard let connection = currentConnection() else { return .failed }
         let result: Reply<T>? = await withCheckedContinuation { (continuation: CheckedContinuation<Reply<T>?, Never>) in
             let once = Once(continuation)
-            let proxy = connection.remoteObjectProxyWithErrorHandler { _ in once.resume(.failed) }
+            let proxy = connection.remoteObjectProxyWithErrorHandler { [weak self] error in
+                self?.noteFailure(error)
+                once.resume(.failed)
+            }
             guard let service = proxy as? IndexServiceXPC else {
                 once.resume(.failed)
                 return
@@ -470,7 +504,10 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
     ) async -> T? {
         await withCheckedContinuation { (continuation: CheckedContinuation<T?, Never>) in
             let once = Once(continuation)
-            let proxy = connection.remoteObjectProxyWithErrorHandler { _ in once.resume(nil) }
+            let proxy = connection.remoteObjectProxyWithErrorHandler { [weak self] error in
+                self?.noteFailure(error)
+                once.resume(nil)
+            }
             guard let service = proxy as? IndexServiceXPC else {
                 once.resume(nil)
                 return
@@ -545,7 +582,8 @@ final class LocalIndex: @unchecked Sendable {
         guard let found else {
             return FileIndex(roots: locations.roots, exclusions: exclusions, order: order)
         }
-        if found.origin != .own { await found.index.prune(exclusions.paths) }
+        // Whatever the rules leave out goes, from any snapshot (never written here).
+        await found.index.pruneExcluded()
         return found.index
     }
 

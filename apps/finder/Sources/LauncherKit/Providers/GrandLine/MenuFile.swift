@@ -2,7 +2,8 @@ import Foundation
 
 /// The main menu's entries, read like bin/menu reads them: menu.tsv, then
 /// menu.local.tsv, where the same path replaces an entry and a command of "-"
-/// removes it. Columns: Group/Sub/Label TAB command TAB ?guard TAB ✓check.
+/// removes it. Columns: Group/Sub/Label TAB command TAB ?guard TAB ✓check
+/// TAB !question. The optional columns may come in any order after the command.
 public struct MenuEntry: Sendable, Equatable {
     public let path: String
     public let command: String
@@ -10,6 +11,25 @@ public struct MenuEntry: Sendable, Equatable {
     public let guardTest: String?
     /// A shell test: the entry is ticked when it succeeds.
     public let checkTest: String?
+    /// "!Press Return again to restart": the first Return shows this and only
+    /// a second Return runs it. A command that restarts, shuts down, logs out
+    /// or sleeps asks even without the column (`confirmation`).
+    public let question: String?
+
+    public init(path: String, command: String, guardTest: String? = nil, checkTest: String? = nil, question: String? = nil) {
+        self.path = path
+        self.command = command
+        self.guardTest = guardTest
+        self.checkTest = checkTest
+        self.question = question
+    }
+
+    /// The question asked before the entry runs, if it asks: its own "!"
+    /// column, or a plain one for an irreversible command without it.
+    public var confirmation: String? {
+        if let question { return question.isEmpty ? "Press Return again to run \(label)" : question }
+        return UsagePolicy.isIrreversible(.shell(command)) ? "Press Return again to run \(label)" : nil
+    }
 
     public var label: String { path.split(separator: "/").last.map(String.init) ?? path }
     public var groups: [String] { path.split(separator: "/").dropLast().map(String.init) }
@@ -23,12 +43,14 @@ public enum MenuFile {
             for row in TSV.rows(text) where row.count >= 2 && !row[0].isEmpty {
                 var guardTest: String?
                 var checkTest: String?
+                var question: String?
                 for field in row.dropFirst(2) {
                     if field.hasPrefix("?") { guardTest = String(field.dropFirst()) }
                     else if field.hasPrefix("✓") { checkTest = String(field.dropFirst()) }
+                    else if field.hasPrefix("!") { question = String(field.dropFirst()).trimmingCharacters(in: .whitespaces) }
                 }
                 if byPath[row[0]] == nil { order.append(row[0]) }
-                byPath[row[0]] = MenuEntry(path: row[0], command: row[1], guardTest: guardTest, checkTest: checkTest)
+                byPath[row[0]] = MenuEntry(path: row[0], command: row[1], guardTest: guardTest, checkTest: checkTest, question: question)
             }
         }
         return order.compactMap { byPath[$0] }.filter { $0.command != "-" }

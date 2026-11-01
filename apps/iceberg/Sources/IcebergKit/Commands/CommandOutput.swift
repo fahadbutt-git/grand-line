@@ -209,6 +209,6 @@ public enum CommandOutputParser {
     }
 
     static func formatSeconds(_ s: TimeInterval) -> String {
-        s.rounded() == s ? "\(Int(s)) s" : String(format: "%.1f s", s)
+        s.rounded() == s ? String(format: "%.0f s", s) : String(format: "%.1f s", s)
     }
 }

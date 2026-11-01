@@ -17,10 +17,13 @@ final class ThemeStore: ObservableObject {
 
     private let paths: IcebergPaths
     private var watcher: FileWatcher?
-    /// macOS's own appearance, for a theme that follows it.
+    /// The macOS appearance last acted on (for running `theme mode` once per
+    /// switch). Reloading reads the appearance fresh instead.
     private var systemIsDark = SystemStyle.isDark()
-    private var appearanceObserver: NSObjectProtocol?
-    private var changeObserver: NSObjectProtocol?
+    /// `.deliverImmediately` observers: Iceberg is almost never the active
+    /// app, and the block form of addObserver would hold these back until it was.
+    private var appearanceObserver: DistributedObserver?
+    private var changeObserver: DistributedObserver?
 
     init(paths: IcebergPaths) {
         self.paths = paths
@@ -29,18 +32,13 @@ final class ThemeStore: ObservableObject {
         watcher = FileWatcher(paths: [paths.themeState, paths.renderedTheme, paths.themesFolder]) { [weak self] in
             self?.reload()
         }
-        changeObserver = DistributedNotificationCenter.default().addObserver(
-            forName: ThemeLoader.changedNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.reload() }
+        changeObserver = DistributedObserver(ThemeLoader.changedNotification.rawValue) { [weak self] _ in
+            self?.reload()
         }
-        appearanceObserver = DistributedNotificationCenter.default().addObserver(
-            forName: SystemStyle.changed, object: nil, queue: .main
-        ) { [weak self] _ in
-            guard let store = self else { return }
+        appearanceObserver = DistributedObserver(SystemStyle.changed.rawValue) { [weak self] _ in
             // The default is written as the notification goes out; read it a moment later.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak store] in
-                MainActor.assumeIsolated { store?.systemAppearanceChanged() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                MainActor.assumeIsolated { self?.systemAppearanceChanged() }
             }
         }
     }
@@ -58,7 +56,7 @@ final class ThemeStore: ObservableObject {
     }
 
     func reload() {
-        let name = ThemeLoader.followedName(paths: paths, systemIsDark: systemIsDark)
+        let name = ThemeLoader.followedName(paths: paths, currentAppearanceIsDark: SystemStyle.isDark)
         let (loaded, problems) = ThemeLoader.load(paths: paths, named: name)
         if loaded != theme { theme = loaded }
         if problems != issues { issues = problems }

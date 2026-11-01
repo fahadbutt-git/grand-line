@@ -1,7 +1,8 @@
 import Foundation
 
 /// Iceberg's own settings, from `~/.config/grand-line/iceberg/iceberg.toml`.
-/// Every key is optional; a missing or broken file gives the defaults.
+/// Every key is optional; a missing file gives the defaults. On a reload
+/// (`reload(from:previous:)`) a broken file keeps the last good settings.
 public struct IcebergSettings: Equatable, Sendable {
     public enum ExternalDisplays: String, Sendable, CaseIterable {
         /// Only the built-in display shows Iceberg (a pill on the main
@@ -44,20 +45,41 @@ public struct IcebergSettings: Equatable, Sendable {
     public init() {}
 
     public static func parse(_ text: String, fileName: String = "iceberg.toml") -> (IcebergSettings, [ConfigIssue]) {
+        let p = parseDetailed(text, fileName: fileName, fallback: "using the defaults")
+        return (p.settings, p.issues)
+    }
+
+    /// One read of the file: the settings, its problems, whether it could be
+    /// read at all, and the keys it set to a value that was turned down.
+    struct Parsed {
+        var settings: IcebergSettings
+        var issues: [ConfigIssue]
+        var readable: Bool
+        var rejected: Set<String>
+    }
+
+    static func parseDetailed(_ text: String, fileName: String, fallback: String) -> Parsed {
         var settings = IcebergSettings()
 
         let document: TOMLDocument
         do {
             document = try TOML.parseDocument(text)
         } catch let error as TOMLError {
-            return (settings, [ConfigIssue(file: fileName, line: error.line, message: error.message + "; using the defaults",
-                                           severity: .error, fix: WidgetConfig.syntaxFix(for: error))])
+            return Parsed(settings: settings,
+                          issues: [ConfigIssue(file: fileName, line: error.line, message: error.message + "; " + fallback,
+                                               severity: .error, fix: WidgetConfig.syntaxFix(for: error))],
+                          readable: false, rejected: [])
         } catch {
-            return (settings, [ConfigIssue(file: fileName, message: "unreadable; using the defaults")])
+            return Parsed(settings: settings, issues: [ConfigIssue(file: fileName, message: "unreadable; " + fallback)],
+                          readable: false, rejected: [])
         }
 
         let checked = ConfigSchema.settings.check(document.values, lines: document.lines, fileName: fileName)
         var issues = checked.issues
+        var rejected: Set<String> = []
+        for rawKey in document.values.keys {
+            if let spec = ConfigSchema.settings.key(named: rawKey), checked.values[spec.name] == nil { rejected.insert(spec.name) }
+        }
         func warn(_ key: String, _ m: String, fix: String) {
             issues.append(ConfigIssue(file: fileName, line: checked.lines[key], message: m, severity: .warning, fix: fix))
         }
@@ -118,14 +140,108 @@ public struct IcebergSettings: Equatable, Sendable {
                 break
             }
         }
-        return (settings, issues)
+        return Parsed(settings: settings, issues: issues, readable: true, rejected: rejected)
     }
 
     public static func load(from url: URL) -> (IcebergSettings, [ConfigIssue]) {
-        guard let data = FileManager.default.contents(atPath: url.path) else { return (IcebergSettings(), []) }
-        guard let text = String(data: data, encoding: .utf8) else {
-            return (IcebergSettings(), [ConfigIssue(file: url.lastPathComponent, message: "not UTF-8 text; using the defaults")])
+        let r = reload(from: url, previous: nil)
+        return (r.settings, r.issues)
+    }
+
+    /// iceberg.toml is a few lines; a larger file is refused.
+    public static let maxFileSize = 256 * 1024
+
+    /// What a reload of iceberg.toml gives.
+    public struct Reload: Equatable, Sendable {
+        public var settings: IcebergSettings
+        public var issues: [ConfigIssue]
+        /// True when the file could not be used and `previous` was kept whole.
+        public var keptPrevious: Bool
+        /// False when the file could not be used (whether or not there were
+        /// settings to keep): nothing outside the app should follow it then.
+        public var fileUsable: Bool
+
+        public init(settings: IcebergSettings, issues: [ConfigIssue], keptPrevious: Bool, fileUsable: Bool? = nil) {
+            self.settings = settings
+            self.issues = issues
+            self.keptPrevious = keptPrevious
+            self.fileUsable = fileUsable ?? !keptPrevious
         }
-        return parse(text, fileName: url.lastPathComponent)
+    }
+
+    /// Reads iceberg.toml again after a save. With `previous` (the settings
+    /// in use), a file that cannot be used keeps them: a syntax error, text
+    /// that is not UTF-8, or a file that is missing or empty for a moment (an
+    /// editor that truncates or renames as it saves). A key whose new value
+    /// is turned down keeps its previous value, not the default. Without
+    /// `previous` (the first read) the defaults stand in, as before.
+    public static func reload(from url: URL, previous: IcebergSettings?) -> Reload {
+        let name = url.lastPathComponent
+        let fallback = previous == nil ? "using the defaults" : "keeping the last good settings"
+        let data: Data
+        switch SafeFileRead.read(url, limit: maxFileSize) {
+        case .success(let d):
+            data = d
+        case .failure(.missing):
+            if let previous { return Reload(settings: previous, issues: [], keptPrevious: true) }
+            return Reload(settings: IcebergSettings(), issues: [], keptPrevious: false)
+        case .failure(let why):
+            let what: String
+            switch why {
+            case .tooLarge: what = "larger than \(maxFileSize / 1024) KB"
+            case .notAFile: what = "not a regular file"
+            default: what = "unreadable"
+            }
+            return Reload(settings: previous ?? IcebergSettings(), issues: [ConfigIssue(file: name, message: what + "; " + fallback)],
+                          keptPrevious: previous != nil, fileUsable: false)
+        }
+        guard let text = String(data: data, encoding: .utf8) else {
+            return Reload(settings: previous ?? IcebergSettings(),
+                          issues: [ConfigIssue(file: name, message: "not UTF-8 text; " + fallback)],
+                          keptPrevious: previous != nil, fileUsable: false)
+        }
+        if let previous, text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return Reload(settings: previous, issues: [], keptPrevious: true)
+        }
+        let p = parseDetailed(text, fileName: name, fallback: fallback)
+        guard p.readable else {
+            return Reload(settings: previous ?? p.settings, issues: p.issues, keptPrevious: previous != nil, fileUsable: false)
+        }
+        var settings = p.settings
+        if let previous {
+            for key in p.rejected { settings.take(key, from: previous) }
+        }
+        return Reload(settings: settings, issues: p.issues, keptPrevious: false)
+    }
+
+    /// Copies one key's value from `other` (by its iceberg.toml name).
+    mutating func take(_ key: String, from other: IcebergSettings) {
+        switch key {
+        case "external_displays": externalDisplays = other.externalDisplays
+        case "open_on": openOn = other.openOn
+        case "hover_delay": hoverDelay = other.hoverDelay
+        case "close_delay": closeDelay = other.closeDelay
+        case "live_activity": liveActivity = other.liveActivity
+        case "launch_at_login": launchAtLogin = other.launchAtLogin
+        case "menu_bar_icon": menuBarIcon = other.menuBarIcon
+        case "toggle_shortcut": toggleShortcut = other.toggleShortcut
+        case "max_concurrent": maxConcurrent = other.maxConcurrent
+        case "panel": panel = other.panel
+        case "builtin":
+            builtin = other.builtin
+            builtinIsSet = other.builtinIsSet
+        default: break
+        }
+    }
+}
+
+/// Whether to touch macOS Login Items after reading iceberg.toml: on the
+/// first good read (to match the file), and later only when the setting
+/// itself changed. Never for a file that could not be used.
+public enum LoginItemPolicy {
+    public static func shouldApply(wanted: Bool, applied: Bool?, fileUsable: Bool) -> Bool {
+        guard fileUsable else { return false }
+        guard let applied else { return true }
+        return applied != wanted
     }
 }

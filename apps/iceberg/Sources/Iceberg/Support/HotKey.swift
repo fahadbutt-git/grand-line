@@ -5,20 +5,38 @@ import IcebergKit
 /// The keyboard shortcut that opens or closes the panel from any app
 /// (`toggle_shortcut` in iceberg.toml). It uses Carbon's
 /// RegisterEventHotKey, which needs no Accessibility permission and sees
-/// only this one key combination.
+/// only this one key combination. A second one (`HotKey(id: 2)`) holds
+/// Escape while the panel is open, and only then.
 @MainActor
 final class HotKey {
     /// Run when the shortcut is pressed.
     var action: (@MainActor () -> Void)?
 
+    private let hotKeyID: UInt32
     private var ref: EventHotKeyRef?
-    private var handler: EventHandlerRef?
     private(set) var registered: KeyShortcut?
     private var wanted: KeyShortcut?
     private var suspended = false
 
-    /// The one HotKey the Carbon handler calls (Iceberg has one shortcut).
-    private static weak var current: HotKey?
+    /// One Carbon handler for the app; it finds the HotKey by its id.
+    private static var handler: EventHandlerRef?
+    private static var live: [UInt32: Weak] = [:]
+    private final class Weak { weak var key: HotKey?; init(_ k: HotKey) { key = k } }
+
+    /// Escape, held while the panel is open so it can close it.
+    static let escape = KeyShortcut(key: "escape", keyCode: UInt16(kVK_Escape), modifiers: [])
+
+    init(id: UInt32 = 1) {
+        hotKeyID = id
+    }
+
+    deinit {
+        if let ref { UnregisterEventHotKey(ref) }
+    }
+
+    fileprivate static func fire(_ id: UInt32) {
+        live[id]?.key?.action?()
+    }
 
     /// Registers `shortcut` (nil turns it off). Returns why it could not be
     /// registered, or nil.
@@ -44,8 +62,8 @@ final class HotKey {
     private func apply() -> String? {
         unregister()
         guard let shortcut = wanted else { return nil }
-        installHandler()
-        let id = EventHotKeyID(signature: OSType(0x4943_4247), id: 1)   // "ICBG"
+        Self.installHandler()
+        let id = EventHotKeyID(signature: OSType(0x4943_4247), id: hotKeyID)   // "ICBG"
         var newRef: EventHotKeyRef?
         let status = RegisterEventHotKey(UInt32(shortcut.keyCode), shortcut.carbonModifiers, id,
                                          GetApplicationEventTarget(), 0, &newRef)
@@ -55,7 +73,7 @@ final class HotKey {
         }
         ref = newRef
         registered = shortcut
-        HotKey.current = self
+        HotKey.live[hotKeyID] = Weak(self)
         return nil
     }
 
@@ -65,12 +83,16 @@ final class HotKey {
         registered = nil
     }
 
-    private func installHandler() {
+    private static func installHandler() {
         guard handler == nil else { return }
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
+        InstallEventHandler(GetApplicationEventTarget(), { _, event, _ in
+            var pressed = EventHotKeyID()
+            let status = GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
+                                           nil, MemoryLayout<EventHotKeyID>.size, nil, &pressed)
+            let id = status == OSStatus(noErr) ? pressed.id : 1
             DispatchQueue.main.async {
-                MainActor.assumeIsolated { HotKey.current?.action?() }
+                MainActor.assumeIsolated { HotKey.fire(id) }
             }
             return OSStatus(noErr)
         }, 1, &spec, nil, &handler)

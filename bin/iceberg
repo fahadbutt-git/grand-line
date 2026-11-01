@@ -6,8 +6,9 @@
 # iceberg schema            prints where iceberg.schema.json is, for editors
 # A trigger reaches a running Iceberg as a distributed notification, so the
 # panel is not opened or brought forward; when Iceberg is not running it is
-# started with iceberg://trigger/NAME. While the panel is closed the widget
-# runs as it next opens (or at once, with updates = "always").
+# started once with iceberg://trigger/NAME/OTHER, and runs them as soon as
+# it is ready. While the panel is closed the widget runs as it next opens
+# (or at once, with updates = "always").
 # Exit status: 0 done, 2 usage, 1 Iceberg could not be reached.
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 
@@ -50,14 +51,27 @@ case "${1:-}" in
   trigger)
     shift
     [[ $# -gt 0 ]] || usage
+    ids=()
     for name in "$@"; do
       id="$(widget_id "$name")"
       [[ "$id" =~ ^[a-z0-9._-]+$ ]] || { echo "iceberg: \"$name\" is not a widget name (letters, digits, . _ -)" >&2; exit 2; }
-      if iceberg_running && post_trigger "$id"; then
-        continue
-      fi
-      open_url "trigger/$id"
+      ids+=("$id")
     done
+    if iceberg_running; then
+      left=()
+      for id in "${ids[@]}"; do
+        post_trigger "$id" || left+=("$id")
+      done
+      ids=("${left[@]+"${left[@]}"}")
+    fi
+    # Not running (or the notice could not be posted): one URL for all of
+    # them, so Iceberg is started once and runs each as soon as it is ready
+    # (a notice posted while it is still starting would be lost).
+    if [[ ${#ids[@]} -gt 0 ]]; then
+      path="trigger"
+      for id in "${ids[@]}"; do path="$path/$id"; done
+      open_url "$path"
+    fi
     ;;
   toggle|open|close|reload|settings)
     open_url "$1"

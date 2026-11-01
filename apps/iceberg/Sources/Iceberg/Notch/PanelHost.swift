@@ -27,15 +27,22 @@ final class PanelHost: ObservableObject {
     var openSettings: (@MainActor () -> Void)?
     /// A panel opened (the app delegate's hang watchdog watches a while).
     var onPanelOpen: (@MainActor () -> Void)?
+    /// Escape was pressed while a panel is open (closes them).
+    var onEscape: (@MainActor () -> Void)?
 
     /// The keyboard shortcut that opens or closes the panel (`toggle_shortcut`).
     let hotKey: HotKey
+    /// Escape, held only while a panel is open: the panel is never key, so
+    /// this is how Escape reaches it. Let go the moment the last one closes.
+    private let escapeKey: HotKey
     /// Why the shortcut could not be registered, for Settings.
     @Published private(set) var hotKeyProblem: String?
     /// When iceberg.toml was last read (hot reload), for Settings.
     @Published private(set) var lastSettingsReload: Date?
 
     private var made: [String: NotchWidget] = [:]
+    /// What Login Items were last set to, nil before the first good read.
+    private var appliedLoginItem: Bool?
     private var openPanels = 0
     private var configWatcher: ConfigWatcher?
     private var fallbackWatchers: [FileWatcher] = []
@@ -50,6 +57,8 @@ final class PanelHost: ObservableObject {
         self.user = UserWidgets(paths: paths, theme: theme)
         self.events = SharedEventStore()
         self.hotKey = HotKey()
+        self.escapeKey = HotKey(id: 2)
+        escapeKey.action = { [weak self] in self?.onEscape?() }
         reloadSettings()
         watchConfig()
         triggerObserver = DistributedObserver(Self.triggerNotification) { [weak self] note in
@@ -117,18 +126,32 @@ final class PanelHost: ObservableObject {
         PanelContent(sections: sections.count, userWidgets: user.widgets.count, showsIssues: false)
     }
 
+    /// Reads iceberg.toml again. A file that cannot be used (a syntax error,
+    /// a save caught half-way) keeps the settings in use: nothing is torn
+    /// down, and Login Items, the menu bar item and the shortcut stay as
+    /// they are. Login Items follow the file only when the setting changes.
     func reloadSettings() {
-        let (loaded, issues) = IcebergSettings.load(from: paths.settingsFile)
-        Log.issues(issues, context: "settings")
-        settingsIssues = issues
+        let first = lastSettingsReload == nil
+        let read = IcebergSettings.reload(from: paths.settingsFile, previous: first ? nil : settings)
+        Log.issues(read.issues, context: "settings")
+        if read.issues != settingsIssues { settingsIssues = read.issues }
+        if read.keptPrevious {
+            lastSettingsReload = Date()
+            Log.info("iceberg.toml could not be used; keeping the last good settings")
+            return
+        }
+        let loaded = read.settings
         let newLayout = PanelLayout(settings: loaded)
         let layoutChanged = loaded.externalDisplays != settings.externalDisplays || loaded.liveActivity != settings.liveActivity
             || newLayout.builtins != layout.builtins
         let shortcutChanged = loaded.toggleShortcut != settings.toggleShortcut || lastSettingsReload == nil
-        settings = loaded
+        if loaded != settings { settings = loaded }
         lastSettingsReload = Date()
         if newLayout != layout { layout = newLayout }
-        LoginItem.apply(loaded.launchAtLogin)
+        if LoginItemPolicy.shouldApply(wanted: loaded.launchAtLogin, applied: appliedLoginItem, fileUsable: read.fileUsable) {
+            LoginItem.apply(loaded.launchAtLogin)
+            appliedLoginItem = loaded.launchAtLogin
+        }
         user.setMaxConcurrent(loaded.maxConcurrent)
         if shortcutChanged { hotKeyProblem = hotKey.register(loaded.toggleShortcut) }
         let context = WidgetContext(theme: theme, events: events, settings: loaded,
@@ -185,6 +208,7 @@ final class PanelHost: ObservableObject {
         onPanelOpen?()
         openPanels += 1
         guard openPanels == 1 else { return }
+        escapeKey.register(HotKey.escape)
         for w in builtins { w.panelWillOpen() }
         user.panelWillOpen()
     }
@@ -192,6 +216,7 @@ final class PanelHost: ObservableObject {
     func panelDidClose() {
         openPanels = max(0, openPanels - 1)
         guard openPanels == 0 else { return }
+        escapeKey.register(nil)
         for w in builtins { w.panelDidClose() }
         user.panelDidClose()
     }

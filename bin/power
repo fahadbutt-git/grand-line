@@ -3,7 +3,9 @@
 # power lock | display-sleep | sleep | logout | restart | shutdown
 # Restart, shut down and log out go through System Events, so apps can still
 # ask to save their work and nothing is forced. Sight asks before it runs
-# sleep, logout, restart and shutdown.
+# sleep, logout, restart and shutdown, wherever they show (its settings rows,
+# the menu's System entries, which carry a !question in menu.tsv, shortcuts
+# and favourites), and never learns them as a top hit or keeps them in Recents.
 # Exit status: 0 done, 2 usage, and the codes of fail() in lib/bin-common.sh.
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 

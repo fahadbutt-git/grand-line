@@ -10,9 +10,9 @@
 #   grandline save "label"       mark this moment as a version worth keeping
 #   grandline versions           the saved versions
 #   grandline restore [label]    go back to a saved version (pick one if no label)
-#   grandline try start <name>   try something on the side; main stays untouched
-#   grandline try keep           keep the experiment (it becomes part of main)
-#   grandline try drop           throw the experiment away, back to main
+#   grandline try start <name>   try something on the side; your branch stays untouched
+#   grandline try keep           keep the experiment (it joins the branch it came from)
+#   grandline try drop           throw the experiment away, back to that branch
 #   grandline publish            send your saved changes to GitHub, after
 #                                showing them and asking
 #   grandline update             update everything (same as: update)
@@ -79,16 +79,23 @@ case "${1:-}" in
     case "${2:-}" in
       start)
         [[ -n "${3:-}" ]] || { echo "usage: grandline try start <name>"; exit 2; }
-        dirty_guard; git_ switch -q -c "try/$3" && echo "Trying \"$3\". Change anything, then: grandline try keep, or grandline try drop" ;;
+        dirty_guard
+        # The branch it starts from, so keep and drop go back there (not
+        # always main: the package may follow another branch).
+        base="$(git_ branch --show-current)"; [[ -n "$base" && "$base" != try/* ]] || base=main
+        git_ switch -q -c "try/$3" && git_ config "branch.try/$3.grandlineBase" "$base" \
+          && echo "Trying \"$3\". Change anything, then: grandline try keep, or grandline try drop" ;;
       keep)
         b="$(git_ branch --show-current)"; [[ "$b" == try/* ]] || { echo "No experiment running."; exit 1; }
         dirty_guard "Experiment ${b#try/}"
-        git_ switch -q main && git_ merge -q --no-ff "$b" -m "Keep experiment ${b#try/}" && git_ branch -q -d "$b" \
-          && echo "Kept ${b#try/}." && apply && local_note ;;
+        base="$(git_ config --get "branch.$b.grandlineBase")" || base=main
+        git_ switch -q "$base" && git_ merge -q --no-ff "$b" -m "Keep experiment ${b#try/}" && git_ branch -q -d "$b" \
+          && echo "Kept ${b#try/} on $base." && apply && local_note ;;
       drop)
         b="$(git_ branch --show-current)"; [[ "$b" == try/* ]] || { echo "No experiment running."; exit 1; }
-        git_ stash -q -u 2>/dev/null; git_ switch -q main && git_ branch -q -D "$b" \
-          && echo "Dropped ${b#try/}. Back to main." && apply ;;
+        base="$(git_ config --get "branch.$b.grandlineBase")" || base=main
+        git_ stash -q -u 2>/dev/null; git_ switch -q "$base" && git_ branch -q -D "$b" \
+          && echo "Dropped ${b#try/}. Back to $base." && apply ;;
       *) echo "usage: grandline try start <name> | keep | drop"; exit 2 ;;
     esac
     ;;

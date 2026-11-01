@@ -83,11 +83,14 @@ tomllib.load(open('config/aerospace/aerospace.toml', 'rb'))"
 check "karabiner.json parses" python3 -m json.tool config/karabiner/karabiner.json
 check "generated files are current with tools/bindings.py" python3 tools/bindings.py --check
 
-check "menu.tsv: path and command, then optional ?guard and ✓check columns" bash -c \
+check "menu.tsv: path and command, then optional ?guard, ✓check and !question columns" bash -c \
   "grep -v -e '^#' -e '^\$' config/grand-line/menu.tsv | awk -F'\t' '
-     NF < 2 || NF > 4 || \$2 == \"\" { print NR\": \"\$0; bad=1; next }
+     NF < 2 || NF > 5 || \$2 == \"\" { print NR\": \"\$0; bad=1; next }
      NF >= 3 && \$3 != \"\" && substr(\$3, 1, 1) != \"?\" { print \"column 3 must start with ?: \"\$0; bad=1 }
-     NF == 4 && index(\$4, \"✓\") != 1 { print \"column 4 must start with ✓: \"\$0; bad=1 }
+     NF >= 4 && \$4 != \"\" && index(\$4, \"✓\") != 1 { print \"column 4 must start with ✓: \"\$0; bad=1 }
+     NF == 4 && \$4 == \"\" { print \"column 4 is empty: \"\$0; bad=1 }
+     NF == 5 && substr(\$5, 1, 1) != \"!\" { print \"column 5 must start with !: \"\$0; bad=1 }
+     \$2 ~ /^power (sleep|logout|restart|shutdown)/ && (NF < 5 || length(\$5) < 2) { print \"irreversible entry needs a !question: \"\$0; bad=1 }
      END { exit bad }'"
 
 check "every package command used by menus and shortcuts exists in bin/" bash -c '

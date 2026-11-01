@@ -20,7 +20,9 @@ public struct ClipEntry: Sendable, Equatable {
 
 /// Maccy's history, read only. Maccy has no API, so its store (SwiftData's
 /// Storage.sqlite in its sandbox container) is copied with its write-ahead log
-/// and the copy is read; Maccy's own file is never opened. Only text entries
+/// and the copy is read; Maccy's own file is never opened, and its external
+/// blobs folder and shared-memory file are never copied. The copy is made only
+/// when the store or its log changed since the last read. Only text entries
 /// are listed. When the store is not where Maccy keeps it, `:` is hidden and
 /// keeps its older meaning (symbols).
 public enum ClipboardHistory {
@@ -36,6 +38,28 @@ public enum ClipboardHistory {
 
     public static func isAvailable(_ paths: GrandLinePaths = GrandLinePaths()) -> Bool {
         store(paths) != nil
+    }
+
+    /// What a read of the store depends on: the size and modification date of
+    /// the store and of its write-ahead log. The same signature means the same
+    /// entries, so nothing is copied.
+    public struct Signature: Sendable, Equatable {
+        public let parts: [String]
+    }
+
+    public static func signature(of database: String, fileManager: FileManager = .default) -> Signature? {
+        var parts: [String] = []
+        for suffix in ["", "-wal"] {
+            guard let attributes = try? fileManager.attributesOfItem(atPath: database + suffix) else {
+                if suffix.isEmpty { return nil }
+                parts.append("-")
+                continue
+            }
+            let size = (attributes[.size] as? NSNumber)?.int64Value ?? -1
+            let date = (attributes[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+            parts.append("\(size):\(date)")
+        }
+        return Signature(parts: [database] + parts)
     }
 
     /// Core Data and SwiftData keep dates as seconds since 2001.
@@ -133,17 +157,42 @@ public final class ClipboardHistoryProvider: InstantProvider, @unchecked Sendabl
     public let inGlobalSearch = false
     let paths: GrandLinePaths
     let catalog = Catalog()
+    let loader: @Sendable (String) -> [ClipEntry]
+    private let lock = NSLock()
+    /// One reload at a time: opening the window quickly twice does not copy twice.
+    private var reloading = false
+    private var loaded: (signature: ClipboardHistory.Signature, entries: [ClipEntry])?
 
-    public init(paths: GrandLinePaths = GrandLinePaths()) {
+    public init(paths: GrandLinePaths = GrandLinePaths(), loader: @escaping @Sendable (String) -> [ClipEntry] = { ClipboardHistory.load($0) }) {
         self.paths = paths
+        self.loader = loader
     }
 
-    public func reload() {
-        guard let store = ClipboardHistory.store(paths) else {
+    /// Reads the history again when Maccy's store changed; otherwise only the
+    /// "2 min ago" dates are brought up to now. A reload already under way
+    /// makes this one return at once. Blocks on the disk: call it off the main thread.
+    public func reload(now: Date = Date()) {
+        let claimed = lock.withLock { () -> Bool in
+            guard !reloading else { return false }
+            reloading = true
+            return true
+        }
+        guard claimed else { return }
+        defer { lock.withLock { reloading = false } }
+        guard let store = ClipboardHistory.store(paths), let signature = ClipboardHistory.signature(of: store) else {
+            lock.withLock { loaded = nil }
             catalog.replace([])
             return
         }
-        catalog.replace(ClipboardHistory.results(ClipboardHistory.load(store)))
+        let cached = lock.withLock { loaded }
+        let entries: [ClipEntry]
+        if let cached, cached.signature == signature {
+            entries = cached.entries
+        } else {
+            entries = loader(store)
+            lock.withLock { loaded = (signature, entries) }
+        }
+        catalog.replace(ClipboardHistory.results(entries, now: now))
     }
 
     public func replace(_ entries: [ClipEntry], now: Date = Date()) {

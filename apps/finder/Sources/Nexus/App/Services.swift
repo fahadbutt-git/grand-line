@@ -41,6 +41,16 @@ final class Services: ObservableObject {
     @Published private(set) var undoHistory: [OperationRecord] = []
     @Published private(set) var sidebarHidden: SidebarHidden
     private(set) var trashLedger: TrashLedger
+    /// Finder's own Put Back records for the Trash (its .DS_Store), for items
+    /// Nexus did not trash; read in the background when the Trash is shown.
+    private(set) var finderPutBack: [String: URL] = [:]
+    private var ledgerSave: Task<Void, Never>?
+    /// The progress not yet shown: the tasks popover takes at most ten
+    /// updates a second, however fast files are copied.
+    private var pendingProgress: OperationProgress?
+    private var progressFlush: Task<Void, Never>?
+    private var lastProgress = Date.distantPast
+    static let progressInterval: TimeInterval = 0.1
     private(set) var drives: [GoogleDrive]
 
     private init() {
@@ -72,7 +82,13 @@ final class Services: ObservableObject {
         index.start()
         let progress = operations.progress
         Task { [weak self] in
-            for await step in progress { self?.transfers.apply(step) }
+            for await step in progress { self?.progressArrived(step) }
+        }
+        // Every item FileOperations sends to the Trash, or takes out, as it
+        // happens: Put Back knows a task's items even when it stopped halfway.
+        let trashChanges = operations.trashChanges
+        Task { [weak self] in
+            for await change in trashChanges { self?.trashChanged(change) }
         }
         let events = tasks.events
         Task { [weak self] in
@@ -83,7 +99,8 @@ final class Services: ObservableObject {
                 if event.state.isDone { self?.refreshUndo() }
             }
         }
-        // Quick Look's copies of archive items from an earlier run (security note L2).
+        // Quick Look's copies of archive items from an earlier run (security
+        // note L2); a copy someone edited goes to the Trash, not away.
         Task.detached(priority: .utility) { Archive.TemporaryFolder.cleanAtLaunch() }
         theme.start()
         sidebar.start()
@@ -170,14 +187,63 @@ final class Services: ObservableObject {
 
     // MARK: Trash
 
-    func noteTrashed(_ originals: [URL], to trashed: [URL]) {
-        trashLedger.record(originals: originals, trashed: trashed)
-        try? JSONFile<TrashLedger>(paths.trashLedger).write(trashLedger)
+    private func trashChanged(_ change: TrashChange) {
+        trashLedger.apply(change)
+        // One write for a burst (500 items trashed), a moment after the last.
+        guard ledgerSave == nil else { return }
+        ledgerSave = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard let self else { return }
+            self.ledgerSave = nil
+            let ledger = self.trashLedger
+            let file = JSONFile<TrashLedger>(self.paths.trashLedger)
+            await Task.detached(priority: .utility) { try? file.write(ledger) }.value
+        }
     }
 
-    func notePutBack(_ trashed: URL) {
-        trashLedger.forget(trashed)
-        try? JSONFile<TrashLedger>(paths.trashLedger).write(trashLedger)
+    /// Where Put Back sends an item in the Trash: Nexus's ledger first, then
+    /// Finder's own record of it.
+    func putBackOriginal(of trashed: URL) -> URL? {
+        trashLedger.original(of: trashed) ?? finderPutBack[trashed.standardizedFileURL.path]
+    }
+
+    func canPutBack(_ items: [URL]) -> Bool {
+        !items.isEmpty && items.allSatisfy { putBackOriginal(of: $0) != nil }
+    }
+
+    /// Reads Finder's Put Back records for the Trash, off the main thread.
+    func refreshFinderPutBack() {
+        let trash = paths.trash
+        Task { [weak self] in
+            let found = await Task.detached(priority: .utility) { FinderPutBack.originals(trash: trash) }.value
+            self?.finderPutBack = found
+        }
+    }
+
+    // MARK: Progress
+
+    /// Shows progress at most every `progressInterval`; the end of an
+    /// operation is shown at once, and a later step never follows it.
+    private func progressArrived(_ step: OperationProgress) {
+        let now = Date()
+        if step.isFinished || now.timeIntervalSince(lastProgress) >= Self.progressInterval {
+            pendingProgress = nil
+            lastProgress = now
+            transfers.apply(step)
+            return
+        }
+        pendingProgress = step
+        guard progressFlush == nil else { return }
+        progressFlush = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(Self.progressInterval * 1_000_000_000))
+            guard let self else { return }
+            self.progressFlush = nil
+            if let pending = self.pendingProgress {
+                self.pendingProgress = nil
+                self.lastProgress = Date()
+                self.transfers.apply(pending)
+            }
+        }
     }
 
     // MARK: Undo

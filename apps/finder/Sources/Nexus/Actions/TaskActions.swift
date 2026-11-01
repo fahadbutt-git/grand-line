@@ -35,17 +35,6 @@ extension BrowserModel {
     }
 }
 
-/// A tool's error text as an error, for a task that ran one (Compress).
-struct TaskProblem: LocalizedError {
-    let message: String
-
-    init(_ message: String) {
-        self.message = message.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    var errorDescription: String? { message.isEmpty ? nil : message }
-}
-
 /// The conflict sheet: Keep Both (Return), Replace, Skip or Stop (Escape),
 /// with Apply to All when more items have the same problem. Replace moves the
 /// old item to the Trash, so Undo brings it back.

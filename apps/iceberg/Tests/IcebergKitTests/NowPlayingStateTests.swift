@@ -67,6 +67,21 @@ final class NowPlayingStateTests: XCTestCase {
         XCTAssertEqual(buffer.append(Data(":3}\n\n".utf8)), ["{\"c\":3}"])
     }
 
+    /// A line over the limit is dropped whole: its tail, after the buffer
+    /// overflowed, must not come out as a line of its own.
+    func testOverlongLineIsDroppedWhole() {
+        var buffer = LineBuffer()
+        buffer.maxLineBytes = 16
+        XCTAssertEqual(buffer.append(Data("{\"ok\":1}\n{\"art\":\"AAAAAAAAAAAA".utf8)), ["{\"ok\":1}"])
+        XCTAssertEqual(buffer.append(Data("AAAAAAAAAAAAAAAA".utf8)), [], "still inside the long line")
+        XCTAssertEqual(buffer.append(Data("AAAA==\"}\n{\"b\":2}\n".utf8)), ["{\"b\":2}"], "the tail is not a line")
+        // A long line arriving whole in one chunk is dropped too.
+        XCTAssertEqual(buffer.append(Data("\(String(repeating: "x", count: 40))\n{\"c\":3}\n".utf8)), ["{\"c\":3}"])
+        // And the buffer is back to normal afterwards.
+        XCTAssertEqual(buffer.append(Data("{\"d\":".utf8)), [])
+        XCTAssertEqual(buffer.append(Data("4}\n".utf8)), ["{\"d\":4}"])
+    }
+
     func testPlayerNotifications() {
         let p = PlayerNotification.payload(bundleIdentifier: "com.spotify.client",
                                            info: ["Name": "Track", "Artist": "Band", "Player State": "Playing", "Duration": 180_000, "Playback Position": 12.5])

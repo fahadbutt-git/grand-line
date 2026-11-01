@@ -94,35 +94,92 @@ ask() {
   [[ "$answer" == [yY]* ]]
 }
 
+# The last commit from GitHub this Mac applied, per clone, one
+# "git-dir<TAB>sha" line each. It is what a rewritten history is judged
+# against, so a fetch made by anything else (grandline publish, lazygit,
+# git pull) never hides a force-push.
+UPSTREAM_APPLIED="${GRAND_LINE_UPSTREAM_APPLIED:-${GRAND_LINE_STATE:-$HOME/.local/state/grand-line}/upstream-applied}"
+# What the unattended run last told you about, so it says it once.
+UPDATE_TOLD="${GRAND_LINE_UPDATE_TOLD:-${GRAND_LINE_STATE:-$HOME/.local/state/grand-line}/update-told}"
+
+# upstream_applied_get REPO: the recorded commit, or nothing.
+upstream_applied_get() {
+  local key; key="$(git -C "$1" rev-parse --absolute-git-dir 2>/dev/null)" || return 1
+  [[ -f "$UPSTREAM_APPLIED" ]] || return 1
+  awk -F'\t' -v k="$key" '$1 == k { sha = $2 } END { if (sha == "") exit 1; print sha }' "$UPSTREAM_APPLIED"
+}
+
+# upstream_applied_set REPO SHA
+upstream_applied_set() {
+  local key tmp; key="$(git -C "$1" rev-parse --absolute-git-dir 2>/dev/null)" || return 1
+  mkdir -p "$(dirname "$UPSTREAM_APPLIED")" || return 1
+  tmp="$UPSTREAM_APPLIED.$$"
+  { [[ -f "$UPSTREAM_APPLIED" ]] && awk -F'\t' -v k="$key" '$1 != k' "$UPSTREAM_APPLIED"
+    printf '%s\t%s\n' "$key" "$2"; } > "$tmp" && mv -f "$tmp" "$UPSTREAM_APPLIED"
+}
+
+# upstream_applied_seed REPO UPSTREAM: with no record yet (a Mac updated
+# before the record existed), the newest value the remote-tracking ref had
+# that this clone's HEAD contains, from that ref's reflog.
+upstream_applied_seed() {
+  local sha
+  while IFS= read -r sha; do
+    [[ -n "$sha" ]] || continue
+    git -C "$1" merge-base --is-ancestor "$sha" HEAD 2>/dev/null && { echo "$sha"; return 0; }
+  done < <(git -C "$1" reflog show -n 50 --format=%H "$2" -- 2>/dev/null)
+  return 1
+}
+
+# tell_once KEY MESSAGE: adds MESSAGE to needs, except that the unattended
+# run (STRICT=1) leaves it out when it already told you about KEY.
+tell_once() {
+  if [[ "${STRICT:-1}" == 1 && "$(cat "$UPDATE_TOLD" 2>/dev/null)" == "$1" ]]; then
+    return 0
+  fi
+  mkdir -p "$(dirname "$UPDATE_TOLD")" && printf '%s\n' "$1" > "$UPDATE_TOLD"
+  needs+=("$2")
+}
+
 # package_update REPO: fetch, check every new commit, then apply them.
 # Returns 0 when the package is current, 2 when something waits for you, 1
 # when GitHub could not be reached. With STRICT=1 (no one at the keyboard)
-# only trusted commits are applied and nothing is asked. Adds to the caller's
-# arrays changed (what it applied) and needs (what waits for you).
+# only trusted commits are applied, only by fast-forward (never a rebase, so
+# no commit is rewritten or signed again), and nothing is asked. Adds to the
+# caller's arrays changed (what it applied) and needs (what waits for you).
 package_update() {
-  local REPO="$1" branch upstream old new count untrusted dirty
+  local REPO="$1" branch upstream new count untrusted dirty applied head own
   git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1 || return 0
   branch="$(git -C "$REPO" branch --show-current)"
   upstream="$(git -C "$REPO" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)" || {
     echo "No GitHub copy to update from${branch:+ for branch $branch}."; return 0; }
-  old="$(git -C "$REPO" rev-parse -q --verify "$upstream")"
+  # Read before the fetch, so the reflog seed still sees the old value.
+  applied="$(upstream_applied_get "$REPO")" || applied="$(upstream_applied_seed "$REPO" "$upstream")" || applied=""
   if ! git -C "$REPO" fetch -q "${upstream%%/*}"; then
     echo "Could not reach GitHub."; return 1
   fi
-  new="$(git -C "$REPO" rev-parse -q --verify "$upstream")" || return 1
+  new="$(git -C "$REPO" rev-parse -q --verify "$upstream^{commit}")" || return 1
+  head="$(git -C "$REPO" rev-parse -q --verify HEAD)" || return 1
 
-  # GitHub's history only ever grows. A rewritten history is never applied.
-  if [[ -n "$old" && "$old" != "$new" ]] && ! git -C "$REPO" merge-base --is-ancestor "$old" "$new"; then
-    echo "GitHub's copy was rewritten (force-pushed), so nothing was applied. Check it before updating:"
-    echo "  git -C $REPO log --oneline $old...$new"
-    needs+=("GitHub's copy was rewritten; check it before updating")
-    return 2
-  fi
   count="$(git -C "$REPO" rev-list --count "HEAD..$new")"
   if [[ "$count" == 0 ]]; then
+    upstream_applied_set "$REPO" "$new"
     echo "The package is up to date."
     return 0
   fi
+
+  # GitHub's history only ever grows. When the last commit this Mac applied
+  # from it is no longer in it, the history was rewritten, and nothing is
+  # applied. (Once you have moved this clone off that commit yourself, it is
+  # no longer what the update builds on.)
+  if [[ -n "$applied" ]] && git -C "$REPO" merge-base --is-ancestor "$applied" HEAD 2>/dev/null \
+     && ! git -C "$REPO" merge-base --is-ancestor "$applied" "$new" 2>/dev/null; then
+    echo "GitHub's copy was rewritten (force-pushed): the commit this Mac last applied from it is gone, so nothing was applied. Check it before updating:"
+    echo "  git -C $REPO log --oneline $applied...$new"
+    echo "When you are sure, and have no changes of your own: git -C $REPO reset --keep $new"
+    tell_once "rewritten $applied" "GitHub's copy was rewritten; check it before updating"
+    return 2
+  fi
+
   echo "$count new change(s) on GitHub:"
   git -C "$REPO" log --format='  %h %s (%an, %ad)' --date=short "HEAD..$new"
 
@@ -145,27 +202,42 @@ package_update() {
     fi
   fi
 
-  # Your own commits not yet on GitHub are replayed on top of GitHub's.
-  # Unattended, a tree with edits not saved in git is left alone.
   dirty="$(git -C "$REPO" status --porcelain --untracked-files=no)"
-  if [[ "${STRICT:-1}" == 1 && -n "$dirty" ]]; then
-    if ! git -C "$REPO" merge-base --is-ancestor HEAD "$new" || ! git -C "$REPO" merge -q --ff-only "$new" 2>/dev/null; then
-      echo "Edits on this Mac (not saved in git) touch the same files, so nothing was applied:"
-      printf '%s\n' "$dirty" | sed 's/^/  /'
-      needs+=("your unsaved edits in $REPO block the update")
+  if ! git -C "$REPO" merge-base --is-ancestor HEAD "$new"; then
+    own="$(git -C "$REPO" rev-list --count "$new..HEAD")"
+    if [[ "${STRICT:-1}" == 1 ]]; then
+      # Putting your commits on top of GitHub's rewrites them, and with
+      # commit signing on it would ask for your key. That waits for you.
+      echo "This Mac has $own commit(s) of its own that GitHub does not have, so nothing was applied. Run update in a terminal to put them on top of GitHub's."
+      tell_once "own-commits $head" "this Mac has commits of its own; run update in a terminal to apply GitHub's changes"
       return 2
     fi
-  elif git -C "$REPO" merge-base --is-ancestor HEAD "$new"; then
-    git -C "$REPO" merge -q --ff-only --autostash "$new" || {
-      echo "Could not apply GitHub's changes."; needs+=("GitHub's changes could not be applied"); return 2; }
-  else
+    # Your own commits not yet on GitHub are replayed on top of GitHub's
+    # (signed again, as you sign, so your other Macs still trust them).
     if ! git -C "$REPO" rebase -q --autostash "$new"; then
       git -C "$REPO" rebase --abort 2>/dev/null
       echo "Your changes clash with GitHub's. Kept yours; GitHub's were not applied."
       needs+=("your changes clash with GitHub's")
       return 2
     fi
+  elif [[ "${STRICT:-1}" == 1 ]]; then
+    # Unattended, edits not saved in git are never stashed or touched.
+    if ! git -C "$REPO" merge -q --ff-only "$new" 2>/dev/null; then
+      if [[ -n "$dirty" ]]; then
+        echo "Edits on this Mac (not saved in git) touch the same files, so nothing was applied:"
+        printf '%s\n' "$dirty" | sed 's/^/  /'
+        needs+=("your unsaved edits in $REPO block the update")
+      else
+        echo "Could not apply GitHub's changes."; needs+=("GitHub's changes could not be applied")
+      fi
+      return 2
+    fi
+  else
+    git -C "$REPO" merge -q --ff-only --autostash "$new" || {
+      echo "Could not apply GitHub's changes."; needs+=("GitHub's changes could not be applied"); return 2; }
   fi
+  upstream_applied_set "$REPO" "$new"
+  rm -f "$UPDATE_TOLD"
   changed+=("$count change(s) from GitHub")
   echo "Applied $count change(s): now at $(git -C "$REPO" log -1 --format='%h %s')"
   return 0

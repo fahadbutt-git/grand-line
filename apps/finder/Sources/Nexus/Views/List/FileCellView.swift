@@ -76,7 +76,11 @@ final class FileCellView: NSTableCellView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
+    /// The item this cell shows, so an edit of its name renames that item.
+    private(set) var itemID: String?
+
     func show(_ item: FileItem, column: FileColumn, row info: Info) {
+        itemID = item.id
         let text = info.theme.map { NSColor($0.text) } ?? .labelColor
         let dim = info.theme.map { NSColor($0.dim) } ?? .secondaryLabelColor
         alphaValue = info.isCut ? 0.45 : 1

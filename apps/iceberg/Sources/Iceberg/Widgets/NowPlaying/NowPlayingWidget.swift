@@ -38,6 +38,13 @@ final class NowPlayingWidget: ObservableObject, NotchWidget {
     /// Automation prompt) only once the panel has been opened: never at
     /// launch, when nobody asked for anything.
     private var openedOnce = false
+    /// AppleScript runs here, never on the main thread (see AppleScriptCall).
+    private let appleScriptQueue = DispatchQueue(label: "com.grandline.iceberg.nowplaying.applescript", qos: .userInitiated)
+    private var asking = false
+    private var askAgain = false
+    /// When the adapter's stream last delivered a line: a stream that works
+    /// is not given up for one failed check (MediaHealth.record).
+    private var lastStreamLine: Date?
 
     init(context: WidgetContext) {
         location = MediaAdapter.bundled()
@@ -79,6 +86,7 @@ final class NowPlayingWidget: ObservableObject, NotchWidget {
             if adapter != nil {
                 adapter?.stop()
                 adapter = nil
+                lastStreamLine = nil
                 update(to: NowPlayingState())
             }
             startFallback()
@@ -112,12 +120,21 @@ final class NowPlayingWidget: ObservableObject, NotchWidget {
     private func finishedCheck(_ check: AdapterCheck) {
         checking = false
         let before = health.source
-        health.record(check, at: Date())
+        health.record(check, at: Date(), streamDataAt: adapter == nil ? nil : lastStreamLine)
         if case .broken(let why) = check { Log.info("Now Playing adapter check failed: \(why)") }
         // In the fallback, ask now so Settings shows whether AppleScript works.
         if openedOnce && health.source != .adapter && health.appleScript == .unused { askPlayers() }
         if health.source != before {
             Log.info("Now Playing source: \(health.summary)")
+        }
+        // A first failure is confirmed (or not) soon, not in five minutes.
+        if health.nextCheckDelay < MediaHealth.checkInterval {
+            DispatchQueue.main.asyncAfter(deadline: .now() + health.nextCheckDelay) { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self, !self.stopped else { return }
+                    self.checkHealth()
+                }
+            }
         }
         applySource()
     }
@@ -138,6 +155,7 @@ final class NowPlayingWidget: ObservableObject, NotchWidget {
     }
 
     private func handle(line: String) {
+        lastStreamLine = Date()
         var next = state
         guard next.apply(line: line) else { return }
         update(to: next)
@@ -188,21 +206,40 @@ final class NowPlayingWidget: ObservableObject, NotchWidget {
     }
 
     /// Asks Music and Spotify, if running, what they play (never opens them).
+    /// The scripts run on a background queue with a time limit, so a busy
+    /// player or the Automation prompt never holds the panel; the answer is
+    /// applied on the main thread. Asks made meanwhile are folded into one.
     private func askPlayers() {
-        var found: [[String: JSONValue]] = []
-        var status: AppleScriptStatus?
-        for player in AppleScriptNowPlaying.players {
-            guard !NSRunningApplication.runningApplications(withBundleIdentifier: player.bundleIdentifier).isEmpty else { continue }
-            var error: NSDictionary?
-            let result = NSAppleScript(source: AppleScriptNowPlaying.script(for: player))?.executeAndReturnError(&error)
-            let number = error?[NSAppleScript.errorNumber] as? Int
-            let message = error?[NSAppleScript.errorMessage] as? String
-            let this = AppleScriptStatus.from(errorNumber: number, message: message)
-            if status == nil || this != .working { status = this }
-            if let text = result?.stringValue, let payload = AppleScriptNowPlaying.payload(from: text, player: player), !payload.isEmpty {
-                found.append(payload)
+        guard !asking else { askAgain = true; return }
+        let running = AppleScriptNowPlaying.players.filter {
+            !NSRunningApplication.runningApplications(withBundleIdentifier: $0.bundleIdentifier).isEmpty
+        }
+        asking = true
+        appleScriptQueue.async { [weak self] in
+            var found: [[String: JSONValue]] = []
+            var status: AppleScriptStatus?
+            for player in running {
+                let outcome = AppleScriptCall.run(AppleScriptNowPlaying.script(for: player))
+                if let this = outcome.status, status == nil || this != .working { status = this }
+                if let text = outcome.output, let payload = AppleScriptNowPlaying.payload(from: text, player: player), !payload.isEmpty {
+                    found.append(payload)
+                }
+            }
+            let answers = found
+            let seen = status
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { self?.finishedAsking(found: answers, status: seen) }
             }
         }
+    }
+
+    private func finishedAsking(found: [[String: JSONValue]], status: AppleScriptStatus?) {
+        asking = false
+        if askAgain {
+            askAgain = false
+            if !stopped { askPlayers() }
+        }
+        guard !stopped else { return }
         if let status, status != health.appleScript {
             health.appleScript = status
             Log.info("Now Playing through AppleScript: \(health.summary)")

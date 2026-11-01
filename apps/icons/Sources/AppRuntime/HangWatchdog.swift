@@ -39,27 +39,63 @@ public enum StallReport {
     }
 }
 
+/// What a ping that never came back says: a freeze that may not end (a
+/// deadlock, an Apple Event to a hung app). Written once per ping, so a true
+/// freeze leaves a line in the log before the app is force-quit.
+public enum FreezeReport {
+    /// A ping unanswered this long counts as a freeze.
+    public static let after: TimeInterval = 5
+
+    public static func line(waited: TimeInterval) -> String {
+        "main thread not answering for \(Int(waited.rounded())) s"
+    }
+
+    /// True when a log's text records a freeze (the journeys use it).
+    public static func found(in text: String) -> Bool {
+        text.contains("main thread not answering for ")
+    }
+}
+
 /// Notices the main thread not answering. Every two seconds, while the
 /// window says to watch, a background timer (utility QoS, with half a second
 /// of leeway) sends the main queue a ping; a ping answered 250 ms or more
 /// late is written to the app's log with how long it waited. No stack is
 /// taken, so it is cheap; and with the app unused the timer is cancelled,
 /// so it never wakes the Mac.
+///
+/// A late answer is only written when it comes, so a freeze that never ends
+/// would leave nothing. So each ping also arms a one-off check on a second
+/// queue: still unanswered after `FreezeReport.after` seconds, it writes
+/// "main thread not answering" once. That check runs whether or not the
+/// timer is still on (the watch window can close during the freeze).
 public final class HangWatchdog: @unchecked Sendable {
     public static let interval: TimeInterval = 2
 
     private let log: AppLog
     private let queue = DispatchQueue(label: "AppRuntime.HangWatchdog", qos: .utility)
+    /// The freeze check's own queue, so a stuck tick cannot hold it up.
+    private let freezeQueue = DispatchQueue(label: "AppRuntime.HangWatchdog.freeze", qos: .utility)
     private let lock = NSLock()
     private var timer: DispatchSourceTimer?
     private var active = false
     private var lastUse: Date?
     private var waiting = false
     private var stopAt: DispatchWorkItem?
+    /// Which ping is out, and whether its freeze was written already.
+    private var pingNumber = 0
+    private var freezeWritten = false
+    private let target: DispatchQueue
+    private let freezeAfter: TimeInterval
 
-    public init(log: AppLog) {
+    /// `target` is the queue watched (the main queue; tests pass their own).
+    public init(log: AppLog, target: DispatchQueue = .main, freezeAfter: TimeInterval = FreezeReport.after) {
         self.log = log
+        self.target = target
+        self.freezeAfter = freezeAfter
     }
+
+    /// Sends one ping now, outside the timer (tests).
+    public func pingNow() { tick() }
 
     /// The app came to the front or left it.
     public func setActive(_ isActive: Bool) {
@@ -117,15 +153,28 @@ public final class HangWatchdog: @unchecked Sendable {
             return
         }
         waiting = true
+        pingNumber += 1
+        freezeWritten = false
+        let number = pingNumber
         lock.unlock()
         let sent = DispatchTime.now()
-        DispatchQueue.main.async { [weak self] in
+        target.async { [weak self] in
             let delay = Double(DispatchTime.now().uptimeNanoseconds - sent.uptimeNanoseconds) / 1_000_000_000
             guard let self else { return }
             self.lock.lock()
             self.waiting = false
             self.lock.unlock()
             if let line = StallReport.line(delay: delay) { self.log.write(line) }
+        }
+        // The second check: this ping still out after freezeAfter seconds.
+        let wait = freezeAfter
+        freezeQueue.asyncAfter(deadline: sent + wait) { [weak self] in
+            guard let self else { return }
+            self.lock.lock()
+            let frozen = self.waiting && self.pingNumber == number && !self.freezeWritten
+            if frozen { self.freezeWritten = true }
+            self.lock.unlock()
+            if frozen { self.log.write(FreezeReport.line(waited: wait)) }
         }
     }
 }

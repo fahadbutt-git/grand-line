@@ -31,7 +31,8 @@ public final class MenuProvider: InstantProvider, @unchecked Sendable {
                 keywords: entry.groups + [entry.path],
                 accessory: state.checked ? "On" : "",
                 actions: [
-                    LaunchAction("Run", symbol: "play", .shell(entry.command)),
+                    // Restart, shut down, log out and sleep ask first, here as in Settings rows.
+                    LaunchAction("Run", symbol: "play", confirmation: entry.confirmation, .shell(entry.command)),
                     LaunchAction.copy(entry.command, title: "Copy command"),
                     .favourite,
                 ],
@@ -68,5 +69,45 @@ public final class MenuProvider: InstantProvider, @unchecked Sendable {
     public func instantResults(for query: LaunchQuery) -> [LaunchResult] {
         guard !query.term.isEmpty else { return [] }
         return catalog.search(query.term, exactOnly: query.prefix == .exact, limit: 40)
+    }
+
+    // MARK: Rows the settings rows already offer
+
+    /// The settings row ("setting.darkmode") a menu row (or a shortcut's row)
+    /// duplicates: one that runs the same bin/toggle setting, bin/power action
+    /// or capture, whatever else its line says ("toggle dark" and "toggle dark
+    /// on" are both dark mode).
+    public static func settingDuplicated(by row: LaunchResult) -> String? {
+        guard row.providerID == "menu" || row.providerID == "keybindings", case .shell(let line)? = row.primary?.command else { return nil }
+        let words = line.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
+        guard words.count >= 2 else { return nil }
+        let command = (words[0] as NSString).lastPathComponent
+        for setting in SettingsActions.toggles + SettingsActions.actions {
+            switch setting.kind {
+            case .toggle(let name, _, _) where command == "toggle" && words[1] == name:
+                return setting.id
+            case .power(let what, _) where command == "power" && words[1] == what:
+                return setting.id
+            case .capture(let what) where command == "capture" && words[1] == what:
+                return setting.id
+            default:
+                continue
+            }
+        }
+        return nil
+    }
+
+    /// Drops menu rows whose setting is already among the results as a
+    /// settings row ("dark mode" shows the Dark mode settings row, with its
+    /// state and its accessibility id, not the menu's Toggle › Dark mode too).
+    /// Menu rows stay when no settings row answers (the settings source is
+    /// off, or the words match only the menu).
+    public static func withoutSettingDuplicates(_ results: [LaunchResult]) -> [LaunchResult] {
+        let settings = Set(results.lazy.filter { $0.providerID == SettingsActionsProvider.providerID }.map(\.id))
+        guard !settings.isEmpty else { return results }
+        return results.filter { row in
+            guard let duplicated = settingDuplicated(by: row) else { return true }
+            return !settings.contains(duplicated)
+        }
     }
 }

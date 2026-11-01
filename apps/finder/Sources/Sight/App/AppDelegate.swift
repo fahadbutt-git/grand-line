@@ -9,7 +9,7 @@ import ThemeKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var services: Services!
     private var panel: PanelController!
-    private var hotKey: HotKey?
+    private var hotKey = HotkeyRegistration<HotKey>()
     private var statusItem: NSStatusItem?
     private var saveTimer: Timer?
     private var preferences: SightPreferencesStore!
@@ -35,7 +35,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings = SightSettingsWindow(services: services, themes: panel.themes, store: preferences)
         wireSettings()
         watchMainThread()
-        if !registerHotkey(preferences.hotkey), preferences.hotkey == .commandSpace { explainBusyShortcut() }
+        if !registerHotkey(preferences.hotkey) {
+            if preferences.hotkey == .commandSpace { explainBusyShortcut() } else { preferences.noteRefusedAtLaunch() }
+        }
         if preferences.current.launchAtLogin { startAtLogin() }
         if preferences.current.showMenuBarIcon { statusItem = makeStatusItem() }
         applyDensity()
@@ -93,7 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         preferences.onRecording = { [weak self] recording in
             guard let self else { return }
             // The shortcut being recorded must reach the field, not open the window.
-            if recording { self.hotKey = nil } else { self.registerHotkey(self.preferences.hotkey) }
+            if recording { self.hotKey.suspend() } else { self.registerHotkey(self.preferences.hotkey) }
         }
         preferences.onMenuBarIconChange = { [weak self] shown in
             guard let self else { return }
@@ -130,14 +132,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.model.objectWillChange.send()
     }
 
-    /// Registers the launcher shortcut, replacing the one before. Returns false
-    /// when macOS refused it (another app or Spotlight holds it).
+    /// Registers the launcher shortcut, then lets the one before go. Returns
+    /// false when macOS refused it (another app or Spotlight holds it); the
+    /// shortcut before it then keeps working.
     @discardableResult
     private func registerHotkey(_ shortcut: LauncherHotkey?) -> Bool {
-        hotKey = nil
-        guard let shortcut else { return true }
-        hotKey = HotKey(keyCode: shortcut.keyCode, modifiers: shortcut.modifiers) { [weak self] in self?.panel.toggle() }
-        return hotKey != nil
+        hotKey.change(to: shortcut) { wanted in
+            HotKey(keyCode: wanted.keyCode, modifiers: wanted.modifiers) { [weak self] in self?.panel.toggle() }
+        }
     }
 
     // MARK: Menu bar

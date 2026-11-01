@@ -3,7 +3,9 @@
 # Both are on by default once the app is installed, and each switches back
 # with one toggle (toggle files, toggle search). The choice is remembered in
 # ~/.local/state/grand-line/takeover-<files|search> and kept across updates.
-# Needs lib/default-apps.sh (set_ls_handler).
+# Needs lib/default-apps.sh (set_ls_handler, LS_PREFS).
+# Each switch first reads what macOS has now and changes nothing when it is
+# already so, so an update run that changes nothing restarts nothing.
 
 NEXUS_ID=com.grandline.nexus
 SIGHT_ID=com.grandline.sight
@@ -12,10 +14,50 @@ SIGHT_APP="${GRAND_LINE_APPS_DEST:-/Applications}/Sight.app"
 
 takeover_mode() { cat "$GRAND_LINE_STATE/takeover-$1" 2>/dev/null || echo on; }
 
+lower_id() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+
+# ls_handler TYPE: the app LaunchServices opens TYPE with, from its settings
+# (as set_ls_handler writes them), or nothing.
+ls_handler() {
+  defaults export "$LS_PREFS" - 2>/dev/null | plutil -convert json -o - - 2>/dev/null \
+    | jq -r --arg u "$1" '[.LSHandlers[]? | select(.LSHandlerContentType == $u) | .LSHandlerRoleAll][-1] // empty' 2>/dev/null
+}
+
+# files_now: on when folders already open in Nexus, off when they open in
+# Finder, nothing when it is something else (or cannot be read).
+files_now() {
+  local viewer handler
+  viewer="$(lower_id "$(defaults read -g NSFileViewer 2>/dev/null)")"
+  handler="$(lower_id "$(ls_handler public.folder)")"
+  if [[ "$viewer" == "$NEXUS_ID" && "$handler" == "$NEXUS_ID" ]]; then echo on
+  elif [[ -z "$viewer" && ( -z "$handler" || "$handler" == com.apple.finder ) ]] && ls_readable; then echo off
+  fi
+}
+
+# ls_readable: the LaunchServices settings can be read here at all, so an
+# empty answer means "never set", not "could not tell".
+ls_readable() { defaults export "$LS_PREFS" - 2>/dev/null | plutil -convert json -o - - >/dev/null 2>&1; }
+
+# search_now: on when Sight already holds Command + Space, off when
+# Spotlight does, nothing when it is something else.
+search_now() {
+  local enabled takes
+  enabled="$(defaults export com.apple.symbolichotkeys - 2>/dev/null | plutil -extract AppleSymbolicHotKeys.64.enabled raw -o - - 2>/dev/null)"
+  takes="$(defaults read "$SIGHT_ID" TakesCommandSpace 2>/dev/null)"
+  if [[ "$enabled" == false && "$takes" == 1 ]]; then echo on
+  elif [[ "$enabled" == true && ( -z "$takes" || "$takes" == 0 ) ]]; then echo off
+  fi
+}
+
 # takeover_files on|off: folders, "Show in Finder" and "Reveal" open in
 # Nexus, or in Finder again.
 takeover_files() {
   [[ -d "$NEXUS_APP" ]] || return 1
+  # Already so: nothing is written and LaunchServices is not restarted.
+  if [[ "$(files_now)" == "$1" ]]; then
+    mkdir -p "$GRAND_LINE_STATE" && printf '%s\n' "$1" > "$GRAND_LINE_STATE/takeover-files"
+    return 0
+  fi
   if [[ "$1" == on ]]; then
     defaults write -g NSFileViewer -string "$NEXUS_ID"
     set_ls_handler public.folder "$NEXUS_ID"
@@ -32,6 +74,11 @@ takeover_files() {
 # while Sight holds it, since only one app can.
 takeover_search() {
   [[ -d "$SIGHT_APP" ]] || return 1
+  # Already so: Sight keeps running and the shortcuts are not rewritten.
+  if [[ "$(search_now)" == "$1" ]]; then
+    mkdir -p "$GRAND_LINE_STATE" && printf '%s\n' "$1" > "$GRAND_LINE_STATE/takeover-search"
+    return 0
+  fi
   local enabled=true takes=false
   [[ "$1" == on ]] && { enabled=false; takes=true; }
   # 64 is "Show Spotlight search": Space (49) with Command (1048576).

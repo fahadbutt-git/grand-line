@@ -1,0 +1,4 @@
+#!/bin/bash
+# Test stub: Gatekeeper's check. Apps named in $SPCTL_APPROVED pass.
+echo "spctl $*" >> "${STUB_LOG:-/dev/null}"
+[[ " ${SPCTL_APPROVED:-} " == *" $(basename "${!#}") "* ]]

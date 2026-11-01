@@ -44,6 +44,11 @@ public enum ConflictQuestions {
     /// Asks `ask` about each conflict in turn until an answer applies to all.
     /// `ask` gets the conflict and how many come after it, and returns nil to
     /// stop the task. Returns nil when stopped.
+    ///
+    /// Apply to All covers the conflicts that were listed when it was chosen,
+    /// by name, and nothing else: a name that only becomes taken later (a task
+    /// queued ahead brings the same name in) is kept as both, never replaced
+    /// or skipped without being asked.
     public static func resolve(
         _ conflicts: [FileConflict], ask: (FileConflict, Int) async -> ConflictAnswer?
     ) async -> ConflictResolution? {
@@ -51,7 +56,9 @@ public enum ConflictQuestions {
         for (index, conflict) in conflicts.enumerated() {
             guard let answer = await ask(conflict, conflicts.count - index - 1) else { return nil }
             if answer.applyToAll {
-                resolution.fallback = answer.policy
+                for rest in conflicts[index...] where resolution.byName[rest.name] == nil {
+                    resolution.byName[rest.name] = answer.policy
+                }
                 return resolution
             }
             resolution.byName[conflict.name] = answer.policy

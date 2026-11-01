@@ -62,11 +62,14 @@ public enum JSONLines {
         return nil
     }
 
-    /// Rows from the output, in order. Lines that are not JSON objects with a title are skipped.
+    /// Rows past this are not read (a provider runs on every keystroke).
+    public static let maxRows = 500
+
+    /// Rows from the output, in order, up to `maxRows`. Lines that are not JSON objects with a title are skipped.
     public static func parse(_ output: String, providerID: String, paths: GrandLinePaths = GrandLinePaths()) -> [LaunchResult] {
         let decoder = JSONDecoder()
         var rows: [LaunchResult] = []
-        for (n, raw) in output.split(separator: "\n").enumerated() {
+        for (n, raw) in output.split(separator: "\n").enumerated() where rows.count < maxRows {
             guard let line = try? decoder.decode(Line.self, from: Data(raw.utf8)), let title = line.title, !title.isEmpty else { continue }
             var actions: [LaunchAction] = []
             if let main = action(open: line.open, url: line.url, run: line.run, copy: line.copy, paste: line.paste, query: line.query) {

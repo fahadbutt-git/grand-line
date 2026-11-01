@@ -120,11 +120,14 @@ public final class StreamProcess: @unchecked Sendable {
             return finished ? 0 : pid
         }
         guard target > 0 else { return }
-        GroupSpawn.signalGroup(target, SIGTERM)
+        // The group only: the reader thread may reap the leader at any moment,
+        // and after that its bare pid can belong to someone else. The leader
+        // was spawned as the group's leader, so the group reaches it alive.
+        ProcessGroup.signal(target, SIGTERM, leaderReaped: true)
         let grace = killGrace
         DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + grace) { [self] in
             let still = self.locked { self.finished ? 0 : self.pid }
-            if still > 0 { GroupSpawn.signalGroup(still, SIGKILL) }
+            if still > 0 { ProcessGroup.signal(still, SIGKILL, leaderReaped: true) }
         }
     }
 
@@ -214,8 +217,9 @@ public final class StreamProcess: @unchecked Sendable {
         if !exited {
             while waitpid(child.pid, &status, 0) == -1 && errno == EINTR {}
         }
-        // Anything it left behind in its group goes too.
-        GroupSpawn.signalGroup(child.pid, SIGKILL)
+        // Anything it left behind in its group goes too (the group only: the
+        // leader is reaped, so its bare pid is free for reuse).
+        ProcessGroup.signal(child.pid, SIGKILL, leaderReaped: true)
         let requested = locked { () -> Bool in
             finished = true
             pid = 0
@@ -316,9 +320,5 @@ enum GroupSpawn {
             return .failure("Could not start \(shell) (\(String(cString: strerror(spawned))))")
         }
         return .success(Child(pid: pid, stdout: outPipe[0], stderr: errPipe[0]))
-    }
-
-    static func signalGroup(_ pid: pid_t, _ sig: Int32) {
-        if kill(-pid, sig) != 0 { _ = kill(pid, sig) }
     }
 }

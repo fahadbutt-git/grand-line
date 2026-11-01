@@ -13,14 +13,17 @@ public struct Ranker: Sendable {
     public func key(for result: LaunchResult, folded: String, frecencies: [String: Double], learned: String? = nil) -> RankKey {
         let match = result.match
         let alias = min(match.alias, aliases.match(folded: folded, id: result.id, own: result.aliases))
+        // A row that restarts, shuts down or quits is never lifted by what was
+        // learned: it ranks only by how well it matches what was typed.
+        let learnable = !UsagePolicy.asksFirst(result)
         return RankKey(
             fallback: result.isFallback,
             alias: alias,
             title: match.title?.rawValue ?? 5,
             keyword: match.keyword?.rawValue ?? 5,
-            frecency: frecencies[result.id] ?? 0,
+            frecency: learnable ? frecencies[result.id] ?? 0 : 0,
             quality: match.quality,
-            learned: learned != nil && learned == result.id && match.matched && !result.isFallback
+            learned: learnable && learned != nil && learned == result.id && match.matched && !result.isFallback
         )
     }
 
@@ -30,8 +33,9 @@ public struct Ranker: Sendable {
         let learned = usage?.abbreviation(for: query)
         let folded = TextFold.simple(query.term)
         var keyed = results.enumerated().map { offset, result -> (Int, LaunchResult) in
-            var ranked = result
-            ranked.rank = key(for: result, folded: folded, frecencies: frecencies, learned: learned)
+            // Whatever made the row, anything irreversible on it asks first.
+            var ranked = UsagePolicy.guarding(result)
+            ranked.rank = key(for: ranked, folded: folded, frecencies: frecencies, learned: learned)
             return (offset, ranked)
         }
         keyed.sort { a, b in

@@ -9,10 +9,10 @@ import IcebergKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let paths = IcebergPaths()
-    private var theme: ThemeStore!
-    private var host: PanelHost!
+    private var theme: ThemeStore?
+    private var host: PanelHost?
     private var controllers: [UInt32: NotchController] = [:]
-    private var settingsWindow: SettingsWindow!
+    private var settingsWindow: SettingsWindow?
     private var statusItem: NSStatusItem?
     private var settingsSink: AnyCancellable?
     /// ~/Library/Logs/grand-line/iceberg.log, where Log writes too.
@@ -21,17 +21,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var crashRecord = CrashGuard(name: "iceberg", log: runtimeLog)
     private var activeObservers: [NSObjectProtocol] = []
     private var termination: DispatchSourceSignal?
+    /// URLs that arrive before setup is done (a cold launch from a URL) wait here.
+    private var launchQueue = LaunchQueue()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // After three crashes in ten minutes Iceberg stays closed (and says so once).
         guard crashRecord.launch(displayName: "Iceberg") else { exit(0) }
         termination = TerminationSignal.handle { DispatchQueue.main.async { MainActor.assumeIsolated { NSApp.terminate(nil) } } }
-        theme = ThemeStore(paths: paths)
-        host = PanelHost(paths: paths, theme: theme)
+        let theme = ThemeStore(paths: paths)
+        let host = PanelHost(paths: paths, theme: theme)
+        self.theme = theme
+        self.host = host
         settingsWindow = SettingsWindow(host: host)
         host.onLayoutChange = { [weak self] in self?.rebuildPanels(force: true) }
         host.openSettings = { [weak self] in self?.showSettings() }
-        host.hotKey.action = { [weak self] in self?.targetController()?.toggle() }
+        host.hotKey.action = { [weak self] in self?.targetController()?.toggle(byKeyboard: true) }
+        host.onEscape = { [weak self] in self?.controllers.values.forEach { $0.close() } }
         let dog = watchdog
         host.onPanelOpen = { dog.noteUse() }
         let center = NotificationCenter.default
@@ -49,46 +54,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.rebuildPanels(force: false) }
         }
+        // A full-screen app's Space hides the menu bar: the pill goes with it
+        // (NotchGeometry.closedShapeVisible) and comes back on the way out.
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification,
+                                                          object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.rebuildPanels(force: false) }
+        }
+        // A cold launch from `open -g iceberg://...` can deliver the URL before
+        // this point; it runs now that the panels and widgets exist.
+        for command in launchQueue.becomeReady() { run(command) }
     }
-
-    /// The URL schemes the panel answers. `denden` is the app's former scheme,
-    /// kept for one release so shortcuts made before the rename keep working
-    /// (Info/Iceberg.plist registers both).
-    static let urlSchemes: Set<String> = ["iceberg", "denden"]
 
     /// `iceberg://toggle`, `open`, `close`, `reload` and `settings`, so a keyboard shortcut
     /// (Karabiner, `open -g iceberg://toggle`) can drive the panel, and
     /// `iceberg://trigger/NAME`, which runs a widget (`iceberg trigger NAME`
-    /// uses it when Iceberg is not running yet).
+    /// uses it when Iceberg is not running yet). `denden` is the former
+    /// scheme (Info/Iceberg.plist registers both). Before setup is done the
+    /// commands are queued, not run (see LaunchQueue).
     func application(_ application: NSApplication, open urls: [URL]) {
-        for url in urls where Self.urlSchemes.contains(url.scheme?.lowercased() ?? "") {
-            switch url.host ?? url.path {
-            case "toggle": targetController()?.toggle()
-            case "open": targetController()?.open()
-            case "close": controllers.values.forEach { $0.close() }
-            case "reload": host.reloadEverything()
-            case "settings": showSettings()
-            case "trigger":
-                let fromPath = url.pathComponents.filter { $0 != "/" }
-                let fromQuery = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                    .queryItems?.filter { $0.name == "widget" }.compactMap(\.value) ?? []
-                for name in fromPath + fromQuery where !name.isEmpty { host.user.trigger(name) }
-            default: break
-            }
+        for url in urls {
+            if let command = launchQueue.receive(url) { run(command) }
+        }
+    }
+
+    private func run(_ command: URLCommand) {
+        guard let host else { return }
+        switch command {
+        case .toggle: targetController()?.toggle(byKeyboard: true)
+        case .open: targetController()?.open(byKeyboard: true)
+        case .close: controllers.values.forEach { $0.close() }
+        case .reload: host.reloadEverything()
+        case .settings: showSettings()
+        case .trigger(let names): for name in names { host.user.trigger(name) }
         }
     }
 
     @objc func showSettings() {
-        settingsWindow.show()
+        settingsWindow?.show()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         crashRecord.quitCleanly()
     }
 
-    @objc private func togglePanel() { targetController()?.toggle() }
-    @objc private func reloadAll() { host.reloadEverything() }
-    @objc private func openWidgetsFolder() { host.user.openFolder() }
+    @objc private func togglePanel() { targetController()?.toggle(byKeyboard: true) }
+    @objc private func reloadAll() { host?.reloadEverything() }
+    @objc private func openWidgetsFolder() { host?.user.openFolder() }
     @objc private func openLog() { NSWorkspace.shared.open(Log.file) }
 
     /// Iceberg's menu bar item (`menu_bar_icon`): its glyph, and a menu with
@@ -155,6 +166,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func rebuildPanels(force: Bool) {
+        guard let host else { return }
         let screens = NSScreen.screens
         let infos = screens.map(Self.info(for:))
         let mainID = NSScreen.main.map(Self.displayID)

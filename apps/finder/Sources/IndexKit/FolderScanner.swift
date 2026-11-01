@@ -33,7 +33,7 @@ enum FolderScanner {
             }
             if name == "." || name == ".." || exclusions.skips(name) { continue }
             let full = IndexStorage.join(path, name)
-            if !exclusions.paths.isEmpty, exclusions.skips(path: full) { continue }
+            if exclusions.hasPathRules, exclusions.skips(path: full) { continue }
             var isFolder: Bool
             switch Int32(entry.pointee.d_type) {
             case DT_DIR: isFolder = true

@@ -1,14 +1,16 @@
 import AppKit
 
 /// The notch app (role "notch"): the panel opens from its URL commands and on
-/// hover, shows only the sections turned on, has settings if it has them,
-/// follows the theme, runs a signal widget when `iceberg trigger` asks, and
-/// takes saved config files without a restart. Without a notch (CI) it sits
-/// as a pill at the top.
+/// hover, closes on a click outside it, on Escape and when the pointer moves
+/// on after a keyboard or URL open, shows only the sections turned on, has
+/// settings if it has them, follows the theme, runs a signal widget when
+/// `iceberg trigger` asks (also as the URL that starts it), and takes saved
+/// config files without a restart. Without a notch (CI) it sits as a pill at
+/// the top.
 enum NotchJourneys {
     static let role = "notch"
 
-    static var all: [Journey] { [panel, settings, theme, signal, reload] }
+    static var all: [Journey] { [panel, dismiss, settings, theme, signal, coldLaunch, reload] }
 
     static func journey(_ name: String, _ summary: String, _ steps: [Step]) -> Journey {
         Journey(name, role: role, summary: summary, waitsForWindow: false,
@@ -132,6 +134,105 @@ enum NotchJourneys {
 }
 
 extension NotchJourneys {
+    /// Where the pointer can rest well away from the panel: below it, on the
+    /// same screen (window-server coordinates).
+    static func awayPoint(_ ctx: Ctx) throws -> CGPoint {
+        guard let closed = ctx.closedFrame ?? ctx.notchFrame() else { throw StepFailure("no panel window") }
+        return CGPoint(x: closed.midX, y: closed.maxY + 360)
+    }
+
+    /// The open panel never takes the keys and must not trap the pointer:
+    /// opened by URL (as a shortcut does), it closes on a click elsewhere,
+    /// on Escape, and once the pointer moves on.
+    static var dismiss: Journey {
+        journey("notch-dismiss", "a panel opened by URL closes on a click outside, on Escape, and when the pointer moves on", [
+            step("a click outside closes it") { ctx in
+                let away = try awayPoint(ctx)
+                Input.move(to: away)
+                try ctx.notchURL("open")
+                try ctx.wait("the panel to open") { ctx.isNotchOpen() }
+                Input.pause(0.8)
+                try ctx.check(ctx.isNotchOpen(), "the panel closed by itself before anything was done")
+                Input.click(away)
+                try ctx.wait("a click outside to close the panel", timeout: 4) { !ctx.isNotchOpen() }
+            },
+            step("Escape closes it") { ctx in
+                try ctx.notchURL("open")
+                try ctx.wait("the panel to open") { ctx.isNotchOpen() }
+                try ctx.key("escape")
+                try ctx.wait("Escape to close the panel", timeout: 4) { !ctx.isNotchOpen() }
+            },
+            step("Escape is let go once it is closed") { ctx in
+                // Only held while the panel is open: another Escape now must
+                // not reopen, close or otherwise touch it.
+                try ctx.key("escape")
+                Input.pause(0.4)
+                try ctx.check(!ctx.isNotchOpen(), "Escape opened the panel")
+            },
+            step("opened by URL, moving the pointer on closes it") { ctx in
+                let away = try awayPoint(ctx)
+                Input.move(to: away)
+                try ctx.notchURL("open")
+                try ctx.wait("the panel to open") { ctx.isNotchOpen() }
+                Input.pause(0.8)
+                try ctx.check(ctx.isNotchOpen(), "the panel closed though the pointer did not move")
+                Input.move(to: CGPoint(x: away.x + 120, y: away.y + 40))
+                Input.move(to: CGPoint(x: away.x + 160, y: away.y + 60))
+                try ctx.wait("the panel to close once the pointer moved on", timeout: 4) { !ctx.isNotchOpen() }
+            },
+            step("closed, it lets clicks through beside the notch") { ctx in
+                // The closed window may be wider than the shape (its flares,
+                // the live-activity wings); only the shape takes the pointer.
+                // A click at the closed window's outer edge must not open it.
+                guard let closed = ctx.notchFrame() else { throw StepFailure("no panel window") }
+                Input.click(CGPoint(x: closed.minX + 1, y: closed.minY + 1))
+                Input.pause(0.6)
+                try ctx.check(!ctx.isNotchOpen(), "a click on the closed window's edge, outside the shape, opened the panel")
+                try ctx.key("escape")   // shuts a menu the click may have opened below
+                Input.move(to: try awayPoint(ctx))
+            },
+        ])
+    }
+
+    /// `iceberg trigger NAME` while Iceberg is not running starts it with
+    /// iceberg://trigger/NAME, which AppKit can deliver before the app has
+    /// finished launching: it must neither crash nor lose the command.
+    static var coldLaunch: Journey {
+        journey("notch-cold-launch", "started by iceberg://trigger/NAME (and iceberg://open), it runs the command and keeps running", [
+            step("add a signal widget and put it in the panel") { ctx in
+                try ctx.writeHomeFile("signal-value.txt", "cold-1\n")
+                try ctx.writeWidgetFile("signal.toml", """
+                title = "Signal"
+                icon = "bolt"
+                command = 'cat "$HOME/signal-value.txt"'
+                signal = true
+                """)
+                try ctx.editSettings { $0.replacingOccurrences(of: "panel = [\"battery\", \"journey\"]",
+                                                                 with: "panel = [\"battery\", \"journey\", \"signal\"]") }
+                Input.pause(0.6)
+            },
+            step("quit, then start it with iceberg://trigger/signal", timeout: 90) { ctx in
+                try ctx.coldLaunch(with: "trigger/signal")
+                let pid = ctx.pid
+                Input.pause(3)
+                try ctx.check(ctx.running?.isTerminated == false && ctx.pid == pid, "Iceberg quit or crashed after a cold launch by URL")
+                try ctx.wait("its panel window", timeout: 10) { ctx.notchFrame() != nil }
+                try ctx.notchURL("open")
+                try ctx.wait("the panel to open") { ctx.isNotchOpen() }
+                try ctx.wait("the Signal widget's value", timeout: 10) { ctx.notchTexts().contains { $0.contains("cold-1") } }
+                try ctx.notchURL("close")
+                try ctx.wait("the panel to close") { !ctx.isNotchOpen() }
+            },
+            step("quit, then start it with iceberg://open: the queued command runs", timeout: 90) { ctx in
+                try ctx.coldLaunch(with: "open")
+                try ctx.wait("the panel to open by itself once Iceberg is ready", timeout: 15) { ctx.isNotchOpen() }
+                try ctx.check(ctx.running?.isTerminated == false, "Iceberg quit after a cold launch by URL")
+                try ctx.notchURL("close")
+                try ctx.wait("the panel to close") { !ctx.isNotchOpen() }
+            },
+        ])
+    }
+
     /// A widget with `signal = true` that shows the contents of a file, so a
     /// step can change the file and then send the signal. The file is kept
     /// outside the config folder, where hot reload would run the widget by itself.
@@ -275,6 +376,31 @@ extension Ctx {
         guard FileManager.default.fileExists(atPath: script.path) else { throw StepFailure("\(script.path) is missing") }
         let result = Shell.run("/bin/bash", [script.path] + args, timeout: 20)
         try check(result.status == 0, "iceberg \(args.joined(separator: " ")) failed (\(result.status)): \(result.output)")
+    }
+
+    /// Quits the app and starts it again by opening one of its URLs, with
+    /// the fixture home, as `iceberg trigger` does when it is not running.
+    func coldLaunch(with command: String) throws {
+        guard let scheme = app.urlScheme else { throw StepFailure("apps.tsv names no URL scheme for \(app.name)") }
+        quit()
+        try wait("\(app.name) to quit", timeout: 10) {
+            NSRunningApplication.runningApplications(withBundleIdentifier: app.bundleID).allSatisfy(\.isTerminated)
+        }
+        var env = ["GRAND_LINE_JOURNEY": "1", "HOME": home.path, "CFFIXED_USER_HOME": home.path]
+        extraEnv.forEach { env[$0.key] = $0.value }
+        var args = ["-g", "-a", bundle.path]
+        for key in env.keys.sorted() { args += ["--env", "\(key)=\(env[key]!)"] }
+        args.append("\(scheme)://\(command)")
+        let opened = Shell.run("/usr/bin/open", args, timeout: 40)
+        guard opened.status == 0 else {
+            throw StepSkip("open --env with a URL failed (\(opened.output.prefix(120))), so a cold launch by URL cannot be driven here")
+        }
+        try wait("\(app.name) to start from its URL", timeout: 30) {
+            guard let found = NSRunningApplication.runningApplications(withBundleIdentifier: app.bundleID)
+                .first(where: { !$0.isTerminated }) else { return false }
+            pid = found.processIdentifier
+            return !ax.role.isEmpty
+        }
     }
 
     func notchURL(_ command: String) throws {

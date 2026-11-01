@@ -24,10 +24,13 @@ public struct IndexStatus: Sendable, Equatable, Codable {
     /// The folders the index covers.
     public var roots: [String]
     public var source: Source
+    /// Why the service is not answering, when that is known (it is signed
+    /// differently from the app), for Settings to show.
+    public var problem: String?
 
     public init(
         files: Int, lastSync: Date?, building: Bool, unreadable: [String],
-        complete: Bool = true, roots: [String] = [], source: Source = .inApp
+        complete: Bool = true, roots: [String] = [], source: Source = .inApp, problem: String? = nil
     ) {
         self.files = files
         self.lastSync = lastSync
@@ -36,6 +39,7 @@ public struct IndexStatus: Sendable, Equatable, Codable {
         self.complete = complete
         self.roots = roots
         self.source = source
+        self.problem = problem
     }
 
     public static let empty = IndexStatus(files: 0, lastSync: nil, building: false, unreadable: [], complete: false)

@@ -36,6 +36,8 @@ final class MediaHealthTests: XCTestCase {
     func testBrokenAdapterFallsBackToAppleScript() {
         var h = MediaHealth(adapterBundled: true)
         h.record(.broken("Symbol not found"), at: t0)
+        XCTAssertEqual(h.source, .adapter, "one failed check is not enough")
+        h.record(.broken("Symbol not found"), at: t0.addingTimeInterval(30))
         XCTAssertEqual(h.source, .appleScript)
         XCTAssertTrue(h.summary.hasPrefix("Music and Spotify only"))
         XCTAssertTrue(h.summary.contains("Symbol not found"))
@@ -60,6 +62,7 @@ final class MediaHealthTests: XCTestCase {
     func testNeitherWorkingSaysWhatToDo() {
         var h = MediaHealth(adapterBundled: true)
         h.record(.broken("x"), at: t0)
+        h.record(.broken("x"), at: t0.addingTimeInterval(30))
         h.appleScript = .denied
         XCTAssertEqual(h.source, .none)
         XCTAssertTrue(h.summary.hasPrefix("Not working"))
@@ -121,4 +124,95 @@ final class MediaHealthTests: XCTestCase {
             XCTAssertTrue(script.hasPrefix("if application \"\(player.name)\" is running then"), script)
         }
     }
+
+    /// One slow or failed check (perl loading after wake) must not stop a
+    /// working stream: it takes two failures in a row, and a quiet stream.
+    func testOneFailedCheckKeepsTheAdapter() {
+        var h = MediaHealth(adapterBundled: true)
+        h.record(.healthy, at: t0)
+        h.record(.broken("the check did not answer"), at: t0.addingTimeInterval(300))
+        XCTAssertEqual(h.source, .adapter)
+        XCTAssertNil(h.adapterProblem, "not reported while it still counts as working")
+        // The next check comes soon, to confirm or clear it.
+        XCTAssertEqual(h.nextCheckDelay, MediaHealth.recheckAfterFailure)
+        XCTAssertTrue(h.checkDue(at: t0.addingTimeInterval(300 + MediaHealth.recheckAfterFailure)))
+        // A pass clears it.
+        h.record(.inconclusive, at: t0.addingTimeInterval(330))
+        XCTAssertEqual(h.source, .adapter)
+        XCTAssertEqual(h.brokenInARow, 0)
+        XCTAssertEqual(h.nextCheckDelay, MediaHealth.checkInterval)
+        // Two in a row set it aside, and the usual interval applies again.
+        h.record(.broken("x"), at: t0.addingTimeInterval(600))
+        h.record(.broken("x"), at: t0.addingTimeInterval(630))
+        XCTAssertEqual(h.source, .appleScript)
+        XCTAssertEqual(h.nextCheckDelay, MediaHealth.checkInterval)
+        h.record(.healthy, at: t0.addingTimeInterval(930))
+        XCTAssertEqual(h.source, .adapter)
+    }
+
+    func testAStreamThatDeliversIsNotStopped() {
+        var h = MediaHealth(adapterBundled: true)
+        let now = t0.addingTimeInterval(1000)
+        h.record(.broken("x"), at: now, streamDataAt: now.addingTimeInterval(-60))
+        h.record(.broken("x"), at: now.addingTimeInterval(30), streamDataAt: now.addingTimeInterval(-60))
+        XCTAssertEqual(h.source, .adapter, "the stream delivered a minute ago")
+        XCTAssertEqual(h.nextCheckDelay, MediaHealth.checkInterval, "no rapid rechecks while it streams")
+        // Quiet for longer than streamFreshFor: the checks win.
+        let later = now.addingTimeInterval(MediaHealth.streamFreshFor + 60)
+        h.record(.broken("x"), at: later, streamDataAt: now.addingTimeInterval(-60))
+        XCTAssertEqual(h.source, .appleScript)
+    }
+
+    /// The AppleScript fallback runs in osascript with a time limit, off the
+    /// main thread; what it says is read here.
+    func testAppleScriptCallOutcomes() {
+        var ok = CommandResult()
+        ok.exitCode = 0
+        ok.stdout = "playing\tSong\n"
+        XCTAssertEqual(AppleScriptCall.outcome(of: ok), .init(output: "playing\tSong", status: .working))
+
+        var denied = CommandResult()
+        denied.exitCode = 1
+        denied.stderr = "0:20: execution error: Not authorized to send Apple events to Music. (-1743)\n"
+        XCTAssertEqual(AppleScriptCall.outcome(of: denied).status, .denied)
+        XCTAssertNil(AppleScriptCall.outcome(of: denied).output)
+
+        var hung = CommandResult()
+        hung.timedOut = true
+        XCTAssertEqual(AppleScriptCall.outcome(of: hung), .init(output: nil, status: nil),
+                       "a timeout (the consent prompt waiting) says nothing about access")
+
+        var odd = CommandResult()
+        odd.exitCode = 1
+        odd.stderr = "something broke"
+        XCTAssertEqual(AppleScriptCall.outcome(of: odd).status, .failed("something broke"))
+
+        XCTAssertEqual(AppleScriptCall.errorNumber(fromStderr: "x (-1712)"), -1712)
+        XCTAssertNil(AppleScriptCall.errorNumber(fromStderr: "no number"))
+    }
+
+    func testAppleScriptCommandQuotesEachLine() {
+        let cmd = AppleScriptCall.command(for: "with timeout of 2 seconds\ntell application \"Music\" to play\nend timeout")
+        XCTAssertEqual(cmd, "/usr/bin/osascript -e 'with timeout of 2 seconds' -e 'tell application \"Music\" to play' -e 'end timeout'")
+        XCTAssertEqual(AppleScriptCall.command(for: "say \"it's\""), "/usr/bin/osascript -e 'say \"it'\\''s\"'")
+    }
+
+    func testScriptsHaveTheirOwnTimeout() {
+        for player in AppleScriptNowPlaying.players {
+            let script = AppleScriptNowPlaying.script(for: player)
+            XCTAssertTrue(script.contains("with timeout of 2 seconds"), script)
+            XCTAssertLessThan(2, AppleScriptCall.timeout)
+        }
+    }
+
+    #if os(macOS)
+    /// A script that does not answer is cut off by the process limit.
+    func testAHungScriptIsCutOff() throws {
+        guard FileManager.default.isExecutableFile(atPath: "/usr/bin/osascript") else { throw XCTSkip("no osascript") }
+        let started = Date()
+        let outcome = AppleScriptCall.run("delay 30", timeout: 1)
+        XCTAssertNil(outcome.status)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 4)
+    }
+    #endif
 }

@@ -61,6 +61,13 @@ public enum MediaSource: Equatable, Sendable {
 public struct MediaHealth: Equatable, Sendable {
     /// How often the adapter is checked again while Now Playing is on.
     public static let checkInterval: TimeInterval = 5 * 60
+    /// Failed checks in a row before the adapter is set aside. One failure
+    /// (a slow start after wake, a busy Mac) is not enough.
+    public static let brokenChecksToDistrust = 2
+    /// After a failed check that did not yet count, the next one comes soon.
+    public static let recheckAfterFailure: TimeInterval = 30
+    /// A stream that delivered within this long is working, whatever the check says.
+    public static let streamFreshFor: TimeInterval = 10 * 60
 
     /// False when the adapter is not in the app at all.
     public var adapterBundled: Bool
@@ -70,6 +77,10 @@ public struct MediaHealth: Equatable, Sendable {
     /// The adapter's stream kept exiting.
     public var streamGaveUp = false
     public var appleScript: AppleScriptStatus = .unused
+    /// Failed checks in a row.
+    public private(set) var brokenInARow = 0
+    /// Set once the checks have failed often enough (and the stream is quiet).
+    public private(set) var checksDistrust = false
 
     public init(adapterBundled: Bool) {
         self.adapterBundled = adapterBundled
@@ -78,8 +89,7 @@ public struct MediaHealth: Equatable, Sendable {
     /// True while the adapter should be used.
     public var adapterUsable: Bool {
         guard adapterBundled, !streamGaveUp else { return false }
-        if case .broken? = lastCheck { return false }
-        return true
+        return !checksDistrust
     }
 
     public var source: MediaSource {
@@ -94,7 +104,7 @@ public struct MediaHealth: Equatable, Sendable {
     public var adapterProblem: String? {
         if !adapterBundled { return "the Now Playing helper is not in this copy of Iceberg" }
         if streamGaveUp { return "the Now Playing helper keeps stopping" }
-        if case .broken(let why)? = lastCheck { return "the Now Playing helper failed its check (\(why))" }
+        if checksDistrust, case .broken(let why)? = lastCheck { return "the Now Playing helper failed its check (\(why))" }
         return nil
     }
 
@@ -134,18 +144,37 @@ public struct MediaHealth: Equatable, Sendable {
     }
 
     /// Notes a check. A healthy check also clears an earlier give-up, so the
-    /// adapter is tried again.
-    public mutating func record(_ check: AdapterCheck, at now: Date) {
+    /// adapter is tried again. A failed one sets the adapter aside only after
+    /// `brokenChecksToDistrust` in a row, and never while its stream has
+    /// delivered within `streamFreshFor` (`streamDataAt`): that stream is the
+    /// proof it works.
+    public mutating func record(_ check: AdapterCheck, at now: Date, streamDataAt: Date? = nil) {
         lastCheck = check
         lastCheckAt = now
-        if check == .healthy { streamGaveUp = false }
+        switch check {
+        case .healthy, .inconclusive:
+            brokenInARow = 0
+            checksDistrust = false
+            if check == .healthy { streamGaveUp = false }
+        case .broken:
+            brokenInARow += 1
+            let streamWorks = streamDataAt.map { now.timeIntervalSince($0) < Self.streamFreshFor } ?? false
+            checksDistrust = brokenInARow >= Self.brokenChecksToDistrust && !streamWorks
+        }
     }
 
-    /// True when a check is due.
+    /// True when a check is due: every `checkInterval`, or soon after a
+    /// failure that did not yet count, so a real break is confirmed quickly.
     public func checkDue(at now: Date) -> Bool {
         guard adapterBundled else { return false }
         guard let at = lastCheckAt else { return true }
-        return now.timeIntervalSince(at) >= Self.checkInterval - 1
+        return now.timeIntervalSince(at) >= nextCheckDelay - 1
+    }
+
+    /// How long after the last check the next one is due: soon after a
+    /// first failure, else the usual interval.
+    public var nextCheckDelay: TimeInterval {
+        brokenInARow > 0 && brokenInARow < Self.brokenChecksToDistrust ? Self.recheckAfterFailure : Self.checkInterval
     }
 }
 
@@ -164,17 +193,21 @@ public enum AppleScriptNowPlaying {
     public static let players = [spotify, music]
 
     /// Prints "state<TAB>title<TAB>artist<TAB>album<TAB>duration<TAB>position",
-    /// "stopped", or "" when the app is not running.
+    /// "stopped", or "" when the app is not running. A player that does not
+    /// answer within two seconds ends it with an error (and AppleScriptCall
+    /// kills the run after three, whatever happens).
     public static func script(for player: Player) -> String {
         """
         if application "\(player.name)" is running then
-            tell application "\(player.name)"
-                if player state is stopped then return "stopped"
-                set t to current track
-                set out to (player state as text) & tab & (name of t as text) & tab & (artist of t as text)
-                set out to out & tab & (album of t as text) & tab & (duration of t as text) & tab & (player position as text)
-                return out
-            end tell
+            with timeout of 2 seconds
+                tell application "\(player.name)"
+                    if player state is stopped then return "stopped"
+                    set t to current track
+                    set out to (player state as text) & tab & (name of t as text) & tab & (artist of t as text)
+                    set out to out & tab & (album of t as text) & tab & (duration of t as text) & tab & (player position as text)
+                    return out
+                end tell
+            end timeout
         end if
         return ""
         """

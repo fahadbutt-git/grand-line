@@ -1,7 +1,14 @@
 #!/bin/bash
 # Test stub: report where a file was downloaded from. The test writes the
 # address to $XATTR_SOURCES/<file name>; printed as hex, as macOS does.
+# Writing an attribute (-w) is logged and succeeds; reading the quarantine
+# flag (-p com.apple.quarantine) finds it only on the names listed in
+# $XATTR_QUARANTINED.
 f="${!#}"
+case "${1:-}" in
+  -w|-c|-cr|-d) echo "xattr $*" >> "${STUB_LOG:-/dev/null}"; exit 0 ;;
+  -p) [[ " ${XATTR_QUARANTINED:-} " == *" $(basename "$f") "* ]] && { echo "0081;0;x;"; exit 0; }; exit 1 ;;
+esac
 src="${XATTR_SOURCES:-/nonexistent}/$(basename "$f")"
 [[ -f "$src" ]] || exit 1
 perl -e 'local $/; print unpack("H*", <STDIN>), "\n"' < "$src"

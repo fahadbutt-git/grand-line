@@ -33,6 +33,8 @@ final class Services {
     let clipboardHistory = ClipboardHistoryProvider()
     /// Executables in ~/.config/grand-line/sight/scripts that print rows.
     let scripts = ScriptCommandsProvider()
+    /// Only the newest read of the front app's menus is shown.
+    private let menuReads = LatestOnly()
 
     private(set) var engine: SearchEngine
     /// Sources, result counts and web engines from Settings.
@@ -159,14 +161,20 @@ final class Services {
         let history = clipboardHistory
         BlockingWork.start { history.reload() }
         let menuItems = self.menuItems
+        let reads = menuReads
+        // The last app's menus go at once: their rows press that app's pid.
+        let ticket = reads.next()
+        menuItems.replace([])
         guard let frontApp, frontApp.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
         let pid = frontApp.processIdentifier
         let name = frontApp.localizedName ?? "App"
         // Walking another app's menus through Accessibility waits on that app,
         // for seconds when it is busy: on a Dispatch queue, never on the pool
-        // the searches run on.
+        // the searches run on. A read that finishes after the window opened
+        // again (for another app) is dropped.
         BlockingWork.start(qos: .userInitiated) {
-            menuItems.replace(MenuBarReader.results(pid: pid, app: name))
+            let rows = MenuBarReader.results(pid: pid, app: name)
+            reads.ifCurrent(ticket) { menuItems.replace(rows) }
         }
     }
 

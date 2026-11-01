@@ -1,4 +1,5 @@
 import AppKit
+import IndexKit
 import LauncherKit
 
 /// Carries out the commands rows describe. The window is already hidden for
@@ -44,9 +45,15 @@ final class ActionPerformer {
         case .shell(let line):
             launch("/bin/bash", ShellRunner.bashArguments(for: line, paths: paths))
         case .pressMenuItem(let pid, let path):
-            inFrontApp { _ = MenuBarReader.press(pid: pid, path: path) }
+            // Accessibility waits on the other app (seconds when it is busy):
+            // never on the main thread, so the shortcut keeps working.
+            inFrontApp {
+                BlockingWork.start(qos: .userInitiated) {
+                    if !MenuBarReader.press(pid: pid, path: path) { DispatchQueue.main.async { NSSound.beep() } }
+                }
+            }
         case .quit(let pid, let force):
-            quit(pid, force: force)
+            quit(pid, force: force, expectedName: nil)
         case .lookUp(let word):
             let encoded = word.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? word
             if let url = URL(string: "dict://" + encoded) { NSWorkspace.shared.open(url) }
@@ -153,12 +160,14 @@ final class ActionPerformer {
         do { try process.run() } catch { NSSound.beep() }
     }
 
-    func quit(_ pid: Int32, force: Bool) {
-        if let app = NSRunningApplication(processIdentifier: pid) {
-            _ = force ? app.forceTerminate() : app.terminate()
-        } else {
-            kill(pid, force ? SIGKILL : SIGTERM)
-        }
+    /// Quits the app with this pid, only while it is still the app the row
+    /// named: a pid that now belongs to something else is left alone. Only
+    /// apps are quit (the list holds nothing else), never a raw pid.
+    func quit(_ pid: Int32, force: Bool, expectedName: String?) {
+        guard let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated else { return NSSound.beep() }
+        let running = ProcessEntry(pid: app.processIdentifier, name: app.localizedName ?? "", bundlePath: app.bundleURL?.path)
+        guard ProcessProvider.stillMatches(pid: pid, expected: expectedName, running: running) else { return NSSound.beep() }
+        _ = force ? app.forceTerminate() : app.terminate()
     }
 
     /// Brings back the app that was in front, then acts in it once it is active.

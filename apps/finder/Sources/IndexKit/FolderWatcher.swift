@@ -8,7 +8,11 @@ import Foundation
 /// per folder. Paths are real paths (`/private/var`, not `/var`).
 public final class FolderWatcher: @unchecked Sendable {
     public let paths: [String]
+    /// The changes, batch by batch (empty when the watcher was made with `tagged`).
     public let changes: AsyncStream<[FolderChange]>
+    /// With `tagged`: each batch with the newest event it covers, so whoever
+    /// applies them can store an event ID only once its changes are applied.
+    public let batches: AsyncStream<WatchBatch>
 
     private let since: UInt64?
     private let latency: TimeInterval
@@ -17,21 +21,29 @@ public final class FolderWatcher: @unchecked Sendable {
     private let lock = NSLock()
     private var stream: FSEventStreamRef?
 
-    /// - Parameter since: an event ID to replay from (from `latestEventID` of an earlier
-    ///   run), or nil for changes from now on.
-    public init(paths: [String], since: UInt64? = nil, latency: TimeInterval = 0.5) {
+    /// - Parameters:
+    ///   - since: an event ID to replay from (the last one applied in an
+    ///     earlier run), or nil for changes from now on.
+    ///   - tagged: publish `batches` (changes with their event IDs) instead of `changes`.
+    public init(paths: [String], since: UInt64? = nil, latency: TimeInterval = 0.5, tagged: Bool = false) {
         let real = paths.map(FolderWatcher.realPath)
         self.paths = real
         self.since = since
         self.latency = latency
         let (changes, continuation) = AsyncStream.makeStream(of: [FolderChange].self, bufferingPolicy: .unbounded)
+        let (batches, batchContinuation) = AsyncStream.makeStream(of: WatchBatch.self, bufferingPolicy: .unbounded)
         self.changes = changes
-        self.box = WatcherBox(continuation: continuation, latest: since ?? FolderWatcher.currentEventID, roots: real)
+        self.batches = batches
+        // Only one stream is fed; the other ends at once, so nothing piles up unread.
+        if tagged { continuation.finish() } else { batchContinuation.finish() }
+        self.box = WatcherBox(continuation: continuation, latest: since ?? FolderWatcher.currentEventID, roots: real,
+                              batches: tagged ? batchContinuation : nil)
     }
 
     deinit {
         stop()
         box.continuation.finish()
+        box.batches?.finish()
     }
 
     /// The system's newest event ID, to store with a snapshot.
@@ -39,7 +51,8 @@ public final class FolderWatcher: @unchecked Sendable {
         FSEventsGetCurrentEventId()
     }
 
-    /// The newest event this watcher has seen.
+    /// The newest event this watcher has seen, which may not be applied yet:
+    /// what to store comes from `batches`.
     public var latestEventID: UInt64 {
         box.latestEventID
     }
@@ -175,15 +188,30 @@ public final class FolderWatcher: @unchecked Sendable {
     }
 }
 
+/// One batch of changes and the newest FSEvents event it covers. A batch whose
+/// events all changed nothing has no changes but still moves the event on.
+public struct WatchBatch: Sendable, Equatable {
+    public let changes: [FolderChange]
+    public let eventID: UInt64
+
+    public init(changes: [FolderChange], eventID: UInt64) {
+        self.changes = changes
+        self.eventID = eventID
+    }
+}
+
 /// Lives as long as the stream, which owns one reference to it.
 final class WatcherBox: @unchecked Sendable {
     let continuation: AsyncStream<[FolderChange]>.Continuation
+    let batches: AsyncStream<WatchBatch>.Continuation?
     let roots: [String]
     private let lock = NSLock()
     private var latest: UInt64
 
-    init(continuation: AsyncStream<[FolderChange]>.Continuation, latest: UInt64, roots: [String] = []) {
+    init(continuation: AsyncStream<[FolderChange]>.Continuation, latest: UInt64, roots: [String] = [],
+         batches: AsyncStream<WatchBatch>.Continuation? = nil) {
         self.continuation = continuation
+        self.batches = batches
         self.latest = latest
         self.roots = roots
     }
@@ -195,12 +223,17 @@ final class WatcherBox: @unchecked Sendable {
     }
 
     func receive(_ events: [(String, FSEventStreamEventFlags, FSEventStreamEventId)]) {
-        if let newest = events.map({ $0.2 }).max() {
+        let newest = events.map({ $0.2 }).max()
+        if let newest {
             lock.lock()
             latest = max(latest, newest)
             lock.unlock()
         }
         let changes = FolderWatcher.changes(from: events, roots: roots)
-        if !changes.isEmpty { continuation.yield(changes) }
+        if let batches {
+            if let newest { batches.yield(WatchBatch(changes: changes, eventID: newest)) }
+        } else if !changes.isEmpty {
+            continuation.yield(changes)
+        }
     }
 }

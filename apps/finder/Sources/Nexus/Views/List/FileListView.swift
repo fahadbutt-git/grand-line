@@ -34,6 +34,10 @@ struct FileListView: NSViewRepresentable {
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
         scroll.drawsBackground = true
+        // Folder sizes follow the rows on screen.
+        scroll.contentView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(context.coordinator, selector: #selector(FileListCoordinator.visibleRowsChanged(_:)),
+                                               name: NSView.boundsDidChangeNotification, object: scroll.contentView)
         return scroll
     }
 
@@ -44,7 +48,7 @@ struct FileListView: NSViewRepresentable {
         let colors = theme.theme
         scroll.backgroundColor = NSColor(colors.background)
         coordinator.table?.backgroundColor = NSColor(colors.background)
-        coordinator.update(theme: colors, cut: services.clipboard.cutPaths, renameRequest: model.renameRequest)
+        coordinator.update(theme: colors, cut: services.clipboard.cutPaths, renameRequest: model.renameRequest, isFocused: isFocused)
         // Not while Go to Folder is open: its field is about to take the keys.
         // Checked again once this update is over: when Return closes the path
         // bar's field, this runs while its editor still has the keys, and the
@@ -67,6 +71,7 @@ struct FileListView: NSViewRepresentable {
     }
 
     static func dismantleNSView(_ scroll: NSScrollView, coordinator: FileListCoordinator) {
+        NotificationCenter.default.removeObserver(coordinator, name: NSView.boundsDidChangeNotification, object: scroll.contentView)
         coordinator.table = nil
     }
 }
@@ -94,7 +99,9 @@ enum FileTableSetup {
         table.delegate = coordinator
         table.target = coordinator
         table.doubleAction = #selector(FileListCoordinator.doubleClicked(_:))
-        table.registerForDraggedTypes([.fileURL])
+        // Files, and file promises: a Mail attachment, a photo from Photos, an
+        // image from Safari, an item dragged out of an archive pane.
+        table.registerForDraggedTypes([.fileURL] + NSFilePromiseReceiver.readableDraggedTypes.map { NSPasteboard.PasteboardType($0) })
         table.setDraggingSourceOperationMask([.copy, .move, .link, .generic], forLocal: false)
         table.setDraggingSourceOperationMask([.move, .copy], forLocal: true)
         table.draggingDestinationFeedbackStyle = .regular

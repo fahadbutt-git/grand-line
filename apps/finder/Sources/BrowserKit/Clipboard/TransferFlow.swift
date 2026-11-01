@@ -19,7 +19,8 @@ public enum TransferFlow {
         ask: (FileConflict, Int) async -> ConflictAnswer?
     ) async throws -> Outcome {
         guard !items.isEmpty else { return .done([]) }
-        let conflicts = FileOperations.conflicts(items, in: folder)
+        // Looked up off the main thread: each item's name is checked on disk.
+        let conflicts = await Task.detached(priority: .userInitiated) { FileOperations.conflicts(items, in: folder) }.value
         let kind: FileOperationKind = moving ? .move : .copy
         let title = TaskTitles.title(kind, items, to: folder)
         let taken: String = conflicts.isEmpty ? "" : " (" + NexusLog.names(conflicts.map(\.existing)) + "), asking"

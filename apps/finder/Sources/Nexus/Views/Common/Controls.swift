@@ -21,6 +21,9 @@ struct SymbolButton: View {
         .buttonStyle(.plain)
         .disabled(!isEnabled)
         .help(help)
+        // VoiceOver reads the tooltip, not the symbol's name.
+        .accessibilityLabel(help)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }
 

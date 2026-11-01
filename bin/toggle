@@ -3,6 +3,8 @@
 # toggle NAME [on|off]   flips NAME, or sets it; a setting already as asked is left alone
 #   NAME: awake | dark | hidden | menubar | desktop-icons | dock | wifi | bluetooth | dnd
 #         mute | mic | ollama | docker | files (Nexus or Finder) | search (Sight or Spotlight)
+#   mic is "microphone muted": toggle mic on mutes it, toggle mic off brings it back
+#   dock and menubar are "always shown": off hides them until the pointer reaches them
 # toggle volume N|up|down   sets the output volume (0 to 100) or moves it by 10
 # toggle status [NAME...]   prints "NAME on|off" per setting and "volume N" (Sight reads it)
 # The menu shows each one's state with a check mark (lib/toggle-state.sh).

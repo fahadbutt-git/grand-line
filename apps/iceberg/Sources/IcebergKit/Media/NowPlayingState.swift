@@ -90,22 +90,38 @@ public struct NowPlayingState: Equatable, Sendable {
 }
 
 /// Splits a byte stream into lines, keeping any partial line for the next chunk.
+///
+/// A line longer than `maxLineBytes` is dropped whole: once it overflows,
+/// everything up to its newline is thrown away, so its tail never comes out
+/// as a line of its own.
 public struct LineBuffer: Sendable {
     private var pending = Data()
+    /// True while throwing away the rest of an overlong line.
+    private var discarding = false
     /// Lines longer than this are dropped (artwork lines are a few hundred KB).
     public var maxLineBytes = 16 * 1024 * 1024
 
     public init() {}
 
     public mutating func append(_ chunk: Data) -> [String] {
-        pending.append(chunk)
         var lines: [String] = []
+        var rest = chunk[chunk.startIndex...]
+        if discarding {
+            guard let newline = rest.firstIndex(of: 0x0A) else { return [] }
+            discarding = false
+            rest = rest[rest.index(after: newline)...]
+        }
+        pending.append(contentsOf: rest)
         while let newline = pending.firstIndex(of: 0x0A) {
             let lineData = pending[pending.startIndex..<newline]
+            let tooLong = lineData.count > maxLineBytes
             pending.removeSubrange(pending.startIndex...newline)
-            if let line = String(data: lineData, encoding: .utf8), !line.isEmpty { lines.append(line) }
+            if !tooLong, let line = String(data: lineData, encoding: .utf8), !line.isEmpty { lines.append(line) }
         }
-        if pending.count > maxLineBytes { pending.removeAll() }
+        if pending.count > maxLineBytes {
+            pending.removeAll()
+            discarding = true
+        }
         return lines
     }
 }

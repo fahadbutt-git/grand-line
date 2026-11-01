@@ -46,6 +46,38 @@ public enum CodeSigning {
         return anyOf
     }
 
+    /// How much a signature check proves, for the log and Settings.
+    public enum Trust: String, Equatable, Sendable {
+        /// A team or this Mac's own certificate: only our own builds pass.
+        case certificate
+        /// Ad hoc (the first install, before the local signing identity
+        /// exists) or unsigned (a development build): any program of this
+        /// user can name itself after our apps. What is left is launchd's
+        /// per-user Mach service and the same-user check on every peer.
+        case sameUserOnly
+    }
+
+    public static func trust(_ signer: Signer?) -> Trust {
+        guard let signer else { return .sameUserOnly }
+        if let team = signer.teamID, !team.isEmpty { return .certificate }
+        if let leaf = signer.leafSHA1, !leaf.isEmpty, !signer.isAdHoc { return .certificate }
+        return .sameUserOnly
+    }
+
+    /// The other end of a connection must run as this user, whatever the
+    /// signatures say: XPC reads its user from the connection's audit token
+    /// (`NSXPCConnection.effectiveUserIdentifier`), which the peer cannot forge.
+    public static func acceptsPeer(uid: uid_t, ownUID: uid_t = getuid()) -> Bool {
+        uid == ownUID
+    }
+
+    /// The line the agent logs at start when its signature proves little.
+    public static func trustWarning(_ signer: Signer?) -> String? {
+        guard trust(signer) == .sameUserOnly else { return nil }
+        let how = signer == nil ? "unsigned" : "signed ad hoc"
+        return "The index service is \(how): it accepts any program of this user that names itself as Nexus, Sight or Iceberg. Run: update (it signs the apps with this Mac's own identity)"
+    }
+
     /// How this program is signed, read once.
     public static let own: Signer? = current()
 

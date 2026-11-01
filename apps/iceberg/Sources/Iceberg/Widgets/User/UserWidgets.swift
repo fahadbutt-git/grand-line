@@ -41,6 +41,8 @@ final class UserWidgets: ObservableObject {
     private let scheduler = RefreshScheduler()
     private let pool = CommandPool(maxConcurrent: 4)
     private var maxConcurrent = 4
+    /// Stream widgets left waiting for a slot by `max_concurrent`.
+    private var waitingStreams: Set<String> = []
     private var streams: [String: StreamProcess] = [:]
     private var streamRestarts: [String: DispatchWorkItem] = [:]
     private var streamFailures: [String: Int] = [:]
@@ -277,25 +279,46 @@ final class UserWidgets: ObservableObject {
 
     // MARK: Streams
 
-    /// Starts the streams that should run now and stops the rest.
-    private func syncStreams() {
-        let wanted = widgets.filter {
+    /// The stream widgets that should run now.
+    private func wantedStreams() -> [WidgetConfig] {
+        widgets.filter {
             $0.stream && (scheduler.isOpen || $0.runsWhileClosed) && gate.allows(always: $0.always)
         }
+    }
+
+    /// Starts the streams that should run now and stops the rest.
+    private func syncStreams() {
+        let wanted = wantedStreams()
         let wantedIDs = Set(wanted.map(\.id))
         for id in Array(streams.keys) where !wantedIDs.contains(id) { stopStream(id) }
         for id in Array(streamRestarts.keys) where !wantedIDs.contains(id) {
             streamRestarts[id]?.cancel()
             streamRestarts[id] = nil
         }
-        for w in wanted where streams[w.id] == nil && streamRestarts[w.id] == nil {
-            guard streams.count < maxConcurrent else {
-                stats[w.id, default: WidgetStats()].recordSkip()
-                displays[w.id] = WidgetDisplay(text: "Waiting: \(maxConcurrent) streams already run", icon: "pause.circle",
-                                               color: .theme(.muted), failed: true)
-                continue
-            }
-            startStream(w)
+        let plan = StreamSlots.plan(wanted: wanted.map(\.id), running: Set(streams.keys),
+                                    restarting: Set(streamRestarts.keys), max: maxConcurrent)
+        for id in plan.waiting {
+            stats[id, default: WidgetStats()].recordSkip()
+            displays[id] = WidgetDisplay(text: "Waiting: \(maxConcurrent) streams already run", icon: "pause.circle",
+                                         color: .theme(.muted), failed: true)
+        }
+        waitingStreams = Set(plan.waiting)
+        for id in plan.start {
+            if let w = wanted.first(where: { $0.id == id }) { startStream(w) }
+        }
+    }
+
+    /// A stream ended by itself: a widget waiting for a slot takes it now,
+    /// not at the next open or close (the one that ended is not restarted
+    /// here; a failed one has its own restart timer).
+    private func startWaitingStreams() {
+        guard !waitingStreams.isEmpty else { return }
+        let wanted = wantedStreams()
+        let plan = StreamSlots.plan(wanted: wanted.map(\.id), running: Set(streams.keys),
+                                    restarting: Set(streamRestarts.keys), max: maxConcurrent, eligible: waitingStreams)
+        for id in plan.start {
+            waitingStreams.remove(id)
+            if let w = wanted.first(where: { $0.id == id }) { startStream(w) }
         }
     }
 
@@ -336,6 +359,9 @@ final class UserWidgets: ObservableObject {
         guard let process, streams[id] === process else { return }
         streams[id] = nil
         running.remove(id)
+        // Its slot goes to a widget waiting for one (after the restart, if
+        // any, is set up below, so this one keeps its turn).
+        defer { startWaitingStreams() }
         stats[id, default: WidgetStats()].recordStreamExit(exit, at: Date())
         guard exit.isFailure else { return }
         // A stream that ran a good while before ending starts over gently.

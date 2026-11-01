@@ -66,6 +66,9 @@ public struct IndexStatusSection: View {
                 SettingsRow("State", detail: status.source == .service ? "From the index service." : "From this app's copy while the service is out of reach.") {
                     Text(state(status)).font(.system(size: 13)).foregroundStyle(theme.text)
                 }
+                if let problem = status.problem {
+                    SettingsRow("Index service not used", detail: problem)
+                }
                 if !status.roots.isEmpty {
                     SettingsRow("Covers", detail: status.roots.map(abbreviate).joined(separator: ", "))
                 }

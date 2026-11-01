@@ -2,16 +2,37 @@
 # Installs everything in the Brewfile. Apps already in /Applications that
 # Homebrew did not install are left alone instead of failing.
 
+# shellcheck source=lib/file-age.sh
+source "$REPO_DIR/lib/file-age.sh"
+
+GATEKEEPER_APPS="${GRAND_LINE_APPS_DEST:-/Applications}"
+
+# apps_now: the apps in /Applications, one path per line.
+apps_now() {
+  local app
+  for app in "$GATEKEEPER_APPS"/*.app; do [[ -e "$app" ]] && printf '%s\n' "$app"; done
+  return 0
+}
+
 # Some installers switch off macOS's first-open check for their own app. Any
-# app in /Applications that Apple has not approved (notarized) and that is no
-# longer flagged gets the flag back, so macOS asks before it first opens.
+# app this run installed that Apple has not approved (notarized) and that is
+# no longer flagged gets the flag back, so macOS asks before it first opens.
+# restore_gatekeeper BEFORE START: BEFORE lists the apps there before the run
+# (apps_now), START is when it began (seconds since 1970).
 restore_gatekeeper() {
-  local app stamp since="${1:-}"
+  local app stamp before="${1:-}" start="${2:-0}" added
   stamp="0081;$(printf %x "$(date +%s)");grand-line;"
-  for app in /Applications/*.app; do
-    # Only apps this run installed or changed: checking every app (Xcode
-    # takes minutes) on every run is what made repeat runs crawl.
-    [[ -n "$since" && ! "$app" -nt "$since" ]] && continue
+  for app in "$GATEKEEPER_APPS"/*.app; do
+    [[ -e "$app" ]] || continue
+    # Only apps this run installed or replaced: checking every app (Xcode
+    # takes minutes) on every run is what made repeat runs crawl. An app is
+    # new when it was not there before, or when macOS records it as added to
+    # the folder since the run began. Its modification time says nothing:
+    # installers and Homebrew keep the time the app was built.
+    if [[ -f "$before" ]] && grep -qxF -- "$app" "$before"; then
+      added="$(date_added "$app")" || continue
+      [[ "$added" -ge "$start" ]] || continue
+    fi
     # The package's own apps are built on this Mac, never downloaded: flagging
     # them would make macOS stop every launch (and setup itself) to ask.
     case "$(defaults read "$app/Contents/Info" CFBundleIdentifier 2>/dev/null)" in com.grandline.*) continue ;; esac
@@ -63,8 +84,8 @@ step_apps() {
   fi
 
   info "Installing apps and tools. The first run takes 20 to 40 minutes."
-  local status=0 marker="$work/before-bundle"
-  : > "$marker"
+  local status=0 before="$work/apps-before" start
+  apps_now > "$before"; start="$(date +%s)"
   if ! run brew bundle --file="$effective" --no-upgrade; then
     status=1
     warn "Some apps did not install:"
@@ -72,7 +93,7 @@ step_apps() {
   else
     ok "Every app in the Brewfile is installed"
   fi
-  [[ "$DRY_RUN" == 0 ]] && restore_gatekeeper "$marker"
+  [[ "$DRY_RUN" == 0 ]] && restore_gatekeeper "$before" "$start"
   [[ "$DRY_RUN" == 0 ]] && brew cleanup --prune=all -q >/dev/null 2>&1
   rm -rf "$work"
   return "$status"

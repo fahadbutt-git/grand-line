@@ -8,7 +8,7 @@ enum FilesJourneys {
 
     static var all: [Journey] {
         [navigation, views, sorting, fileOperations, tabsAndGo, lookAndTag, search, searchFromTrash,
-         omnibar, tasksAndRename, flatAndSaved]
+         omnibar, tasksAndRename, flatAndSaved, dataSafety]
     }
 
     static func journey(_ name: String, _ summary: String, _ steps: [Step]) -> Journey {
@@ -576,6 +576,123 @@ enum FilesJourneys {
             step("one Undo puts every name back") { ctx in
                 try ctx.key("cmd+z")
                 try ctx.wait("the old names back") { ctx.listing(batch).sorted() == ["IMG_1.jpg", "IMG_2.jpg", "IMG_3.jpg"] }
+            },
+        ])
+    }
+
+    /// The data-safety promises, as a person meets them: two Compress commands
+    /// in a row never share a name or overwrite an archive already there, a
+    /// change of case and its Undo leave nothing under a hidden name, a folder
+    /// reached through a link is the same folder (no conflict sheet, nothing
+    /// trashed) and never goes into itself, a trashed, undone and redone item
+    /// can still be put back, and Tab with one pane selects the next name.
+    static var dataSafety: Journey {
+        let folder = "Documents/Journey Ops/Safety"
+        func raw(_ ctx: Ctx, _ relative: String) -> [String] {
+            (try? FileManager.default.contentsOfDirectory(atPath: ctx.url(relative).path)) ?? []
+        }
+        // Go to Folder, for a place whose title may read either way (a link
+        // shown by its own name or its target's, the Trash as ".Trash").
+        func go(_ ctx: Ctx, _ path: String, _ titles: [String]) throws {
+            try ctx.key("cmd+shift+g")
+            try ctx.wait("the path field") { ctx.isEditingText() }
+            try ctx.key("cmd+a")
+            ctx.type(path)
+            try ctx.key("return")
+            try ctx.wait("the window to show \(titles[0])") { titles.contains(ctx.title()) }
+            try ctx.wait("the folder's items") { (ctx.status() ?? -1) >= 0 }
+        }
+        return journey("files-data-safety", "Compress names, case-only rename and Undo, links, into itself, Put Back after Redo, Tab", [
+            step("make the Safety folder, with an Archive.zip of the person's own and a link to a folder") { ctx in
+                try ctx.writeFixture(folder + "/Archive.zip", "the person's own")
+                for name in ["p1.txt", "p2.txt", "q1.txt", "q2.txt", "case.txt", "putback.txt"] {
+                    try ctx.writeFixture(folder + "/" + name, name)
+                }
+                try ctx.writeFixture(folder + "/Real/report.pdf", "report")
+                try ctx.writeFixture(folder + "/Real/sub/inner.txt", "inner")
+                let link = ctx.url(folder + "/Link")
+                if (try? FileManager.default.destinationOfSymbolicLink(atPath: link.path)) == nil {
+                    try FileManager.default.createSymbolicLink(at: link, withDestinationURL: ctx.url(folder + "/Real"))
+                }
+                try ctx.goToFolder("~/" + folder, expect: "Safety")
+            },
+            step("Compress twice in a row: two archives, the one already there untouched") { ctx in
+                try ctx.withNexusLog {
+                    try ctx.selectRow("p1.txt")
+                    try ctx.key("shift+down")
+                    try ctx.key("ctrl+cmd+z")
+                    // The first archive is selected when its task ends; only
+                    // then is the second pair chosen, so the keys land on it.
+                    try ctx.wait("the first archive, selected", timeout: 20) { ctx.isRowSelected("Archive 2.zip") }
+                    try ctx.selectRow("q1.txt")
+                    try ctx.key("shift+down")
+                    try ctx.key("ctrl+cmd+z")
+                    try ctx.wait("two new archives", timeout: 20) {
+                        let names = Set(ctx.listing(folder))
+                        return names.contains("Archive 2.zip") && names.contains("Archive 3.zip")
+                    }
+                    try ctx.check(ctx.contents(folder + "/Archive.zip") == "the person's own", "Compress wrote over an archive already there")
+                    try ctx.check(!raw(ctx, folder).contains { $0.hasPrefix(".compressing-") }, "a working file was left behind")
+                }
+            },
+            step("a change of case only, then Undo") { ctx in
+                try ctx.selectRow("case.txt")
+                try ctx.key("f2")
+                try ctx.wait("the name to be editable") { ctx.isEditingText() }
+                try ctx.key("cmd+a")
+                ctx.type("CASE.txt")
+                try ctx.key("return")
+                try ctx.wait("the new case on disk") { raw(ctx, folder).contains("CASE.txt") }
+                try ctx.key("cmd+z")
+                try ctx.wait("the old case back") { raw(ctx, folder).contains("case.txt") }
+                try ctx.check(!raw(ctx, folder).contains { $0.hasPrefix(".rename-") }, "an item was left under a hidden name")
+            },
+            step("Tab with one pane selects the next item by name") { ctx in
+                try ctx.selectRow("p1.txt")
+                try ctx.key("tab")
+                try ctx.wait("p2.txt selected") { ctx.isRowSelected("p2.txt") }
+                try ctx.key("shift+tab")
+                try ctx.wait("p1.txt selected again") { ctx.isRowSelected("p1.txt") }
+            },
+            step("copy a file seen through a link into the real folder: no sheet, both kept") { ctx in
+                try ctx.withNexusLog {
+                    try go(ctx, "~/" + folder + "/Link", ["Link", "Real"])
+                    try ctx.selectRow("report.pdf")
+                    try ctx.key("cmd+c")
+                    try ctx.goToFolder("~/" + folder + "/Real", expect: "Real")
+                    try ctx.key("cmd+v")
+                    try ctx.wait("a second report") { ctx.exists(folder + "/Real/report 2.pdf") }
+                    try ctx.check(ctx.anyNode { $0.role == "AXButton" && $0.text == "Replace" } == nil, "a conflict sheet asked about the file itself")
+                    try ctx.check(ctx.contents(folder + "/Real/report.pdf") == "report", "the source changed")
+                }
+            },
+            step("a folder pasted into its own subfolder through the link is refused") { ctx in
+                try ctx.goToFolder("~/" + folder, expect: "Safety")
+                try ctx.selectRow("Real")
+                try ctx.key("cmd+c")
+                try go(ctx, "~/" + folder + "/Link/sub", ["sub"])
+                try ctx.key("cmd+v")
+                var ok: Node?
+                try ctx.wait("the refusal", timeout: 10) {
+                    ok = ctx.anyNode { $0.role == "AXButton" && $0.text == "OK" }
+                    return ok != nil
+                }
+                try ctx.click(ok!)
+                try ctx.check(!ctx.exists(folder + "/Real/sub/Real"), "the folder was copied into itself")
+            },
+            step("trash, undo, redo, then Put Back from the Trash") { ctx in
+                try ctx.goToFolder("~/" + folder, expect: "Safety")
+                try ctx.selectRow("putback.txt")
+                try ctx.key("cmd+delete")
+                try ctx.wait("the file trashed") { !ctx.exists(folder + "/putback.txt") }
+                try ctx.key("cmd+z")
+                try ctx.wait("the file back") { ctx.exists(folder + "/putback.txt") }
+                try ctx.key("cmd+shift+z")
+                try ctx.wait("the file trashed again") { !ctx.exists(folder + "/putback.txt") }
+                try go(ctx, "~/.Trash", ["Trash", ".Trash"])
+                try ctx.selectRow("putback.txt")
+                try ctx.key("cmd+delete")
+                try ctx.wait("Put Back returned it to Safety", timeout: 10) { ctx.exists(folder + "/putback.txt") }
             },
         ])
     }

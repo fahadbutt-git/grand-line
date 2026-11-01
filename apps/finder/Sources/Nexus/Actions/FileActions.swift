@@ -12,6 +12,7 @@ extension BrowserModel {
     /// Runs file work as a task after the others, then selects what it made.
     /// A cancelled task says nothing; a failed one says why.
     func runOperation(_ kind: FileOperationKind?, _ title: String, failure: String,
+                      then: (@MainActor (PaneModel, [URL]) -> Void)? = nil,
                       _ body: @escaping @Sendable (FileOperations) async throws -> [URL]) {
         let services = self.services
         let pane = focused
@@ -21,6 +22,7 @@ extension BrowserModel {
                 if !made.isEmpty, let folder = pane.location.folderURL {
                     pane.go(.folder(folder), select: made)
                 }
+                then?(pane, made)
             } catch is CancellationError {
                 pane.reload()
             } catch {
@@ -33,19 +35,21 @@ extension BrowserModel {
     func newFolder(withSelection: Bool) {
         guard let folder = focused.location.folderURL else { return }
         let items = withSelection ? selectedOnDisk : []
-        runOperation(.newFolder, "New folder in \(folder.lastPathComponent)", failure: "The folder could not be made.") { operations in
+        // Its name is edited once the task has made it and the pane shows it
+        // selected, however long the task waited behind others: never on
+        // whatever happened to be selected meanwhile.
+        runOperation(.newFolder, "New folder in \(folder.lastPathComponent)", failure: "The folder could not be made.",
+                     then: { [weak self] pane, made in
+                         guard let made = made.first else { return }
+                         pane.renameWhenShown(made) { [weak self, weak pane] in
+                             guard let self, let pane, self.focused === pane else { return }
+                             self.renameTarget = pane.selectedItems.first?.id
+                             self.renameRequest += 1
+                         }
+                     }) { operations in
             let made = try await operations.newFolder(in: folder, named: withSelection ? "New Folder With Items" : "untitled folder")
             if !items.isEmpty { _ = try await operations.move(items, to: made) }
             return [made]
-        }
-        renameAfterLoad()
-    }
-
-    /// The new folder is selected once the pane reloads; then its name is edited.
-    private func renameAfterLoad() {
-        Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 400_000_000)
-            self?.renameRequest += 1
         }
     }
 
@@ -63,6 +67,7 @@ extension BrowserModel {
         if items.count > 1 {
             batchRenameItems = items
         } else {
+            renameTarget = nil
             renameRequest += 1
         }
     }
@@ -110,59 +115,66 @@ extension BrowserModel {
         focused.go(.folder(original.deletingLastPathComponent()), select: [original])
     }
 
-    /// Compress runs as a task; Undo moves the archive to the Trash.
+    /// Compress runs as a task; the archive's name is chosen when it runs
+    /// (`Compressor`), Stop ends the tool, and Undo moves the archive to the Trash.
     func compress() {
         let items = selectedOnDisk
         guard let plan = CompressPlan.make(for: items) else { return }
         runOperation(.compress, TaskTitles.title(.compress, items), failure: "Compressing failed.") { operations in
-            try Task.checkCancellation()
-            let result = try await ProcessRunner.run(plan.command)
-            guard result.succeeded else { throw TaskProblem(result.errorText) }
-            await operations.recordCreated([plan.destination], kind: .compress)
-            return [plan.destination]
+            [try await Compressor.run(plan, operations: operations)]
         }
     }
 
+    /// Each item is noted for Put Back as it goes to the Trash
+    /// (`Services.trashChanged`), so a stopped task's items can be put back too.
     func moveToTrash() {
         let items = selectedOnDisk
         guard !items.isEmpty else { return }
-        let services = self.services
         runOperation(.trash, TaskTitles.title(.trash, items), failure: "The items could not be moved to the Trash.") { operations in
-            let trashed = try await operations.moveToTrash(items)
-            await MainActor.run { services.noteTrashed(Array(items.prefix(trashed.count)), to: trashed) }
+            _ = try await operations.moveToTrash(items)
             return []
         }
     }
 
     /// Put Back: each item returns to its folder under its old name, in one
-    /// step that Undo reverses.
+    /// step that Undo reverses. Items Nexus trashed come from its ledger, items
+    /// Finder trashed from Finder's own record in the Trash.
     func putBack() {
         let items = selectedOnDisk
-        let ledger = services.trashLedger
-        let services = self.services
         let entries = items.compactMap { item -> (item: URL, original: URL)? in
-            guard let place = ledger.destination(of: item) else { return nil }
-            return (item: item, original: place.folder.appendingPathComponent(place.name))
+            guard let original = services.putBackOriginal(of: item) else { return nil }
+            return (item: item, original: original)
         }
         guard !entries.isEmpty else { return }
         runOperation(.putBack, TaskTitles.title(.putBack, entries.map { $0.item }), failure: "The items could not be put back.") { operations in
-            let back = try await operations.putBack(entries)
-            await MainActor.run { for entry in entries { services.notePutBack(entry.item) } }
-            return back
+            try await operations.putBack(entries)
         }
     }
 
     /// Emptying is Finder's own action, asked of Finder, after you confirm unless
     /// you held Option (Opt+Shift+Cmd+Delete, as in Finder). Nexus itself
-    /// never deletes a file.
+    /// never deletes a file. It runs as a task after the others (never while a
+    /// Trash or Undo is still going), off the main thread, so a large Trash or
+    /// the first Automation question never stops the window.
     func emptyTrash(asking: Bool) {
         if asking, NexusPreferencesStore.shared.current.warnBeforeEmptyingTrash, !Prompt.confirm(
             "Empty the Trash?", message: "Items in the Trash are removed for good. This cannot be undone.", action: "Empty Trash"
         ) { return }
-        var error: NSDictionary?
-        NSAppleScript(source: "tell application \"Finder\" to empty trash")?.executeAndReturnError(&error)
-        if error != nil { Prompt.problem("The Trash could not be emptied.") }
-        focused.reload()
+        let services = self.services
+        let pane = focused
+        Task {
+            do {
+                _ = try await services.run(nil, "Empty the Trash") { _ in
+                    let result = try await ProcessRunner.run(ToolCommand("/usr/bin/osascript", ["-e", "tell application \"Finder\" to empty trash"]))
+                    guard result.succeeded else { throw ToolFailure(result.errorText) }
+                    return []
+                }
+            } catch is CancellationError {
+            } catch {
+                Prompt.problem("The Trash could not be emptied.", error)
+            }
+            pane.reload()
+        }
     }
 
     /// Undo and Redo wait their turn behind running tasks, so they never
@@ -254,23 +266,40 @@ extension BrowserModel {
 
     // MARK: Clutter
 
-    /// R11: .DS_Store and ._ files go to the Trash in one undoable step.
+    /// R11: .DS_Store and ._ files go to the Trash in one undoable step. The
+    /// folder is searched as a task (off the main thread, Stop ends it),
+    /// never inside packages or on other volumes; the files are listed for a
+    /// yes first, then trashed as found.
     func cleanClutter() {
         guard let folder = focused.location.folderURL else { return }
-        let found = Clutter.find(in: folder)
-        guard !found.isEmpty else {
-            Prompt.problem("No .DS_Store or ._ files were found here.")
-            return
-        }
-        guard Prompt.confirm(
-            "Move \(ItemFormat.count(found.count, "clutter file")) to the Trash?",
-            message: "These are .DS_Store and ._ files that macOS leaves on drives and shares. Undo puts them back.",
-            action: "Move to Trash"
-        ) else { return }
-        runOperation(.trash, "Move \(ItemFormat.count(found.count, "clutter file")) to the Trash",
-                     failure: "The files could not be moved to the Trash.") { operations in
-            _ = try await Clutter.clean(in: folder, using: operations)
-            return []
+        let services = self.services
+        Task {
+            let found: [URL]
+            do {
+                found = try await services.run(nil, "Look for .DS_Store and ._ files in \(folder.lastPathComponent)") { _ in
+                    // The task's body runs off the main thread; Stop cancels the search.
+                    try Clutter.find(in: folder)
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                Prompt.problem("The folder could not be searched.", error)
+                return
+            }
+            guard !found.isEmpty else {
+                Prompt.problem("No .DS_Store or ._ files were found here.")
+                return
+            }
+            guard Prompt.confirm(
+                "Move \(ItemFormat.count(found.count, "clutter file")) to the Trash?",
+                message: "These are .DS_Store and ._ files that macOS leaves on drives and shares. Undo puts them back.",
+                action: "Move to Trash"
+            ) else { return }
+            runOperation(.trash, "Move \(ItemFormat.count(found.count, "clutter file")) to the Trash",
+                         failure: "The files could not be moved to the Trash.") { operations in
+                _ = try await operations.moveToTrash(found.filter { FileManager.default.fileExists(atPath: $0.path) })
+                return []
+            }
         }
     }
 }

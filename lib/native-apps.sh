@@ -43,14 +43,38 @@ build_native_apps() {
 }
 
 build_app_folder() {
-  local dir="$1" stamp product name id agent
+  local dir="$1" stamp print
   stamp="$GRAND_LINE_STATE/built-$(basename "$dir")"
-  # apps/icons is a package every app uses, so a change there rebuilds them all.
-  if [[ -f "$stamp" ]] && [[ -z "$(find "$dir" "$REPO_DIR/apps/icons" -path '*/.build' -prune -o \( -name '*.swift' -o -name '*.[chm]' -o -name '*.tsv' -o -name '*.plist' -o -name '*.entitlements' -o -path '*/Bundle/*' -o -path '*/Resources/*' \) -newer "$stamp" -print -quit 2>/dev/null)" ]]; then
+  print="$(app_fingerprint "$dir")"
+  if [[ -n "$print" && "$(cat "$stamp" 2>/dev/null)" == "$print" ]]; then
     return 0
   fi
   build_and_install "$dir" || return 1
-  [[ "$DRY_RUN" == 1 ]] || { mkdir -p "$GRAND_LINE_STATE" && touch "$stamp"; }
+  [[ "$DRY_RUN" == 1 ]] || { mkdir -p "$GRAND_LINE_STATE" && printf '%s\n' "$print" > "$stamp"; }
+}
+
+# app_fingerprint DIR: one hash of every file that goes into the apps in DIR
+# (their sources, Info, Resources and the rest), apps/icons (every app uses
+# it) and the lib files that bundle and sign them. A changed, added or
+# deleted file changes it, so the stamp never misses a change that a
+# "newer than" test would (a deletion, or a change to how bundles are made).
+app_fingerprint() {
+  local dir="$1" rel f files
+  rel="${dir#"$REPO_DIR"/}"
+  {
+    if [[ "$rel" != "$dir" ]] && git -C "$REPO_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+      # The files git would track (build output is ignored), as they are now.
+      files="$(git -C "$REPO_DIR" ls-files -co --exclude-standard -- "$rel" apps/icons lib/native-apps.sh lib/signing.sh 2>/dev/null \
+        | LC_ALL=C sort -u | while IFS= read -r f; do [[ -f "$REPO_DIR/$f" ]] && printf '%s\n' "$f"; done)"
+      [[ -n "$files" ]] && paste -d ' ' <(printf '%s\n' "$files") \
+        <(printf '%s\n' "$files" | git -C "$REPO_DIR" hash-object --stdin-paths)
+    else
+      find "$dir" "$REPO_DIR/apps/icons" -path '*/.build' -prune -o -type f -print 2>/dev/null | LC_ALL=C sort \
+        | while IFS= read -r f; do printf '%s %s\n' "${f#"$REPO_DIR"/}" "$(cksum < "$f")"; done
+      cksum < "$(dirname "${BASH_SOURCE[0]}")/native-apps.sh"
+      cksum < "$(dirname "${BASH_SOURCE[0]}")/signing.sh"
+    fi
+  } | cksum | awk '{ print $1 "-" $2 }'
 }
 
 # build_and_install DIR: build the package and install each app it lists.
@@ -183,11 +207,8 @@ install_app_bundle() {
       return 0
     fi
   fi
-  # The installed copy goes to the Trash. A folder's own build.sh replaces
-  # its last build in place (GRAND_LINE_APPS_SCRATCH=1): that is build output.
-  if [[ -e "$app" && "${GRAND_LINE_APPS_SCRATCH:-0}" == 1 ]]; then rm -rf "$app"
-  elif [[ -e "$app" ]]; then move_to_trash "$app"; fi
-  mv "$new" "$app"
+  # The installed copy goes to the Trash, then the new one takes its place.
+  swap_in "$new" "$app" || { rm -rf "$new"; return 1; }
   [[ -x "$LSREGISTER" ]] && "$LSREGISTER" -f "$app" >/dev/null 2>&1
   # A staged copy from an earlier run is older than this one.
   rm -rf "$APPS_DEST/.$name.app.staged"
@@ -199,6 +220,35 @@ install_app_bundle() {
   # bin/update reads the list of apps it replaced, for its one notification.
   [[ -n "${GRAND_LINE_APPS_REPORT:-}" ]] && printf '%s\n' "$name" >> "$GRAND_LINE_APPS_REPORT"
   ok "Installed $name"
+}
+
+# swap_in NEW APP: the installed copy to the Trash, then NEW in its place.
+# When the old copy cannot be moved (it needs a password the unattended run
+# does not have, or macOS's App Management refused), nothing changes: the
+# old copy stays and keeps working, and it fails, so the next run tries
+# again. NEW is never moved into an existing bundle: the rename refuses a
+# folder that is there. A folder's own build.sh replaces its last build in
+# place (GRAND_LINE_APPS_SCRATCH=1): that is build output.
+swap_in() {
+  local new="$1" app="$2" name
+  name="$(basename "$app" .app)"
+  if [[ -e "$app" || -L "$app" ]]; then
+    if [[ "${GRAND_LINE_APPS_SCRATCH:-0}" == 1 ]]; then
+      rm -rf "$app"
+    elif ! move_to_trash "$app" && [[ -e "$app" || -L "$app" ]]; then
+      warn "The installed $name could not be moved to the Trash, so it is kept and the new version was not installed. Setup tries again next run."
+      return 1
+    fi
+  fi
+  if [[ -e "$app" || -L "$app" ]]; then
+    warn "$app is still there, so the new version of $name was not installed."
+    return 1
+  fi
+  # rename(2): one step, and it never puts NEW inside a folder at APP.
+  if ! perl -e 'exit(rename($ARGV[0], $ARGV[1]) ? 0 : 1)' "$new" "$app"; then
+    warn "Could not put the new version of $name in place."
+    return 1
+  fi
 }
 
 # relaunch_app APP PRODUCT AGENT: quit the running copy (SIGTERM, which the
@@ -277,8 +327,8 @@ apply_staged_apps() {
       pgrep -x "$product" >/dev/null 2>&1 && running=1
       if [[ "$running" == 1 && "$(swap_probe "$id" "$product")" != swap ]]; then continue; fi
       if [[ "$DRY_RUN" == 1 ]]; then run "put in the waiting copy of $name"; continue; fi
-      [[ -e "$app" ]] && move_to_trash "$app"
-      mv "$staged" "$app"
+      # When the old copy cannot be moved, the waiting one keeps waiting.
+      swap_in "$staged" "$app" || continue
       [[ -x "$LSREGISTER" ]] && "$LSREGISTER" -f "$app" >/dev/null 2>&1
       [[ "$running" == 1 ]] && relaunch_app "$app" "$product" "$agent"
       ok "Installed the waiting copy of $name"

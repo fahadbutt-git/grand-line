@@ -2,9 +2,18 @@ import ApplicationServices
 import LauncherKit
 
 /// Reads and clicks the front app's menu bar through the Accessibility API.
+/// Every call waits on the other app, so none of them runs on the main thread,
+/// and each gives up after `timeout` instead of the system's six seconds.
 enum MenuBarReader {
     static let maxItems = 1_500
     static let maxDepth = 4
+    static let timeout: Float = 1
+
+    static func application(_ pid: pid_t) -> AXUIElement {
+        let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, timeout)
+        return app
+    }
 
     static func results(pid: pid_t, app: String) -> [LaunchResult] {
         guard AXIsProcessTrusted() else { return [permissionRow()] }
@@ -12,7 +21,7 @@ enum MenuBarReader {
     }
 
     static func read(pid: pid_t) -> [MenuNode] {
-        let app = AXUIElementCreateApplication(pid)
+        let app = application(pid)
         guard let bar = element(app, kAXMenuBarAttribute) else { return [] }
         var budget = maxItems
         return kids(bar).compactMap { node($0, depth: 0, budget: &budget) }
@@ -38,7 +47,7 @@ enum MenuBarReader {
     /// Finds the item by its titles and presses it. Returns false if it is gone.
     @discardableResult
     static func press(pid: pid_t, path: [String]) -> Bool {
-        let app = AXUIElementCreateApplication(pid)
+        let app = application(pid)
         guard var current = element(app, kAXMenuBarAttribute) else { return false }
         for (depth, title) in path.enumerated() {
             let candidates = depth == 0 ? kids(current) : kids(current).first.map(kids) ?? []

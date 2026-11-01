@@ -5,3 +5,4 @@ tests/vm-logs/
 *.backup-*
 config/nvim/lazyvim.json
 apps/*/build/
+__pycache__/

@@ -13,20 +13,39 @@ public final class WebProvider: InstantProvider, @unchecked Sendable {
     private var searches = WebSearches.builtIn
     /// The engines from Settings, Web; quicklinks.tsv adds to them.
     private var engines = WebEngineList.standard
+    /// Counts changes of `engines`, so a list built from older engines is not kept.
+    private var enginesVersion = 0
+    /// Called between building the list and keeping it (tests only).
+    var afterBuild: (() -> Void)?
 
     public init(quicklinksFile: String = GrandLinePaths().quicklinks) {
         self.quicklinksFile = quicklinksFile
     }
 
+    /// Reads quicklinks.tsv and builds the list. When Settings changed the
+    /// engines while the list was being built, it is built again from the new
+    /// ones rather than kept: a reload never puts back older engines.
     public func reload() {
         let text = (try? String(contentsOfFile: quicklinksFile, encoding: .utf8)) ?? ""
-        let engines = lock.withLock { self.engines }
-        set(WebEngineList.searches(engines, quicklinks: text))
+        while true {
+            let (engines, version) = lock.withLock { (self.engines, enginesVersion) }
+            let built = WebEngineList.searches(engines, quicklinks: text)
+            afterBuild?()
+            let kept = lock.withLock { () -> Bool in
+                guard enginesVersion == version else { return false }
+                searches = built
+                return true
+            }
+            if kept { return }
+        }
     }
 
     /// New engines from Settings take effect at once.
     public func setEngines(_ list: [WebEngine]) {
-        lock.withLock { engines = list }
+        lock.withLock {
+            engines = list
+            enginesVersion += 1
+        }
         reload()
     }
 

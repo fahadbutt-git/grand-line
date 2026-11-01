@@ -170,7 +170,7 @@ final class SharedIndexTests: XCTestCase {
         let exclusions = IndexExclusions.home(home)
         let adopted = try XCTUnwrap(SnapshotAdoption.load(locations, exclusions: exclusions, order: .none))
         XCTAssertEqual(adopted.origin, .nexus)
-        await adopted.index.prune(exclusions.paths)
+        await adopted.index.pruneExcluded()
         let names = await adopted.index.search("conj").map(\.name).sorted()
         XCTAssertEqual(names, ["Conj Flap", "Lid Study - CONJ.docx", "conj drive.docx"])
     }

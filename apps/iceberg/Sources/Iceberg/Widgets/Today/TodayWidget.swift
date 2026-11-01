@@ -21,6 +21,13 @@ final class TodayWidget: ObservableObject, NotchWidget {
     private let store: SharedEventStore
     private var stale = true
     private var isOpen = false
+    /// `events(matching:)` is synchronous and can take a while with many
+    /// calendars, so it runs here, one fetch at a time (FetchCoalescer).
+    private let fetchQueue = DispatchQueue(label: "com.grandline.iceberg.today.fetch", qos: .userInitiated)
+    private var fetches = FetchCoalescer()
+    /// Change notices come in bursts while calendars sync: one fetch per burst.
+    private var changeWork: DispatchWorkItem?
+    private static let changeSettle: TimeInterval = 0.3
 
     init(context: WidgetContext) {
         store = context.events
@@ -29,8 +36,22 @@ final class TodayWidget: ObservableObject, NotchWidget {
         store.onChange { [weak self] in
             guard let self else { return }
             self.stale = true
-            if self.isOpen { self.reload() }
+            guard self.isOpen else { return }
+            self.changeWork?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self, self.isOpen else { return }
+                    self.reload()
+                }
+            }
+            self.changeWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.changeSettle, execute: work)
         }
+    }
+
+    func shutDown() {
+        changeWork?.cancel()
+        fetches.cancel()
     }
 
     func makeView() -> AnyView { AnyView(TodayView(model: self)) }
@@ -49,13 +70,7 @@ final class TodayWidget: ObservableObject, NotchWidget {
         switch access {
         case .granted:
             stale = false
-            let day = Agenda.today(Date())
-            let predicate = store.store.predicateForEvents(withStart: day.start, end: day.end, calendars: nil)
-            let found = store.store.events(matching: predicate).map { e in
-                AgendaEvent(id: e.calendarItemIdentifier, title: e.title ?? "Untitled", start: e.startDate,
-                            end: e.endDate, isAllDay: e.isAllDay, calendar: e.calendar?.title ?? "")
-            }
-            events = Agenda.upcoming(found, now: Date())
+            if let generation = fetches.request() { fetch(generation) }
         case .notAsked:
             Task {
                 if await store.requestAccess(for: .event) { reload() } else { access = store.access(for: .event) }
@@ -63,6 +78,31 @@ final class TodayWidget: ObservableObject, NotchWidget {
         case .denied:
             events = []
         }
+    }
+
+    /// Reads today's events on the fetch queue and shows them on the main thread.
+    private func fetch(_ generation: Int) {
+        let eventStore = store.store
+        let day = Agenda.today(Date())
+        fetchQueue.async { [weak self] in
+            let predicate = eventStore.predicateForEvents(withStart: day.start, end: day.end, calendars: nil)
+            let found = eventStore.events(matching: predicate).map { e in
+                AgendaEvent(id: e.calendarItemIdentifier, title: e.title ?? "Untitled", start: e.startDate,
+                            end: e.endDate, isAllDay: e.isAllDay, calendar: e.calendar?.title ?? "")
+            }
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { self?.fetched(found, generation: generation) }
+            }
+        }
+    }
+
+    private func fetched(_ found: [AgendaEvent], generation: Int) {
+        let (useResult, next) = fetches.finished(generation)
+        if useResult {
+            let upcoming = Agenda.upcoming(found, now: Date())
+            if upcoming != events { events = upcoming }
+        }
+        if let next { fetch(next) }
     }
 
     func openCalendar() {

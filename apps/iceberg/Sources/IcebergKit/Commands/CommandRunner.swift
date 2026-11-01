@@ -29,7 +29,10 @@ public struct CommandResult: Equatable, Sendable {
 ///
 /// The command runs in its own process group (`/bin/sh -c`), so when it hangs
 /// the whole group, including anything it started, gets SIGTERM and then
-/// SIGKILL. Output is read as it arrives and capped, so a chatty command
+/// SIGKILL. When it ends by itself, whatever it left running in the group
+/// (`helper &`) is killed too, so repeated runs cannot pile up orphans; a
+/// helper meant to outlive the run must leave the group (`open`, launchd, or
+/// a new session). Output is read as it arrives and capped, so a chatty command
 /// cannot fill memory. This is the technique SketchyBar uses (a fork with an
 /// alarm), done with posix_spawn so it is safe from a multithreaded app.
 public struct CommandRunner: Sendable {
@@ -213,10 +216,10 @@ public struct CommandRunner: Sendable {
                 _ = reap(0)
             }
         }
-        if result.timedOut {
-            // Anything the command left behind in its group goes too.
-            signalGroup(pid, SIGKILL)
-        }
+        // The leader is reaped now. Anything it left behind in its group goes
+        // too, whether it timed out or ended normally; the group only, as the
+        // bare pid may already belong to another process.
+        ProcessGroup.signal(pid, SIGKILL, leaderReaped: true)
 
         let low = status & 0x7f
         if low == 0 {
@@ -230,7 +233,25 @@ public struct CommandRunner: Sendable {
         return result
     }
 
+    /// Before the leader is reaped (it is still our child, so its pid cannot
+    /// have been reused).
     private func signalGroup(_ pid: pid_t, _ sig: Int32) {
-        if kill(-pid, sig) != 0 { _ = kill(pid, sig) }
+        ProcessGroup.signal(pid, sig, leaderReaped: false)
+    }
+}
+
+/// Signals a command's process group (its leader's pid is the group's id).
+public enum ProcessGroup {
+    /// Sends `sig` to the group `pid` leads. Only while the leader is not yet
+    /// reaped (`leaderReaped` false) may it fall back to the bare pid: after
+    /// waitpid the pid is free and may belong to an unrelated process. The
+    /// group id itself cannot be handed out again while any member lives.
+    /// Returns true when a signal was delivered.
+    @discardableResult
+    public static func signal(_ pid: pid_t, _ sig: Int32, leaderReaped: Bool) -> Bool {
+        guard pid > 0 else { return false }
+        if kill(-pid, sig) == 0 { return true }
+        guard !leaderReaped else { return false }
+        return kill(pid, sig) == 0
     }
 }

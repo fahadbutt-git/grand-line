@@ -119,5 +119,16 @@ struct SidebarRow: View {
         .onTapGesture(perform: open)
         .onHover { hovering = $0 }
         .help(item.detail.map { "\(item.title), \($0)" } ?? item.title)
+        // A button to VoiceOver and Full Keyboard Access: VO-Space opens it.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(item.title)
+        .accessibilityValue(item.badge ?? item.detail ?? "")
+        .accessibilityAddTraits(isCurrent ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction(perform: open)
+        .accessibilityActions {
+            if let volume = item.ejectable {
+                Button("Eject \(item.title)") { eject(volume) }
+            }
+        }
     }
 }

@@ -52,6 +52,31 @@ enum IndexJourneys {
                 try ctx.check(shown, "\(name) was not found within 2 s of being made; shown: \(ctx.panelTexts().prefix(15))")
                 try ctx.key("escape"); try ctx.key("escape")
             },
+            step("a folder made in ~/Library after the service started stays out of the results") { ctx in
+                // ~/Library is a rule (all of it but CloudStorage), not the list
+                // of folders there when the service started.
+                try ctx.showPanel(metric: "time to visible (library rule)")
+                let leak = ctx.home.appendingPathComponent("Library/Vendor Made Later/conj library leak 4K.txt")
+                let control = ctx.home.appendingPathComponent("Documents/Index Probe/conj library control 4K.txt")
+                for file in [leak, control] {
+                    try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try Data("probe\n".utf8).write(to: file)
+                }
+                let made = Date()
+                var shown = false
+                while !shown, Date().timeIntervalSince(made) < 5 {
+                    try ctx.replaceQuery("library 4k")
+                    let until = Date().addingTimeInterval(0.3)
+                    while !shown, Date() < until {
+                        shown = ctx.panelTexts().contains { $0.hasPrefix("conj library control 4K") }
+                        if !shown { Input.pause(0.03) }
+                    }
+                }
+                try ctx.check(shown, "the control file in Documents was not found within 5 s; shown: \(ctx.panelTexts().prefix(15))")
+                let leaked = ctx.panelTexts().contains { $0.hasPrefix("conj library leak 4K") }
+                try ctx.check(!leaked, "a file in a ~/Library folder made after the service started is in the results")
+                try ctx.key("escape"); try ctx.key("escape")
+            },
             step("a file made while the launcher is closed is there the moment it opens") { ctx in
                 ctx.quit()
                 let name = "conj while closed.txt"

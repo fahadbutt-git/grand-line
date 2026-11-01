@@ -11,17 +11,24 @@ public struct IndexExclusions: Sendable, Equatable {
     public var packageExtensions: Set<String>
     /// Absolute folders skipped with everything inside.
     public var paths: Set<String>
+    /// Folders of which only the named children are kept: every other child,
+    /// whenever it was made, is skipped with everything inside. A rule, not a
+    /// list read once: ~/Library keeps only CloudStorage, including against a
+    /// folder an app creates there next week.
+    public var keptOnly: [String: Set<String>]
 
     public init(
         names: Set<String> = [],
         prefixes: [String] = [],
         packageExtensions: Set<String> = [],
-        paths: Set<String> = []
+        paths: Set<String> = [],
+        keptOnly: [String: Set<String>] = [:]
     ) {
         self.names = names
         self.prefixes = prefixes
         self.packageExtensions = packageExtensions
         self.paths = paths
+        self.keptOnly = keptOnly
     }
 
     public static let standard = IndexExclusions(
@@ -44,32 +51,50 @@ public struct IndexExclusions: Sendable, Equatable {
     public static let keptInLibrary: Set<String> = ["CloudStorage"]
 
     /// What the shared index of a home folder leaves out: the standard
-    /// exclusions and everything in ~/Library except ~/Library/CloudStorage.
+    /// exclusions and everything in ~/Library except ~/Library/CloudStorage,
+    /// as a rule on ~/Library (see `keptOnly`).
     /// - Parameters:
     ///   - home: the home folder as the index sees it (a real path).
-    ///   - libraryNames: the names in ~/Library.
+    ///   - libraryNames: no longer used: the rule covers whatever is in ~/Library.
     public static func home(_ home: String, libraryNames: [String]) -> IndexExclusions {
         var rules = IndexExclusions.standard
-        let library = home + "/Library"
-        for name in libraryNames where !keptInLibrary.contains(name) {
-            rules.paths.insert(library + "/" + name)
-        }
+        rules.keptOnly[home + "/Library"] = keptInLibrary
         return rules
     }
 
-    /// Reads ~/Library once; call it off the main thread.
+    /// The rules for a home folder, by its real path. Reads nothing from ~/Library.
     public static func home(_ home: String) -> IndexExclusions {
-        let real = FolderWatcher.realPath(home)
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: real + "/Library")) ?? []
-        return Self.home(real, libraryNames: names)
+        Self.home(FolderWatcher.realPath(home), libraryNames: [])
     }
 
     public func skips(_ name: String) -> Bool {
         names.contains(name) || prefixes.contains { name.hasPrefix($0) }
     }
 
+    /// Whether there are rules by path at all (a walk checks every child against them).
+    public var hasPathRules: Bool { !paths.isEmpty || !keptOnly.isEmpty }
+
+    /// Whether this exact path is left out by a path rule: an excluded path,
+    /// or a child of a `keptOnly` folder that is not kept.
     public func skips(path: String) -> Bool {
-        paths.contains(path)
+        if paths.contains(path) { return true }
+        guard !keptOnly.isEmpty, let slash = path.lastIndex(of: "/") else { return false }
+        let parent = slash == path.startIndex ? "/" : String(path[..<slash])
+        guard let kept = keptOnly[parent] else { return false }
+        return !kept.contains(String(path[path.index(after: slash)...]))
+    }
+
+    /// Whether the path or anything above it is left out by a path rule.
+    public func excludes(_ path: String) -> Bool {
+        if paths.contains(where: { FolderChange.isInside(path, $0) }) { return true }
+        for (parent, kept) in keptOnly {
+            let prefix = parent.hasSuffix("/") ? parent : parent + "/"
+            guard path.hasPrefix(prefix) else { continue }
+            let rest = path.dropFirst(prefix.count)
+            let child = rest.split(separator: "/", maxSplits: 1).first.map(String.init) ?? ""
+            if !child.isEmpty, !kept.contains(child) { return true }
+        }
+        return false
     }
 
     public func isPackage(_ name: String) -> Bool {

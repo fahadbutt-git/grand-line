@@ -349,18 +349,39 @@ public actor FileIndex {
         if removed { generation += 1 }
     }
 
+    /// The most paths whose opens are remembered; the least recently opened go first.
+    public static let maxUsage = 5_000
+    /// Opens older than this no longer count (Usage scores them at nothing past 30 days).
+    public static let usageLifetime: TimeInterval = 180 * 86_400
+
     /// Records an open, which lifts the path above equal matches from then on.
+    /// Only paths in the index count (a client may send any path), and only
+    /// the `maxUsage` most recently opened are kept.
     public func noteOpened(_ path: String, at date: Date = Date()) {
         let path = FolderChange.normalize(path)
+        guard let index = index(of: path) else { return }
         var entry = usage[path] ?? Usage(count: 0, last: date)
         entry.count += 1
         entry.last = max(entry.last, date)
         usage[path] = entry
         usageChanged = true
-        if let index = index(of: path) {
-            storage.boost[Int(index)] = entry.score(now: Date())
-        }
+        storage.boost[Int(index)] = entry.score(now: Date())
+        if usage.count > Self.maxUsage { trimUsage(now: date) }
     }
+
+    /// Drops opens past their lifetime, then the least recent beyond `maxUsage`.
+    func trimUsage(now: Date = Date()) {
+        let before = usage.count
+        usage = usage.filter { now.timeIntervalSince($0.value.last) < Self.usageLifetime }
+        if usage.count > Self.maxUsage {
+            let oldest = usage.sorted { $0.value.last < $1.value.last }.prefix(usage.count - Self.maxUsage)
+            for (path, _) in oldest { usage[path] = nil }
+        }
+        if usage.count != before { usageChanged = true }
+    }
+
+    /// The number of paths whose opens are remembered (for tests and status).
+    public var usageCount: Int { usage.count }
 
     /// Rescans the changed folders: only their direct contents, or everything below
     /// for a recursive change. New folders are scanned in full.
@@ -368,24 +389,40 @@ public actor FileIndex {
     /// ~/Library/Application Support, say) are skipped, and the index counts as
     /// changed only when an entry came or went, so a save does not set off
     /// another save and a narrowing survives events that change nothing.
+    ///
+    /// Changes inside an excluded tree (node_modules, .git, DerivedData, an app
+    /// bundle, ~/Library outside CloudStorage) are dropped before any work, and
+    /// a folder the index does not know is answered by rescanning its nearest
+    /// indexed ancestor, once per batch however many changes lead there.
     public func apply(_ changes: [FolderChange]) {
         let before = (storage.count, storage.removedCount)
+        var ancestors = Set<String>()
+        var rescanned = Set<String>()
         for change in FolderChange.coalesce(changes) where !isExcluded(change.path) {
-            rescan(change.path, recursive: change.recursive)
+            if folders[change.path] != nil {
+                rescan(change.path, recursive: change.recursive)
+                rescanned.insert(change.path)
+            } else if let parent = nearestIndexedAncestor(of: change.path) {
+                ancestors.insert(parent)
+            }
+        }
+        for parent in ancestors.sorted() where !rescanned.contains(parent) && folders[parent] != nil {
+            rescan(parent, recursive: false)
         }
         if !changes.isEmpty { lastSync = Date() }
         if (storage.count, storage.removedCount) != before { generation += 1 }
-        if let watcher { lastEventID = max(lastEventID, watcher.latestEventID) }
         if storage.removedCount > 10_000, storage.removedCount * 4 > storage.count { compact() }
     }
 
     /// What the watcher reports. A whole root to rescan (FSEvents dropped events,
     /// or the root itself changed) is walked in the background instead, so
-    /// searches are not held up while the home folder is read again.
-    func applyWatched(_ changes: [FolderChange]) {
+    /// searches are not held up while the home folder is read again. The
+    /// batch's event ID is stored only once its changes are applied, so a save
+    /// (or a quit) never records events still waiting in the stream.
+    func applyWatched(_ batch: WatchBatch) {
         var rest: [FolderChange] = []
         var wholeRoot = false
-        for change in changes {
+        for change in batch.changes {
             if change.recursive, roots.contains(change.path), storage.liveCount > 0 {
                 wholeRoot = true
             } else {
@@ -393,6 +430,8 @@ public actor FileIndex {
             }
         }
         apply(rest)
+        // A whole-root walk starts from the event it begins at (see `build`).
+        lastEventID = max(lastEventID, batch.eventID)
         if wholeRoot { rebuildInBackground() }
     }
 
@@ -400,13 +439,13 @@ public actor FileIndex {
     public func startWatching(latency: TimeInterval = 0.5) {
         guard watcher == nil else { return }
         watchLatency = latency
-        let watcher = FolderWatcher(paths: roots, since: lastEventID, latency: latency)
+        let watcher = FolderWatcher(paths: roots, since: lastEventID, latency: latency, tagged: true)
         guard watcher.start() else { return }
         self.watcher = watcher
         if lastSync == nil { lastSync = Date() }
-        let changes = watcher.changes
+        let batches = watcher.batches
         watchTask = Task { [weak self] in
-            for await batch in changes {
+            for await batch in batches {
                 await self?.applyWatched(batch)
             }
         }
@@ -422,10 +461,11 @@ public actor FileIndex {
         watcher = nil
     }
 
-    /// Writes the index, usage and the last event seen, for an instant start next time.
+    /// Writes the index, usage and the last event applied, for an instant start
+    /// next time: events seen but not yet applied are replayed then.
     public func save(to url: URL) throws {
         if storage.removedCount > 0 { compact() }
-        if let watcher { lastEventID = max(lastEventID, watcher.latestEventID) }
+        if usage.count > Self.maxUsage { trimUsage() }
         let snapshot = IndexSnapshot(
             roots: roots, storage: storage, usage: usage, lastEventID: lastEventID,
             complete: isComplete, volumes: volumes
@@ -499,9 +539,45 @@ public actor FileIndex {
         }
     }
 
-    private func isExcluded(_ path: String) -> Bool {
-        guard !exclusions.paths.isEmpty else { return false }
-        return exclusions.paths.contains { FolderChange.isInside(path, $0) }
+    /// Whether a changed path lies in a tree the index leaves out: below an
+    /// excluded path or rule, or with a name on the way down from its root
+    /// that is skipped (node_modules, .git) or a package (Xcode.app).
+    func isExcluded(_ path: String) -> Bool {
+        if exclusions.excludes(path) { return true }
+        guard let root = roots.first(where: { FolderChange.isInside(path, $0) }), path != root else { return false }
+        let below = path.dropFirst(root.hasSuffix("/") ? root.count : root.count + 1)
+        for name in below.split(separator: "/") {
+            let name = String(name)
+            if exclusions.skips(name) || exclusions.isPackage(name) { return true }
+        }
+        return false
+    }
+
+    /// Removes what the exclusions leave out from an index loaded from a
+    /// snapshot (Nexus's, which indexed all of ~/Library, or this index's own
+    /// from before a folder appeared in ~/Library). Returns the entries removed.
+    @discardableResult
+    public func pruneExcluded() -> Int {
+        let before = storage.removedCount
+        var gone: [String] = []
+        for (path, _) in folders where exclusions.excludes(path) {
+            let parent = (path as NSString).deletingLastPathComponent
+            if !exclusions.excludes(parent) { gone.append(path) }
+        }
+        for path in gone {
+            guard let entry = folders[path] else { continue }
+            forget(storage.remove(entry))
+        }
+        // Files right inside a folder that keeps only some of its children.
+        for parent in exclusions.keptOnly.keys {
+            guard let folder = folders[parent] else { continue }
+            for (name, child) in storage.children(of: folder) where exclusions.skips(path: IndexStorage.join(parent, name)) {
+                forget(storage.remove(child))
+            }
+        }
+        let removed = storage.removedCount - before
+        if removed > 0 { generation += 1 }
+        return removed
     }
 
     private func nearestIndexedAncestor(of path: String) -> String? {

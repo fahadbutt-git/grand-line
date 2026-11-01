@@ -129,7 +129,7 @@ extension BrowserModel {
         case .showOriginal:
             return onDisk.count == 1 && onDisk[0].isAlias
         case .putBack:
-            return services.trashLedger.canPutBack(onDisk.map(\.url))
+            return services.canPutBack(onDisk.map(\.url))
         case .newFolder, .newFolderWithSelection, .paste, .moveHere, .cleanClutter:
             return folder != nil
         case .extract, .extractTo:

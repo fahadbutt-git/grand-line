@@ -392,6 +392,10 @@ struct NexusAdvancedPane: View {
                                isOn: binding(\.warnBeforeChangingExtension))
                 SettingsToggle("Warn before emptying the Trash", detail: "Option+Shift+Cmd+Delete always empties without asking.",
                                id: settingID("advanced.trashWarning"), isOn: binding(\.warnBeforeEmptyingTrash))
+                SettingsToggle("Calculate folder sizes", detail: "Folders on screen in the list, measured in the background on their own disk.",
+                               id: settingID("advanced.folderSizes"), isOn: binding(\.calculateFolderSizes))
+                SettingsToggle("Also on network and cloud drives", detail: "Reads the folders over the network (servers, Google Drive, iCloud Drive).",
+                               id: settingID("advanced.remoteFolderSizes"), isOn: binding(\.remoteFolderSizes))
             }
             SettingsSection("Configuration", note: "Places and projects are in settings.json; view exceptions and hidden sidebar items in Application Support.") {
                 SettingsRow("Configuration folder", detail: NexusSettingsFormat.abbreviate(services.paths.settingsFolder.path)) {

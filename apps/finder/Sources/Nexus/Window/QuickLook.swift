@@ -46,7 +46,7 @@ final class QuickLook: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelegat
         }
     }
 
-    /// The panel is gone: its copies of archive items are removed from
+    /// The panel is gone: its copies of archive items are cleaned from
     /// $TMPDIR/Archive Preview (security note L2). Items opened in apps and
     /// the preview pane's item live in folders of their own.
     func panelClosed() {
@@ -57,8 +57,10 @@ final class QuickLook: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelegat
         let doomed = (try? FileManager.default.contentsOfDirectory(
             at: Archive.TemporaryFolder.quickLook, includingPropertiesForKeys: nil)) ?? []
         guard !doomed.isEmpty else { return }
+        // A copy marked up in the panel (Markup saves in place) goes to the
+        // Trash; untouched copies are removed.
         Task.detached(priority: .utility) {
-            for folder in doomed { try? FileManager.default.removeItem(at: folder) }
+            Archive.TemporaryFolder.clean(folders: doomed)
         }
     }
 

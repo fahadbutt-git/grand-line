@@ -52,6 +52,15 @@ public enum ThemeLoader {
         return variant(of: name, systemIsDark: systemIsDark, paths: paths) ?? name
     }
 
+    /// The same, asking for macOS's appearance at the moment of the call (and
+    /// only while following it). The app reloads with this, never with an
+    /// appearance it noted earlier: a reload after `theme mode dark` from
+    /// Nexus or Sight can arrive before the appearance notice does.
+    public static func followedName(paths: IcebergPaths, currentAppearanceIsDark: () -> Bool) -> String {
+        guard followsSystem(paths: paths) else { return currentName(paths: paths) }
+        return followedName(paths: paths, systemIsDark: currentAppearanceIsDark())
+    }
+
     /// The other variant to switch to, or nil when `name` already matches or has none.
     public static func variant(of name: String, systemIsDark: Bool, paths: IcebergPaths) -> String? {
         let target: String

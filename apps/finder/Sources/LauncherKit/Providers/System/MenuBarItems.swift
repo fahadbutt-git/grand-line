@@ -17,6 +17,8 @@ public struct MenuNode: Sendable, Equatable {
 
 /// The front app's menu items as rows: "File › Export › PDF", with their shortcuts.
 public enum MenuBarItems {
+    public static let providerID = "menubar"
+
     public struct Item: Sendable, Equatable {
         public let path: [String]
         public let shortcut: KeyShortcut?
@@ -53,13 +55,13 @@ public enum MenuBarItems {
                 keywords: Array(item.path.dropLast()),
                 keys: item.shortcut.map { [$0.label] } ?? [],
                 actions: [LaunchAction("Choose", symbol: "cursorarrow.click", .pressMenuItem(pid: pid, path: item.path))],
-                providerID: "menubar"
+                providerID: providerID
             )
         }
     }
 
     /// Filled by the app with the front app's menus each time the window opens.
     public static func provider() -> CatalogProvider {
-        CatalogProvider(id: "menubar", title: "Menu items of the front app", symbol: "filemenu.and.selection", globalLimit: 12)
+        CatalogProvider(id: providerID, title: "Menu items of the front app", symbol: "filemenu.and.selection", globalLimit: 12)
     }
 }

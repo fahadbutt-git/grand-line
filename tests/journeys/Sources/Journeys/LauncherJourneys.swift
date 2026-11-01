@@ -425,6 +425,12 @@ extension Ctx {
             text = row.text
             return true
         }
+        // Return runs the top hit: it should be this row, not the menu's copy
+        // of it (a wrong row shows as the panel closing after Return, below).
+        let heading = answerSection { !$0.isEmpty && ($0 == text || text.hasPrefix($0)) }
+        if heading != "Top hit" {
+            note("setting.\(setting.id) is not under Top hit for \"\(setting.phrase)\" (\(heading ?? "another heading"))")
+        }
         return text
     }
 
@@ -489,7 +495,11 @@ extension Ctx {
                     newSystem = readSetting(setting).map(LauncherJourneys.normalise)
                     if newSystem == nil || newSystem == system {
                         try LauncherJourneys.skipIfAutomationRefused(setting, row: row)
-                        throw StepFailure(failure.message + (row.isEmpty ? "; the row is not shown" : "; the row reads \"\(row)\""))
+                        // Return on a settings row keeps the panel open; a closed
+                        // panel means another row (a menu or shortcut copy) ran.
+                        let why = !row.isEmpty ? "; the row reads \"\(row)\""
+                            : panelVisible() ? "; the row is not shown" : "; the panel closed after Return, so a row other than setting.\(setting.id) ran"
+                        throw StepFailure(failure.message + why)
                     }
                     note("\(setting.phrase) took more than 10 s to change (\(label))")
                 }

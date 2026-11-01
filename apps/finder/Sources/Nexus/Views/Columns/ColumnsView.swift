@@ -125,11 +125,20 @@ private struct Column: View {
         .frame(height: 24)
         .background(RoundedRectangle(cornerRadius: 5).fill(selected ? palette.selection : Color.clear).padding(.horizontal, 4))
         .contentShape(Rectangle())
+        let name = item.shownName(allExtensions: NexusPreferencesStore.shared.current.showAllExtensions)
         if interactive {
             base.modifier(ItemInteraction(model: model, pane: pane, item: item))
                 .simultaneousGesture(TapGesture().onEnded { if item.isFolder { choose(item) } })
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(name)
+                .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+                .accessibilityAction { choose(item) }
         } else {
             base.onTapGesture { choose(item) }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(name)
+                .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+                .accessibilityAction { choose(item) }
         }
     }
 }

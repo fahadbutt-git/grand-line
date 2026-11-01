@@ -19,6 +19,9 @@ public final class IndexListenerDelegate: NSObject, NSXPCListenerDelegate {
     }
 
     public func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
+        // Another user's process is refused whatever its signature (the only
+        // check left when the apps are signed ad hoc).
+        guard CodeSigning.acceptsPeer(uid: connection.effectiveUserIdentifier) else { return false }
         // A client that does not meet it is cut off before any of its messages arrive.
         if let clientRequirement { connection.setCodeSigningRequirement(clientRequirement) }
         connection.exportedInterface = IndexXPC.serviceInterface()

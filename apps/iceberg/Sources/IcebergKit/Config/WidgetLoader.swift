@@ -50,12 +50,20 @@ public enum WidgetLoader {
                 issues.append(ConfigIssue(file: name, message: "skipped: only \(maxWidgets) widgets are loaded", severity: .warning))
                 continue
             }
-            let size = (try? fileManager.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.intValue ?? 0
-            if size > maxFileSize {
+            // Through symlinks, but only to a regular file, and capped as it
+            // is read: a FIFO or /dev/zero must not freeze or fill the app.
+            let data: Data
+            switch SafeFileRead.read(url, limit: maxFileSize) {
+            case .success(let d):
+                data = d
+            case .failure(.tooLarge):
                 issues.append(ConfigIssue(file: name, message: "skipped: the file is larger than \(maxFileSize / 1024) KB"))
                 continue
-            }
-            guard let data = fileManager.contents(atPath: url.path) else {
+            case .failure(.notAFile):
+                issues.append(ConfigIssue(file: name, message: "skipped: not a regular file",
+                                          fix: "Widget files are plain text files (a symlink to one is fine)."))
+                continue
+            case .failure:
                 issues.append(ConfigIssue(file: name, message: "the file cannot be read"))
                 continue
             }

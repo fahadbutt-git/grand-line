@@ -32,13 +32,18 @@ public enum SettingsActions {
 
     /// One phrase that names a setting. `implies` is the state the phrase asks
     /// for by itself: "light mode" is dark mode off, "show hidden files" is on.
+    /// `opposite` names the thing the setting takes away, so on and off after
+    /// it mean the other way round: "microphone on" is Mute microphone off,
+    /// "dock on" is Dock autohide off. Alone, such a phrase switches the setting.
     public struct Name: Sendable, Equatable {
         public let phrase: String
         public let implies: Bool?
+        public let opposite: Bool
 
-        public init(_ phrase: String, implies: Bool? = nil) {
+        public init(_ phrase: String, implies: Bool? = nil, opposite: Bool = false) {
             self.phrase = phrase
             self.implies = implies
+            self.opposite = opposite
         }
     }
 
@@ -87,6 +92,11 @@ public enum SettingsActions {
         phrases.map { Name($0, implies: implies) }
     }
 
+    /// Names of what the setting takes away: "mic" for Mute microphone.
+    static func opposite(_ phrases: String...) -> [Name] {
+        phrases.map { Name($0, opposite: true) }
+    }
+
     public static let toggles: [Setting] = [
         Setting("darkmode", "Dark mode", symbol: "circle.lefthalf.filled",
                 names: n("dark mode", "dark", "dark theme", "dark appearance", "night theme") + n("light mode", "light", "light theme", "light appearance", implies: false),
@@ -105,20 +115,23 @@ public enum SettingsActions {
                 names: n("mute", "mute sound", "sound mute", "mute audio", "muted") + n("unmute", "unmute sound", implies: false),
                 kind: .toggle(name: "mute", stateKey: "mute", inverted: false), pane: "Sound"),
         Setting("micmute", "Mute microphone", symbol: "mic.slash",
-                names: n("mute mic", "mute microphone", "mic mute", "microphone mute", "mic", "microphone") + n("unmute mic", "unmute microphone", implies: false),
+                names: n("mute mic", "mute microphone", "mic mute", "microphone mute", "mic muted", "microphone muted") + opposite("mic", "microphone")
+                    + n("unmute mic", "unmute microphone", implies: false),
                 kind: .toggle(name: "mic", stateKey: "mic-muted", inverted: false), pane: "Sound"),
         Setting("hiddenfiles", "Show hidden files", symbol: "eye",
                 names: n("hidden files", "hidden", "dotfiles", "dot files", "invisible files") + n("show hidden files", "show hidden", "show dotfiles", "show all files", implies: true)
                     + n("hide hidden files", "hide dotfiles", implies: false),
                 kind: .toggle(name: "hidden", stateKey: "hidden", inverted: false), pane: nil),
         Setting("dockautohide", "Dock autohide", symbol: "dock.rectangle",
-                names: n("dock autohide", "autohide dock", "dock", "dock hiding") + n("hide dock", "hide the dock", implies: true) + n("show dock", "dock always shown", implies: false),
+                names: n("dock autohide", "autohide dock", "dock hiding") + opposite("dock") + n("hide dock", "hide the dock", implies: true)
+                    + n("show dock", "dock always shown", implies: false),
                 kind: .toggle(name: "dock", stateKey: "dock", inverted: true), pane: "Desktop & Dock"),
         Setting("desktopicons", "Desktop icons", symbol: "menubar.dock.rectangle",
                 names: n("desktop icons", "icons on desktop", "desktop items") + n("show desktop icons", implies: true) + n("hide desktop icons", "clean desktop", implies: false),
                 kind: .toggle(name: "desktop-icons", stateKey: "desktop-icons", inverted: false), pane: "Desktop & Dock"),
         Setting("menubarautohide", "Menu bar autohide", symbol: "menubar.rectangle",
-                names: n("menu bar autohide", "autohide menu bar", "menu bar", "menubar", "menubar autohide") + n("hide menu bar", "hide menubar", implies: true) + n("show menu bar", "show menubar", implies: false),
+                names: n("menu bar autohide", "autohide menu bar", "menubar autohide") + opposite("menu bar", "menubar") + n("hide menu bar", "hide menubar", implies: true)
+                    + n("show menu bar", "show menubar", implies: false),
                 kind: .toggle(name: "menubar", stateKey: "menubar", inverted: true), pane: "Control Center",
                 permission: .automation),
         Setting("keepawake", "Keep awake", symbol: "cup.and.saucer",
@@ -274,10 +287,13 @@ public enum SettingsActions {
                 if hit == nil, subject.count >= shortest, name.phrase.hasPrefix(subject) { hit = (name, false) }
             }
             guard let hit else { continue }
-            // "light mode on" is dark mode off; "light mode off" is dark mode on.
+            // "light mode on" is dark mode off; "light mode off" is dark mode on;
+            // "mic on" is Mute microphone off.
             var desired = stated
             if let implied = hit.name.implies {
                 if let stated { desired = stated ? implied : !implied } else { desired = implied }
+            } else if hit.name.opposite {
+                desired = stated.map { !$0 }
             }
             found.append(Match(request: .toggle(key: setting.key, desired: desired), exact: hit.exact, order: 200 - i))
         }
@@ -357,6 +373,26 @@ public struct SettingsState: Sendable, Equatable {
         }
         return state
     }
+
+    /// Takes the values of a read that started at `started` (a number that
+    /// grows with each read), unless a value already here came from a read
+    /// that started later: a full read begun before a change must not put
+    /// back the state from before it. `stamps` holds each value's read
+    /// ("volume" for the volume) and is updated.
+    public func merging(_ newer: SettingsState, started: Int, stamps: inout [String: Int]) -> SettingsState {
+        var merged = self
+        for (key, value) in newer.values where (stamps[key] ?? Int.min) <= started {
+            merged.values[key] = value
+            stamps[key] = started
+        }
+        if let volume = newer.volume, (stamps[Self.volumeStamp] ?? Int.min) <= started {
+            merged.volume = volume
+            stamps[Self.volumeStamp] = started
+        }
+        return merged
+    }
+
+    static let volumeStamp = "volume"
 
     /// `newer` read only some settings: they replace these, the rest stay.
     public func merging(_ newer: SettingsState) -> SettingsState {
