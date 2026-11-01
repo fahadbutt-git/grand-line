@@ -279,7 +279,8 @@ enum LauncherJourneys {
         // Do Not Disturb needs two Shortcuts the owner makes once (README),
         // which a runner does not have.
         let ciReason: [String: String] = ["bluetooth": "has no Bluetooth hardware", "wifi": "has no Wi-Fi hardware",
-                                          "dnd": "has no Do Not Disturb shortcuts (made once by hand, see README)"]
+                                          "dnd": "has no Do Not Disturb shortcuts (made once by hand, see README)",
+                                          "mute": "has no sound output device"]
         if let reason = ciReason[setting.id], ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] != nil,
            row.lowercased().trimmingCharacters(in: .whitespaces) == "failed" {
             print("::notice title=\(setting.phrase) not checked::this CI runner \(reason); the row reads \(noticeText(row))")
