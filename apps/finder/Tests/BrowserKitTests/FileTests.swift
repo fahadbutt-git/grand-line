@@ -14,6 +14,13 @@ final class FileTests: XCTestCase {
         temp.remove()
     }
 
+    func testTheTrashIsTheFixtureHomesAndTheAccountsOwn() {
+        let paths = AppPaths(home: URL(fileURLWithPath: "/tmp/fixture-home", isDirectory: true))
+        XCTAssertTrue(paths.isTrash(URL(fileURLWithPath: "/tmp/fixture-home/.Trash", isDirectory: true)))
+        XCTAssertTrue(paths.isTrash(AppPaths.accountTrash))
+        XCTAssertFalse(paths.isTrash(URL(fileURLWithPath: "/tmp/fixture-home/Documents", isDirectory: true)))
+    }
+
     func testFolderReaderHidesClutterAlways() throws {
         try temp.file("Share/report.pdf")
         try temp.file("Share/.DS_Store")

@@ -426,6 +426,14 @@ extension Ctx {
             text = row.text
             return true
         }
+        // A row still reading its state says "Checking…": wait for the state
+        // itself, so a before and after compare like with like.
+        if text.contains("Checking") {
+            try? wait("setting.\(setting.id) to read its state", timeout: 5, poll: 0.2) {
+                text = self.settingRow(setting.id)?.text ?? text
+                return !text.contains("Checking")
+            }
+        }
         // Return runs the top hit: it should be this row, not the menu's copy
         // of it (a wrong row shows as the panel closing after Return, below).
         let heading = answerSection { !$0.isEmpty && ($0 == text || text.hasPrefix($0)) }

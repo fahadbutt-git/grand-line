@@ -45,7 +45,7 @@ final class PaneModel: ObservableObject, Identifiable {
     var location: BrowserLocation { state.location }
     var items: [FileItem] { state.items }
     var selectedItems: [FileItem] { state.selectedItems }
-    var inTrash: Bool { location.folderURL?.standardizedFileURL == services.paths.trash.standardizedFileURL }
+    var inTrash: Bool { location.folderURL.map(services.paths.isTrash) ?? false }
 
     // MARK: Navigation
 

@@ -28,4 +28,17 @@ public struct AppPaths: Sendable, Equatable {
     /// Rewritten on every selection change while Nexus is frontmost.
     public var selectionFile: URL { home.appendingPathComponent(".local/state/grand-line/nexus-selection") }
     public var trash: URL { home.appendingPathComponent(".Trash", isDirectory: true) }
+
+    /// The Trash macOS moves this account's files into: the account's own home
+    /// folder, which differs from `home` when HOME points elsewhere.
+    public static let accountTrash: URL = {
+        let dir = getpwuid(getuid()).map { String(cString: $0.pointee.pw_dir) } ?? NSHomeDirectory()
+        return URL(fileURLWithPath: dir, isDirectory: true).appendingPathComponent(".Trash", isDirectory: true)
+    }()
+
+    /// Whether `folder` is this account's Trash.
+    public func isTrash(_ folder: URL) -> Bool {
+        let path = folder.standardizedFileURL.path
+        return path == trash.standardizedFileURL.path || path == Self.accountTrash.standardizedFileURL.path
+    }
 }
