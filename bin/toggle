@@ -163,7 +163,7 @@ case "$name" in
     ;;
   desktop-icons)
     defaults write com.apple.finder CreateDesktop -bool "$yes"
-    killall Finder
+    killall Finder 2>/dev/null || true
     if [[ "$want" == on ]]; then say "Desktop icons shown"; else say "Desktop icons hidden"; fi
     ;;
   dock)

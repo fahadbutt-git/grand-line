@@ -240,7 +240,7 @@ enum LauncherJourneys {
         Setting(id: "mute", phrase: "mute", mode: .toggle, read: #"v=$(osascript -e 'output muted of (get volume settings)' 2>&1); case "$v" in true|false) echo "$v";; *) echo "SKIP no sound output on this Mac ($v)";; esac"#),
         Setting(id: "hiddenfiles", phrase: "hidden files", mode: .toggle, read: "defaults read com.apple.finder AppleShowAllFiles 2>&1"),
         Setting(id: "dockautohide", phrase: "dock autohide", mode: .toggle, read: "defaults read com.apple.dock autohide 2>&1"),
-        Setting(id: "desktopicons", phrase: "desktop icons", mode: .toggle, read: #"v=$(defaults read com.apple.finder CreateDesktop 2>&1); case "$v" in *exist*) echo 1;; *) echo "$v";; esac"#),
+        Setting(id: "desktopicons", phrase: "desktop icons", mode: .toggle, read: #"v=$(defaults read com.apple.finder CreateDesktop 2>&1); case "$v" in *exist*|*"could not find"*) echo 1;; *) echo "$v";; esac"#),
         Setting(id: "menubarautohide", phrase: "menu bar autohide", mode: .toggle, read: "defaults read -g _HIHideMenuBar 2>&1"),
         Setting(id: "keepawake", phrase: "keep awake", mode: .toggle, read: "pmset -g assertions | grep -i -E 'sight|caffeinate' | grep -c -i prevent"),
         Setting(id: "lock", phrase: "lock screen", mode: .offerOnly, read: nil),
