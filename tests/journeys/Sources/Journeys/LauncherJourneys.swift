@@ -421,10 +421,26 @@ extension Ctx {
         if !panelVisible() { try showPanel(metric: "time to visible (\(setting.id))") }
         try replaceQuery(setting.phrase)
         var text = ""
-        try wait("a row setting.\(setting.id) for \"\(setting.phrase)\"") {
+        let found = {
             guard let row = self.settingRow(setting.id) else { return false }
             text = row.text
             return true
+        }
+        do {
+            try wait("a row setting.\(setting.id) for \"\(setting.phrase)\"", timeout: 6, found)
+        } catch let first as StepFailure {
+            // Finder restarted by the last change can take the front while
+            // the words are typed: say what was on screen, then type them again.
+            let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?"
+            let seen = panelTexts().prefix(8).joined(separator: " | ")
+            note("setting.\(setting.id) not shown at first: front app \(front), window \(panelVisible() ? "shown" : "hidden"), it reads: \(seen)")
+            if !panelVisible() { try showPanel(metric: "time to visible again (\(setting.id))") }
+            try replaceQuery(setting.phrase)
+            do { try wait("a row setting.\(setting.id) for \"\(setting.phrase)\"", timeout: 8, found) } catch {
+                let again = panelTexts().prefix(8).joined(separator: " | ")
+                throw StepFailure(first.message + "; typed again, still not shown: front app " +
+                    (NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?") + ", the window reads: " + again)
+            }
         }
         // A row still reading its state says "Checking…": wait for the state
         // itself, so a before and after compare like with like.
