@@ -101,7 +101,10 @@ final class PanelController: NSObject, NSWindowDelegate {
 
     func windowDidResignKey(_ notification: Notification) {
         // Clicking another app hides the window, unless a sheet or open panel took the keys.
-        if NSApp.modalWindow == nil, panel.attachedSheet == nil { hide() }
+        if NSApp.modalWindow == nil, panel.attachedSheet == nil {
+            if model.settingsRunningOpen > 0 { model.keysLostDuringSetting = true }
+            hide()
+        }
     }
 
     private func route(_ event: NSEvent) -> Bool {

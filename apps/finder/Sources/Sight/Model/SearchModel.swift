@@ -28,6 +28,10 @@ final class SearchModel: ObservableObject {
     var show: () -> Void = {}
     /// The window is coming back to show a change that failed after it closed.
     private var reopeningForFailure = false
+    /// Setting changes still running that keep the window open.
+    private(set) var settingsRunningOpen = 0
+    /// The window lost the keys while such a change ran.
+    var keysLostDuringSetting = false
     private var task: Task<Void, Never>?
     private var query = LaunchQuery(raw: "")
     /// Keeps the top row still while the query grows.
@@ -326,7 +330,7 @@ final class SearchModel: ObservableObject {
         case .started(let job):
             // Not recorded in Recents: the row's title is a state that will change.
             let closes = action.closesWindow || UserDefaults.standard.bool(forKey: SettingsActionsProvider.closeAfterChangeKey)
-            if closes { hide() }
+            if closes { hide() } else { settingsRunningOpen += 1 }
             updateSettingRows()
             Task { [weak self] in
                 let failure = await settings.finish(job)
@@ -334,6 +338,20 @@ final class SearchModel: ObservableObject {
                 if failure != nil, closes {
                     self.reopeningForFailure = true
                     self.show()
+                } else if !closes {
+                    self.settingsRunningOpen -= 1
+                    // A change that restarts Finder or the Dock (hidden files,
+                    // desktop icons, Dock hiding) brings that app to the front;
+                    // the window comes back, as it was, so the change can be seen.
+                    // A click into any other app is left alone.
+                    let restarted: Set<String> = ["com.apple.finder", "com.apple.dock"]
+                    if self.settingsRunningOpen == 0, self.keysLostDuringSetting {
+                        self.keysLostDuringSetting = false
+                        if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier, restarted.contains(front) {
+                            self.reopeningForFailure = true
+                            self.show()
+                        }
+                    }
                 }
                 self.updateSettingRows()
             }
