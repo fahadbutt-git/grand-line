@@ -15,6 +15,12 @@ final class PanelHost: ObservableObject {
     let theme: ThemeStore
     let user: UserWidgets
     let events: SharedEventStore
+    /// The shelf (files dropped on the notch or the basket), kept across restarts.
+    let shelf: ShelfModel
+    /// Notices files being dragged in any app (the shelf and the basket).
+    let drag = DragWatcher()
+    /// The HUDs in the notch.
+    let hud = HUDCenter()
 
     @Published private(set) var settings = IcebergSettings()
     @Published private(set) var settingsIssues: [ConfigIssue] = []
@@ -56,6 +62,7 @@ final class PanelHost: ObservableObject {
         self.theme = theme
         self.user = UserWidgets(paths: paths, theme: theme)
         self.events = SharedEventStore()
+        self.shelf = ShelfModel(paths: paths)
         self.hotKey = HotKey()
         self.escapeKey = HotKey(id: 2)
         escapeKey.action = { [weak self] in self?.onEscape?() }
@@ -114,6 +121,8 @@ final class PanelHost: ObservableObject {
     var sections: [NotchWidget] { builtins.filter { $0.placement == .section && $0.isAvailable } }
     var headerWidgets: [NotchWidget] { builtins.filter { $0.placement == .header && $0.isAvailable } }
     var showsDate: Bool { layout.isEnabled("date") }
+    /// The panel takes dropped files while the shelf is in it.
+    var takesFiles: Bool { layout.isEnabled("shelf") }
 
     /// Settings, theme and widget problems together, errors first. They are
     /// listed in the Settings window, not in the panel.
@@ -154,7 +163,8 @@ final class PanelHost: ObservableObject {
         }
         user.setMaxConcurrent(loaded.maxConcurrent)
         if shortcutChanged { hotKeyProblem = hotKey.register(loaded.toggleShortcut) }
-        let context = WidgetContext(theme: theme, events: events, settings: loaded,
+        applyFeatures(loaded, layout: newLayout)
+        let context = WidgetContext(theme: theme, events: events, settings: loaded, shelf: shelf,
                                     availabilityChanged: { [weak self] in self?.objectWillChange.send() })
         let wanted = newLayout.builtins
         for (name, widget) in made where !wanted.contains(name) {
@@ -171,6 +181,15 @@ final class PanelHost: ObservableObject {
         }
         user.show(newLayout.enabled)
         if layoutChanged { onLayoutChange?() }
+    }
+
+    /// The shelf, the drag watcher and the HUDs follow the settings: what
+    /// is turned off is stopped (its monitors and listeners removed).
+    private func applyFeatures(_ settings: IcebergSettings, layout: PanelLayout) {
+        if shelf.quickActionsEnabled != settings.shelfQuickActions { shelf.quickActionsEnabled = settings.shelfQuickActions }
+        drag.shakeEnabled = settings.dragBasket
+        drag.setActive(layout.isEnabled("shelf") || settings.dragBasket)
+        hud.apply(settings)
     }
 
     /// Writes one setting to iceberg.toml (keeping the rest of the file) and

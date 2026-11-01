@@ -33,6 +33,14 @@ let package = Package(
                 .linkedFramework("ServiceManagement"),
                 .linkedFramework("Carbon"),
                 .linkedFramework("CoreServices"),
+                // The HUDs (volume, Bluetooth headphones, the key tap) and the
+                // shelf's background removal.
+                .linkedFramework("CoreAudio"),
+                .linkedFramework("IOBluetooth"),
+                .linkedFramework("CoreBluetooth"),
+                .linkedFramework("ApplicationServices"),
+                .linkedFramework("Vision"),
+                .linkedFramework("CoreImage"),
             ]
         ),
         .target(

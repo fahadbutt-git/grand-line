@@ -13,6 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var host: PanelHost?
     private var controllers: [UInt32: NotchController] = [:]
     private var settingsWindow: SettingsWindow?
+    /// The drop basket a shake brings up while dragging a file (`drag_basket`).
+    private var basket: BasketController?
     private var statusItem: NSStatusItem?
     private var settingsSink: AnyCancellable?
     /// ~/Library/Logs/grand-line/iceberg.log, where Log writes too.
@@ -37,6 +39,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         host.openSettings = { [weak self] in self?.showSettings() }
         host.hotKey.action = { [weak self] in self?.targetController()?.toggle(byKeyboard: true) }
         host.onEscape = { [weak self] in self?.controllers.values.forEach { $0.close() } }
+        let basket = BasketController(shelf: host.shelf, theme: theme)
+        self.basket = basket
+        host.drag.onShake = { [weak host, weak basket] point in
+            guard host?.settings.dragBasket == true else { return }
+            basket?.show(at: point)
+        }
+        host.drag.onEnded = { [weak basket] in basket?.dragEnded() }
+        // A HUD shows on the display with the pointer (else the built-in one).
+        host.hud.onEvent = { [weak self] event in self?.targetController()?.showHUD(event) }
         let dog = watchdog
         host.onPanelOpen = { dog.noteUse() }
         let center = NotificationCenter.default

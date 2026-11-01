@@ -2,6 +2,7 @@
 <key>NSCalendarsFullAccessUsageDescription</key><string>Iceberg shows today's events in the notch.</string>
 <key>NSRemindersUsageDescription</key><string>Iceberg shows reminders due today and lets you tick them off.</string>
 <key>NSRemindersFullAccessUsageDescription</key><string>Iceberg shows reminders due today and lets you tick them off.</string>
+<key>NSBluetoothAlwaysUsageDescription</key><string>Iceberg shows your headphones connecting, with their battery, in the notch. Only when you turn on that HUD in Settings.</string>
 <key>NSAppleEventsUsageDescription</key><string>Iceberg asks Spotify or Music what is playing, and sends play, pause and skip, when the system Now Playing is unavailable.</string>
 <key>NSSupportsAutomaticTermination</key><false/>
 <key>CFBundleURLTypes</key>

@@ -184,3 +184,46 @@ public enum NotchGeometry {
         return out.map { (screenID: $0.0, style: $0.1) }
     }
 }
+
+// MARK: Displays without a notch, HUDs and dropping files
+
+extension NotchGeometry {
+    /// The closed shape's corner radii: the notch's own (a small flare at the
+    /// top, a round at the bottom), or the island's (flat on the top edge,
+    /// fully round below). A display with a notch always uses the notch's;
+    /// one without follows `no_notch_style`.
+    public static func closedRadii(style: PanelStyle, look: IcebergSettings.NoNotchStyle,
+                                   height: CGFloat) -> (top: CGFloat, bottom: CGFloat) {
+        if style == .notch || look == .notch {
+            return (NotchMetrics.collapsedTopRadius, NotchMetrics.collapsedBottomRadius)
+        }
+        return (0, height / 2)
+    }
+
+    /// Each side wing of a HUD (volume, brightness, battery, headphones):
+    /// room for a symbol on the left and a level bar or a short text on the
+    /// right.
+    public static func hudWingWidth(collapsedHeight h: CGFloat) -> CGFloat {
+        max(56, (h * 2.5).rounded())
+    }
+
+    /// The closed window while a HUD shows: the shape, both HUD wings and
+    /// the top flares.
+    public static func hudPanelSize(of screen: ScreenInfo) -> CGSize {
+        var size = collapsedSize(of: screen)
+        size.width += 2 * hudWingWidth(collapsedHeight: size.height) + 2 * NotchMetrics.collapsedTopRadius
+        return size
+    }
+
+    /// How far around the closed shape a file being dragged opens the panel
+    /// to take it (the shelf), so the drop target is easy to find.
+    public static let dropMargin = CGSize(width: 60, height: 40)
+
+    /// Where a dragged file opens the panel: the hit zone, wider each side
+    /// and taller below (never above the display's top edge).
+    public static func dropZone(of screen: ScreenInfo, style: PanelStyle) -> CGRect {
+        let zone = hitZone(of: screen, style: style)
+        return CGRect(x: zone.minX - dropMargin.width, y: zone.minY - dropMargin.height,
+                      width: zone.width + 2 * dropMargin.width, height: zone.height + dropMargin.height)
+    }
+}

@@ -14,6 +14,14 @@ public struct IcebergSettings: Equatable, Sendable {
 
     public enum OpenOn: String, Sendable, CaseIterable { case hover, click }
 
+    /// How the closed shape looks on a display without a notch.
+    public enum NoNotchStyle: String, Sendable, CaseIterable {
+        /// A pill at the top centre, round at the bottom (the island).
+        case island
+        /// A black tab drawn like a MacBook's camera notch.
+        case notch
+    }
+
     /// The built-in widgets, in panel order.
     public static let builtinWidgets = ["now-playing", "today", "reminders", "battery"]
 
@@ -41,8 +49,26 @@ public struct IcebergSettings: Equatable, Sendable {
     public var toggleShortcut: KeyShortcut? = .defaultToggle
     /// The most widget commands that run at once (and the most streams).
     public var maxConcurrent = 4
+    /// The closed shape on displays without a notch.
+    public var noNotchStyle: NoNotchStyle = .island
+    /// Zip, compress, convert and background removal on shelved files.
+    public var shelfQuickActions = true
+    /// Shaking the pointer while dragging a file shows a drop basket.
+    public var dragBasket = false
+    /// HUDs in the notch: volume, display brightness, battery (plugged in,
+    /// unplugged, low) and Bluetooth headphones connecting.
+    public var hudVolume = false
+    public var hudBrightness = false
+    public var hudBattery = false
+    public var hudBluetooth = false
+    /// Iceberg takes the volume and brightness keys (Accessibility), so only
+    /// its HUD shows and macOS's own does not.
+    public var hudReplaceSystem = false
 
     public init() {}
+
+    /// True when any HUD is turned on.
+    public var anyHUD: Bool { hudVolume || hudBrightness || hudBattery || hudBluetooth }
 
     public static func parse(_ text: String, fileName: String = "iceberg.toml") -> (IcebergSettings, [ConfigIssue]) {
         let p = parseDetailed(text, fileName: fileName, fallback: "using the defaults")
@@ -111,6 +137,22 @@ public struct IcebergSettings: Equatable, Sendable {
                 settings.toggleShortcut = s.isEmpty ? nil : KeyShortcut.parse(s)
             case ("max_concurrent", .integer(let n)):
                 settings.maxConcurrent = n
+            case ("no_notch_style", .string(let s)):
+                settings.noNotchStyle = NoNotchStyle(rawValue: s) ?? .island
+            case ("shelf_quick_actions", .bool(let b)):
+                settings.shelfQuickActions = b
+            case ("drag_basket", .bool(let b)):
+                settings.dragBasket = b
+            case ("hud_volume", .bool(let b)):
+                settings.hudVolume = b
+            case ("hud_brightness", .bool(let b)):
+                settings.hudBrightness = b
+            case ("hud_battery", .bool(let b)):
+                settings.hudBattery = b
+            case ("hud_bluetooth", .bool(let b)):
+                settings.hudBluetooth = b
+            case ("hud_replace_system", .bool(let b)):
+                settings.hudReplaceSystem = b
             case ("panel", .array(let items)):
                 var list: [String] = []
                 for item in items {
@@ -226,6 +268,14 @@ public struct IcebergSettings: Equatable, Sendable {
         case "menu_bar_icon": menuBarIcon = other.menuBarIcon
         case "toggle_shortcut": toggleShortcut = other.toggleShortcut
         case "max_concurrent": maxConcurrent = other.maxConcurrent
+        case "no_notch_style": noNotchStyle = other.noNotchStyle
+        case "shelf_quick_actions": shelfQuickActions = other.shelfQuickActions
+        case "drag_basket": dragBasket = other.dragBasket
+        case "hud_volume": hudVolume = other.hudVolume
+        case "hud_brightness": hudBrightness = other.hudBrightness
+        case "hud_battery": hudBattery = other.hudBattery
+        case "hud_bluetooth": hudBluetooth = other.hudBluetooth
+        case "hud_replace_system": hudReplaceSystem = other.hudReplaceSystem
         case "panel": panel = other.panel
         case "builtin":
             builtin = other.builtin

@@ -25,12 +25,14 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         let window = self.window ?? make()
         self.window = window
         permissions.refresh()
+        host.hud.refreshPermissions()
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
     }
 
     private func make() -> NSWindow {
-        let root = SettingsView(host: host, user: host.user, theme: host.theme, permissions: permissions, recorder: recorder)
+        let root = SettingsView(host: host, user: host.user, theme: host.theme, hud: host.hud, permissions: permissions,
+                                recorder: recorder)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 640),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable],
                               backing: .buffered, defer: false)
@@ -58,6 +60,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
 
     func windowDidBecomeKey(_ notification: Notification) {
         permissions.refresh()
+        host.hud.refreshPermissions()
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -167,6 +170,7 @@ struct SettingsView: View {
     @ObservedObject var host: PanelHost
     @ObservedObject var user: UserWidgets
     @ObservedObject var theme: ThemeStore
+    @ObservedObject var hud: HUDCenter
     @ObservedObject var permissions: PermissionStatus
     @ObservedObject var recorder: ShortcutRecorder
     @Local private var failure: String?
@@ -239,6 +243,20 @@ struct SettingsView: View {
                     SettingsHeader(text: "General")
                 }
 
+                Section {
+                    shelfSettings
+                } header: {
+                    SettingsHeader(text: "Shelf and drag",
+                                   note: "Turn on Shelf in the list above, then drag files onto the notch to keep them there.")
+                }
+
+                Section {
+                    hudSettings
+                } header: {
+                    SettingsHeader(text: "HUDs in the notch",
+                                   note: "Shown beside the closed notch when something changes. Each starts turned off.")
+                }
+
                 if let player = host.nowPlaying {
                     Section {
                         NowPlayingHealthRow(model: player)
@@ -297,11 +315,68 @@ struct SettingsView: View {
                 Text("The built-in display").tag(IcebergSettings.ExternalDisplays.none)
                 Text("Every display (a pill where there is no notch)").tag(IcebergSettings.ExternalDisplays.pill)
             }
+            Picker("Without a notch, show", selection: Binding(
+                get: { host.settings.noNotchStyle },
+                set: { failure = host.save("no_notch_style", .string($0.rawValue)) })) {
+                Text("An island (a pill at the top centre)").tag(IcebergSettings.NoNotchStyle.island)
+                Text("A notch (a black tab shaped like the camera notch)").tag(IcebergSettings.NoNotchStyle.notch)
+            }
+            .help("How the closed shape looks on displays without a camera notch: other displays with Show on every display, and a Mac with its lid closed.")
             settingToggle("Artwork and playing bars beside the closed notch", key: "live_activity", value: host.settings.liveActivity)
             settingToggle("Iceberg in the menu bar", key: "menu_bar_icon", value: host.settings.menuBarIcon)
             settingToggle("Open at login", key: "launch_at_login", value: host.settings.launchAtLogin)
         }
         .font(.system(size: 13))
+    }
+
+    private var shelfSettings: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            settingToggle("Quick actions on shelved files", key: "shelf_quick_actions", value: host.settings.shelfQuickActions)
+            SettingNote(text: "Zip, make a smaller copy, convert an image, or remove its background (on this Mac). Each makes a new file beside the original; nothing is overwritten, moved or deleted.")
+            settingToggle("Shake while dragging a file to show a drop basket", key: "drag_basket", value: host.settings.dragBasket)
+            SettingNote(text: "Shake the pointer left and right while dragging. What you drop in the basket goes on the shelf; drag it out again from there.")
+            SettingNote(text: "The shelf keeps only a link to each file. Removing a file from the shelf, or clearing it, never touches the file. Dragging one out gives the other app a copy.")
+        }
+        .font(.system(size: 13))
+    }
+
+    private var hudSettings: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            settingToggle("Volume", key: "hud_volume", value: host.settings.hudVolume)
+            SettingNote(text: "No permission needed. macOS shows its own volume HUD too, unless Iceberg takes the keys (below).")
+            hudToggle("Display brightness", key: "hud_brightness", value: host.settings.hudBrightness, needsAccessibility: true)
+            SettingNote(text: "Needs Accessibility, so Iceberg can see the brightness keys.")
+            settingToggle("Battery", key: "hud_battery", value: host.settings.hudBattery)
+            SettingNote(text: "When power is connected or removed, and when the battery falls to 20% and 10%. No permission needed.")
+            settingToggle("Headphones connecting (AirPods and other Bluetooth headphones)", key: "hud_bluetooth", value: host.settings.hudBluetooth)
+            SettingNote(text: "Needs Bluetooth access; macOS asks the first time. Shows the battery when the headphones report it.")
+            if host.settings.hudBluetooth && hud.bluetoothDenied {
+                HStack(spacing: 6) {
+                    SettingNote(text: "Bluetooth access is turned down for Iceberg.")
+                    Button("Open Privacy Settings") { hud.openPrivacySettings("Privacy_Bluetooth") }.controlSize(.small)
+                }
+            }
+            hudToggle("Hide macOS's own volume and brightness HUD", key: "hud_replace_system",
+                      value: host.settings.hudReplaceSystem, needsAccessibility: true)
+            SettingNote(text: "Needs Accessibility. Iceberg then changes the volume and brightness itself, for the HUDs turned on above, so only its HUD shows.")
+            if (host.settings.hudBrightness || host.settings.hudReplaceSystem) && !hud.accessibilityAllowed {
+                HStack(spacing: 6) {
+                    SettingNote(text: "Iceberg is not allowed Accessibility yet. Allow it in System Settings, Privacy & Security, Accessibility.")
+                    Button("Open Accessibility Settings") { hud.openPrivacySettings("Privacy_Accessibility") }.controlSize(.small)
+                }
+            }
+        }
+        .font(.system(size: 13))
+    }
+
+    /// A HUD switch whose HUD needs Accessibility: turning it on asks macOS
+    /// to list Iceberg there.
+    private func hudToggle(_ title: String, key: String, value: Bool, needsAccessibility: Bool) -> some View {
+        Toggle(title, isOn: Binding(get: { value }, set: { on in
+            failure = host.save(key, .bool(on))
+            if on && needsAccessibility && !hud.accessibilityAllowed { hud.requestAccessibility() }
+        }))
+        .toggleStyle(.checkbox)
     }
 
     private var shortcutRow: some View {
@@ -396,6 +471,16 @@ struct SettingsView: View {
             failure = host.save("open_on", .string(host.settings.openOn.rawValue))
         }
         NSWorkspace.shared.open(url)
+    }
+}
+
+/// A muted line under a setting, saying what it does or needs.
+private struct SettingNote: View {
+    @EnvironmentObject var theme: ThemeStore
+    let text: String
+
+    var body: some View {
+        Text(text).font(.system(size: 11)).foregroundStyle(theme.muted).fixedSize(horizontal: false, vertical: true)
     }
 }
 

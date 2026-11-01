@@ -24,6 +24,7 @@ final class NotchController {
     private var closeWork: DispatchWorkItem?
     private var shrinkWork: DispatchWorkItem?
     private var pauseWork: DispatchWorkItem?
+    private var hudWork: DispatchWorkItem?
     private var bag: Set<AnyCancellable> = []
     private var nowPlayingSink: AnyCancellable?
     private weak var watchedNowPlaying: NowPlayingWidget?
@@ -81,6 +82,12 @@ final class NotchController {
             }
         }
         model.onTap = { [weak self] in self?.tapped() }
+        // Files dropped on the open panel go on the shelf (while it is turned on).
+        container.drops.onDrop = { [weak host] urls in _ = host?.shelf.add(urls) }
+        container.drops.onHover = { [weak host] on in
+            if host?.shelf.isDropTargeted != on { host?.shelf.isDropTargeted = on }
+        }
+        container.setTakesFiles(host.takesFiles)
 
         panel.setFrame(model.frame(open: false), display: false)
         panel.ignoresMouseEvents = true
@@ -125,6 +132,8 @@ final class NotchController {
         closeWork?.cancel()
         openWork?.cancel()
         model.update(content: host.content)
+        hudWork?.cancel()
+        model.hud = nil
         panel.setFrame(model.frame(open: true), display: true)
         panel.alphaValue = 1
         withAnimation(openAnimation) { model.isOpen = true }
@@ -149,6 +158,7 @@ final class NotchController {
         moveMonitors = []
         stopClickMonitors()
         pauseWork?.cancel()
+        hudWork?.cancel()
         nowPlayingSink = nil
         bag.removeAll()
         panel.orderOut(nil)
@@ -194,6 +204,12 @@ final class NotchController {
             case .cancelClose: closeWork?.cancel()
             case .none: break
             }
+            return
+        }
+        // A file dragged near the notch opens the panel at once, to drop it on the shelf.
+        if host.takesFiles, host.drag.isFileDrag,
+           NotchGeometry.contains(NotchGeometry.dropZone(of: model.screen, style: model.style), p) {
+            open()
             return
         }
         let inside = NotchGeometry.contains(hitZone, p)
@@ -273,6 +289,7 @@ final class NotchController {
                 guard let self else { return }
                 let before = self.model.expandedPanelSize
                 self.model.update(content: self.host.content)
+                self.container.setTakesFiles(self.host.takesFiles)
                 self.watchNowPlaying()
                 self.syncLiveActivity()
                 if self.model.isOpen, self.model.expandedPanelSize != before {
@@ -328,6 +345,11 @@ final class NotchController {
             model.showsLiveActivity = wanted
             return
         }
+        if model.hud != nil {
+            // A HUD is showing in a wider window; the wings follow when it goes.
+            model.showsLiveActivity = wanted
+            return
+        }
         if wanted {
             // Grow the window, then the shape.
             let size = NotchGeometry.collapsedPanelSize(of: model.screen, liveActivity: true)
@@ -338,9 +360,42 @@ final class NotchController {
             let delay = model.reduceMotion ? 0 : 0.3
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 MainActor.assumeIsolated {
-                    guard let self, !self.model.isOpen, !self.model.showsLiveActivity else { return }
+                    guard let self, !self.model.isOpen, !self.model.showsLiveActivity, self.model.hud == nil else { return }
                     self.panel.setFrame(self.model.frame(open: false), display: true)
                 }
+            }
+        }
+    }
+
+    // MARK: HUDs
+
+    /// Shows a HUD beside the closed notch for a moment; a new one replaces
+    /// it and starts the wait again. Nothing shows while the panel is open.
+    func showHUD(_ event: HUDEvent) {
+        guard !model.isOpen else { return }
+        hudWork?.cancel()
+        if model.hud == nil {
+            // Grow the window, then the shape.
+            panel.setFrame(NotchGeometry.topCentred(NotchGeometry.hudPanelSize(of: model.screen), on: model.screen), display: true)
+            panel.alphaValue = 1
+            withAnimation(wingAnimation) { model.hud = event }
+        } else if model.hud != event {
+            model.hud = event
+        }
+        let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.hideHUD() } }
+        hudWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + HUDEvent.duration, execute: work)
+    }
+
+    private func hideHUD() {
+        guard model.hud != nil, !model.isOpen else { return }
+        withAnimation(wingAnimation) { model.hud = nil }
+        let delay = model.reduceMotion ? 0 : 0.3
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, !self.model.isOpen, self.model.hud == nil else { return }
+                self.panel.setFrame(self.model.frame(open: false), display: true)
+                self.refreshClosedVisibility()
             }
         }
     }

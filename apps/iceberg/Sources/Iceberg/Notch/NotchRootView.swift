@@ -13,9 +13,10 @@ struct NotchRootView: View {
     var body: some View {
         let open = model.isOpen
         let size = model.currentSize
-        let pill = model.style == .pill
-        let top = open ? NotchMetrics.expandedTopRadius : (pill ? 0 : NotchMetrics.collapsedTopRadius)
-        let bottom = open ? NotchMetrics.expandedBottomRadius : (pill ? size.height / 2 : NotchMetrics.collapsedBottomRadius)
+        // Displays without a notch: an island (a pill) or a tab like the notch (`no_notch_style`).
+        let closed = NotchGeometry.closedRadii(style: model.style, look: host.settings.noNotchStyle, height: size.height)
+        let top = open ? NotchMetrics.expandedTopRadius : closed.top
+        let bottom = open ? NotchMetrics.expandedBottomRadius : closed.bottom
         let shape = NotchShape(topRadius: top, bottomRadius: bottom)
 
         ZStack(alignment: .top) {
@@ -27,9 +28,12 @@ struct NotchRootView: View {
                 if open {
                     ExpandedPanel(model: model, host: host, user: host.user)
                         .transition(.opacity.animation(.easeOut(duration: 0.14).delay(0.06)))
+                } else if let hud = model.hud {
+                    HUDView(event: hud, height: model.bandHeight, inset: closed.top)
+                        .transition(.opacity)
                 } else if model.showsLiveActivity, let nowPlaying = host.nowPlaying {
                     LiveActivityView(model: nowPlaying, height: model.bandHeight,
-                                     inset: pill ? 0 : NotchMetrics.collapsedTopRadius,
+                                     inset: closed.top,
                                      reduceMotion: !model.barsMove(playing: nowPlaying.isPlaying))
                         .transition(.opacity)
                 }

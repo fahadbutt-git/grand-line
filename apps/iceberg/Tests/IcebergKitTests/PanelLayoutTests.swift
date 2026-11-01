@@ -82,7 +82,9 @@ final class PanelLayoutTests: XCTestCase {
     }
 
     func testCatalogue() {
-        XCTAssertEqual(PanelCatalog.builtins.map(\.id), ["date", "now-playing", "today", "reminders", "battery"])
+        XCTAssertEqual(PanelCatalog.builtins.map(\.id), ["date", "now-playing", "today", "reminders", "battery", "shelf"])
+        XCTAssertEqual(PanelCatalog.builtin("shelf")?.placement, .section)
+        XCTAssertFalse(PanelCatalog.defaultEnabled.contains("shelf"), "the shelf starts turned off")
         XCTAssertEqual(PanelCatalog.builtin("today")?.permission, .calendars)
         XCTAssertEqual(PanelCatalog.builtin("reminders")?.permission, .reminders)
         XCTAssertNil(PanelCatalog.builtin("now-playing")?.permission)

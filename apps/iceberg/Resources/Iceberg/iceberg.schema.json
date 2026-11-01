@@ -6,7 +6,7 @@
   "type": "object",
   "properties": {
     "panel": {
-      "description": "What the panel shows, in order: built-in items (date, now-playing, today, reminders, battery) and widget file names without .toml.",
+      "description": "What the panel shows, in order: built-in items (date, now-playing, today, reminders, battery, shelf) and widget file names without .toml.",
       "type": "array",
       "items": {
         "type": "string",
@@ -77,6 +77,50 @@
       "minimum": 1,
       "maximum": 16,
       "default": 4
+    },
+    "no_notch_style": {
+      "description": "The closed shape on displays without a notch: a pill at the top centre (\"island\") or a black tab drawn like a MacBook's camera notch (\"notch\").",
+      "type": "string",
+      "enum": [
+        "island",
+        "notch"
+      ],
+      "default": "island"
+    },
+    "shelf_quick_actions": {
+      "description": "Zip, compress, convert and remove the background of files on the shelf. Results are new files beside the original; nothing is overwritten or deleted.",
+      "type": "boolean",
+      "default": true
+    },
+    "drag_basket": {
+      "description": "Shake the pointer while dragging a file to show a basket near it; what you drop there goes on the shelf.",
+      "type": "boolean",
+      "default": false
+    },
+    "hud_volume": {
+      "description": "Show the volume in the notch when it changes.",
+      "type": "boolean",
+      "default": false
+    },
+    "hud_brightness": {
+      "description": "Show the display brightness in the notch when it changes. Needs Accessibility, to see the brightness keys.",
+      "type": "boolean",
+      "default": false
+    },
+    "hud_battery": {
+      "description": "Show the battery in the notch when power is connected or removed, and when it falls to 20% and 10%.",
+      "type": "boolean",
+      "default": false
+    },
+    "hud_bluetooth": {
+      "description": "Show Bluetooth headphones (AirPods and others) connecting, with their battery when macOS knows it. Needs Bluetooth access.",
+      "type": "boolean",
+      "default": false
+    },
+    "hud_replace_system": {
+      "description": "Iceberg handles the volume and brightness keys itself, so macOS's own HUD does not show. Needs Accessibility; only for the HUDs turned on.",
+      "type": "boolean",
+      "default": false
     },
     "builtin": {
       "description": "The older way to choose built-in items; panel replaces it.",

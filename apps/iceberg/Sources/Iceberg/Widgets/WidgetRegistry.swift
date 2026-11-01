@@ -11,5 +11,6 @@ enum WidgetRegistry {
         "today": { TodayWidget(context: $0) },
         "reminders": { RemindersWidget(context: $0) },
         "battery": { _ in BatteryWidget() },
+        "shelf": { ShelfWidget(context: $0) },
     ]
 }

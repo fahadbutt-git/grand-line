@@ -44,6 +44,39 @@ final class HoverContainerView: NSView {
     override func mouseEntered(with event: NSEvent) { onEnter?() }
     override func mouseExited(with event: NSEvent) { onExit?() }
 
+    /// Files dropped on the panel (the shelf), when it takes them.
+    let drops = FileDropTarget()
+    private var takesFiles = false
+
+    /// Registers for dropped files while the shelf is on, and not otherwise.
+    func setTakesFiles(_ on: Bool) {
+        guard on != takesFiles else { return }
+        takesFiles = on
+        if on { registerForDraggedTypes([.fileURL]) } else { unregisterDraggedTypes() }
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        MainActor.assumeIsolated { drops.entered(sender) }
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        MainActor.assumeIsolated { drops.entered(sender) }
+    }
+
+    override func draggingExited(_ sender: NSDraggingInfo?) {
+        MainActor.assumeIsolated { drops.exited() }
+    }
+
+    override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool { true }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        MainActor.assumeIsolated { drops.perform(sender) }
+    }
+
+    override func draggingEnded(_ sender: NSDraggingInfo) {
+        MainActor.assumeIsolated { drops.exited() }
+    }
+
     /// True when the pointer is inside right now (after a resize). The top
     /// edge counts: a pointer pushed against the notch sits on it.
     var containsPointer: Bool {

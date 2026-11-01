@@ -41,6 +41,9 @@ public enum PanelCatalog {
                     symbol: "checklist", placement: .section, permission: .reminders),
         BuiltinItem(id: "battery", title: "Battery", detail: "The charge in the top band, right of the camera.",
                     symbol: "battery.75percent", placement: .header),
+        BuiltinItem(id: "shelf", title: "Shelf",
+                    detail: "Drag files onto the notch to keep them here, then drag them out to any app. Only a link to each file is kept; the files stay where they are.",
+                    symbol: "tray.and.arrow.down", placement: .section),
     ]
 
     /// What a new install shows. Setup ships no widget turned on, so the
