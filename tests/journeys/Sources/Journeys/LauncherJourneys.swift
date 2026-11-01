@@ -325,7 +325,7 @@ enum LauncherJourneys {
     static func normalise(_ raw: String) -> String {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let last = text.split(whereSeparator: { $0 == " " || $0 == ":" }).last.map(String.init) ?? text
-        if text.contains("does not exist") || text.isEmpty { return "off" }
+        if text.contains("does not exist") || text.contains("could not find key") || text.isEmpty { return "off" }
         if ["dark", "on", "1", "true", "yes"].contains(last) { return "on" }
         if ["light", "off", "0", "false", "no"].contains(last) { return "off" }
         if let n = Int(last) { return n > 0 ? "on" : "off" }
