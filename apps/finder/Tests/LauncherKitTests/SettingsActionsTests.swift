@@ -265,7 +265,7 @@ final class SettingsActionsTests: XCTestCase {
 
     func testReturnReturnReturnFlipsEachTime() async throws {
         let mac = FakeMac()
-        let provider = SettingsActionsProvider(paths: paths, runner: mac)
+        let provider = SettingsActionsProvider(paths: paths, runner: mac, settleInterval: 0)
         await provider.readState()
         for expected in [false, true, false] {
             let current = try row(provider, "wifi")
@@ -291,6 +291,19 @@ final class SettingsActionsTests: XCTestCase {
         await provider.finish(job)
         XCTAssertEqual(mac.changes, [["toggle", "bluetooth", "off"]])
         XCTAssertEqual(try row(provider, "bt off").title, "Bluetooth: Off")
+    }
+
+    func testAReturnJustAfterAChangeEndsIsNotASecondChange() async throws {
+        let mac = FakeMac()
+        let provider = SettingsActionsProvider(paths: paths, runner: mac, settleInterval: 5)
+        await provider.readState()
+        let first = try row(provider, "wifi")
+        guard case .started(let job) = provider.begin(first.primary!, resultID: first.id) else { return XCTFail("did not start") }
+        await provider.finish(job)
+        // The second press of a fast double Return lands on the updated row.
+        let again = try row(provider, "wifi")
+        XCTAssertEqual(provider.begin(again.primary!, resultID: again.id), .busy)
+        XCTAssertEqual(mac.changes.count, 1)
     }
 
     func testAMissingPermissionIsShownWithItsPane() async throws {

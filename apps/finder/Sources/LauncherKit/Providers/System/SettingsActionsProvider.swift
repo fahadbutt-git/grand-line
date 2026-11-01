@@ -54,11 +54,18 @@ public final class SettingsActionsProvider: InstantProvider, @unchecked Sendable
     private var reads = 0
     private var stamps: [String: Int] = [:]
     private var phases: [String: SettingPhase] = [:]
+    /// When each row's last change finished: a Return that arrives just
+    /// after (the second of a fast double press) is not a new request.
+    private var finishedAt: [String: Date] = [:]
+    /// How long after a switch ends a Return on the same row is ignored.
+    /// Volume steps are exempt: pressing Return again is how you step.
+    let settleInterval: TimeInterval
 
     /// The runner should set GRAND_LINE_QUIET, so the commands report through
     /// their exit status and this row instead of a notification as well.
-    public init(paths: GrandLinePaths = GrandLinePaths(), runner: (any CommandRunning)? = nil) {
+    public init(paths: GrandLinePaths = GrandLinePaths(), runner: (any CommandRunning)? = nil, settleInterval: TimeInterval = 0.35) {
         self.paths = paths
+        self.settleInterval = settleInterval
         var environment = ShellRunner.environment(paths: paths)
         environment["GRAND_LINE_QUIET"] = "1"
         self.runner = runner ?? ShellRunner(environment: environment)
@@ -126,6 +133,8 @@ public final class SettingsActionsProvider: InstantProvider, @unchecked Sendable
         else { return .notManaged }
         return locked {
             if case .running? = phases[resultID] { return .busy }
+            if !resultID.hasPrefix("setting.volume"), let done = finishedAt[resultID],
+               Date().timeIntervalSince(done) < settleInterval { return .busy }
             phases[resultID] = .running(Self.progress(job, resultID: resultID))
             return .started(job)
         }
@@ -151,7 +160,10 @@ public final class SettingsActionsProvider: InstantProvider, @unchecked Sendable
                 failure = SettingFailure("The volume is \(got)%, not \(want)%")
             }
         }
-        locked { phases[job.resultID] = failure.map { SettingPhase.failed($0) } }
+        locked {
+            phases[job.resultID] = failure.map { SettingPhase.failed($0) }
+            finishedAt[job.resultID] = Date()
+        }
         return failure
     }
 
