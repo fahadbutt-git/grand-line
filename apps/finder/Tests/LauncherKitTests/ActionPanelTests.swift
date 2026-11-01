@@ -143,8 +143,9 @@ final class ActionPanelTests: XCTestCase {
         let press = KeyPress(keyCode: 11, characters: "b", command: true)
         XCTAssertEqual(KeyCommand.command(for: press), .toggleBuffer)
         let row = FileResults.result(FileHit(path: "/x/a.txt", isFolder: false), paths: paths)
-        XCTAssertTrue(FooterHints.hints(for: row, confirming: nil).contains { $0.keys == "⌘B" })
-        XCTAssertFalse(FooterHints.hints(for: Make.row("Safari"), confirming: nil).contains { $0.keys == "⌘B" })
+        // The footer stays short: ⌘B is listed in the actions (⌘K), not the footer.
+        XCTAssertTrue(FooterHints.hints(for: row, confirming: nil).contains { $0.keys == "\u{2318}K" })
+        XCTAssertFalse(FooterHints.hints(for: row, confirming: nil).contains { $0.keys == "\u{2318}B" })
     }
 
     // MARK: File buffer
