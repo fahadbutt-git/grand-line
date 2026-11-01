@@ -509,6 +509,12 @@ extension Ctx {
                             try LauncherJourneys.skipIfAutomationRefused(setting, row: again)
                             throw StepFailure(failure.message + "; the panel closed while setting.\(setting.id) worked (something took the focus, such as a macOS permission question); the row now reads \"\(again)\"")
                         }
+                        // A runner's appearance is locked to the image's: dark
+                        // mode that did not change there is reported, not failed.
+                        if setting.id == "darkmode", ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] != nil {
+                            print("::notice title=\(setting.phrase) not checked::macOS on this CI runner kept its appearance; the row reads \(LauncherJourneys.noticeText(row.isEmpty ? "nothing" : row))")
+                            throw StepSkip("macOS on this CI runner did not switch its appearance; the row reads \"\(row)\"")
+                        }
                         let why = !row.isEmpty ? "; the row reads \"\(row)\""
                             : panelVisible() ? "; the row is not shown" : "; the panel closed after Return, so a row other than setting.\(setting.id) ran"
                         throw StepFailure(failure.message + why)

@@ -693,7 +693,16 @@ enum FilesJourneys {
                 try ctx.wait("the file back") { ctx.exists(folder + "/putback.txt") }
                 try ctx.key("cmd+shift+z")
                 try ctx.wait("the file trashed again") { !ctx.exists(folder + "/putback.txt") }
-                try go(ctx, "~/.Trash", ["Trash", ".Trash"])
+                // macOS trashes into the account's own Trash, not the fixture
+                // home's, so Put Back is checked there.
+                let realHome = getpwuid(getuid()).map { String(cString: $0.pointee.pw_dir) } ?? NSHomeDirectory()
+                let trash = realHome + "/.Trash"
+                if (try? FileManager.default.contentsOfDirectory(atPath: trash)) == nil,
+                   ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] != nil {
+                    print("::notice title=Put Back not checked::this CI runner's Trash cannot be read without Full Disk Access")
+                    throw StepSkip("trash, undo and redo checked; Put Back not checked, this CI runner's Trash cannot be read without Full Disk Access")
+                }
+                try go(ctx, trash, ["Trash", ".Trash"])
                 try ctx.selectRow("putback.txt")
                 try ctx.key("cmd+delete")
                 try ctx.wait("Put Back returned it to Safety", timeout: 10) { ctx.exists(folder + "/putback.txt") }
