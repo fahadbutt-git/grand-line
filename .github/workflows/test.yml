@@ -189,9 +189,11 @@ jobs:
         if: always()
         run: |
           [ -d "$RESULTS" ] || exit 0
-          # The fixture homes are rebuilt each run; only the pictures and results are kept.
-          rm -rf "$RESULTS/homes"
-          cd "$(dirname "$RESULTS")" && zip -qr journeys.zip "$(basename "$RESULTS")"
+          # The fixture homes are rebuilt each run; only the pictures and results
+          # are kept. They are left out of the zip rather than removed: a journey
+          # leaves locked files there (the data-safety checks) that rm refuses.
+          name="$(basename "$RESULTS")"
+          cd "$(dirname "$RESULTS")" && zip -qr journeys.zip "$name" -x "$name/homes/*"
       - name: Keep the screenshots
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
