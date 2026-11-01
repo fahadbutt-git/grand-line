@@ -4,18 +4,36 @@ One command turns a new Mac into a ready workstation: apps, command line tools, 
 
 ## On the new Mac
 
+This is the standard installation. It builds Nexus, Sight, Iceberg and Grand Line Index on the Mac itself, so macOS opens them without the "Apple could not verify" message, and it keeps everything up to date by itself afterwards.
+
 1. Finish Apple's setup screens (Apple ID, user account, FileVault).
-2. Copy this folder to the new Mac. AirDrop from the old Mac is easiest. It lands in Downloads.
-3. Open Terminal and run:
+2. Open Terminal and run:
 
    ```
-   bash ~/Downloads/grand-line/setup.sh
+   git clone https://github.com/fahadbutt-git/grand-line.git ~/grand-line
+   bash ~/grand-line/setup.sh
    ```
 
-4. Type your Mac password once when asked. The rest runs unattended for 30 to 60 minutes.
-5. Work through `Finish setup.txt`, which opens at the end (it is saved in Documents). It lists the clicks macOS insists on (Karabiner and AeroSpace permissions, notifications, Google Drive, app sign-ins).
+   On a new Mac, `git` first asks to install Apple's Command Line Tools. Click Install, wait for it to finish, then run the two lines again.
 
-The first run copies the package to `~/grand-line`. That copy is the one to edit and keep. Later runs, from anywhere, use it.
+3. Type your Mac password once when asked. The rest runs unattended for 30 to 60 minutes.
+4. Work through `Finish setup.txt`, which opens at the end (it is saved in Documents). It lists the clicks macOS insists on (Karabiner and AeroSpace permissions, notifications, Google Drive, app sign-ins).
+
+`~/grand-line` is the copy to edit and keep. From then on, `update` brings in new versions from GitHub and rebuilds the apps whose code changed, so nothing is downloaded or installed by hand again.
+
+Without internet access to GitHub, copy this folder to the Mac instead (AirDrop lands it in Downloads) and run `bash ~/Downloads/grand-line/setup.sh`. The first run copies it to `~/grand-line`. A copy made this way has no link to GitHub until you add one (`git -C ~/grand-line remote add origin https://github.com/fahadbutt-git/grand-line.git`), so `update` cannot fetch new versions before then.
+
+### Why not download the apps in a browser
+
+The apps are signed on each Mac but not notarized by Apple. macOS blocks any app downloaded in a browser that Apple has not notarized ("Iceberg Not Opened. Apple could not verify..."), and it does so for every new copy. The apps setup builds are made on the Mac, never downloaded, so this never happens to them, and they update themselves.
+
+The zip from the "Apps download" run on GitHub is only for a quick look on a Mac without setup. To open those copies, move them to Applications and run once:
+
+```
+xattr -dr com.apple.quarantine /Applications/Nexus.app /Applications/Sight.app /Applications/Iceberg.app "/Applications/Grand Line Index.app"
+```
+
+They do not update themselves. Install with setup to stop the message for good.
 
 ## Everyday commands
 

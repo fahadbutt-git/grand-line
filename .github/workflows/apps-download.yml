@@ -39,6 +39,22 @@ jobs:
           # Zipped with ditto first: the artifact upload drops the executable
           # bit and the framework symlinks an app needs to open.
           mkdir -p "$RUNNER_TEMP/out"
+          cat > "$GRAND_LINE_APPS_DEST/Read me first.txt" <<'TXT'
+          These apps are signed but not notarized by Apple, so macOS blocks a copy
+          downloaded in a browser ("Apple could not verify..."). Move them to
+          Applications, then run this once in Terminal:
+
+              xattr -dr com.apple.quarantine /Applications/Nexus.app /Applications/Sight.app /Applications/Iceberg.app "/Applications/Grand Line Index.app"
+
+          These copies do not update themselves. The standard installation builds
+          the apps on the Mac instead, which macOS never blocks, and keeps them up
+          to date:
+
+              git clone https://github.com/fahadbutt-git/grand-line.git ~/grand-line
+              bash ~/grand-line/setup.sh
+
+          See "On the new Mac" in the README.
+          TXT
           ditto -c -k --keepParent "$GRAND_LINE_APPS_DEST" "$RUNNER_TEMP/out/Grand-Line-apps.zip"
           echo "::notice title=apps::$(ls -1 | tr '\n' ' ')"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
