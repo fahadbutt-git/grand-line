@@ -535,6 +535,12 @@ extension Ctx {
                         }
                         // A runner's appearance is locked to the image's: dark
                         // mode that did not change there is reported, not failed.
+                        // The runner image keeps its desktop drawn as it was set up
+                        // (CreateDesktop is held for the session): reported, not failed.
+                        if setting.id == "desktopicons", ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] != nil {
+                            print("::notice title=\(setting.phrase) not checked::Finder on this CI runner kept its desktop setting; the row reads \(LauncherJourneys.noticeText(row.isEmpty ? "nothing" : row))")
+                            throw StepSkip("Finder on this CI runner kept its desktop setting; the row reads \"\(row)\"")
+                        }
                         if setting.id == "darkmode", ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] != nil {
                             print("::notice title=\(setting.phrase) not checked::macOS on this CI runner kept its appearance; the row reads \(LauncherJourneys.noticeText(row.isEmpty ? "nothing" : row))")
                             throw StepSkip("macOS on this CI runner did not switch its appearance; the row reads \"\(row)\"")
