@@ -26,6 +26,31 @@ final class FileTests: XCTestCase {
         XCTAssertEqual(FolderReader.subfolderNames(folder), ["Figures"])
     }
 
+    func testAFolderOpenedThroughALinkListsItsTargetUnderTheLinksPath() throws {
+        try temp.file("Safety/Real/report.pdf", "report")
+        try temp.folder("Safety/Real/sub")
+        let link = temp.url("Safety/Link")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: temp.url("Safety/Real"))
+        let chain = temp.url("Safety/Chain")
+        try FileManager.default.createSymbolicLink(atPath: chain.path, withDestinationPath: "Link")
+
+        XCTAssertEqual(FolderReader.listingTarget(temp.url("Safety/Real")), temp.url("Safety/Real"), "a real folder is read as it is")
+        // Resolved the same way (it also drops /private before /var).
+        let real = temp.url("Safety/Real").resolvingSymlinksInPath().path
+        XCTAssertEqual(FolderReader.listingTarget(link).path, real)
+        XCTAssertEqual(FolderReader.listingTarget(chain).path, real, "a link to a link")
+        for folder in [link, chain] {
+            let items = try FolderReader.items(in: folder, showHidden: false)
+            XCTAssertEqual(items.map(\.name).sorted(), ["report.pdf", "sub"], folder.lastPathComponent)
+            let report = try XCTUnwrap(items.first { $0.name == "report.pdf" })
+            XCTAssertEqual(report.url.deletingLastPathComponent().lastPathComponent, folder.lastPathComponent, "shown through the link")
+            XCTAssertFalse(report.isFolder)
+            XCTAssertEqual(report.size, 6)
+            XCTAssertTrue(try XCTUnwrap(items.first { $0.name == "sub" }).isFolder)
+            XCTAssertEqual(FolderReader.subfolderNames(folder), ["sub"])
+        }
+    }
+
     func testItemsReadFromDisk() throws {
         let url = try temp.file("notes.md", "hello")
         let read = try XCTUnwrap(FileItem.read(url))

@@ -44,12 +44,11 @@ enum FilesJourneys {
         ]
         for (title, expected, folder) in places {
             steps.append(step("sidebar: \(title)") { ctx in
-                guard let item = try ctx.sidebarItem(title) else {
+                guard try ctx.sidebarItem(title) != nil else {
                     if title == "Drive" { throw StepSkip("no Drive in the sidebar") }
                     throw StepFailure("no \"\(title)\" in the sidebar")
                 }
-                try ctx.click(item)
-                try ctx.wait("the window to show \(expected[0])") { expected.contains(ctx.title()) }
+                try ctx.goSidebar(title, titles: expected)
                 if title == "Trash", ctx.title() == ".Trash" { ctx.note("the Trash's window title reads \".Trash\"") }
                 if let folder {
                     let count = ctx.visibleCount(in: folder)
@@ -610,10 +609,15 @@ enum FilesJourneys {
                 }
                 try ctx.writeFixture(folder + "/Real/report.pdf", "report")
                 try ctx.writeFixture(folder + "/Real/sub/inner.txt", "inner")
+                // A relative link, so it still points at Real when the fixture
+                // home is copied or moved; one left pointing elsewhere is remade.
                 let link = ctx.url(folder + "/Link")
-                if (try? FileManager.default.destinationOfSymbolicLink(atPath: link.path)) == nil {
-                    try FileManager.default.createSymbolicLink(at: link, withDestinationURL: ctx.url(folder + "/Real"))
+                let target = try? FileManager.default.destinationOfSymbolicLink(atPath: link.path)
+                if target != "Real" {
+                    if target != nil { try FileManager.default.removeItem(at: link) }
+                    try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: "Real")
                 }
+                try ctx.check(ctx.exists(folder + "/Link/report.pdf"), "the link does not reach Real/report.pdf")
                 try ctx.goToFolder("~/" + folder, expect: "Safety")
             },
             step("Compress twice in a row: two archives, the one already there untouched") { ctx in
@@ -921,7 +925,10 @@ extension Ctx {
             guard let names else { return !images.isEmpty }
             return images.contains { image in names.contains { image.allText.contains($0) } }
         }
-        let texts = Set(inside.filter { ["AXStaticText", "AXTextField"].contains($0.role) }.map(\.text))
+        // Texts, and the names of rows combined into one button for VoiceOver
+        // (the columns view's rows: their name is the AXDescription).
+        let named = inside.filter { ["AXStaticText", "AXTextField", "AXButton", "AXCell"].contains($0.role) }
+        let texts = Set(named.flatMap { [$0.text, $0.title, $0.label] }.filter { !$0.isEmpty })
         guard let names else { return texts.contains { fold($0).contains("conj") } }
         return names.contains { texts.contains($0) }
     }
@@ -932,19 +939,27 @@ extension Ctx {
         return field.minY - window.minY <= 90
     }
 
-    /// The sidebar entry: the leftmost text with that title.
+    /// The sidebar entry left of the file pane: the row's combined button
+    /// (named by its AXTitle or AXDescription, as VoiceOver reads it), else the
+    /// leftmost text with that title.
     func sidebarItem(_ title: String) throws -> Node? {
         guard let snap = browserSnapshot() else { throw StepFailure("no browser window") }
-        let pane = snap.identified(app.id("pane"))?.frame
-        return snap.all("AXStaticText") { $0.text == title && $0.isVisibleSize && ($0.frame!.maxX <= (pane?.minX ?? .greatestFiniteMagnitude)) }
-            .min { $0.frame!.minX < $1.frame!.minX }
+        let paneLeft: CGFloat = snap.identified(app.id("pane"))?.frame?.minX ?? .greatestFiniteMagnitude
+        return snap.rowsNamed(title) { $0.midX < paneLeft && $0.minX < paneLeft }.first
     }
 
+    /// Clicks the sidebar entry and waits for the window to show it. A click
+    /// that does not land (the row scrolled under the pointer as it moved)
+    /// falls back to the combined button's own action, as VoiceOver presses it.
     func goSidebar(_ title: String, titles: [String]? = nil) throws {
         guard let item = try sidebarItem(title) else { throw StepFailure("no \"\(title)\" in the sidebar") }
-        try click(item)
         let expected = titles ?? [title]
-        try wait("the window to show \(title)") { expected.contains(self.title()) }
+        try click(item)
+        if item.role != "AXStaticText", (try? wait("the click on \(title)", timeout: 3) { expected.contains(self.title()) }) == nil {
+            note("a click on the sidebar's \"\(title)\" did not open it; pressed the row instead")
+            try check((try sidebarItem(title) ?? item).element.perform("AXPress"), "could not press the sidebar's \"\(title)\"")
+        }
+        try wait("the window to show \(expected[0])") { expected.contains(self.title()) }
     }
 
     func rowNode(_ name: String) -> Node? {

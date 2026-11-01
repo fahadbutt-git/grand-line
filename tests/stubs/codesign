@@ -24,6 +24,11 @@ done
 case "$mode" in
   sign)
     [[ -e "$target" ]] || { echo "$target: No such file or directory" >&2; exit 1; }
+    # A certificate not trusted for code signing (tests/stubs/security), as
+    # on macOS 26 and later; STUB_SIGNS_UNTRUSTED=1 signs with it, as older macOS did.
+    if [[ "$identity" != - && -f "${STUB_SECURITY:-/nonexistent}/untrusted" && "${STUB_SIGNS_UNTRUSTED:-0}" != 1 ]]; then
+      echo "$identity: no identity found" >&2; exit 1
+    fi
     printf 'identity=%s\nruntime=%s\nrequirement=%s\n' "$identity" "$runtime" "$req" > "$sig" ;;
   verify)
     [[ -f "$sig" ]] || { echo "$target: code object is not signed at all" >&2; exit 1; } ;;
@@ -42,6 +47,7 @@ case "$mode" in
       elif [[ "$runtime" == 1 ]]; then flags="0x10000(runtime)"; fi
       echo "Executable=$target" >&2
       echo "CodeDirectory v=20500 size=100 flags=$flags hashes=1+2 location=embedded" >&2
+      if [[ "$identity" == - ]]; then echo "Signature=adhoc" >&2; else echo "Authority=Grand Line Local Signing" >&2; fi
       echo "TeamIdentifier=not set" >&2
     fi ;;
 esac

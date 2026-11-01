@@ -49,6 +49,40 @@ signing_identity() {
   printf '%s\n' "$hash" | tr 'a-f' 'A-F'
 }
 
+# signing_usable [--quiet]: the identity exists and macOS will sign with it:
+# `security find-identity -v` lists it as valid. A self-signed certificate
+# that is not trusted for code signing (trusting it needs a password typed at
+# the keyboard, which a test machine never has) is listed only without -v,
+# and codesign then says "no identity found". Asked once per run (the answer
+# is kept for this identity); the first "no" warns, once, that everything is
+# signed ad hoc instead. --quiet asks without warning. Call it in the shell
+# that signs, not inside $( ), so the answer and the warning are kept.
+signing_usable() {
+  local hash
+  hash="$(signing_identity)" || return 1
+  if [[ "${SIGN_USABLE_FOR:-}" != "$hash" ]]; then
+    SIGN_USABLE_FOR="$hash"
+    if security find-identity -v -p codesigning "$SIGN_KEYCHAIN" 2>/dev/null | grep -qiF "$hash"; then
+      SIGN_USABLE=1
+    else
+      SIGN_USABLE=0
+    fi
+  fi
+  [[ "$SIGN_USABLE" == 1 ]] && return 0
+  if [[ "${1:-}" != --quiet && "${SIGN_UNUSABLE_WARNED:-}" != "$hash" ]]; then
+    SIGN_UNUSABLE_WARNED="$hash"
+    local why="The code-signing identity \"$SIGN_NAME\" is not trusted for code signing on this Mac, so the apps and helpers are signed ad hoc for now and may ask for their permissions again after an update. Trusting its certificate for code signing in Keychain Access fixes it."
+    if declare -F warn >/dev/null; then warn "$why"; else printf '%s\n' "$why" >&2; fi
+  fi
+  return 1
+}
+
+# code_is_adhoc PATH: the code is signed ad hoc (codesign -dv says
+# Signature=adhoc), so an ad hoc copy in its place loses no permission.
+code_is_adhoc() {
+  codesign -dv "$1" 2>&1 | grep -qx 'Signature=adhoc'
+}
+
 # security_stdin: run security commands given on standard input, one per
 # line, so passwords never appear in a process list.
 security_stdin() {
@@ -129,6 +163,8 @@ EOF
   fi
   signing_lock
   rm -rf "$work"
+  # A new identity is asked about afresh.
+  SIGN_USABLE_FOR=""
   return "$status"
 }
 
@@ -157,16 +193,19 @@ signing_ensure() {
 }
 
 # sign_code PATH [ENTITLEMENTS] [ID]: sign with hardened runtime, with the
-# identity when there is one, otherwise ad hoc. With an id (a bundle's id, or
-# the name a bare program is signed under), the designated requirement pins
-# the certificate itself (its hash, not its name).
+# identity when there is one macOS will sign with, otherwise ad hoc (an
+# identity that cannot sign is not tried; signing_usable warns once). With
+# an id (a bundle's id, or the name a bare program is signed under), the
+# designated requirement pins the certificate itself (its hash, not its name).
 sign_code() {
   local path="$1" ent="${2:-}" id="${3:-}" hash args
   args=(--force --options runtime)
   [[ -n "$ent" && -f "$ent" ]] && args+=(--entitlements "$ent")
   # A bare program (not a bundle) takes its name from the file unless given one.
   [[ -n "$id" && ! -d "$path" ]] && args+=(--identifier "$id")
-  if hash="$(signing_identity)"; then
+  # SIGN_TRY_IDENTITY=1: try it all the same (lib/native-apps.sh, for an
+  # installed copy it signed before).
+  if { signing_usable || [[ "${SIGN_TRY_IDENTITY:-0}" == 1 ]]; } && hash="$(signing_identity)"; then
     signing_unlock || return 1
     args+=(--timestamp=none --keychain "$SIGN_KEYCHAIN" --sign "$hash")
     [[ -n "$id" ]] && args+=(-r "=designated => identifier \"$id\" and certificate leaf = H\"$(printf '%s' "$hash" | tr 'A-F' 'a-f')\"")
@@ -188,8 +227,9 @@ sign_code_adhoc() {
   SIGN_ERROR="$(codesign "${args[@]}" "$1" 2>&1 >/dev/null)"
 }
 
-# signing_check APP: hardened runtime is on and, when the identity exists,
-# the designated requirement names its certificate. Prints what is wrong.
+# signing_check APP: hardened runtime is on and, when the identity exists
+# and can sign, the designated requirement names its certificate. Prints
+# what is wrong.
 signing_check() {
   local app="$1" hash detail req
   detail="$(codesign -d --verbose=2 "$app" 2>&1)"
@@ -197,6 +237,7 @@ signing_check() {
     echo "$app is not signed with hardened runtime"; return 1
   fi
   [[ "${SIGN_ADHOC_FALLBACK:-0}" == 1 ]] && return 0
+  { signing_usable --quiet || [[ "${SIGN_TRY_IDENTITY:-0}" == 1 ]]; } || return 0
   hash="$(signing_identity)" || return 0
   hash="$(printf '%s' "$hash" | tr 'A-F' 'a-f')"
   req="$(codesign -d -r- "$app" 2>&1)"

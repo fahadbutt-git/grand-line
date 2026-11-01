@@ -135,6 +135,12 @@ struct Node {
 
     var allText: [String] { [value, title, label, placeholder, help].filter { !$0.isEmpty } }
 
+    /// Whether the element is named `name`: what it shows, its AXTitle or its
+    /// AXDescription. A SwiftUI row combined into one button for VoiceOver
+    /// keeps its name in AXDescription and may show a value (a count, a size)
+    /// besides, so `text` alone would read the value.
+    func isNamed(_ name: String) -> Bool { text == name || title == name || label == name }
+
     var center: CGPoint? { frame.map { CGPoint(x: $0.midX, y: $0.midY) } }
 
     var isVisibleSize: Bool { (frame?.width ?? 0) > 0.5 && (frame?.height ?? 0) > 0.5 }
@@ -208,6 +214,27 @@ final class Snapshot {
     }
 
     func identified(_ id: String) -> Node? { nodes.first { $0.identifier == id } }
+
+    /// Roles a list row can take: a combined button (SwiftUI's
+    /// `.accessibilityElement(children: .combine)` with the button trait), a
+    /// cell or row, the plain text of a row that is not combined, or a group
+    /// that names itself.
+    static let rowRoles: [String] = ["AXButton", "AXCell", "AXRow", "AXStaticText", "AXGroup"]
+
+    /// Visible rows named `name` whose centre passes `place`, the combined
+    /// button first (its frame is the whole row, so a click on its centre
+    /// opens it), static texts last; leftmost first within a role.
+    func rowsNamed(_ name: String, where place: (CGRect) -> Bool = { _ in true }) -> [Node] {
+        let rank = Dictionary(uniqueKeysWithValues: Self.rowRoles.enumerated().map { ($0.element, $0.offset) })
+        return nodes.filter { node in
+            guard rank[node.role] != nil, node.isVisibleSize, let frame = node.frame else { return false }
+            return node.isNamed(name) && place(frame)
+        }
+        .sorted { a, b in
+            let ra = rank[a.role]!, rb = rank[b.role]!
+            return ra != rb ? ra < rb : a.frame!.minX < b.frame!.minX
+        }
+    }
 
     /// Whether node `a` lies inside node `b` in the tree.
     func isDescendant(_ a: Int, of b: Int) -> Bool {

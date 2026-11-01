@@ -45,8 +45,14 @@ artcraft_release_json() {
 
 # Installs one app. Prints progress. Exit code 0 on success, 2 when the
 # release simply has no Mac build yet, 3 when it was refused (unsigned, not
-# notarized or another developer); those two are warnings, not failures. 1
-# otherwise.
+# notarized or another developer); those two are warnings, not failures: a
+# refusal is the signature policy doing its job. 1 otherwise (GitHub could
+# not be reached, the download failed or was damaged, the copy failed).
+#
+# A refused release is remembered ($state/APP.refused: its tag and the Team
+# ID pin it was checked against), so later runs do not download it, or ask
+# GitHub's rate-limited API about it, again: only a newer release, or a
+# changed pin, is tried.
 artcraft_install_one() {
   local app="$1" repo="$2" pinned="${3:-}" state="$GRAND_LINE_STATE/artcraft"
   [[ "$pinned" == "-" ]] && pinned=""
@@ -58,6 +64,10 @@ artcraft_install_one() {
   if [[ -n "$tag" && -d "$installed_path" && "$(cat "$state/$app.tag" 2>/dev/null)" == "$tag" ]]; then
     echo "  ✓ $app $tag already installed"
     return 0
+  fi
+  if [[ -n "$tag" && "$(cat "$state/$app.refused" 2>/dev/null)" == "$tag|$pinned" ]]; then
+    echo "  ! $app: release $tag did not pass the signature checks when it was tried, so it was not downloaded again. A newer release will be."
+    return 3
   fi
 
   local release asset name url digest
@@ -130,6 +140,7 @@ artcraft_install_one() {
       register_app "$dest"
       printf '%s\n' "$tag" > "$state/$app.tag"
       printf '%s\n' "$dest" > "$state/$app.path"
+      rm -f "$state/$app.refused"
       echo "  ✓ Installed $(basename "$dest") $tag"
     else
       rm -rf "$dest.new"
@@ -137,8 +148,11 @@ artcraft_install_one() {
     fi
   fi
 
+  [[ "$status" == 3 && -n "$tag" ]] && printf '%s\n' "$tag|$pinned" > "$state/$app.refused"
   if [[ "$mounted" == 1 ]] && ! hdiutil detach -quiet "$work/mnt" && ! hdiutil detach -force -quiet "$work/mnt"; then
     echo "  ! $app: could not unmount the disk image; it is left in $work"
+    # A refusal stays a refusal; anything else that left a disk mounted fails.
+    [[ "$status" == 3 ]] && return 3
     return 1
   fi
   rm -rf "$work"
@@ -157,6 +171,8 @@ step_artcraft() {
   fi
 
   # Download and install every app in parallel, then report in list order.
+  # Only real errors fail the step: a release with no Mac build, or one the
+  # signature checks refused, is a warning and the step still succeeds.
   local logs pids=() apps=() i failed=0
   logs="$(mktemp -d)"
   while IFS=$'\t' read -r app repo _role team; do

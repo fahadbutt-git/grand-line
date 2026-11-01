@@ -496,7 +496,15 @@ extension Ctx {
                     if newSystem == nil || newSystem == system {
                         try LauncherJourneys.skipIfAutomationRefused(setting, row: row)
                         // Return on a settings row keeps the panel open; a closed
-                        // panel means another row (a menu or shortcut copy) ran.
+                        // panel means another row (a menu or shortcut copy) ran,
+                        // unless the settings row did run and something took the
+                        // focus while it worked (a macOS permission prompt): the
+                        // row, shown again, says which.
+                        if row.isEmpty, !panelVisible(), let again = try? showSetting(setting),
+                           again.contains("Working") || again.contains("not changed") {
+                            try LauncherJourneys.skipIfAutomationRefused(setting, row: again)
+                            throw StepFailure(failure.message + "; the panel closed while setting.\(setting.id) worked (something took the focus, such as a macOS permission question); the row now reads \"\(again)\"")
+                        }
                         let why = !row.isEmpty ? "; the row reads \"\(row)\""
                             : panelVisible() ? "; the row is not shown" : "; the panel closed after Return, so a row other than setting.\(setting.id) ran"
                         throw StepFailure(failure.message + why)

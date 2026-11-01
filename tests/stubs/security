@@ -2,7 +2,7 @@
 # Test stub: a pretend security tool. With $STUB_SECURITY set to a folder, it
 # keeps a pretend keychain there: commands given on standard input (-i) make
 # the keychain, store its password and import the identity, which
-# find-identity then lists. Only the command names given on standard input
+# find-identity then lists (with -v only while it is trusted). Only the command names given on standard input
 # are logged, so a test can check no password reached a command line.
 echo "security $*" >> "${STUB_LOG:-/dev/null}"
 st="${STUB_SECURITY:-}"
@@ -30,7 +30,19 @@ case "${1:-}" in
     done
     exit 0 ;;
   find-identity)
-    [[ -n "$st" && -f "$st/imported" ]] && printf '  1) %s "Grand Line Local Signing" (CSSMERR_TP_NOT_TRUSTED)\n     1 identities found\n' "$HASH"
+    # -v lists valid identities only. A test marks the certificate as not
+    # trusted for code signing with $STUB_SECURITY/untrusted, as on a Mac
+    # where nobody was at the keyboard to trust it: then only the plain
+    # listing shows it.
+    [[ -n "$st" && -f "$st/imported" ]] || { printf '     0 identities found\n'; exit 0; }
+    if [[ " $* " == *" -v "* ]]; then
+      if [[ -f "$st/untrusted" ]]; then printf '     0 valid identities found\n'
+      else printf '  1) %s "Grand Line Local Signing"\n     1 valid identities found\n' "$HASH"; fi
+    elif [[ -f "$st/untrusted" ]]; then
+      printf '  1) %s "Grand Line Local Signing" (CSSMERR_TP_NOT_TRUSTED)\n     1 identities found\n' "$HASH"
+    else
+      printf '  1) %s "Grand Line Local Signing"\n     1 identities found\n' "$HASH"
+    fi
     exit 0 ;;
   find-generic-password)
     [[ -n "$st" && -f "$st/password" ]] && { cat "$st/password"; exit 0; }

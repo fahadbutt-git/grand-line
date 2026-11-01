@@ -23,8 +23,16 @@ public struct Ranker: Sendable {
             keyword: match.keyword?.rawValue ?? 5,
             frecency: learnable ? frecencies[result.id] ?? 0 : 0,
             quality: match.quality,
-            learned: learnable && learned != nil && learned == result.id && match.matched && !result.isFallback
+            learned: learnable && learned != nil && learned == result.id && match.matched && !result.isFallback,
+            settingPhrase: Self.isSettingPhrase(result)
         )
+    }
+
+    /// A settings row named by the whole phrase typed: its provider marks
+    /// such a match as an exact alias and an exact title.
+    static func isSettingPhrase(_ result: LaunchResult) -> Bool {
+        result.providerID == SettingsActionsProvider.providerID && !result.isFallback
+            && result.match.alias == .exact && result.match.title == .exact
     }
 
     /// Ranked best first. Equal keys keep shorter titles first, then the providers' order.

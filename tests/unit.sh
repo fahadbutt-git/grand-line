@@ -304,6 +304,55 @@ else
   t_fail "jq is not installed, so the ArtCraft tests could not run"
 fi
 
+# --- ArtCraft: a release the signature checks refuse is a warning, remembered, and not fetched again
+if command -v jq >/dev/null 2>&1; then
+  (
+    art="$tmp/artcraft"; mkdir -p "$art/config/grand-line"
+    export REPO_DIR="$art" DRY_RUN=0 GRAND_LINE_STATE="$art/state" STUB_LOG="$art/log"
+    source "$ROOT/lib/common.sh"; source "$ROOT/steps/03-artcraft.sh"
+    state="$GRAND_LINE_STATE/artcraft"; : > "$art/api"
+    # GitHub, the download and the zip, as functions. The app in the zip is
+    # unsigned, so the codesign stub refuses it like an unnotarized release.
+    echo v1 > "$art/tag"
+    artcraft_latest_tag() { cat "$art/tag"; }
+    artcraft_release_json() {
+      echo "$1" >> "$art/api"
+      [[ -f "$art/offline-${1#*/}" ]] && return 1
+      printf '{"tag_name":"%s","assets":[{"name":"%s-mac-arm64.zip","browser_download_url":"https://example.com/a.zip"}]}\n' \
+        "$(cat "$art/tag")" "${1#*/}"
+    }
+    curl() { local out=""; while [[ $# -gt 0 ]]; do [[ "$1" == -o ]] && out="$2"; shift; done; [[ -n "$out" ]] && echo zip > "$out"; }
+    ditto() {
+      [[ "$1" == -x ]] || return 1
+      local app; app="$(basename "$3" -mac-arm64.zip)"
+      mkdir -p "$4/$(tr 'a-z' 'A-Z' <<<"${app:0:1}")${app:1}.app/Contents"
+    }
+    out="$(artcraft_install_one Gridcraft storytold/gridcraft - 2>&1)"; rc=$?
+    [[ $rc == 3 ]] || { echo "$out"; exit 1; }
+    grep -q "unsigned or its signature is broken" <<<"$out" || exit 2
+    [[ "$(cat "$state/Gridcraft.refused")" == "v1|" && ! -e "$state/Gridcraft.path" ]] || exit 3
+    # The next run asks GitHub's API nothing about the same release.
+    : > "$art/api"; out="$(artcraft_install_one Gridcraft storytold/gridcraft - 2>&1)"; rc=$?
+    [[ $rc == 3 && ! -s "$art/api" ]] || { echo "$out"; exit 4; }
+    grep -q "not downloaded again" <<<"$out" || exit 5
+    # A newer release, or a different pin, is tried.
+    echo v2 > "$art/tag"; out="$(artcraft_install_one Gridcraft storytold/gridcraft - 2>&1)"
+    [[ -s "$art/api" && "$(cat "$state/Gridcraft.refused")" == "v2|" ]] || exit 6
+    : > "$art/api"; artcraft_install_one Gridcraft storytold/gridcraft ABCDE12345 >/dev/null 2>&1
+    [[ -s "$art/api" ]] || exit 7
+    # The step: refusals alone are warnings and it succeeds; a real error fails it.
+    printf 'Gridcraft\tstorytold/gridcraft\tSheets\t-\nDeckcraft\tstorytold/deckcraft\tSlides\t-\n' > "$art/config/grand-line/artcraft.tsv"
+    WARNINGS=(); step_artcraft >/dev/null 2>&1 || exit 8
+    [[ "${#WARNINGS[@]}" == 2 && "${WARNINGS[*]}" == *"Deckcraft was not installed: its release did not pass the signature checks"* ]] || exit 9
+    WARNINGS=(); step_artcraft >/dev/null 2>&1 || exit 10      # again, from what was remembered
+    printf 'Filmcraft\tstorytold/filmcraft\tVideo\t-\n' >> "$art/config/grand-line/artcraft.tsv"; : > "$art/offline-filmcraft"
+    WARNINGS=(); step_artcraft >/dev/null 2>&1 && exit 11
+    [[ "${WARNINGS[*]}" == *"Filmcraft did not install"* ]] || exit 12
+    exit 0
+  ) && t_ok "ArtCraft: a refused release is a warning, not a failed step, and is not fetched again until a newer one" \
+    || t_fail "ArtCraft refusals (step $?)"
+fi
+
 # --- tidy-downloads: rules, sources, age, clashes, never deleting
 # A file's age is when it arrived in Downloads (the mdls stub answers from
 # $MDLS_DATES/<name>; with no answer, the inode change time), never its
@@ -936,6 +985,78 @@ logged() { local _; for _ in 1 2 3 4 5 6 7 8 9 10; do grep -qF -- "$1" "$STUB_LO
   exit 0
 ) && t_ok "apps are signed with hardened runtime by one identity made once, passwords never on a command line" \
   || t_fail "signing (step $?)" "$(tail -5 "$STUB_LOG")"
+
+# An identity macOS will not sign with (its certificate is not trusted for code
+# signing, as on a test machine): never tried, one warning for the run, the
+# apps signed ad hoc on every run, an installed copy signed with it kept.
+(
+  export PATH="$tmp/bin-apps:$PATH" REPO_DIR="$apps_root" DRY_RUN=0 GRAND_LINE_APPS_DEST="$tmp/UntrustedApps"
+  export STUB_SECURITY="$tmp/sec-untrusted" GRAND_LINE_SIGN_KEYCHAIN="$tmp/kc-untrusted/grand-line-signing.keychain-db"
+  source "$ROOT/lib/common.sh"; source "$ROOT/lib/native-apps.sh"
+  SIGN_KEYCHAIN="$GRAND_LINE_SIGN_KEYCHAIN"; mkdir -p "$GRAND_LINE_APPS_DEST"
+  signing_ensure >/dev/null 2>&1 && signing_identity >/dev/null || exit 1
+  : > "$STUB_SECURITY/untrusted"
+  app="$GRAND_LINE_APPS_DEST/Demo App.app"; stamp="$GRAND_LINE_STATE/built-demo"
+  # Two runs' worth of builds in one shell: the first installs, the second
+  # replaces that ad hoc copy (it once failed: an installed copy existed).
+  : > "$STUB_LOG"; rm -f "$stamp"
+  out="$(build_native_apps 2>&1 || echo FAILED1; rm -f "$stamp"; echo '// again' >> "$apps_root/apps/demo/Sources/main.swift"
+         build_native_apps 2>&1 || echo FAILED2)"
+  grep -q FAILED <<<"$out" && { echo "$out"; exit 2; }
+  [[ "$(grep -c "is not trusted for code signing" <<<"$out")" == 1 ]] || { echo "$out"; exit 3; }   # once, not per app
+  grep -q -- "--sign 0123456789ABCDEF" "$STUB_LOG" && exit 4                                       # never tried
+  [[ "$(grep -c "^codesign --force --options runtime .*--sign - .*\.Demo App\.app\.new$" "$STUB_LOG")" == 2 ]] || exit 5
+  grep -q "Could not sign" <<<"$out" && exit 6
+  code_is_adhoc "$app" && signing_check "$app" >/dev/null || exit 7
+  # A copy signed with the identity (by a macOS that signed with it untrusted)
+  # is not replaced by an ad hoc one: the identity is tried for it, and when
+  # it cannot sign, that copy is kept and the next run tries again.
+  STUB_SIGNS_UNTRUSTED=1 codesign --force --options runtime --sign 0123456789ABCDEF0123456789ABCDEF01234567 "$app" 2>/dev/null
+  rm -f "$stamp"; echo '// v3' >> "$apps_root/apps/demo/Sources/main.swift"; : > "$STUB_LOG"
+  out="$(build_native_apps 2>&1)" || { echo "$out"; exit 8; }
+  grep -q "Kept the installed Demo App" <<<"$out" || exit 9
+  code_is_adhoc "$app" && exit 10
+  [[ -f "$stamp" ]] && exit 11
+  grep -q "^codesign --force .*--sign - " "$STUB_LOG" && exit 12
+  compgen -G "$GRAND_LINE_APPS_DEST/.Demo App.app.*" >/dev/null && exit 15
+  # Where macOS still signs with it untrusted, that copy is replaced as usual.
+  : > "$STUB_LOG"; out="$(STUB_SIGNS_UNTRUSTED=1 build_native_apps 2>&1)" || { echo "$out"; exit 16; }
+  grep -q "Kept the installed" <<<"$out" && exit 17
+  codesign -d -r- "$app" 2>&1 | grep -q 'certificate leaf = H"0123456789abcdef' && [[ -f "$stamp" ]] || exit 18
+  rm -f "$stamp"
+  # Trusted again: signed with the identity.
+  rm -f "$STUB_SECURITY/untrusted"; SIGN_USABLE_FOR=""
+  : > "$STUB_LOG"; build_native_apps >/dev/null 2>&1 || exit 13
+  grep -qF -- '--sign 0123456789ABCDEF0123456789ABCDEF01234567 -r =designated' "$STUB_LOG" && [[ -f "$stamp" ]] || exit 14
+  exit 0
+) && t_ok "an identity that cannot sign is not tried: one warning, the apps signed ad hoc on every run, a copy signed with it kept" \
+  || t_fail "untrusted signing identity (step $?)" "$(tail -5 "$STUB_LOG")"
+
+# The helpers in step 09 the same way: not signed with it, the step not failed.
+(
+  trepo="$tmp/tools-repo"; mkdir -p "$trepo/tools" "$tmp/bin-tools" "$tmp/ToolsApps"
+  echo '// hello' > "$trepo/tools/hello.swift"; ln -sfn "$ROOT/migrations" "$trepo/migrations"; ln -sfn "$ROOT/lib" "$trepo/lib"
+  printf '%s\n' '#!/bin/bash' 'echo "swiftc $*" >> "$STUB_LOG"' 'out="${!#}"; printf "#!/bin/sh\n" > "$out"; chmod +x "$out"' > "$tmp/bin-tools/swiftc"
+  chmod +x "$tmp/bin-tools/swiftc"
+  export PATH="$tmp/bin-tools:$PATH" REPO_DIR="$trepo" DRY_RUN=0 GRAND_LINE_APPS_DEST="$tmp/ToolsApps"
+  export STUB_SECURITY="$tmp/sec-untrusted" GRAND_LINE_SIGN_KEYCHAIN="$tmp/kc-untrusted/grand-line-signing.keychain-db"
+  source "$ROOT/lib/common.sh"; source "$ROOT/steps/09-native-tools.sh"
+  : > "$STUB_SECURITY/untrusted"; : > "$STUB_LOG"
+  out="$(step_native_tools 2>&1)" || { echo "$out"; exit 1; }
+  [[ -x "$trepo/.build/hello" ]] || exit 2
+  grep -q "^codesign" "$STUB_LOG" && exit 3
+  [[ "$(grep -c "is not trusted for code signing" <<<"$out")" == 1 ]] || { echo "$out"; exit 4; }
+  grep -q "Could not sign" <<<"$out" && exit 5
+  # Unattended, nothing is rebuilt ad hoc, and that is not a failure either.
+  out="$(GRAND_LINE_UNATTENDED=1 step_native_tools 2>&1)" || { echo "$out"; exit 6; }
+  grep -q "not rebuilt unattended while their signing identity cannot sign" <<<"$out" || exit 7
+  # Trusted: the helper is signed with it under its fixed name.
+  rm -f "$STUB_SECURITY/untrusted"; : > "$STUB_LOG"
+  out="$(step_native_tools 2>&1)" || { echo "$out"; exit 8; }
+  grep -qF -- "--identifier com.grandline.tool.hello --timestamp=none" "$STUB_LOG" && grep -qF -- "--sign 0123456789ABCDEF" "$STUB_LOG" || exit 9
+  exit 0
+) && t_ok "step 09: helpers are not signed with an identity that cannot sign, warned once, the step not failed" \
+  || t_fail "step 09 with an untrusted identity (step $?)" "$(tail -5 "$STUB_LOG")"
 
 (
   export PATH="$tmp/bin-apps:$PATH" REPO_DIR="$apps_root" DRY_RUN=0 GRAND_LINE_APPS_DEST="$tmp/Applications"

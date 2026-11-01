@@ -45,6 +45,11 @@ final class OmnibarTests: XCTestCase {
         XCTAssertTrue(Omnibar.commands(matching: "trash").map(\.command).contains(.moveToTrash))
         XCTAssertEqual(Omnibar.commands(matching: "zzzz"), [])
         XCTAssertEqual(Omnibar.commands(matching: "", limit: 3).map(\.command), [.newWindow, .newTab, .newFolder])
+        // The View menu's "as Columns", typed with or without its menu.
+        XCTAssertEqual(Omnibar.mode(for: ">as columns", origin: .goToFolder), .command("as columns"))
+        XCTAssertEqual(Omnibar.commands(matching: "as columns").first?.command, .viewColumns)
+        XCTAssertEqual(Omnibar.commands(matching: "view as columns").first?.command, .viewColumns)
+        XCTAssertEqual(Omnibar.commands(matching: "columns").first?.command, .viewColumns)
         let available = Omnibar.commands(matching: "trash") { $0 != .moveToTrash }
         XCTAssertFalse(available.map(\.command).contains(.moveToTrash), "commands that do not apply are left out")
     }

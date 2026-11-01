@@ -10,7 +10,7 @@ step_native_tools() {
     warn "Apple's Swift compiler is missing, so the text capture and PDF shrink helpers were skipped."
     return 1
   fi
-  local build="$REPO_DIR/.build" src name failed=0 identity=0 hash=""
+  local build="$REPO_DIR/.build" src name failed=0 identity=0 unusable=0 hash=""
   # shellcheck source=lib/native-apps.sh
   source "$REPO_DIR/lib/native-apps.sh"
   # The identity the apps and helpers are signed with, made once
@@ -18,6 +18,12 @@ step_native_tools() {
   # the apps ad hoc in its place, which would cost them their permissions.
   signing_ensure && identity=1
   [[ "$identity" == 1 && "$DRY_RUN" == 0 ]] && { hash="$(signing_identity)" || identity=0; }
+  # One macOS will not sign with (its certificate is not trusted for code
+  # signing) is not tried at all: the helpers keep their build signature and
+  # the apps are signed ad hoc. signing_usable says so once for the run.
+  if [[ "$identity" == 1 && "$DRY_RUN" == 0 ]] && ! signing_usable; then
+    identity=0; unusable=1
+  fi
   run mkdir -p "$build"
   for src in "$REPO_DIR"/tools/*.swift; do
     name="$(basename "$src" .swift)"
@@ -45,6 +51,12 @@ step_native_tools() {
       failed=1
     fi
   done
+  if [[ "$unusable" == 1 && "${GRAND_LINE_UNATTENDED:-0}" == 1 ]]; then
+    # Not a failure of this run: nothing changes until the certificate is
+    # trusted, and the installed apps keep working.
+    warn "The apps are not rebuilt unattended while their signing identity cannot sign."
+    return "$failed"
+  fi
   if [[ "$identity" == 0 && "${GRAND_LINE_UNATTENDED:-0}" == 1 ]]; then
     warn "The apps are not rebuilt unattended until setup has made their signing identity. Run: update"
     return 1

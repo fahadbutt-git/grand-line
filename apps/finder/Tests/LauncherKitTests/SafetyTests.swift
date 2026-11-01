@@ -270,6 +270,81 @@ final class SafetyTests: XCTestCase {
         XCTAssertNil(MenuProvider.settingDuplicated(by: try menuRow("Style/Graphite\ttheme set graphite")))
     }
 
+    func testThemeModeAndPrefixedCommandsAreDarkModesCopies() throws {
+        XCTAssertEqual(MenuProvider.settingDuplicated(by: try menuRow("Style/Dark or light variant\ttheme mode toggle")), "setting.darkmode")
+        XCTAssertEqual(MenuProvider.settingDuplicated(by: try menuRow("Mine/Dark\t$HOME/.grand-line/bin/theme mode dark")), "setting.darkmode")
+        XCTAssertEqual(MenuProvider.settingDuplicated(by: try menuRow("Mine/Dark\tGRAND_LINE_QUIET=1 exec \"$HOME/.grand-line/bin/toggle\" dark")),
+                       "setting.darkmode")
+        XCTAssertNil(MenuProvider.settingDuplicated(by: try menuRow("Style/Pick a theme\ttheme pick")))
+        XCTAssertNil(MenuProvider.settingDuplicated(by: try menuRow("Mine/Modes\tmode dark")))
+    }
+
+    /// Sight as it runs with ~/.grand-line linked to this repository: the
+    /// shipped menu.tsv, keybindings.tsv and bin/ commands, System Settings'
+    /// panes ("Appearance" answers "dark mode" too) and the settings rows.
+    func shippedEngine() throws -> SearchEngine {
+        let settings = SettingsActionsProvider(paths: paths, runner: FakeMac())
+        let menu = MenuProvider(paths: paths)
+        let menuText = try String(contentsOf: Self.repo.appendingPathComponent("config/grand-line/menu.tsv"), encoding: .utf8)
+        menu.catalog.replace(MenuProvider.results(MenuFile.parse([menuText]), states: nil))
+        let keys = KeybindingsFile.provider(paths)
+        let keysText = try String(contentsOf: Self.repo.appendingPathComponent("config/grand-line/keybindings.tsv"), encoding: .utf8)
+        let bindings = KeybindingsFile.parse(keysText, local: "")
+        XCTAssertGreaterThan(bindings.count, 90, "the shipped shortcuts were read")
+        keys.replace(KeybindingsFile.results(bindings))
+        let commands = CommandsProvider(folder: Self.repo.appendingPathComponent("bin").path)
+        commands.reload()
+        return SearchEngine(providers: [settings, menu, commands, keys, SettingsPanes.provider()])
+    }
+
+    func testTheShippedFilesPutTheSettingsRowOnTopForEverySettingPhrase() throws {
+        let engine = try shippedEngine()
+        for (phrase, id) in [("dark mode", "setting.darkmode"), ("dark", "setting.darkmode"), ("light mode", "setting.darkmode"),
+                             ("wifi", "setting.wifi"), ("hidden files", "setting.hiddenfiles"), ("mute", "setting.mute"),
+                             ("mute mic", "setting.micmute")] {
+            let plan = engine.plan(phrase)
+            let rows = engine.instantRanked(plan)
+            XCTAssertEqual(rows.first?.id, id, "\(phrase): \(rows.prefix(4).map(\.id))")
+            XCTAssertEqual(rows.first?.providerID, SettingsActionsProvider.providerID, phrase)
+            // What the window shows: the settings row as the top hit, the one Return runs.
+            let groups = ResultGrouping.group(rows, topHit: plan.topHit, limitScale: plan.limitScale, layout: .standard)
+            XCTAssertEqual(groups.first?.section, .topHit, phrase)
+            XCTAssertEqual(groups.first?.rows.first?.id, id, phrase)
+            // Nothing left that runs the same change another way.
+            let copies = rows.filter { MenuProvider.settingDuplicated(by: $0) == id }
+            XCTAssertTrue(copies.isEmpty, "\(phrase): \(copies.map(\.id))")
+            // Typed a letter at a time, the row held on top for a shorter query never beats it.
+            var hold = TopRowHold()
+            var top: String?
+            var ends = Array(phrase.indices.dropFirst())
+            ends.append(phrase.endIndex)
+            for end in ends {
+                let partial = engine.plan(String(phrase[..<end]))
+                top = hold.apply(engine.instantRanked(partial), query: partial.query).first?.id
+            }
+            XCTAssertEqual(top, id, "\(phrase), typed")
+        }
+    }
+
+    func testAWholeSettingPhraseOutranksAnAliasOrAnExactTitleElsewhere() {
+        let ranker = Ranker()
+        let setting = LaunchResult(id: "setting.darkmode", title: "Dark mode", icon: .symbol("circle.lefthalf.filled"), section: .system,
+                                   actions: [], providerID: SettingsActionsProvider.providerID,
+                                   match: MatchInfo(alias: .exact, title: .exact, quality: 10_000))
+        let aliased = LaunchResult(id: "app:/Applications/Dark.app", title: "Dark mode", icon: .symbol("app"), section: .apps,
+                                   actions: [], providerID: "apps", match: MatchInfo(alias: .exact, title: .exact, quality: 20_000))
+        let folded = "dark mode"
+        let a = ranker.key(for: setting, folded: folded, frecencies: [:])
+        let b = ranker.key(for: aliased, folded: folded, frecencies: [aliased.id: 1_000], learned: aliased.id)
+        XCTAssertTrue(a.settingPhrase)
+        XCTAssertFalse(b.settingPhrase)
+        XCTAssertTrue(a < b)
+        XCTAssertTrue(a.hasBetterTier(than: b), "the hold never keeps another row above it")
+        var started = setting
+        started.match = MatchInfo(title: .prefix, quality: 10_000)
+        XCTAssertFalse(ranker.key(for: started, folded: "dark m", frecencies: [:]).settingPhrase, "a phrase still being typed is not whole")
+    }
+
     // MARK: Helpers
 
     /// Adds a snapshot, its score, an abbreviation and (optionally) a
@@ -294,6 +369,9 @@ final class SafetyTests: XCTestCase {
         if favourite {
             json["favourites"] = (json["favourites"] as? [String] ?? []) + [row.id]
         }
-        try JSONSerialization.data(withJSONObject: json).write(to: url)
+        // As Sight's own JSONEncoder writes ids: JSONSerialization would
+        // otherwise escape "/" as "\/", and "menu:System/Restart" would not
+        // read back as written.
+        try JSONSerialization.data(withJSONObject: json, options: [.withoutEscapingSlashes]).write(to: url)
     }
 }

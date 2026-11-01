@@ -49,7 +49,11 @@ build_app_folder() {
   if [[ -n "$print" && "$(cat "$stamp" 2>/dev/null)" == "$print" ]]; then
     return 0
   fi
+  APPS_KEPT=0
   build_and_install "$dir" || return 1
+  # An installed copy kept for want of an identity that signs is not this
+  # build: the next run tries again.
+  [[ "$APPS_KEPT" == 1 ]] && return 0
   [[ "$DRY_RUN" == 1 ]] || { mkdir -p "$GRAND_LINE_STATE" && printf '%s\n' "$print" > "$stamp"; }
 }
 
@@ -149,6 +153,18 @@ install_app_bundle() {
     return 0
   fi
   [[ -x "$out/$product" ]] || { warn "The build made no $product program."; return 1; }
+  # Without an identity macOS lists as valid, the new copy is signed ad hoc.
+  # That costs nothing when there is no installed copy or it is ad hoc (or
+  # not signed) itself. An installed copy signed with the identity shows it
+  # did sign on this Mac (older macOS signs with an untrusted certificate), so
+  # it is tried once more; if it cannot sign, that copy is kept, since an ad
+  # hoc one in its place would lose its permissions, and the next run tries
+  # again.
+  SIGN_TRY_IDENTITY=0
+  if have codesign && ! signing_usable && ! adhoc_costs_nothing "$app"; then
+    signing_identity >/dev/null || { keep_installed_copy "$name" ""; return 0; }
+    SIGN_TRY_IDENTITY=1
+  fi
   new="$APPS_DEST/.$name.app.new"
   rm -rf "$new"   # only ever our own half-made copy from a failed run
   mkdir -p "$new/Contents/MacOS" "$new/Contents/Resources"
@@ -163,9 +179,11 @@ install_app_bundle() {
       [[ -z "$lib" || "$lib" == \#* ]] && continue
       [[ -f "$out/lib$lib.dylib" ]] || { warn "The build made no lib$lib.dylib for $name."; rm -rf "$new"; return 1; }
       wrap_framework "$out/lib$lib.dylib" "$fw" "$id.$fw" "$new/Contents/Frameworks/$fw.framework"
-      if have codesign && ! sign_code "$new/Contents/Frameworks/$fw.framework/Versions/A" \
-        && ! { [[ ! -e "$app" ]] && sign_code_adhoc "$new/Contents/Frameworks/$fw.framework/Versions/A"; }; then
-        warn "Could not sign $fw for $name: $SIGN_ERROR"; rm -rf "$new"; return 1
+      if have codesign && ! sign_code "$new/Contents/Frameworks/$fw.framework/Versions/A"; then
+        [[ "$SIGN_TRY_IDENTITY" == 1 ]] && { signing_lock; keep_installed_copy "$name" "$new"; return 0; }
+        if ! { adhoc_costs_nothing "$app" && sign_code_adhoc "$new/Contents/Frameworks/$fw.framework/Versions/A"; }; then
+          warn "Could not sign $fw for $name: $SIGN_ERROR"; rm -rf "$new"; return 1
+        fi
       fi
     done < "$dir/frameworks.tsv"
   fi
@@ -177,8 +195,10 @@ install_app_bundle() {
     SIGN_ADHOC_FALLBACK=0
     if ! sign_code "$new" "$dir/Entitlements/$product.entitlements" "$id"; then
       local first="$SIGN_ERROR"
-      # A first install still gets a working app, signed ad hoc for now.
-      if [[ -e "$app" ]] || ! sign_code_adhoc "$new" "$dir/Entitlements/$product.entitlements"; then
+      [[ "$SIGN_TRY_IDENTITY" == 1 ]] && { signing_lock; keep_installed_copy "$name" "$new"; return 0; }
+      # A first install still gets a working app, signed ad hoc for now, as
+      # does one whose installed copy is ad hoc already (nothing is lost).
+      if ! adhoc_costs_nothing "$app" || ! sign_code_adhoc "$new" "$dir/Entitlements/$product.entitlements"; then
         signing_lock; warn "Could not sign $name ($first). The installed copy is kept."; rm -rf "$new"; return 1
       fi
       SIGN_ADHOC_FALLBACK=1
@@ -186,9 +206,11 @@ install_app_bundle() {
     fi
     signing_lock
     if ! why="$(signing_check "$new")"; then
+      SIGN_TRY_IDENTITY=0
       warn "$why. The installed copy is kept."; rm -rf "$new"; return 1
     fi
   fi
+  SIGN_TRY_IDENTITY=0
   # A running copy is stopped and started again from the new one, so it never
   # keeps running from the Trash.
   local running=0 label reinstall=0 decision
@@ -220,6 +242,22 @@ install_app_bundle() {
   # bin/update reads the list of apps it replaced, for its one notification.
   [[ -n "${GRAND_LINE_APPS_REPORT:-}" ]] && printf '%s\n' "$name" >> "$GRAND_LINE_APPS_REPORT"
   ok "Installed $name"
+}
+
+# keep_installed_copy NAME [NEW]: the installed copy, signed with the
+# identity, stays as it is (NEW, the copy that could not be signed the same
+# way, is removed), and the build is tried again next run.
+keep_installed_copy() {
+  warn "Kept the installed $1: it is signed with \"$SIGN_NAME\", which cannot sign on this Mac now, and an ad hoc copy would ask for its permissions again."
+  [[ -n "${2:-}" ]] && rm -rf "$2"
+  APPS_KEPT=1
+  SIGN_TRY_IDENTITY=0
+}
+
+# adhoc_costs_nothing APP: an ad hoc signed copy may take APP's place: there
+# is no installed copy, or it is signed ad hoc itself, or not at all.
+adhoc_costs_nothing() {
+  [[ ! -e "$1" ]] || code_is_adhoc "$1" || ! codesign -d "$1" >/dev/null 2>&1
 }
 
 # swap_in NEW APP: the installed copy to the Trash, then NEW in its place.

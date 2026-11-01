@@ -1,13 +1,18 @@
 import Foundation
 import IndexKit
 
-/// The fixed rank order: fallbacks last, then exact alias, alias prefix, exact
-/// and prefix titles, a row learned for exactly this abbreviation, the other
-/// title tiers, the keyword tier, and last a blend of fzf's match score and
-/// learned frecency. Smaller sorts first.
+/// The fixed rank order: fallbacks last, then a setting named by its whole
+/// phrase, exact alias, alias prefix, exact and prefix titles, a row learned for
+/// exactly this abbreviation, the other title tiers, the keyword tier, and last
+/// a blend of fzf's match score and learned frecency. Smaller sorts first.
 public struct RankKey: Hashable, Sendable, Comparable {
     public var fallback: Bool
     public var alias: AliasMatch
+    /// A settings row ("setting.darkmode") whose whole phrase was typed ("dark
+    /// mode", "wifi"): it changes the setting in place, so it comes before any
+    /// other row that answers the same words: a menu entry or shortcut that
+    /// runs something close to it, a pane, an app, a symbol, an alias.
+    public var settingPhrase: Bool
     /// MatchTier raw value, or 5 for no title match.
     public var title: Int
     public var keyword: Int
@@ -16,9 +21,11 @@ public struct RankKey: Hashable, Sendable, Comparable {
     /// Picked last time this exact abbreviation was typed (LaunchBar's learning).
     public var learned: Bool
 
-    public init(fallback: Bool, alias: AliasMatch, title: Int, keyword: Int, frecency: Double, quality: Int, learned: Bool = false) {
+    public init(fallback: Bool, alias: AliasMatch, title: Int, keyword: Int, frecency: Double, quality: Int, learned: Bool = false,
+                settingPhrase: Bool = false) {
         self.fallback = fallback
         self.alias = alias
+        self.settingPhrase = settingPhrase
         self.title = title
         self.keyword = keyword
         self.frecency = frecency
@@ -44,6 +51,7 @@ public struct RankKey: Hashable, Sendable, Comparable {
     /// tier, 1 when `b` is, 0 when they share one.
     static func compareTiers(_ a: RankKey, _ b: RankKey) -> Int {
         if a.fallback != b.fallback { return a.fallback ? 1 : -1 }
+        if a.settingPhrase != b.settingPhrase { return a.settingPhrase ? -1 : 1 }
         if a.alias != b.alias { return a.alias < b.alias ? -1 : 1 }
         if a.band != b.band { return a.band < b.band ? -1 : 1 }
         if a.learned != b.learned { return a.learned ? -1 : 1 }
