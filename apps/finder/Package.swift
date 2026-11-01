@@ -36,7 +36,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "GrandLineIndex",
-            dependencies: ["IndexKit", "IndexService"],
+            dependencies: ["IndexKit", "IndexService", .product(name: "AppRuntime", package: "icons")],
             swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [.linkedFramework("ServiceManagement")]
         ),
@@ -61,7 +61,7 @@ let package = Package(
         .executableTarget(
             name: "Nexus",
             dependencies: ["BrowserKit", "QueryKit", "IndexKit", "IndexService", "FileKit", "ArchiveKit", "ThemeKit", "LaunchKit", "SettingsKit",
-                           .product(name: "AppIcon", package: "icons")],
+                           .product(name: "AppIcon", package: "icons"), .product(name: "AppRuntime", package: "icons")],
             swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [.linkedFramework("AppKit"), .linkedFramework("SwiftUI"), .linkedFramework("Quartz"), .linkedFramework("QuickLookThumbnailing")]
         ),
@@ -73,7 +73,7 @@ let package = Package(
         .executableTarget(
             name: "Sight",
             dependencies: ["LauncherKit", "IndexKit", "IndexService", "QueryKit", "ThemeKit", "LaunchKit", "SettingsKit",
-                           .product(name: "AppIcon", package: "icons")],
+                           .product(name: "AppIcon", package: "icons"), .product(name: "AppRuntime", package: "icons")],
             swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [.linkedFramework("AppKit"), .linkedFramework("SwiftUI"), .linkedFramework("Quartz"), .linkedFramework("Carbon"), .linkedFramework("ApplicationServices"), .linkedFramework("CoreServices")]
         ),
@@ -93,6 +93,9 @@ let package = Package(
             dependencies: ["BrowserKit", "FileKit", "IndexKit", "ArchiveKit", "LaunchKit"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
+        // The shared runtime pieces (apps/icons, AppRuntime), tested here so CI runs them.
+        .testTarget(name: "AppRuntimeTests", dependencies: [.product(name: "AppRuntime", package: "icons")],
+                    swiftSettings: [.swiftLanguageMode(.v5)]),
         .testTarget(name: "LauncherKitTests", dependencies: ["LauncherKit", "IndexKit"], swiftSettings: [.swiftLanguageMode(.v5)]),
     ]
 )

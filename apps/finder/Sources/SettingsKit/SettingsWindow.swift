@@ -28,6 +28,26 @@ final class SettingsSelection: ObservableObject {
     }
 }
 
+/// Whether the Settings window is on screen, for panes that keep something
+/// fresh while it is (the index status): they stop when it closes, is
+/// minimised or is covered.
+@MainActor
+final class SettingsVisibility: ObservableObject {
+    @Published var isVisible = false
+}
+
+private struct SettingsWindowVisibleKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+extension EnvironmentValues {
+    /// False while the Settings window is closed, minimised or covered.
+    public var settingsWindowVisible: Bool {
+        get { self[SettingsWindowVisibleKey.self] }
+        set { self[SettingsWindowVisibleKey.self] = newValue }
+    }
+}
+
 /// A standard macOS settings window: the panes in a sidebar on the left, the
 /// chosen one on the right, in the theme's colours. Every sidebar entry has
 /// the accessibility identifier `<app>.settings.<pane>`, and the pane itself
@@ -44,6 +64,7 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     private let panes: [SettingsPane]
     private let selection: SettingsSelection
+    private let visibility = SettingsVisibility()
     private var themeSink: AnyCancellable?
 
     /// The frame is remembered under "<App> Settings".
@@ -64,12 +85,24 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
         self.window = window
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
+        updateVisibility()
     }
+
+    private func updateVisibility(closing: Bool = false) {
+        guard let window else { return }
+        let visible = !closing && window.isVisible && !window.isMiniaturized && window.occlusionState.contains(.visible)
+        if visibility.isVisible != visible { visibility.isVisible = visible }
+    }
+
+    public func windowDidChangeOcclusionState(_ notification: Notification) { updateVisibility() }
+    public func windowDidMiniaturize(_ notification: Notification) { updateVisibility() }
+    public func windowDidDeminiaturize(_ notification: Notification) { updateVisibility() }
+    public func windowWillClose(_ notification: Notification) { updateVisibility(closing: true) }
 
     public var isVisible: Bool { window?.isVisible ?? false }
 
     private func make() -> NSWindow {
-        let root = SettingsRootView(appName: appName, idPrefix: idPrefix, panes: panes, selection: selection)
+        let root = SettingsRootView(appName: appName, idPrefix: idPrefix, panes: panes, selection: selection, visibility: visibility)
             .environmentObject(theme)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 560),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -111,6 +144,7 @@ struct SettingsRootView: View {
     let idPrefix: String
     let panes: [SettingsPane]
     @ObservedObject var selection: SettingsSelection
+    @ObservedObject var visibility: SettingsVisibility
 
     var body: some View {
         HStack(spacing: 0) {
@@ -120,6 +154,7 @@ struct SettingsRootView: View {
             Rectangle().fill(theme.line).frame(width: 1)
             detail
         }
+        .environment(\.settingsWindowVisible, visibility.isVisible)
         .background(theme.background)
         .tint(theme.highlight)
         .preferredColorScheme(theme.colorScheme)

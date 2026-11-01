@@ -288,11 +288,18 @@ final class PaneModel: ObservableObject, Identifiable {
     }
 
     /// Cached sizes come back at once; the rest arrive one by one.
-    private func measureSizes() {
+    /// Measures the folders shown. `after` waits first, so a stream of
+    /// changes deep inside them (an app writing its caches below the home
+    /// folder) measures once when it calms down, not on every event.
+    private func measureSizes(after delay: TimeInterval = 0) {
         sizeTask?.cancel()
         let folders = state.items.filter(\.isFolder).map(\.url)
         let sizes = services.folderSizes
         sizeTask = Task { [weak self] in
+            if delay > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                if Task.isCancelled { return }
+            }
             for url in folders {
                 if Task.isCancelled { return }
                 let result = await sizes.size(of: url)
@@ -327,9 +334,12 @@ final class PaneModel: ObservableObject, Identifiable {
         } else if direct, location.folderURL == folder {
             loadFolder(folder)
         } else {
-            measureSizes()
+            measureSizes(after: Self.deepChangeDelay)
         }
     }
+
+    /// How long sizes wait after a change below the folders shown.
+    static let deepChangeDelay: TimeInterval = 2
 
     private func stopWatching() {
         watchTask?.cancel()

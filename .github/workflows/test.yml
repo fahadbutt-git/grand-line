@@ -170,6 +170,21 @@ jobs:
         run: >-
           "$DRIVER" --apps "$APPS_OUT" --fixture-script tests/journeys/make-fixture.sh
           --out "$RESULTS" --only notch --github --total-timeout 540
+      - name: No app stalled its main thread for over a second
+        if: always() && steps.build.outcome == 'success'
+        # Each app's hang watchdog writes "main thread stalled N ms" to its
+        # log in the fixture home (~/Library/Logs/grand-line).
+        run: |
+          [ -d "$RESULTS/homes" ] || exit 0
+          worst=0; where=""
+          while IFS= read -r line; do
+            ms="$(printf '%s' "$line" | sed -n 's/.*main thread stalled \([0-9]*\) ms.*/\1/p')"
+            [ -n "$ms" ] || continue
+            echo "::notice title=main-thread stall::$line"
+            if [ "$ms" -gt "$worst" ]; then worst="$ms"; where="$line"; fi
+          done < <(grep -rH "main thread stalled" "$RESULTS"/homes/*/journeyhome/Library/Logs/grand-line/ 2>/dev/null || true)
+          if [ "$worst" -gt 1000 ]; then echo "::error title=main-thread stall::$where"; exit 1; fi
+          echo "::notice title=main-thread stalls::longest ${worst} ms"
       - name: Zip the screenshots
         if: always()
         run: |
@@ -183,6 +198,51 @@ jobs:
         with:
           name: journey-screenshots
           path: ${{ runner.temp }}/journeys.zip
+          if-no-files-found: ignore
+
+  budgets:
+    name: Resource budgets (macOS 27)
+    runs-on: xcode-27
+    permissions:
+      contents: read
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - name: Build the app bundles
+        id: build
+        timeout-minutes: 25
+        run: |
+          set -o pipefail
+          APPS_OUT="$RUNNER_TEMP/apps" PERF_OUT="$RUNNER_TEMP/perf"
+          printf 'APPS_OUT=%s\nPERF_OUT=%s\n' "$APPS_OUT" "$PERF_OUT" >> "$GITHUB_ENV"
+          export GRAND_LINE_APPS_DEST="$APPS_OUT" REPO_DIR="$GITHUB_WORKSPACE" DRY_RUN=0
+          mkdir -p "$APPS_OUT" "$PERF_OUT"
+          # The same app folders and build as the journeys job.
+          for folder in $(grep -v '^#' tests/journeys/apps.tsv | cut -f2 | sort -u); do
+            if ! bash -c 'source lib/common.sh && source lib/native-apps.sh && build_and_install "$1"' _ "$folder" 2>&1 | tee build.log; then
+              echo "::error title=budgets build $folder::$(grep -E 'error:' build.log | head -20 | awk 'BEGIN{ORS="%0A"} {gsub(/%/,"%25"); print}')"; exit 1
+            fi
+          done
+          ls "$APPS_OUT"
+      - name: The shell tools the package's zsh lines load
+        run: brew install starship zoxide fzf mise eza || echo "::warning title=budgets::some shell tools did not install; shell startup is measured without them"
+      - name: Allow the measuring script to type and read back through System Events
+        timeout-minutes: 5
+        run: bash tests/journeys/grant-tcc.sh --automation "$APPS_OUT/Sight.app" /usr/bin/osascript
+      - name: Link the package where the apps look for its commands
+        run: ln -sfn "$GITHUB_WORKSPACE" "$HOME/.grand-line"
+      - name: Measure idle, bursts, focus, shell startup and launch agents
+        if: steps.build.outcome == 'success'
+        timeout-minutes: 30
+        run: bash tests/perf/run.sh --apps "$APPS_OUT" --out "$PERF_OUT"
+      - name: Keep the measurements
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: resource-budgets
+          path: ${{ runner.temp }}/perf/results
           if-no-files-found: ignore
 
   full-install:

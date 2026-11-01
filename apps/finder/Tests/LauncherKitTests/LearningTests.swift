@@ -32,6 +32,28 @@ final class LearningTests: XCTestCase {
         XCTAssertEqual(scores["test:Old"]!, pow(0.5, 10.0 / 7) * 0.25, accuracy: 1e-9)
     }
 
+    func testASaveWithNothingLearnedWritesNothing() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("usage-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let usage = UsageStore(fileURL: url)
+        XCTAssertFalse(usage.hasUnsavedChanges)
+        try usage.saveIfChanged()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path), "nothing learned, nothing written")
+        usage.record(Make.row("Notes"), query: router.parse("no"))
+        XCTAssertTrue(usage.hasUnsavedChanges)
+        try usage.saveIfChanged()
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        XCTAssertFalse(usage.hasUnsavedChanges)
+        let written = try FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 0)], ofItemAtPath: url.path)
+        try usage.saveIfChanged()
+        let after = try FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date
+        XCTAssertEqual(after, Date(timeIntervalSince1970: 0), "an unchanged store is not written again")
+        XCTAssertNotNil(written)
+        usage.toggleFavourite(Make.row("Notes"))
+        XCTAssertTrue(usage.hasUnsavedChanges)
+    }
+
     // MARK: LaunchBar abbreviations
 
     func testFirstPickAssignsTheAbbreviation() {

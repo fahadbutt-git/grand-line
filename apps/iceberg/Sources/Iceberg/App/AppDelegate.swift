@@ -1,5 +1,6 @@
 import AppIcon
 import AppKit
+import AppRuntime
 import Combine
 import IcebergKit
 
@@ -14,14 +15,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: SettingsWindow!
     private var statusItem: NSStatusItem?
     private var settingsSink: AnyCancellable?
+    /// ~/Library/Logs/grand-line/iceberg.log, where Log writes too.
+    private let runtimeLog = AppLog(name: "iceberg")
+    private lazy var watchdog = HangWatchdog(log: runtimeLog)
+    private lazy var crashRecord = CrashGuard(name: "iceberg", log: runtimeLog)
+    private var activeObservers: [NSObjectProtocol] = []
+    private var termination: DispatchSourceSignal?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // After three crashes in ten minutes Iceberg stays closed (and says so once).
+        guard crashRecord.launch(displayName: "Iceberg") else { exit(0) }
+        termination = TerminationSignal.handle { DispatchQueue.main.async { MainActor.assumeIsolated { NSApp.terminate(nil) } } }
         theme = ThemeStore(paths: paths)
         host = PanelHost(paths: paths, theme: theme)
         settingsWindow = SettingsWindow(host: host)
         host.onLayoutChange = { [weak self] in self?.rebuildPanels(force: true) }
         host.openSettings = { [weak self] in self?.showSettings() }
         host.hotKey.action = { [weak self] in self?.targetController()?.toggle() }
+        let dog = watchdog
+        host.onPanelOpen = { dog.noteUse() }
+        let center = NotificationCenter.default
+        activeObservers = [
+            center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in dog.setActive(true) },
+            center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { _ in dog.setActive(false) },
+        ]
         NSApp.mainMenu = makeMainMenu()
         rebuildPanels(force: false)
         settingsSink = host.$settings
@@ -63,6 +80,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func showSettings() {
         settingsWindow.show()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        crashRecord.quitCleanly()
     }
 
     @objc private func togglePanel() { targetController()?.toggle() }

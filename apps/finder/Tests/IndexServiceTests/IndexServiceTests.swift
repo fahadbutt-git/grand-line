@@ -143,6 +143,49 @@ final class IndexServiceTests: XCTestCase {
 
     // MARK: Names and signatures
 
+    // MARK: Staying light
+
+    func testTheCopyGoesAMinuteAfterItsLastUseOnceTheServiceAnswers() {
+        let now = Date()
+        XCTAssertEqual(SharedIndexClient.copyRelease(up: true, loaded: false, lastLocalUse: now, now: now), .keep)
+        XCTAssertEqual(SharedIndexClient.copyRelease(up: false, loaded: true, lastLocalUse: .distantPast, now: now), .keep,
+                       "while the service is out of reach the copy answers")
+        XCTAssertEqual(SharedIndexClient.copyRelease(up: true, loaded: true, lastLocalUse: .distantPast, now: now), .now,
+                       "a copy loaded for a slow start and never used goes at once")
+        guard case .after(let wait) = SharedIndexClient.copyRelease(up: true, loaded: true, lastLocalUse: now.addingTimeInterval(-20), now: now) else {
+            return XCTFail("a copy used 20 s ago is looked at again later")
+        }
+        XCTAssertEqual(wait, 40, accuracy: 0.01)
+        XCTAssertEqual(SharedIndexClient.copyRelease(up: true, loaded: true, lastLocalUse: now.addingTimeInterval(-61), now: now), .now)
+    }
+
+    func testWarmingIsAtMostOnceAMinute() {
+        var gate = WarmGate()
+        let t = Date()
+        XCTAssertTrue(gate.shouldWarm(at: t))
+        XCTAssertFalse(gate.shouldWarm(at: t.addingTimeInterval(10)))
+        XCTAssertFalse(gate.shouldWarm(at: t.addingTimeInterval(59)))
+        XCTAssertTrue(gate.shouldWarm(at: t.addingTimeInterval(61)))
+    }
+
+    func testPeriodicWakeUpsMayComeAFifthLate() {
+        XCTAssertEqual(IndexServiceCore.tolerance(for: 300), 60, accuracy: 0.001)
+        XCTAssertGreaterThanOrEqual(IndexServiceCore.tolerance(for: 300), 300 * 0.1)
+    }
+
+    func testChangeNoticesWaitOnTheIndexInsteadOfPolling() async throws {
+        let index = FileIndex(roots: [home], exclusions: IndexExclusions.home(home))
+        await index.build()
+        var iterator = index.generationChanges.makeAsyncIterator()
+        // The build changed it: one element waits, however many steps it took.
+        let first: Void? = await iterator.next()
+        XCTAssertNotNil(first)
+        try make("Documents/new note.txt")
+        await index.apply([FolderChange(path: FolderWatcher.realPath(home + "/Documents"))])
+        let second: Void? = await iterator.next()
+        XCTAssertNotNil(second)
+    }
+
     func testServiceNames() {
         XCTAssertEqual(IndexServiceName.forClient([:]), "com.grandline.index")
         XCTAssertNil(IndexServiceName.forClient(["GRAND_LINE_JOURNEY": "1"]), "a journey never uses the Mac's own index")

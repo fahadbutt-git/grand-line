@@ -47,7 +47,14 @@ public actor FileIndex {
     private var partialSave: (url: URL, every: TimeInterval, last: Date)?
     private var partialWrite: Task<Void, Never>?
     /// Changes whenever entries are added, removed or renumbered.
-    private var generation = 0
+    private var generation = 0 {
+        didSet { generationContinuation.yield() }
+    }
+    /// One element whenever `changeCount` moves, the newest only, so a
+    /// listener (the index service's change notices) waits without polling
+    /// and a burst of changes reaches it as one.
+    public nonisolated let generationChanges: AsyncStream<Void>
+    private nonisolated let generationContinuation: AsyncStream<Void>.Continuation
     /// The last query and every entry it matched, so a query typed on from it
     /// only searches those. Callers that keep their own (one per client of the
     /// index service) pass it to `search(_:limit:scope:narrowing:)` instead.
@@ -63,6 +70,9 @@ public actor FileIndex {
         self.lastEventID = FolderWatcher.currentEventID
         self.volumes = [:]
         self.isComplete = false
+        let made = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
+        generationChanges = made.stream
+        generationContinuation = made.continuation
     }
 
     init(
@@ -78,10 +88,14 @@ public actor FileIndex {
         self.lastEventID = lastEventID
         self.volumes = volumes
         self.isComplete = complete
+        let made = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
+        generationChanges = made.stream
+        generationContinuation = made.continuation
     }
 
     deinit {
         watchTask?.cancel()
+        generationContinuation.finish()
     }
 
     /// Files and folders in the index.
@@ -112,9 +126,14 @@ public actor FileIndex {
         isBuilding = true
         rebuildWanted = false
         partialSave = publishPartial ? snapshot.map { (url: $0, every: every, last: Date()) } : nil
+        // A background walk (the weekly sweep) also reads the disk at the
+        // throttled I/O tier, so it never slows the apps in front.
+        let throttled = priority == .background
         let built = await Task.detached(priority: priority) {
-            FolderScanner.build(roots: roots, exclusions: exclusions, order: order, interval: publishPartial ? 0.25 : .infinity) { partial in
-                Task { await self.adopt(partial, build: id) }
+            ThrottledIO.run(throttled) {
+                FolderScanner.build(roots: roots, exclusions: exclusions, order: order, interval: publishPartial ? 0.25 : .infinity) { partial in
+                    Task { await self.adopt(partial, build: id) }
+                }
             }
         }.value
         guard id == buildID else { return }

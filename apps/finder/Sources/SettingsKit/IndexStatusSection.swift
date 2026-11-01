@@ -36,6 +36,7 @@ public final class IndexStatusModel: ObservableObject {
 public struct IndexStatusSection: View {
     @EnvironmentObject private var theme: SettingsTheme
     @ObservedObject var model: IndexStatusModel
+    @Environment(\.settingsWindowVisible) private var windowVisible
     let idPrefix: String
     let allowsRebuild: Bool
     let home: String
@@ -86,7 +87,10 @@ public struct IndexStatusSection: View {
                 }
             }
         }
-        .task {
+        // Fresh every two seconds while the window is on screen, and not at
+        // all while it is closed, minimised or covered.
+        .task(id: windowVisible) {
+            guard windowVisible else { return }
             while !Task.isCancelled {
                 await model.refresh()
                 try? await Task.sleep(nanoseconds: 2_000_000_000)

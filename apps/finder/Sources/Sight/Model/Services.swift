@@ -66,8 +66,9 @@ final class Services {
         reloadSources(force: true)
     }
 
+    /// Writes what Sight learned, only when it learned something.
     func save() {
-        try? usage.save()
+        try? usage.saveIfChanged()
         names.save()
     }
 

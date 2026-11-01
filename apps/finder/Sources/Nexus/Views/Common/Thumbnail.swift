@@ -33,7 +33,15 @@ struct Thumbnail: View {
 @MainActor
 final class ThumbnailCache {
     static let shared = ThumbnailCache()
-    private let cache = NSCache<NSString, NSImage>()
+    /// At most 600 thumbnails or about 48 MB of pixels; macOS also empties
+    /// it under memory pressure. A folder of thousands of images scrolls
+    /// through it rather than piling up.
+    private let cache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 600
+        cache.totalCostLimit = 48 * 1024 * 1024
+        return cache
+    }()
 
     func image(for url: URL, size: CGFloat) async -> NSImage? {
         let key = "\(url.path)#\(Int(size))" as NSString
@@ -42,7 +50,9 @@ final class ThumbnailCache {
         let request = QLThumbnailGenerator.Request(fileAt: url, size: CGSize(width: size, height: size), scale: scale, representationTypes: .thumbnail)
         guard let representation = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request) else { return nil }
         let image = representation.nsImage
-        cache.setObject(image, forKey: key)
+        // The cost is the pixels drawn: side x side x scale squared x 4 bytes.
+        let cost = Int(size * size * scale * scale * 4)
+        cache.setObject(image, forKey: key, cost: cost)
         return image
     }
 }

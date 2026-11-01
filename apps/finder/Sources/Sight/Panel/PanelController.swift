@@ -13,8 +13,11 @@ final class PanelController: NSObject, NSWindowDelegate {
     private let panel: SearchPanel
     private var monitor: Any?
     private var changes: AnyCancellable?
+    private var shadowPending = false
     /// Command + Comma in the search window opens Settings.
     var openSettings: (() -> Void)?
+    /// The window was shown (true) or hidden (false).
+    var onVisibilityChange: ((Bool) -> Void)?
 
     init(services: Services) {
         self.services = services
@@ -26,9 +29,17 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.delegate = self
         model.hide = { [weak self] in self?.hide() }
         model.show = { [weak self] in self?.show() }
-        // The window is clear, so its shadow follows what is drawn: redraw it as rows change.
+        // The window is clear, so its shadow follows what is drawn: redraw it
+        // as rows change, once per turn of the run loop however many changes
+        // came, and never while the window is hidden.
         changes = model.objectWillChange.sink { [weak self] _ in
-            DispatchQueue.main.async { self?.panel.invalidateShadow() }
+            guard let self, !self.shadowPending else { return }
+            self.shadowPending = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.shadowPending = false
+                if self.panel.isVisible { self.panel.invalidateShadow() }
+            }
         }
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, event.window === self.panel else { return event }
@@ -54,6 +65,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         position()
         panel.appearance = NSAppearance(named: themes.theme.appearanceName)
         panel.makeKeyAndOrderFront(nil)
+        onVisibilityChange?(true)
         // The field exists once SwiftUI has laid the window out, the first time only.
         if model.field == nil { panel.layoutIfNeeded() }
         if let field = model.field {
@@ -72,7 +84,9 @@ final class PanelController: NSObject, NSWindowDelegate {
 
     func hide() {
         model.actionPanel = nil
+        let wasVisible = panel.isVisible
         panel.orderOut(nil)
+        if wasVisible { onVisibilityChange?(false) }
     }
 
     /// Centred on the screen with the pointer, a fifth of the way down.

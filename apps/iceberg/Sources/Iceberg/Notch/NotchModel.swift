@@ -11,6 +11,10 @@ final class NotchModel: ObservableObject {
     @Published var showsLiveActivity = false
     /// System Settings, Accessibility, Display, Reduce motion.
     @Published var reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    /// Low Power Mode, and displays asleep: the playing bars rest then.
+    @Published private(set) var lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+    @Published private(set) var displaysAsleep = false
+    private var powerObservers: [NSObjectProtocol] = []
     @Published private(set) var screen: ScreenInfo
     @Published private(set) var style: PanelStyle
     @Published private(set) var content = PanelContent(sections: 0, userWidgets: 0)
@@ -21,6 +25,30 @@ final class NotchModel: ObservableObject {
     init(screen: ScreenInfo, style: PanelStyle) {
         self.screen = screen
         self.style = style
+        let workspace = NSWorkspace.shared.notificationCenter
+        powerObservers = [
+            NotificationCenter.default.addObserver(forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled }
+            },
+            workspace.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.displaysAsleep = true }
+            },
+            workspace.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.displaysAsleep = false }
+            },
+        ]
+    }
+
+    deinit {
+        for observer in powerObservers {
+            NotificationCenter.default.removeObserver(observer)
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
+    }
+
+    /// Whether the closed notch's playing bars move (`WakePolicy.barsMove`).
+    func barsMove(playing: Bool) -> Bool {
+        WakePolicy.barsMove(playing: playing, reduceMotion: reduceMotion, lowPower: lowPower, displaysAsleep: displaysAsleep)
     }
 
     func update(screen: ScreenInfo, style: PanelStyle) {

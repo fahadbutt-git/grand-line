@@ -167,12 +167,21 @@ install_app_bundle() {
   fi
   # A running copy is stopped and started again from the new one, so it never
   # keeps running from the Trash.
-  local running=0 label reinstall=0
+  local running=0 label reinstall=0 decision
   label="$(service_label "$dir" "$product")"
   [[ -e "$app" ]] && reinstall=1
   # A background service is restarted by launchd (below), not here.
   if [[ -z "$label" && -e "$app" && "${GRAND_LINE_APPS_SCRATCH:-0}" != 1 ]] && pgrep -x "$product" >/dev/null 2>&1; then
     running=1
+  fi
+  # The unattended update never swaps an app you are using: the new copy
+  # waits beside it and goes in at the next quiet moment (apply_staged_apps).
+  if [[ "$running" == 1 && "${GRAND_LINE_UNATTENDED:-0}" == 1 ]]; then
+    decision="$(swap_probe "$id" "$product")"
+    if [[ "$decision" != swap ]]; then
+      stage_app_bundle "$new" "$name" "${decision#stage:}"
+      return 0
+    fi
   fi
   # The installed copy goes to the Trash. A folder's own build.sh replaces
   # its last build in place (GRAND_LINE_APPS_SCRATCH=1): that is build output.
@@ -180,18 +189,102 @@ install_app_bundle() {
   elif [[ -e "$app" ]]; then move_to_trash "$app"; fi
   mv "$new" "$app"
   [[ -x "$LSREGISTER" ]] && "$LSREGISTER" -f "$app" >/dev/null 2>&1
-  if [[ "$running" == 1 ]]; then
-    pkill -TERM -x "$product" >/dev/null 2>&1
-    local _
-    for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -x "$product" >/dev/null 2>&1 || break; sleep 0.5; done
-    open -g "$app" >/dev/null 2>&1
-  fi
+  # A staged copy from an earlier run is older than this one.
+  rm -rf "$APPS_DEST/.$name.app.staged"
+  [[ "$running" == 1 ]] && relaunch_app "$app" "$product" "$agent"
+
   if [[ -n "$label" && "${GRAND_LINE_APPS_SCRATCH:-0}" != 1 ]]; then
     register_service "$app" "$product" "$label" "$reinstall"
   fi
   # bin/update reads the list of apps it replaced, for its one notification.
   [[ -n "${GRAND_LINE_APPS_REPORT:-}" ]] && printf '%s\n' "$name" >> "$GRAND_LINE_APPS_REPORT"
   ok "Installed $name"
+}
+
+# relaunch_app APP PRODUCT AGENT: quit the running copy (SIGTERM, which the
+# apps treat as a normal quit) and start the new one in the background:
+# `open -g` never brings it forward or takes the keyboard, and an app with a
+# Dock icon (AGENT not yes) also starts hidden (-j), so no window appears
+# over what you are doing.
+relaunch_app() {
+  local app="$1" product="$2" agent="$3" _
+  pkill -TERM -x "$product" >/dev/null 2>&1
+  for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -x "$product" >/dev/null 2>&1 || break; sleep 0.5; done
+  if [[ "$agent" == yes ]]; then open -g "$app" >/dev/null 2>&1
+  else open -g -j "$app" >/dev/null 2>&1; fi
+  return 0
+}
+
+# swap_decision IDLE FRONT ID BUSY SHARING PRESENTING: whether the unattended
+# update may replace a running app now. IDLE is seconds since the last key
+# or pointer move, FRONT the bundle id of the app in front, BUSY 1 when the
+# app says it is mid-task, SHARING 1 while the screen is shared, PRESENTING 1
+# while something keeps the display awake (a presentation, a video call, a
+# film). Prints swap, or stage:<why>.
+SWAP_IDLE_SECONDS=600
+swap_decision() {
+  local idle="${1:-0}" front="$2" id="$3" busy="$4" sharing="$5" presenting="$6"
+  [[ "$idle" =~ ^[0-9]+$ ]] || idle=0
+  if [[ "$sharing" == 1 ]]; then echo "stage:the screen is being shared"
+  elif [[ "$presenting" == 1 ]]; then echo "stage:something is presenting or playing"
+  elif [[ -n "$front" && "$front" == "$id" ]]; then echo "stage:it is the app in front"
+  elif [[ "$busy" == 1 ]]; then echo "stage:it is in the middle of something"
+  elif (( idle < SWAP_IDLE_SECONDS )); then echo "stage:the Mac is in use"
+  else echo swap
+  fi
+}
+
+# swap_probe ID PRODUCT: swap_decision with this Mac's readings, each one a
+# single cheap command.
+swap_probe() {
+  local id="$1" product="$2" idle front busy=0 sharing=0 presenting=0 marker pid
+  idle="$(ioreg -c IOHIDSystem -d 4 2>/dev/null | awk '/HIDIdleTime/ { print int($NF / 1000000000); exit }')"
+  front="$(lsappinfo info -only bundleid "$(lsappinfo front 2>/dev/null)" 2>/dev/null | sed -n 's/.*"CFBundleIdentifier"="\([^"]*\)".*/\1/p')"
+  marker="$HOME/.local/state/grand-line-runtime/$(printf '%s' "$product" | tr '[:upper:]' '[:lower:]').busy"
+  if [[ -f "$marker" ]]; then
+    pid="$(head -1 "$marker" 2>/dev/null)"
+    [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null && busy=1
+  fi
+  pgrep -x screensharingd >/dev/null 2>&1 && sharing=1
+  pmset -g assertions 2>/dev/null | grep -qE '^[[:space:]]*PreventUserIdleDisplaySleep[[:space:]]+1' && presenting=1
+  swap_decision "${idle:-0}" "$front" "$id" "$busy" "$sharing" "$presenting"
+}
+
+# stage_app_bundle NEW NAME WHY: keep the new, signed copy beside the
+# installed one ($APPS_DEST/.NAME.app.staged) for apply_staged_apps.
+stage_app_bundle() {
+  local new="$1" name="$2" why="$3" staged="$APPS_DEST/.$2.app.staged"
+  rm -rf "$staged"
+  mv "$new" "$staged"
+  ok "$name: the new version waits ($why); it goes in when the Mac is idle, at the next update or login"
+  [[ -n "${GRAND_LINE_APPS_REPORT:-}" ]] && printf '%s\n' "$name (waiting)" >> "$GRAND_LINE_APPS_REPORT"
+  return 0
+}
+
+# apply_staged_apps: put in the copies an earlier unattended run left
+# waiting: at once for an app that is not running, and for a running one
+# only when swap_probe says the moment is quiet. bin/update runs it first.
+apply_staged_apps() {
+  local list product name id agent staged app
+  for list in "$REPO_DIR"/apps/*/apps.tsv; do
+    [[ -f "$list" ]] || continue
+    while IFS=$'\t' read -r product name id agent; do
+      [[ -z "$product" || "$product" == \#* ]] && continue
+      staged="$APPS_DEST/.$name.app.staged"
+      app="$APPS_DEST/$name.app"
+      [[ -d "$staged" ]] || continue
+      local running=0
+      pgrep -x "$product" >/dev/null 2>&1 && running=1
+      if [[ "$running" == 1 && "$(swap_probe "$id" "$product")" != swap ]]; then continue; fi
+      if [[ "$DRY_RUN" == 1 ]]; then run "put in the waiting copy of $name"; continue; fi
+      [[ -e "$app" ]] && move_to_trash "$app"
+      mv "$staged" "$app"
+      [[ -x "$LSREGISTER" ]] && "$LSREGISTER" -f "$app" >/dev/null 2>&1
+      [[ "$running" == 1 ]] && relaunch_app "$app" "$product" "$agent"
+      ok "Installed the waiting copy of $name"
+    done < "$list"
+  done
+  return 0
 }
 
 # wrap_framework LIB NAME ID DEST: a framework bundle holding one library.

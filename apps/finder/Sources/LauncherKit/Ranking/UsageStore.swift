@@ -54,6 +54,9 @@ public final class UsageStore: @unchecked Sendable {
     let now: @Sendable () -> Date
     private let lock = NSLock()
     private var data = Stored()
+    /// Counts changes, so a save with nothing new writes nothing.
+    private var revision = 0
+    private var savedRevision = 0
     static let maxResults = 2_000
     static let maxQueries = 2_000
     /// Rows remembered per typed query; the weakest go first.
@@ -102,6 +105,7 @@ public final class UsageStore: @unchecked Sendable {
     public func reset() {
         lock.lock()
         data = Stored()
+        revision += 1
         lock.unlock()
     }
 
@@ -112,6 +116,7 @@ public final class UsageStore: @unchecked Sendable {
         let date = now()
         lock.lock()
         defer { lock.unlock() }
+        revision += 1
         data.global[result.id] = bumped(data.global[result.id], at: date)
         var snapshot = result
         snapshot.match = .unmatched
@@ -213,6 +218,7 @@ public final class UsageStore: @unchecked Sendable {
 
     public func toggleFavourite(_ result: LaunchResult) {
         lock.lock()
+        revision += 1
         defer { lock.unlock() }
         if let index = data.favourites.firstIndex(of: result.id) {
             data.favourites.remove(at: index)
@@ -228,6 +234,7 @@ public final class UsageStore: @unchecked Sendable {
     /// Forgets a result everywhere, for rows whose file is gone.
     public func forget(_ id: String) {
         lock.lock()
+        revision += 1
         defer { lock.unlock() }
         data.global[id] = nil
         data.snapshots[id] = nil
@@ -236,16 +243,34 @@ public final class UsageStore: @unchecked Sendable {
         for (key, entry) in data.abbreviations where entry.id == id { data.abbreviations[key] = nil }
     }
 
+    /// Whether anything was learned or forgotten since the last save.
+    public var hasUnsavedChanges: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return revision != savedRevision
+    }
+
+    /// Saves only when something changed since the last save (the periodic
+    /// save and quitting), so an unused launcher never touches the disk.
+    public func saveIfChanged() throws {
+        guard hasUnsavedChanges else { return }
+        try save()
+    }
+
     public func save() throws {
         guard let fileURL else { return }
         lock.lock()
         let copy = data
+        let saving = revision
         lock.unlock()
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .secondsSince1970
         let raw = try encoder.encode(copy)
         try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try raw.write(to: fileURL, options: .atomic)
+        lock.lock()
+        savedRevision = max(savedRevision, saving)
+        lock.unlock()
     }
 
     /// Keeps the store small: the weakest results and queries go first. Favourites stay.

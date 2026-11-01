@@ -25,6 +25,8 @@ final class PanelHost: ObservableObject {
     var onLayoutChange: (@MainActor () -> Void)?
     /// Opens the Settings window (set by the app delegate).
     var openSettings: (@MainActor () -> Void)?
+    /// A panel opened (the app delegate's hang watchdog watches a while).
+    var onPanelOpen: (@MainActor () -> Void)?
 
     /// The keyboard shortcut that opens or closes the panel (`toggle_shortcut`).
     let hotKey: HotKey
@@ -180,6 +182,7 @@ final class PanelHost: ObservableObject {
     }
 
     func panelWillOpen() {
+        onPanelOpen?()
         openPanels += 1
         guard openPanels == 1 else { return }
         for w in builtins { w.panelWillOpen() }

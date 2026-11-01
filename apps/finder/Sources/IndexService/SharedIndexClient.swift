@@ -28,6 +28,8 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
     private var lastLocalUse = Date.distantPast
     private var changeHandler: (@Sendable (Int) -> Void)?
     private var lateHandler: (@Sendable () -> Void)?
+    /// A release check of the copy is waiting to run.
+    private var releaseScheduled = false
     /// How long a search gives the service before the copy races it. The
     /// service is the one that knows about files made while an app was closed.
     public let headStart: TimeInterval
@@ -47,6 +49,27 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
 
     static let retryAfter: TimeInterval = 2
     static let startEvery: TimeInterval = 60
+    /// How long the copy is kept after its last use once the service answers.
+    static let copyRetention: TimeInterval = 60
+
+    /// What to do with the client's own copy of the index.
+    enum CopyRelease: Equatable {
+        /// Not loaded, or still needed while the service is out of reach.
+        case keep
+        case now
+        /// Look again after this long.
+        case after(TimeInterval)
+    }
+
+    /// The copy goes once the service has answered and the copy has not been
+    /// used for `retention` seconds, so an app does not hold a second index
+    /// in memory for long after a slow start.
+    static func copyRelease(up: Bool, loaded: Bool, lastLocalUse: Date, now: Date,
+                            retention: TimeInterval = SharedIndexClient.copyRetention) -> CopyRelease {
+        guard loaded, up else { return .keep }
+        let idle = now.timeIntervalSince(lastLocalUse)
+        return idle >= retention ? .now : .after(retention - idle)
+    }
 
     public init(
         home: String = NSHomeDirectory(),
@@ -92,7 +115,10 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
         Task.detached(priority: .userInitiated) { [self] in
             _ = self.shouldAskService()
             try? await Task.sleep(nanoseconds: 1_000_000_000)
-            if self.currentState != .up, self.currentState != .refused { _ = await self.local.index() }
+            if self.currentState != .up, self.currentState != .refused {
+                _ = await self.local.index()
+                self.scheduleCopyRelease()
+            }
         }
     }
 
@@ -337,9 +363,35 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
     func markUp() {
         lock.lock()
         if state != .refused { state = .up }
-        let releaseCopy = Date().timeIntervalSince(lastLocalUse) > 60
         lock.unlock()
-        if releaseCopy { local.releaseIfIdle() }
+        scheduleCopyRelease()
+    }
+
+    /// Lets the copy go when `copyRelease` says so, or checks again when it
+    /// may; one check waits at a time, and none while there is no copy.
+    func scheduleCopyRelease() {
+        lock.lock()
+        guard !releaseScheduled else {
+            lock.unlock()
+            return
+        }
+        let decision = Self.copyRelease(up: state == .up, loaded: local.isLoaded, lastLocalUse: lastLocalUse, now: Date())
+        if case .after = decision { releaseScheduled = true }
+        lock.unlock()
+        switch decision {
+        case .keep:
+            break
+        case .now:
+            local.releaseIfIdle()
+        case .after(let wait):
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + wait + 1) { [weak self] in
+                guard let self else { return }
+                self.lock.lock()
+                self.releaseScheduled = false
+                self.lock.unlock()
+                self.scheduleCopyRelease()
+            }
+        }
     }
 
     func markDown() {
@@ -370,6 +422,7 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
         lock.lock()
         lastLocalUse = Date()
         lock.unlock()
+        scheduleCopyRelease()
     }
 
     fileprivate func receivedChange(_ files: Int) {
@@ -561,5 +614,22 @@ final class LocalIndex: @unchecked Sendable {
         if wasLive {
             Task.detached(priority: .utility) { await loaded.value.stopWatching() }
         }
+    }
+}
+
+/// When an app may warm its connection to the service: on use (the window
+/// opening), never on a timer, and at most once a minute. A search makes the
+/// connection itself when it is missing, so warming only saves the first
+/// search a moment; it is not worth a wake-up while the app sits unused.
+public struct WarmGate: Sendable {
+    public static let minimumGap: TimeInterval = 60
+    private var last: Date?
+
+    public init() {}
+
+    public mutating func shouldWarm(at now: Date = Date()) -> Bool {
+        if let last, now.timeIntervalSince(last) < Self.minimumGap, now >= last { return false }
+        last = now
+        return true
     }
 }

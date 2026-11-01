@@ -34,6 +34,10 @@ final class NowPlayingWidget: ObservableObject, NotchWidget {
     private var playerObservers: [DistributedObserver] = []
     private var checkTimer: Timer?
     private var stopped = false
+    /// Music and Spotify are asked with AppleScript (which can bring up an
+    /// Automation prompt) only once the panel has been opened: never at
+    /// launch, when nobody asked for anything.
+    private var openedOnce = false
 
     init(context: WidgetContext) {
         location = MediaAdapter.bundled()
@@ -52,6 +56,7 @@ final class NowPlayingWidget: ObservableObject, NotchWidget {
     var isPlaying: Bool { state.hasMedia && state.isPlaying }
 
     func panelWillOpen() {
+        openedOnce = true
         // One refresh on open in the fallback; the adapter pushes by itself.
         if health.source != .adapter { askPlayers() }
         if health.checkDue(at: Date()) { checkHealth() }
@@ -110,7 +115,7 @@ final class NowPlayingWidget: ObservableObject, NotchWidget {
         health.record(check, at: Date())
         if case .broken(let why) = check { Log.info("Now Playing adapter check failed: \(why)") }
         // In the fallback, ask now so Settings shows whether AppleScript works.
-        if health.source != .adapter && health.appleScript == .unused { askPlayers() }
+        if openedOnce && health.source != .adapter && health.appleScript == .unused { askPlayers() }
         if health.source != before {
             Log.info("Now Playing source: \(health.summary)")
         }
@@ -164,7 +169,7 @@ final class NowPlayingWidget: ObservableObject, NotchWidget {
                 })
             }
         }
-        askPlayers()
+        if openedOnce { askPlayers() }
     }
 
     private func stopFallback() {
@@ -395,6 +400,7 @@ struct LiveActivityView: View {
     let height: CGFloat
     /// The flare at each top corner, which nothing is drawn in.
     let inset: CGFloat
+    /// Still bars: Reduce Motion, Low Power Mode or displays asleep (NotchModel.barsMove).
     let reduceMotion: Bool
 
     var body: some View {
@@ -443,7 +449,9 @@ struct CoverThumb: View {
 }
 
 /// Five thin bars that move while music plays, and rest low when paused.
-/// With Reduce Motion they stay still.
+/// With Reduce Motion, in Low Power Mode and while the displays sleep they
+/// stay still, so no frames are drawn. Twenty frames a second at most, and
+/// only while this view is on screen (the closed notch, music playing).
 struct PlayingBars: View {
     let playing: Bool
     let color: Color

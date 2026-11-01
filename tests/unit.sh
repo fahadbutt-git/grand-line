@@ -798,13 +798,24 @@ logged() { local _; for _ in 1 2 3 4 5 6 7 8 9 10; do grep -qF -- "$1" "$STUB_LO
   GRAND_LINE_UNATTENDED=1 build_native_apps >/dev/null 2>&1 && exit 1
   grep -q "^swift " "$STUB_LOG" && exit 2          # nothing built from a tree with changes
   rm "$apps_root/apps/demo/Sources/extra.swift"
-  # Unattended, from a clean tree: built, a running copy is restarted from the new one.
+  # Unattended, from a clean tree, while the app is in use: the new copy
+  # waits beside the installed one, and nothing is stopped.
   echo Demo > "$tmp/running"; report="$tmp/apps-report"; : > "$report"
+  swap_probe() { echo "stage:the Mac is in use"; }
+  : > "$STUB_LOG"; STUB_RUNNING="$tmp/running" GRAND_LINE_APPS_REPORT="$report" GRAND_LINE_UNATTENDED=1 build_native_apps >/dev/null 2>&1 || exit 6
+  grep -q "^pkill -TERM -x Demo" "$STUB_LOG" && exit 7
+  [[ -d "$tmp/Applications/.Demo App.app.staged" && -d "$tmp/Applications/Demo App.app" ]] || exit 8
+  [[ "$(cat "$report")" == "Demo App (waiting)" ]] || exit 9
+  # When the Mac is idle: built, a running copy is restarted from the new one
+  # in the background, and the waiting copy is gone.
+  swap_probe() { echo swap; }
+  : > "$report"; rm -f "$GRAND_LINE_STATE/built-demo"; touch "$apps_root/apps/demo/Sources/main.swift"
   : > "$STUB_LOG"; STUB_RUNNING="$tmp/running" GRAND_LINE_APPS_REPORT="$report" GRAND_LINE_UNATTENDED=1 build_native_apps >/dev/null 2>&1 || exit 3
   grep -q "^pkill -TERM -x Demo" "$STUB_LOG" && grep -q "^open -g .*Demo App.app" "$STUB_LOG" || exit 4
   [[ "$(cat "$report")" == "Demo App" ]] || exit 5
+  [[ -e "$tmp/Applications/.Demo App.app.staged" ]] && exit 10
   exit 0
-) && t_ok "the unattended update never builds uncommitted app code, and restarts the apps it replaces" \
+) && t_ok "the unattended update never builds uncommitted app code, and swaps a running app only when the Mac is idle" \
   || t_fail "unattended app build (step $?)" "$(cat "$STUB_LOG")"
 
 (
@@ -1078,5 +1089,28 @@ grep -q '^UNATTENDED_STEPS="folders,dotfiles,native-tools,downloads"$' "$ROOT/se
   rm -f "$GRAND_LINE_STATE/done-macos-defaults"
   exit 0
 ) && t_ok "Maccy's ignore list is checked on every run, keeping its own defaults" || t_fail "Maccy ignore list (step $?)" "$(cat "$STUB_LOG")"
+
+# --- the unattended update never swaps an app in use
+(
+  export REPO_DIR="$ROOT" DRY_RUN=0
+  source "$ROOT/lib/common.sh"; source "$ROOT/lib/native-apps.sh"
+  id=com.grandline.sight
+  [[ "$(swap_decision 900 com.apple.TextEdit "$id" 0 0 0)" == swap ]] || exit 1
+  [[ "$(swap_decision 30 com.apple.TextEdit "$id" 0 0 0)" == stage:* ]] || exit 2      # in use
+  [[ "$(swap_decision 900 "$id" "$id" 0 0 0)" == "stage:it is the app in front" ]] || exit 3
+  [[ "$(swap_decision 900 com.apple.TextEdit "$id" 1 0 0)" == "stage:it is in the middle of something" ]] || exit 4
+  [[ "$(swap_decision 900 "" "$id" 0 1 0)" == "stage:the screen is being shared" ]] || exit 5
+  [[ "$(swap_decision 900 "" "$id" 0 0 1)" == stage:* ]] || exit 6                     # presenting
+  [[ "$(swap_decision "" "" "$id" 0 0 0)" == stage:* ]] || exit 7                      # no reading: wait
+  [[ "$(swap_decision 599 "" "$id" 0 0 0)" == stage:* && "$(swap_decision 600 "" "$id" 0 0 0)" == swap ]] || exit 8
+  # A staged copy goes in at once for an app that is not running.
+  dest="$tmp/staged-apps"; mkdir -p "$dest/.Sight.app.staged/Contents" "$dest/Sight.app"
+  echo new > "$dest/.Sight.app.staged/Contents/marker"
+  pgrep() { return 1; }
+  GRAND_LINE_APPS_DEST="$dest" APPS_DEST="$dest" apply_staged_apps >/dev/null 2>&1
+  [[ "$(cat "$dest/Sight.app/Contents/marker" 2>/dev/null)" == new && ! -e "$dest/.Sight.app.staged" ]] || exit 9
+  exit 0
+) && t_ok "the unattended update swaps an app only when the Mac is idle and the app is not in use" \
+  || t_fail "update swap decision (step $?)"
 
 exit $FAIL

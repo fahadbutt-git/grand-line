@@ -27,6 +27,23 @@ final class FolderSizeTests: XCTestCase {
         XCTAssertEqual(sub?.bytes, 4)
     }
 
+    func testTheCacheKeepsTheShallowestFoldersWithinItsLimit() async throws {
+        for i in 0..<12 {
+            try box.file("p/f\(i)/deep/deeper/x.txt", "1")
+        }
+        let sizes = FolderSize(maxEntries: 10)
+        let total = await sizes.size(of: box.url("p"))
+        XCTAssertEqual(total.files, 12)
+        let count = await sizes.count
+        XCTAssertLessThanOrEqual(count, 10)
+        // The folder asked for is always kept, so asking again is instant.
+        let again = await sizes.cached(box.url("p"))
+        XCTAssertEqual(again, total)
+        // The deepest went first.
+        let deepest = await sizes.cached(box.url("p/f0/deep/deeper"))
+        XCTAssertNil(deepest)
+    }
+
     func testCacheUntilAWatcherEvent() async throws {
         try box.file("p/sub/b.txt", "123")
         let sizes = FolderSize()

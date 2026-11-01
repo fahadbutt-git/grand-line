@@ -1,4 +1,5 @@
 import AppKit
+import AppRuntime
 import BrowserKit
 import LaunchKit
 
@@ -8,6 +9,12 @@ import LaunchKit
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemValidation {
     private let services = Services.shared
     private var launchedWithRequest = false
+    /// ~/Library/Logs/grand-line/nexus-runtime.log: stalls and crashes.
+    private let runtimeLog = AppLog(name: "nexus-runtime")
+    private lazy var watchdog = HangWatchdog(log: runtimeLog)
+    private lazy var crashRecord = CrashGuard(name: "nexus", log: runtimeLog)
+    private var activeObservers: [NSObjectProtocol] = []
+    private var termination: DispatchSourceSignal?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         let events = NSAppleEventManager.shared()
@@ -17,6 +24,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Nexus is opened by hand, so it always runs; the record only tells
+        // the log about a crash.
+        crashRecord.launch(displayName: "Nexus", staysDownAfterLoop: false)
+        termination = TerminationSignal.handle { DispatchQueue.main.async { MainActor.assumeIsolated { NSApp.terminate(nil) } } }
+        watchMainThread()
         NSApp.mainMenu = MainMenu.build(workspaces: self)
         NSApp.registerServicesMenuSendTypes([.fileURL], returnTypes: [])
         services.start()
@@ -27,6 +39,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
 
     func applicationWillTerminate(_ notification: Notification) {
         services.stop()
+        crashRecord.quitCleanly()
+    }
+
+    /// The hang watchdog, while Nexus is the app in front.
+    private func watchMainThread() {
+        let center = NotificationCenter.default
+        let dog = watchdog
+        activeObservers = [
+            center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in dog.setActive(true) },
+            center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { _ in dog.setActive(false) },
+        ]
+        dog.setActive(NSApp.isActive)
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

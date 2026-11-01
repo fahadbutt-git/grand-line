@@ -13,6 +13,8 @@ final class SharedEventStore {
     let store = EKEventStore()
     private var listeners: [@MainActor () -> Void] = []
     private var asked: Set<UInt> = []
+    /// One permission prompt at a time, with a pause between two.
+    private var pacing = PromptPacing()
 
     init() {
         NotificationCenter.default.addObserver(forName: .EKEventStoreChanged, object: store, queue: .main) { [weak self] _ in
@@ -40,7 +42,10 @@ final class SharedEventStore {
     func requestAccess(for type: EKEntityType) async -> Bool {
         if access(for: type) == .granted { return true }
         guard !asked.contains(type.rawValue) else { return false }
+        // Another widget is asking, or just did: this one asks on a later open.
+        guard pacing.mayAsk(at: Date()) else { return false }
         asked.insert(type.rawValue)
+        defer { pacing.answered(at: Date()) }
         do {
             switch type {
             case .event: return try await store.requestFullAccessToEvents()

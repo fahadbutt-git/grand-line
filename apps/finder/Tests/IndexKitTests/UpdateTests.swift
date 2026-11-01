@@ -113,3 +113,16 @@ final class UpdateTests: XCTestCase {
         XCTAssertEqual(Set(compact.folderPaths().keys), ["/Index", "/Index/a", "/Index/d"])
     }
 }
+
+/// The weekly sweep reads the disk at the throttled tier, and puts the
+/// thread back as it was.
+final class ThrottledIOTests: XCTestCase {
+    func testThrottlingIsOnlyForTheBlockAndOnlyWhenAsked() {
+        let before = ThrottledIO.currentPolicy
+        let inside = ThrottledIO.run(true) { ThrottledIO.currentPolicy }
+        XCTAssertEqual(inside, ThrottledIO.throttledPolicy)
+        XCTAssertEqual(ThrottledIO.currentPolicy, before)
+        let untouched = ThrottledIO.run(false) { ThrottledIO.currentPolicy }
+        XCTAssertEqual(untouched, before)
+    }
+}

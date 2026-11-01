@@ -88,6 +88,12 @@ fi
 LAST_RUN="$GRAND_LINE_STATE/auto-update-last"
 if [[ "$EXPLICIT" == unattended ]]; then
   [[ -f "$UPDATE_AGENT_OFF" ]] && exit 0
+  # At login, a copy left waiting goes in before its app starts again.
+  if compgen -G "${GRAND_LINE_APPS_DEST:-/Applications}/.*.app.staged" >/dev/null; then
+    mkdir -p "$GRAND_LINE_LOGS"
+    REPO_DIR="$REPO" DRY_RUN=0 bash -c 'source "$1/lib/common.sh" && source "$1/lib/native-apps.sh" && apply_staged_apps' _ "$REPO" \
+      >> "$GRAND_LINE_LOGS/update.log" 2>&1 || true
+  fi
   sleep "$DELAY"
   # At most every 12 hours, so a day with several logins checks once.
   if [[ -f "$LAST_RUN" && -z "$(find "$LAST_RUN" -mmin +720 2>/dev/null)" ]]; then
@@ -121,6 +127,11 @@ else
   echo "=== $(date '+%Y-%m-%d %H:%M') update --$MODE"
 fi
 echo "Log: $LOG"
+
+# Copies an earlier unattended run left waiting (the app was in use) go in
+# now if the Mac is quiet, or at once for an app that is not running (the
+# run at login starts before most apps do).
+REPO_DIR="$REPO" DRY_RUN=0 bash -c 'source "$1/lib/common.sh" && source "$1/lib/native-apps.sh" && apply_staged_apps' _ "$REPO" || true
 
 failed=()    # parts that did not update
 changed=()   # what this run changed, for the one notification

@@ -1,14 +1,35 @@
 # Terminal setup, after Omarchy's shell tools. Loaded from ~/.zshrc.
 # Every tool is optional: a missing one is simply skipped.
+#
+# A new shell must open at once (tests/perf/budgets.env holds the limit), so
+# nothing here reaches the network, and the tools' init scripts are not
+# made on every start: each is kept in ~/.cache/grand-line/zsh and made
+# again only when the tool changed (another version, or a newer file).
+
+_gl_init_cache="${XDG_CACHE_HOME:-$HOME/.cache}/grand-line/zsh"
+# _gl_init NAME COMMAND...: source what COMMAND prints, from the cache.
+_gl_init() {
+  local name="$1"; shift
+  local bin="${commands[$1]}"
+  [[ -n "$bin" ]] || return 0
+  local cache="$_gl_init_cache/$name.zsh" real="${bin:A}" first=""
+  [[ -r "$cache" ]] && IFS= read -r first < "$cache"
+  if [[ "$first" != "# $real" || "$bin" -nt "$cache" ]]; then
+    mkdir -p "$_gl_init_cache" || return 0
+    { print -r -- "# $real"; "$@"; } >| "$cache.$$" 2>/dev/null && mv -f "$cache.$$" "$cache" \
+      || { rm -f "$cache.$$"; return 0; }
+  fi
+  source "$cache"
+}
 
 # Prompt
-command -v starship >/dev/null && eval "$(starship init zsh)"
+_gl_init starship starship init zsh --print-full-init
 
 # cd that remembers folders: "cd res" jumps to the most used folder matching "res"
-command -v zoxide >/dev/null && eval "$(zoxide init zsh --cmd cd)"
+_gl_init zoxide zoxide init zsh --cmd cd
 
 # Fuzzy finder: Ctrl+R searches history, Ctrl+T inserts a file path
-command -v fzf >/dev/null && source <(fzf --zsh)
+_gl_init fzf fzf --zsh
 
 # History that is shared between windows and survives restarts
 HISTFILE="$HOME/.zsh_history"
@@ -25,7 +46,7 @@ if command -v eza >/dev/null; then
 fi
 
 # Language versions per project (mise), as in Omarchy
-command -v mise >/dev/null && eval "$(mise activate zsh)"
+_gl_init mise mise activate zsh
 
 # Editor and agents, as in Omarchy: n opens Neovim (in this folder when
 # given nothing), cx opens Claude Code

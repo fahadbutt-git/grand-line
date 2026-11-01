@@ -37,30 +37,45 @@ public final class IndexServiceCore: @unchecked Sendable {
     }
 
     /// Starts the periodic save, the weekly sweep check and change notices.
+    ///
+    /// Nothing here wakes the Mac while the index is unchanged: the save check
+    /// sleeps `saveEvery` with a fifth of it as tolerance (macOS folds the
+    /// wake-up in with others), and change notices wait on the index's own
+    /// change stream instead of asking it every second. While files keep
+    /// changing, notices go out at most once a second.
     public func start() {
+        // The index's change stream has one listener: a second start is a no-op.
+        lock.lock()
+        let running = !maintenance.isEmpty
+        lock.unlock()
+        guard !running else { return }
         let save = Task.detached(priority: .background) { [weak self] in
             while !Task.isCancelled {
                 guard let interval = self?.saveEvery else { return }
-                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                try? await Task.sleep(for: .seconds(interval), tolerance: .seconds(Self.tolerance(for: interval)), clock: .continuous)
                 await self?.maintain()
             }
         }
         let notices = Task.detached(priority: .utility) { [weak self] in
-            var last = -1
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-                guard let self else { return }
-                let index = await self.index()
-                let now = await index.changeCount
-                if now != last {
-                    if last >= 0 { self.broadcast(await index.count) }
-                    last = now
-                }
+            guard let changes = await self?.index().generationChanges else { return }
+            for await _ in changes {
+                guard let core = self else { return }
+                core.broadcast(await core.index().count)
+                try? await Task.sleep(nanoseconds: UInt64(Self.noticeGap * 1_000_000_000))
             }
         }
         lock.lock()
         maintenance = [save, notices]
         lock.unlock()
+    }
+
+    /// The shortest time between two change notices.
+    static let noticeGap: TimeInterval = 1
+
+    /// How late a periodic wake-up may come: a fifth of its interval, so
+    /// macOS can fold it in with other wake-ups.
+    static func tolerance(for interval: TimeInterval) -> TimeInterval {
+        max(1, interval * 0.2)
     }
 
     public func stop() {

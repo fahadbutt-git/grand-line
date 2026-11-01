@@ -20,28 +20,26 @@ final class NameIndex: IndexStatusProviding, @unchecked Sendable {
         self.client = SharedIndexClient(home: root)
     }
 
-    /// Connects to the service at launch, before the window is first shown,
-    /// and keeps the connection open from then on.
+    /// Connects to the service at launch, before the window is first shown.
+    /// Nothing runs on a timer after that: the connection stays open by
+    /// itself, and `warm()` (the window opening) mends a dropped one.
     func start() {
         client.start()
-        let client = self.client
-        warming = Task.detached(priority: .utility) {
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 30_000_000_000)
-                client.warm()
-            }
-        }
         // A first reading, so the first search can already explain missing folders.
         _ = Task.detached(priority: .utility) { [weak self] in
             _ = await self?.unreadable()
         }
     }
 
-    private var warming: Task<Void, Never>?
+    private var gate = WarmGate()
 
-    /// Reconnects now if the connection was dropped (the window is opening).
+    /// Reconnects if the connection was dropped (the window is opening), at
+    /// most once a minute.
     func warm() {
-        client.warm()
+        lock.lock()
+        let due = gate.shouldWarm()
+        lock.unlock()
+        if due { client.warm() }
     }
 
     /// A search answered from the local copy because the service was slow

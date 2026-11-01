@@ -67,13 +67,16 @@ enum Keystrokes {
     }
 }
 
-/// App icons, read once per path.
+/// App icons, read once per path. At most `limit` are kept (apps and
+/// running processes only, so it rarely fills); past it, it starts over.
 @MainActor
 enum IconCache {
     private static var icons: [String: NSImage] = [:]
+    static let limit = 400
 
     static func icon(_ path: String) -> NSImage {
         if let icon = icons[path] { return icon }
+        if icons.count >= limit { icons.removeAll(keepingCapacity: true) }
         let icon = NSWorkspace.shared.icon(forFile: path)
         icons[path] = icon
         return icon

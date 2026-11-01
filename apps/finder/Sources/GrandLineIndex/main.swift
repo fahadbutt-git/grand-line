@@ -1,3 +1,4 @@
+import AppRuntime
 import Foundation
 import IndexKit
 import IndexService
@@ -53,8 +54,20 @@ func register(quietly: Bool) -> Int32 {
 }
 
 func serve() -> Never {
+    // launchd starts the agent again after a crash (KeepAlive, SuccessfulExit
+    // false); after three crashes in ten minutes it stays down, cleanly, and
+    // says so once. The next app that connects starts it again.
+    let log = AppLog(name: "index")
+    let record = CrashGuard(name: "index", log: log)
+    guard record.launch(displayName: "Grand Line Index") else { exit(0) }
     let core = IndexServiceCore(locations: IndexLocations())
     core.start()
+    // Sight and Iceberg live in the menu bar with no Dock icon to reopen
+    // them from: one that crashed is started again in the background, at
+    // most once a minute (not during the journeys, which quit them on purpose).
+    let watcher = CrashWatcher(apps: [.init(name: "sight", bundleID: "com.grandline.sight"),
+                                      .init(name: "iceberg", bundleID: "com.grandline.iceberg")], log: log)
+    if environment["GRAND_LINE_JOURNEY"] != "1" { watcher.start() }
     let delegate = IndexListenerDelegate(core: core, clientRequirement: IndexListenerDelegate.standardRequirement())
     let listener = NSXPCListener(machServiceName: serviceName)
     listener.delegate = delegate
@@ -64,11 +77,14 @@ func serve() -> Never {
     signal(SIGINT, SIG_IGN)
     let signals = [SIGTERM, SIGINT].map { number -> DispatchSourceSignal in
         let source = DispatchSource.makeSignalSource(signal: number, queue: .main)
-        source.setEventHandler { core.saveAndExit() }
+        source.setEventHandler {
+            record.quitCleanly()
+            core.saveAndExit()
+        }
         source.resume()
         return source
     }
-    withExtendedLifetime((listener, delegate, signals)) {
+    withExtendedLifetime((listener, delegate, signals, watcher)) {
         dispatchMain()
     }
 }

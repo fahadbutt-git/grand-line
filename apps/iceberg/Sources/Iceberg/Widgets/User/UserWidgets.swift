@@ -269,8 +269,8 @@ final class UserWidgets: ObservableObject {
                 self.runDue(self.scheduler.due(at: Date()))
             }
         }
-        // Let macOS fold this wake-up in with others.
-        t.tolerance = min(5, max(0.5, delay * 0.1))
+        // Let macOS fold this wake-up in with others (a tenth of the delay).
+        t.tolerance = WakePolicy.tolerance(forDelay: delay)
         RunLoop.main.add(t, forMode: .common)
         timer = t
     }

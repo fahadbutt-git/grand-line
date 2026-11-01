@@ -24,7 +24,7 @@ let package = Package(
         .target(name: "IcebergKit"),
         .executableTarget(
             name: "Iceberg",
-            dependencies: ["IcebergKit", .product(name: "AppIcon", package: "icons")],
+            dependencies: ["IcebergKit", .product(name: "AppIcon", package: "icons"), .product(name: "AppRuntime", package: "icons")],
             linkerSettings: [
                 .linkedFramework("AppKit"),
                 .linkedFramework("SwiftUI"),

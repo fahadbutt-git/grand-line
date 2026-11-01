@@ -34,8 +34,17 @@ public struct FolderSizeResult: Sendable, Equatable {
 /// ```
 public actor FolderSize {
     private var cache: [String: FolderSizeResult] = [:]
+    /// The most folders remembered. Measuring the home folder remembers every
+    /// folder below it; past this, the deepest go first (the shallow ones are
+    /// what panes show), so the cache stays a few MB on any disk.
+    public nonisolated let maxEntries: Int
 
-    public init() {}
+    public init(maxEntries: Int = 40_000) {
+        self.maxEntries = max(1, maxEntries)
+    }
+
+    /// Folders remembered now.
+    public var count: Int { cache.count }
 
     public func size(of folder: URL) async -> FolderSizeResult {
         let path = FolderWatcher.realPath(folder.path)
@@ -47,7 +56,22 @@ public actor FolderSize {
             return (total, found)
         }.value
         cache.merge(measured.1) { _, new in new }
+        trim(keeping: path)
         return measured.0
+    }
+
+    /// Over `maxEntries`: keeps the shallowest three quarters, and `path`.
+    private func trim(keeping path: String) {
+        guard cache.count > maxEntries else { return }
+        let keep = max(1, maxEntries * 3 / 4)
+        let ordered = cache.keys.sorted { Self.depth($0) < Self.depth($1) }
+        for key in ordered.dropFirst(keep) where key != path {
+            cache.removeValue(forKey: key)
+        }
+    }
+
+    static func depth(_ path: String) -> Int {
+        path.utf8.reduce(0) { $0 + ($1 == UInt8(ascii: "/") ? 1 : 0) }
     }
 
     public func cached(_ folder: URL) -> FolderSizeResult? {

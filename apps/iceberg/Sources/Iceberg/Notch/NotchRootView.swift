@@ -29,7 +29,8 @@ struct NotchRootView: View {
                         .transition(.opacity.animation(.easeOut(duration: 0.14).delay(0.06)))
                 } else if model.showsLiveActivity, let nowPlaying = host.nowPlaying {
                     LiveActivityView(model: nowPlaying, height: model.bandHeight,
-                                     inset: pill ? 0 : NotchMetrics.collapsedTopRadius, reduceMotion: model.reduceMotion)
+                                     inset: pill ? 0 : NotchMetrics.collapsedTopRadius,
+                                     reduceMotion: !model.barsMove(playing: nowPlaying.isPlaying))
                         .transition(.opacity)
                 }
             }

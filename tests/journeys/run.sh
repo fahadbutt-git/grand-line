@@ -75,5 +75,13 @@ fi
 status=0
 "$driver" --apps "$apps_dir" --fixture-script "$here/make-fixture.sh" --config "$here/apps.tsv" \
   --out "$out" ${only:+--only "$only"} ${extra[@]+"${extra[@]}"} || status=$?
+# Any app whose hang watchdog saw its main thread stall for over a second
+# fails the run (each app logs stalls in the fixture home's logs).
+worst="$(grep -rhoE 'main thread stalled [0-9]+ ms' "$out"/homes/*/journeyhome/Library/Logs/grand-line/ 2>/dev/null \
+  | awk '{ if ($4 > max) max = $4 } END { print max + 0 }')"
+if [ "${worst:-0}" -gt 1000 ]; then
+  echo "An app's main thread stalled for $worst ms (over 1 s); see the logs under $out/homes" >&2
+  status=1
+fi
 [ -d "$out" ] && open "$out" 2>/dev/null || true
 exit "$status"

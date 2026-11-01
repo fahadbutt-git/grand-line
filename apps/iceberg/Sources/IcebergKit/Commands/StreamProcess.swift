@@ -168,12 +168,23 @@ public final class StreamProcess: @unchecked Sendable {
                 exitedAt = Date()
                 locked { finished = true }
             }
-            if openFds.isEmpty { if exited { break } else { usleep(50_000); continue } }
+            if openFds.isEmpty {
+                if exited { break }
+                // Its output is closed but it still runs: wait for it to end
+                // (stop() signals it) instead of looking 20 times a second.
+                while waitpid(child.pid, &status, 0) == -1 && errno == EINTR {}
+                exited = true
+                exitedAt = Date()
+                locked { finished = true }
+                break
+            }
             // Something it started in the background can keep the pipes open;
             // stop listening shortly after the command itself is gone.
             if let at = exitedAt, Date().timeIntervalSince(at) > 0.2 { break }
             var fds = openFds.map { pollfd(fd: $0, events: Int16(POLLIN), revents: 0) }
-            let ready = poll(&fds, nfds_t(fds.count), 100)
+            let timeout = WakePolicy.streamPollTimeout(pending: pending != nil, lastDelivered: lastDelivered,
+                                                       minimumInterval: minimumInterval, exited: exited, now: Date())
+            let ready = poll(&fds, nfds_t(fds.count), timeout)
             if ready < 0 {
                 if errno == EINTR { continue }
                 break

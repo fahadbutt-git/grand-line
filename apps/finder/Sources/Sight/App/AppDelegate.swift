@@ -1,4 +1,5 @@
 import AppKit
+import AppRuntime
 import LaunchKit
 import LauncherKit
 import ServiceManagement
@@ -13,8 +14,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var saveTimer: Timer?
     private var preferences: SightPreferencesStore!
     private var settings: SightSettingsWindow!
+    /// ~/Library/Logs/grand-line/sight.log: stalls, crashes.
+    private let log = AppLog(name: "sight")
+    private lazy var watchdog = HangWatchdog(log: log)
+    private lazy var crashRecord = CrashGuard(name: "sight", log: log)
+    /// Present while the search window is open: the unattended update waits.
+    private let busy = BusyMarker(name: "sight")
+    private var activeObservers: [NSObjectProtocol] = []
+    private var termination: DispatchSourceSignal?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // After three crashes in ten minutes Sight stays closed (and says so once).
+        guard crashRecord.launch(displayName: "Sight") else { exit(0) }
+        termination = TerminationSignal.handle { DispatchQueue.main.async { MainActor.assumeIsolated { NSApp.terminate(nil) } } }
         services = Services()
         // Connect to the index service first, so the first search finds it ready.
         services.start()
@@ -22,13 +34,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         preferences = SightPreferencesStore(services: services)
         settings = SightSettingsWindow(services: services, themes: panel.themes, store: preferences)
         wireSettings()
+        watchMainThread()
         if !registerHotkey(preferences.hotkey), preferences.hotkey == .commandSpace { explainBusyShortcut() }
         if preferences.current.launchAtLogin { startAtLogin() }
         if preferences.current.showMenuBarIcon { statusItem = makeStatusItem() }
         applyDensity()
-        saveTimer = Timer.scheduledTimer(withTimeInterval: 1_800, repeats: true) { [weak self] _ in
+        // Every half hour, writing only when something was learned; macOS
+        // may fold the wake-up in with others (tolerance a tenth of it).
+        let timer = Timer(timeInterval: 1_800, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.services.save() }
         }
+        timer.tolerance = 180
+        RunLoop.main.add(timer, forMode: .common)
+        saveTimer = timer
     }
 
     /// `open -b com.grandline.sight` on a running Sight shows the window.
@@ -46,7 +64,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        services.save()
+        services?.save()
+        busy.set("panel", busy: false)
+        crashRecord.quitCleanly()
+    }
+
+    /// The hang watchdog: while Sight is in front, and for a while after the
+    /// search window was last opened.
+    private func watchMainThread() {
+        let center = NotificationCenter.default
+        let dog = watchdog
+        activeObservers = [
+            center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in dog.setActive(true) },
+            center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { _ in dog.setActive(false) },
+        ]
+        let busy = self.busy
+        panel.onVisibilityChange = { visible in
+            if visible { dog.noteUse() }
+            busy.set("panel", busy: visible)
+        }
     }
 
     // MARK: Settings
@@ -160,20 +196,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// macOS applies the switch from Spotlight's shortcut at the next login.
-    /// Shown once, after launch has finished, so whatever started the app
-    /// (setup, login) never waits on the dialog.
+    /// Said once, in a notification: Sight starts in the background (login,
+    /// setup, an update), so it never puts up a dialog that would take the
+    /// keyboard from what you are doing.
     private func explainBusyShortcut() {
         guard ProcessInfo.processInfo.environment["GRAND_LINE_JOURNEY"] != "1" else { return }
         let key = "ExplainedBusyShortcut"
         guard !UserDefaults.standard.bool(forKey: key) else { return }
         UserDefaults.standard.set(true, forKey: key)
-        DispatchQueue.main.async { Self.showBusyShortcutAlert() }
-    }
-
-    private static func showBusyShortcutAlert() {
-        let alert = NSAlert()
-        alert.messageText = "Command + Space still opens Spotlight"
-        alert.informativeText = "Restart the Mac or log out and in once, and Command + Space opens Sight. Its menu bar icon opens it until then."
-        alert.runModal()
+        QuietNotice.post(title: "Command + Space still opens Spotlight",
+                         message: "Restart the Mac or log out and in once, and it opens Sight. The menu bar icon opens Sight until then.")
     }
 }

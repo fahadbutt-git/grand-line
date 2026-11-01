@@ -23,7 +23,7 @@ check() { local name="$1"; shift; local out; if out="$("$@" 2>&1)"; then pass "$
 
 SHELL_FILES=()
 while IFS= read -r f; do SHELL_FILES+=("$f"); done < <(
-  { ls setup.sh publish.sh lib/*.sh steps/*.sh bin/* tests/*.sh tests/stubs/* \
+  { ls setup.sh publish.sh lib/*.sh steps/*.sh bin/* tests/*.sh tests/perf/*.sh tests/stubs/* \
        migrations/*.sh config/grand-line/hooks/*.sample 2>/dev/null; } | sort -u)
 
 echo "Shell scripts"
@@ -211,6 +211,17 @@ check "no email addresses or home coordinates committed" bash -c '
   found="$(git ls-files -z | xargs -0 grep -nIoE "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.(com|org|net|ca|edu)|^-?[0-9]{1,2}\.[0-9]+ -?[0-9]{1,3}\.[0-9]+ [A-Z]" 2>/dev/null \
     | grep -vE "noreply|example\.(com|org)|@users\.noreply|apps/.*/Tests/")"
   [[ -z "$found" ]] || { printf "%s\n" "$found"; exit 1; }'
+
+echo "Resource budgets"
+check "budget measurements: the parsers read macOS's tools (tests/perf/measure.py selftest)" python3 tests/perf/measure.py selftest
+check "launch agents: no endless KeepAlive, watched jobs throttled, background priority (tests/perf/agents.sh)" bash tests/perf/agents.sh /dev/null
+check "the budgets file has every limit the report reads" python3 -c '
+import sys; sys.path.insert(0, "tests/perf"); import measure
+b = measure.read_budgets("tests/perf/budgets.env")
+need = ["IDLE_CPU_PER_APP", "IDLE_CPU_TOTAL", "IDLE_WAKEUPS_PER_APP", "IDLE_GPU_MS_PER_S", "RSS_MB_Sight", "RSS_MB_Nexus",
+        "RSS_MB_Iceberg", "RSS_MB_GrandLineIndex", "DECAY_CPU", "DECAY_SECONDS", "RSS_GROWTH_PCT", "SHELL_MEDIAN_MS"]
+missing = [k for k in need if k not in b]
+print(missing); sys.exit(1 if missing else 0)'
 
 echo "Security"
 check "no keys or tokens in the package's files" bash tests/security-checks.sh --secrets

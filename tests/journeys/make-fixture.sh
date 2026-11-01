@@ -5,12 +5,22 @@
 # the settings the notch app and the themes read.
 #
 #   bash tests/journeys/make-fixture.sh DIR
+#   bash tests/journeys/make-fixture.sh --files 3000 DIR
 #
-# DIR is emptied first. Every name is generic test data.
+# DIR is emptied first. Every name is generic test data. --files N adds a
+# bigger tree for the resource budgets (tests/perf): Documents/Bulk with
+# 2,000 items in one folder, and the rest of N spread over nested project
+# folders, so the index and Nexus have a realistic amount to hold.
 
 set -euo pipefail
 
-dest="${1:?usage: make-fixture.sh DIR}"
+extra_files=0
+if [ "${1:-}" = "--files" ]; then
+  extra_files="${2:?usage: make-fixture.sh [--files N] DIR}"
+  shift 2
+fi
+case "$extra_files" in *[!0-9]*|"") echo "make-fixture.sh: --files needs a number" >&2; exit 2 ;; esac
+dest="${1:?usage: make-fixture.sh [--files N] DIR}"
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "$here/../.." && pwd)"
 
@@ -159,5 +169,24 @@ icon = "checkmark.circle"
 command = "echo journey-ok"
 refresh = "on open"
 EOF
+
+# The bigger tree, written in one pass (no process per file).
+if [ "$extra_files" -gt 0 ]; then
+  python3 - "$extra_files" <<'PY'
+import os, sys
+total = int(sys.argv[1])
+bulk = min(2000, total)
+os.makedirs("Documents/Bulk", exist_ok=True)
+for i in range(bulk):
+    with open("Documents/Bulk/item-%04d.txt" % i, "w") as f:
+        f.write("bulk item %d\n" % i)
+rest = total - bulk
+for i in range(rest):
+    folder = "Documents/Tree/project-%02d/part-%02d" % (i % 40, (i // 40) % 25)
+    os.makedirs(folder, exist_ok=True)
+    with open(os.path.join(folder, "note-%05d.md" % i), "w") as f:
+        f.write("note %d\n" % i)
+PY
+fi
 
 echo "Fixture ready: $dest"

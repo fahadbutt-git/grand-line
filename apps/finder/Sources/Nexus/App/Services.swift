@@ -1,4 +1,5 @@
 import AppKit
+import AppRuntime
 import ArchiveKit
 import BrowserKit
 import FileKit
@@ -23,6 +24,9 @@ final class Services: ObservableObject {
     let selectionFile: SelectionFile
     let workspaces: WorkspaceStore
     let theme = ThemeStore()
+    /// Present while a file task runs, so the unattended update waits to
+    /// swap Nexus (lib/auto-update.sh).
+    let busy = BusyMarker(name: "nexus")
     lazy var sidebar = SidebarModel(services: self)
 
     @Published var viewPreferences: ViewPreferences
@@ -75,6 +79,7 @@ final class Services: ObservableObject {
             for await event in events {
                 NexusLog.note("task \(event.id.value) \(Services.describe(event.state)): \(event.title)")
                 self?.transfers.apply(event)
+                self?.busy.set("task \(event.id.value)", busy: !event.state.isDone)
                 if event.state.isDone { self?.refreshUndo() }
             }
         }

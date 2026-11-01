@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- The Grand Line Index agent, registered by `GrandLineIndex --register`
+<!-- The Grand Line Index agent, registered by `GrandLineIndex` with its register option
      (SMAppService.agent). launchd runs it at login, keeps it running, and
      starts it when Nexus or Sight connect to the Mach service. -->
 <plist version="1.0">
@@ -21,7 +21,14 @@
     <string>com.grandline.index</string>
   </array>
   <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
+  <!-- Started again after a crash, not after a clean exit (the crash-loop
+       guard exits cleanly to stay down); an app connecting starts it too. -->
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key><false/>
+  </dict>
+  <!-- At most one start every 30 seconds, so a crash cannot spin. -->
+  <key>ThrottleInterval</key><integer>30</integer>
   <!-- Boosted while it answers an app, throttled otherwise. -->
   <key>ProcessType</key><string>Adaptive</string>
   <!-- Time to save the index on logout before launchd sends SIGKILL. -->
