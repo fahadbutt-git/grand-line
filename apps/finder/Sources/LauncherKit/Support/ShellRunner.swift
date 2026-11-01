@@ -33,6 +33,8 @@ public struct ShellRunner: Sendable {
         for part in extra + existing where !path.contains(part) { path.append(part) }
         env["PATH"] = path.joined(separator: ":")
         env["HOME"] = env["HOME"] ?? paths.home
+        // The commands find the package through GRAND_LINE_LINK (lib/paths.sh).
+        if paths.isBundledPackage { env["GRAND_LINE_LINK"] = paths.package }
         if env["LANG"] == nil { env["LANG"] = "en_US.UTF-8" }
         return env
     }

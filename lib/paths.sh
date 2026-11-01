@@ -4,7 +4,8 @@
 
 # A stable link to wherever this package lives. Shortcuts and PATH use it,
 # so moving the package only means re-running setup.
-GRAND_LINE_LINK="$HOME/.grand-line"
+# Sight sets it to its own copy of the commands when setup has not run.
+GRAND_LINE_LINK="${GRAND_LINE_LINK:-$HOME/.grand-line}"
 GRAND_LINE_BIN="$GRAND_LINE_LINK/bin"
 GRAND_LINE_BUILD="$GRAND_LINE_LINK/.build"        # compiled helpers (tools/*.swift)
 GRAND_LINE_STATE="$HOME/.local/state/grand-line"  # remembered theme, ArtCraft versions

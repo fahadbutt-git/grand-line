@@ -68,7 +68,7 @@ app_fingerprint() {
   {
     if [[ "$rel" != "$dir" ]] && git -C "$REPO_DIR" rev-parse --git-dir >/dev/null 2>&1; then
       # The files git would track (build output is ignored), as they are now.
-      files="$(git -C "$REPO_DIR" ls-files -co --exclude-standard -- "$rel" apps/icons lib/native-apps.sh lib/signing.sh 2>/dev/null \
+      files="$(git -C "$REPO_DIR" ls-files -co --exclude-standard -- "$rel" apps/icons lib bin config/grand-line 2>/dev/null \
         | LC_ALL=C sort -u | while IFS= read -r f; do [[ -f "$REPO_DIR/$f" ]] && printf '%s\n' "$f"; done)"
       [[ -n "$files" ]] && paste -d ' ' <(printf '%s\n' "$files") \
         <(printf '%s\n' "$files" | git -C "$REPO_DIR" hash-object --stdin-paths)
@@ -174,6 +174,16 @@ install_app_bundle() {
   # Files that belong elsewhere in the bundle (a background service's launch
   # agent plist in Contents/Library/LaunchAgents), so the signature seals them.
   [[ -d "$dir/Bundle/$product" ]] && cp -R "$dir/Bundle/$product/." "$new/Contents/"
+  # Sight carries the package's commands and their settings, so its settings
+  # rows, power actions and menu work on a Mac where only the apps were
+  # installed. With setup, ~/.grand-line is used and this copy is not.
+  if [[ "$product" == Sight ]]; then
+    local package
+    package="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    mkdir -p "$new/Contents/Resources/grand-line/config"
+    cp -R "$package/bin" "$package/lib" "$new/Contents/Resources/grand-line/"
+    cp -R "$package/config/grand-line" "$new/Contents/Resources/grand-line/config/"
+  fi
   if [[ -f "$dir/frameworks.tsv" ]]; then
     while IFS=$'\t' read -r lib fw; do
       [[ -z "$lib" || "$lib" == \#* ]] && continue

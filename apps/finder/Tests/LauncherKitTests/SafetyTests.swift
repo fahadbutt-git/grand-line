@@ -24,6 +24,25 @@ final class SafetyTests: XCTestCase {
 
     // MARK: Irreversible commands
 
+    func testTheAppsOwnCommandsAreUsedOnlyWhenSetupHasNotRun() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("paths-\(UUID().uuidString)").path
+        defer { try? FileManager.default.removeItem(atPath: root) }
+        let home = root + "/home", bundled = root + "/Sight.app/Contents/Resources/grand-line"
+        try FileManager.default.createDirectory(atPath: home, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: bundled + "/bin", withIntermediateDirectories: true)
+        // Only the apps installed: the app's own copy.
+        let alone = GrandLinePaths(home: home, bundled: bundled)
+        XCTAssertEqual(alone.command("power"), bundled + "/bin/power")
+        XCTAssertTrue(alone.isBundledPackage)
+        XCTAssertEqual(ShellRunner.environment(paths: alone, base: [:])["GRAND_LINE_LINK"], bundled)
+        // After setup: ~/.grand-line, whatever the app carries.
+        try FileManager.default.createDirectory(atPath: home + "/.grand-line", withIntermediateDirectories: true)
+        let setUp = GrandLinePaths(home: home, bundled: bundled)
+        XCTAssertEqual(setUp.command("power"), home + "/.grand-line/bin/power")
+        XCTAssertFalse(setUp.isBundledPackage)
+        XCTAssertNil(ShellRunner.environment(paths: setUp, base: [:])["GRAND_LINE_LINK"])
+    }
+
     func testIrreversibleCommandsAreRecognised() {
         for line in ["power restart", "power shutdown", "power logout", "power sleep", "$HOME/.grand-line/bin/power restart",
                      "exec power shutdown", "GRAND_LINE_QUIET=1 power sleep", "/sbin/shutdown -h now", "pmset sleepnow"] {

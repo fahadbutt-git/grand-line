@@ -3,13 +3,26 @@ import Foundation
 /// Where Grand Line keeps what the providers read, from one home folder.
 public struct GrandLinePaths: Sendable, Equatable {
     public let home: String
+    /// ~/.grand-line, the link to the package setup makes. On a Mac where only
+    /// the apps were installed (no setup), the copy of the package's commands
+    /// and settings built into the app instead, so settings rows, power
+    /// actions and the menu still work.
+    public let package: String
 
-    public init(home: String = NSHomeDirectory()) {
+    public init(home: String = NSHomeDirectory(),
+                bundled: String? = Bundle.main.resourceURL?.appendingPathComponent("grand-line").path) {
         self.home = home
+        let linked = home + "/.grand-line"
+        let files = FileManager.default
+        if !files.fileExists(atPath: linked), let bundled, files.fileExists(atPath: bundled + "/bin") {
+            package = bundled
+        } else {
+            package = linked
+        }
     }
 
-    /// ~/.grand-line, the link to the package.
-    public var package: String { home + "/.grand-line" }
+    /// Whether this is the app's own copy of the package rather than setup's.
+    public var isBundledPackage: Bool { package != home + "/.grand-line" }
     public var bin: String { package + "/bin" }
     public var commonShell: String { package + "/lib/bin-common.sh" }
     public var toggleState: String { package + "/lib/toggle-state.sh" }
