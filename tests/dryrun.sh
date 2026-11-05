@@ -28,7 +28,7 @@ expect() {
 [[ $status -eq 0 ]] || { echo "setup.sh --dry-run exited with $status"; fail=1; }
 expect "Homebrew/install/$(sed -n "s/^HOMEBREW_INSTALL_COMMIT=//p" "$ROOT/steps/01-homebrew.sh")/install.sh, check its SHA-256"
 expect "brew bundle --file="
-expect "install WordCraft from the latest release of github.com/storytold/wordcraft"
+expect "install FilmCraft from the latest release of github.com/storytold/filmcraft"
 expect "install PdfCraft from the latest release of github.com/storytold/pdfcraft"
 expect "install.packages"
 expect "ln -s $ROOT $tmp/home/.grand-line"
@@ -45,7 +45,9 @@ expect "include.path $tmp/home/.grand-line/config/git/config"
 expect "point Docker at"
 expect "defaults write NSGlobalDomain KeyRepeat -int 2"
 expect "duti -s"
-expect ".docx all"
+# Word is the user's own: planned once installed, otherwise left to macOS.
+grep -qE "Microsoft Word opens \.docx .* once it is installed|com\.microsoft\.Word \.docx all" "$out" \
+  || { echo "dry run did not plan Word for .docx (or say it waits for Word)"; fail=1; }
 expect ".pdf all"
 expect "bin/theme set graphite"
 expect "grand-line.downloads.plist and load it"

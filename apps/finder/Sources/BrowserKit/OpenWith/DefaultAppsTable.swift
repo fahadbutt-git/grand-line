@@ -1,7 +1,8 @@
 import Foundation
 
 /// ~/.grand-line/config/grand-line/default-apps.tsv (R34): app name TAB
-/// extensions (".docx .doc") TAB fallback app. Open With lists these apps first.
+/// extensions (".docx .doc") TAB fallback app ("-" for none). Open With lists
+/// these apps first.
 public struct DefaultAppsTable: Equatable, Sendable {
     public struct Row: Equatable, Sendable {
         public let app: String
@@ -24,7 +25,7 @@ public struct DefaultAppsTable: Equatable, Sendable {
                 .map { $0.trimmingCharacters(in: .whitespaces) }
             guard fields.count >= 2, !fields[0].isEmpty else { continue }
             let extensions = fields[1].split(separator: " ").map { normalize(String($0)) }.filter { !$0.isEmpty }
-            let fallback = fields.count > 2 && !fields[2].isEmpty ? fields[2] : nil
+            let fallback = fields.count > 2 && !fields[2].isEmpty && fields[2] != "-" ? fields[2] : nil
             rows.append(Row(app: fields[0], extensions: extensions, fallback: fallback))
         }
         return DefaultAppsTable(rows: rows)

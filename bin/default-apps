@@ -1,8 +1,10 @@
 #!/bin/bash
-# grandline:summary=Choose ArtCraft or LibreOffice and Preview as the apps that open documents
-# default-apps primary    ArtCraft apps open documents, sheets, slides and PDFs
-# default-apps fallback   LibreOffice and Preview open them instead
-# Videos open in IINA either way.
+# grandline:summary=Choose PdfCraft or Preview for PDFs; Word, Excel and PowerPoint open documents once installed
+# default-apps primary    PdfCraft opens PDFs
+# default-apps fallback   Preview opens them instead
+# Either way, Microsoft Word, Excel and PowerPoint open their documents once
+# you have installed them (until then macOS keeps its own defaults), and
+# videos open in IINA.
 # The table is config/grand-line/default-apps.tsv.
 HERE="$(dirname "$(readlink -f "$0")")/.."
 source "$HERE/lib/bin-common.sh"

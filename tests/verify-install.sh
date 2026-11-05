@@ -73,12 +73,13 @@ for src in "$ROOT"/tools/*.swift; do
 done
 
 echo "Default apps"
-while IFS=$'\t' read -r app exts _; do
+while IFS=$'\t' read -r app exts fallback; do
   [[ -z "$app" || "$app" == \#* ]] && continue
   ext="${exts%% *}"; ext="${ext#.}"
   handler="$(duti -x "$ext" 2>/dev/null | head -1)"
   if [[ "$handler" == "$app.app" ]]; then pass ".$ext opens in $app"
   elif [[ -d "/Applications/$app.app" ]]; then fail ".$ext opens in ${handler:-nothing}, but $app is installed and should open it"
+  elif [[ "$fallback" == "-" ]]; then note ".$ext keeps macOS's default (${handler:-none}) until $app is installed"
   elif [[ -n "$handler" ]]; then note ".$ext opens in $handler because $app is not installed"
   else fail ".$ext has no default app"; fi
 done < "$ROOT/config/grand-line/default-apps.tsv"

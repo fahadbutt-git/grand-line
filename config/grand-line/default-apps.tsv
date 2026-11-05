@@ -1,7 +1,10 @@
-# App name	File extensions it opens	Fallback app (used if the first is missing, or by: default-apps fallback)
-WordCraft	.docx .doc .odt .rtf	LibreOffice
-GridCraft	.xlsx .xls .ods	LibreOffice
-DeckCraft	.pptx .ppt .odp	LibreOffice
+# App name	File extensions it opens	Fallback app (used if the first is missing, or by: default-apps fallback; - leaves the types to macOS)
+# Microsoft Office is yours to install (com.microsoft.Word, com.microsoft.Excel,
+# com.microsoft.Powerpoint). Once one is installed, the next setup or update
+# makes it the default for its types; until then macOS keeps its own defaults.
+Microsoft Word	.docx .doc .odt .rtf	-
+Microsoft Excel	.xlsx .xls .ods	-
+Microsoft PowerPoint	.pptx .ppt .odp	-
 PdfCraft	.pdf	Preview
 # Videos play in IINA. FilmCraft only opens its own projects, so macOS
 # cannot make it the default for video files. Import clips from inside it.

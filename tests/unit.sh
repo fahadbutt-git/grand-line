@@ -290,13 +290,13 @@ if command -v jq >/dev/null 2>&1; then
   # shellcheck source=steps/03-artcraft.sh
   source "$ROOT/steps/03-artcraft.sh"
   got="$(artcraft_pick_asset < "$ROOT/tests/fixtures/release-mixed.json")"
-  [[ "$got" == "wordcraft-0.4.2-macos-universal.dmg"$'\t'"https://example.com/universal.dmg"$'\t' ]] \
+  [[ "$got" == "filmcraft-0.4.2-macos-universal.dmg"$'\t'"https://example.com/universal.dmg"$'\t' ]] \
     && t_ok "ArtCraft: prefers the Apple silicon or universal .dmg" || t_fail "ArtCraft picked: $got"
   got="$(artcraft_pick_asset < "$ROOT/tests/fixtures/release-zip-only.json")"
   [[ "$got" == pdfcraft-v0.1.0-aarch64-apple-darwin.zip* ]] \
     && t_ok "ArtCraft: falls back to the Apple silicon .zip, never Intel" || t_fail "ArtCraft picked: $got"
   got="$(artcraft_pick_asset < "$ROOT/tests/fixtures/release-other-platforms.json")"
-  [[ "$got" == "wordcraft-macos-arm64.zip"$'\t'"https://example.com/mac.zip"$'\t'"sha256:abc123" ]] \
+  [[ "$got" == "filmcraft-macos-arm64.zip"$'\t'"https://example.com/mac.zip"$'\t'"sha256:abc123" ]] \
     && t_ok "ArtCraft: never picks Windows or Linux Arm builds, and keeps the checksum" || t_fail "ArtCraft picked: $got"
   got="$(artcraft_pick_asset < "$ROOT/tests/fixtures/release-no-mac.json")"
   [[ -z "$got" ]] && t_ok "ArtCraft: reports no Mac build instead of guessing" || t_fail "ArtCraft picked: $got"
@@ -327,31 +327,73 @@ if command -v jq >/dev/null 2>&1; then
       local app; app="$(basename "$3" -mac-arm64.zip)"
       mkdir -p "$4/$(tr 'a-z' 'A-Z' <<<"${app:0:1}")${app:1}.app/Contents"
     }
-    out="$(artcraft_install_one Gridcraft storytold/gridcraft - 2>&1)"; rc=$?
+    out="$(artcraft_install_one Pdfcraft storytold/pdfcraft - 2>&1)"; rc=$?
     [[ $rc == 3 ]] || { echo "$out"; exit 1; }
     grep -q "unsigned or its signature is broken" <<<"$out" || exit 2
-    [[ "$(cat "$state/Gridcraft.refused")" == "v1|" && ! -e "$state/Gridcraft.path" ]] || exit 3
+    [[ "$(cat "$state/Pdfcraft.refused")" == "v1|" && ! -e "$state/Pdfcraft.path" ]] || exit 3
     # The next run asks GitHub's API nothing about the same release.
-    : > "$art/api"; out="$(artcraft_install_one Gridcraft storytold/gridcraft - 2>&1)"; rc=$?
+    : > "$art/api"; out="$(artcraft_install_one Pdfcraft storytold/pdfcraft - 2>&1)"; rc=$?
     [[ $rc == 3 && ! -s "$art/api" ]] || { echo "$out"; exit 4; }
     grep -q "not downloaded again" <<<"$out" || exit 5
     # A newer release, or a different pin, is tried.
-    echo v2 > "$art/tag"; out="$(artcraft_install_one Gridcraft storytold/gridcraft - 2>&1)"
-    [[ -s "$art/api" && "$(cat "$state/Gridcraft.refused")" == "v2|" ]] || exit 6
-    : > "$art/api"; artcraft_install_one Gridcraft storytold/gridcraft ABCDE12345 >/dev/null 2>&1
+    echo v2 > "$art/tag"; out="$(artcraft_install_one Pdfcraft storytold/pdfcraft - 2>&1)"
+    [[ -s "$art/api" && "$(cat "$state/Pdfcraft.refused")" == "v2|" ]] || exit 6
+    : > "$art/api"; artcraft_install_one Pdfcraft storytold/pdfcraft ABCDE12345 >/dev/null 2>&1
     [[ -s "$art/api" ]] || exit 7
     # The step: refusals alone are warnings and it succeeds; a real error fails it.
-    printf 'Gridcraft\tstorytold/gridcraft\tSheets\t-\nDeckcraft\tstorytold/deckcraft\tSlides\t-\n' > "$art/config/grand-line/artcraft.tsv"
+    printf 'Pdfcraft\tstorytold/pdfcraft\tPDFs\t-\nFilmcraft\tstorytold/filmcraft\tVideo\t-\n' > "$art/config/grand-line/artcraft.tsv"
     WARNINGS=(); step_artcraft >/dev/null 2>&1 || exit 8
-    [[ "${#WARNINGS[@]}" == 2 && "${WARNINGS[*]}" == *"Deckcraft was not installed: its release did not pass the signature checks"* ]] || exit 9
+    [[ "${#WARNINGS[@]}" == 2 && "${WARNINGS[*]}" == *"Filmcraft was not installed: its release did not pass the signature checks"* ]] || exit 9
     WARNINGS=(); step_artcraft >/dev/null 2>&1 || exit 10      # again, from what was remembered
-    printf 'Filmcraft\tstorytold/filmcraft\tVideo\t-\n' >> "$art/config/grand-line/artcraft.tsv"; : > "$art/offline-filmcraft"
+    printf 'Democraft\tstorytold/democraft\tDemo\t-\n' >> "$art/config/grand-line/artcraft.tsv"; : > "$art/offline-democraft"
     WARNINGS=(); step_artcraft >/dev/null 2>&1 && exit 11
-    [[ "${WARNINGS[*]}" == *"Filmcraft did not install"* ]] || exit 12
+    [[ "${WARNINGS[*]}" == *"Democraft did not install"* ]] || exit 12
     exit 0
   ) && t_ok "ArtCraft: a refused release is a warning, not a failed step, and is not fetched again until a newer one" \
     || t_fail "ArtCraft refusals (step $?)"
 fi
+
+# --- default apps: Microsoft Office once installed, macOS's own defaults until then
+(
+  export DRY_RUN=0 STUB_LOG="$tmp/default-apps.log"
+  # shellcheck source=lib/default-apps.sh
+  source "$ROOT/lib/default-apps.sh"
+  table="$ROOT/config/grand-line/default-apps.tsv"
+  # Which apps are installed, and what macOS answers once one is set.
+  installed="IINA PdfCraft Preview"
+  id_for() { case "$1" in "Microsoft Word") echo com.microsoft.Word ;; "Microsoft Excel") echo com.microsoft.Excel ;;
+             "Microsoft PowerPoint") echo com.microsoft.Powerpoint ;; IINA) echo com.colliderli.iina ;;
+             PdfCraft) echo ai.storyteller.pdfcraft ;; Preview) echo com.apple.Preview ;; esac; }
+  app_path_of() { [[ " $installed " == *" ${1// /_} "* ]] && echo "/Applications/$1.app"; }
+  bundle_id_of() { app_path_of "$1" >/dev/null && id_for "$1"; }
+  register_app() { :; }
+  default_app_for() {
+    local id; id="$(sed -n "s/^duti -s \([^ ]*\) \.${1#.} all$/\1/p" "$STUB_LOG" | tail -1)"
+    case "$id" in com.microsoft.Word) echo "Microsoft Word.app" ;; com.microsoft.Excel) echo "Microsoft Excel.app" ;;
+      com.microsoft.Powerpoint) echo "Microsoft PowerPoint.app" ;; com.colliderli.iina) echo "IINA.app" ;;
+      ai.storyteller.pdfcraft) echo "PdfCraft.app" ;; com.apple.Preview) echo "Preview.app" ;; esac
+  }
+  # None of Office installed: its types are left alone, with no warning and no failure.
+  : > "$STUB_LOG"; WARNINGS=()
+  apply_default_apps primary "$table" >/dev/null || exit 1
+  [[ "${#WARNINGS[@]}" == 0 ]] || exit 2
+  grep -qE '\.(docx|doc|odt|rtf|xlsx|xls|ods|pptx|ppt|odp) ' "$STUB_LOG" && exit 3
+  grep -q '^duti -s ai.storyteller.pdfcraft .pdf all$' "$STUB_LOG" && grep -q '^duti -s com.colliderli.iina .mp4 all$' "$STUB_LOG" || exit 4
+  # Word and Excel installed, PowerPoint not: each installed one takes its types.
+  installed="IINA PdfCraft Preview Microsoft_Word Microsoft_Excel"
+  : > "$STUB_LOG"; WARNINGS=()
+  apply_default_apps primary "$table" >/dev/null || exit 5
+  [[ "${#WARNINGS[@]}" == 0 ]] || exit 6
+  grep -q '^duti -s com.microsoft.Word .docx all$' "$STUB_LOG" && grep -q '^duti -s com.microsoft.Excel .xlsx all$' "$STUB_LOG" || exit 7
+  grep -qE '\.(pptx|ppt|odp) ' "$STUB_LOG" && exit 8
+  # The fallback set: Preview for PDFs, and Office stays with Office.
+  : > "$STUB_LOG"; WARNINGS=()
+  apply_default_apps fallback "$table" >/dev/null || exit 9
+  grep -q '^duti -s com.apple.Preview .pdf all$' "$STUB_LOG" && grep -q '^duti -s com.microsoft.Word .docx all$' "$STUB_LOG" || exit 10
+  grep -qE '\.(pptx|ppt|odp) ' "$STUB_LOG" && exit 11
+  exit 0
+) && t_ok "default apps: Word, Excel and PowerPoint take their types once installed, missing ones leave macOS's defaults quietly" \
+  || t_fail "default apps (step $?)" "$(cat "$tmp/default-apps.log" 2>/dev/null)"
 
 # --- tidy-downloads: rules, sources, age, clashes, never deleting
 # A file's age is when it arrived in Downloads (the mdls stub answers from
@@ -508,7 +550,7 @@ unset XATTR_SOURCES GRAND_LINE_DOWNLOADS GRAND_LINE_DOWNLOAD_RULES MDLS_DATES GR
 # --- app install and remove keep the Brewfile in step
 mkdir -p "$HOME/.grand-line/config/grand-line"
 printf 'cask "zoom"\ncask "nikitabobko/tap/aerospace"\n' > "$HOME/.grand-line/Brewfile"
-printf 'WordCraft\tstorytold/wordcraft\tWord processor\nGridCraft\tstorytold/gridcraft\tSpreadsheets\n' > "$HOME/.grand-line/config/grand-line/artcraft.tsv"
+printf 'FilmCraft\tstorytold/filmcraft\tVideo editor\nPdfCraft\tstorytold/pdfcraft\tPDF editor\n' > "$HOME/.grand-line/config/grand-line/artcraft.tsv"
 export GRAND_LINE_DETACHED=1 BREW_CASKS="iina zoom" BREW_INSTALLED="zoom aerospace"
 answers "iina"; "$ROOT/bin/app" install
 grep -qx 'cask "iina"' "$HOME/.grand-line/Brewfile" && t_ok "app install adds the app to the Brewfile" || t_fail "app install did not add to the Brewfile"
@@ -516,9 +558,9 @@ grep -qx 'cask "iina"' "$HOME/.grand-line/Brewfile" && t_ok "app install adds th
 "$ROOT/bin/app" remove aerospace
 grep -q aerospace "$HOME/.grand-line/Brewfile" && t_fail "app remove left a tap cask in the Brewfile" || t_ok "app remove takes a tap cask off the Brewfile"
 grep -q 'cask "zoom"' "$HOME/.grand-line/Brewfile" && t_ok "app remove leaves other apps alone" || t_fail "app remove touched other lines"
-"$ROOT/bin/app" remove "GridCraft (ArtCraft)"
-grep -q '^GridCraft' "$HOME/.grand-line/config/grand-line/artcraft.tsv" && t_fail "ArtCraft removal kept its row" || t_ok "app remove takes an ArtCraft app off its list"
-grep -q '^WordCraft' "$HOME/.grand-line/config/grand-line/artcraft.tsv" && t_ok "ArtCraft removal leaves other rows" || t_fail "ArtCraft removal touched other rows"
+"$ROOT/bin/app" remove "PdfCraft (ArtCraft)"
+grep -q '^PdfCraft' "$HOME/.grand-line/config/grand-line/artcraft.tsv" && t_fail "ArtCraft removal kept its row" || t_ok "app remove takes an ArtCraft app off its list"
+grep -q '^FilmCraft' "$HOME/.grand-line/config/grand-line/artcraft.tsv" && t_ok "ArtCraft removal leaves other rows" || t_fail "ArtCraft removal touched other rows"
 grep -q "brew uninstall --cask aerospace" "$STUB_LOG" && ! grep -q -- "--zap" "$STUB_LOG" && t_ok "app remove keeps the app's data (no --zap)" || t_fail "app remove deleted data"
 unset GRAND_LINE_DETACHED BREW_CASKS BREW_INSTALLED
 
@@ -619,6 +661,24 @@ GRAND_LINE_REPO="$ROOT" bash "$ROOT/migrations/1793404860-render-theme-templates
   && t_ok "migration: the old Paper theme becomes Daylight, rendered from the templates" || t_fail "theme template migration"
 rm -f "$HOME/.local/state/grand-line/theme"
 GRAND_LINE_REPO="$ROOT" bash "$ROOT/migrations/1793404860-render-theme-templates.sh" && t_ok "migration: with no theme yet it does nothing" || t_fail "theme migration with no theme"
+# The office suites leave the package's care: nothing deleted, their remembered
+# state moved aside, FilmCraft and PdfCraft untouched, one line said.
+(
+  st="$HOME/.local/state/grand-line"; mkdir -p "$st/artcraft" "$tmp/Apps/WordCraft.app"
+  for f in WordCraft.path WordCraft.tag GridCraft.team DeckCraft.refused PdfCraft.path FilmCraft.tag; do echo x > "$st/artcraft/$f"; done
+  out="$(GRAND_LINE_REPO="$ROOT" bash "$ROOT/migrations/1793880000-stop-managing-office-suites.sh")" || exit 1
+  [[ "$(grep -c . <<<"$out")" == 1 && "$out" == *"no longer installs or updates"* ]] || exit 2
+  [[ -d "$tmp/Apps/WordCraft.app" ]] || exit 3
+  for f in WordCraft.path WordCraft.tag GridCraft.team DeckCraft.refused; do
+    [[ -f "$st/unmanaged/artcraft/$f" && ! -e "$st/artcraft/$f" ]] || exit 4
+  done
+  [[ -f "$st/artcraft/PdfCraft.path" && -f "$st/artcraft/FilmCraft.tag" ]] || exit 5
+  GRAND_LINE_REPO="$ROOT" bash "$ROOT/migrations/1793880000-stop-managing-office-suites.sh" >/dev/null || exit 6
+  grep -qx '# grandline:unattended' "$ROOT/migrations/1793880000-stop-managing-office-suites.sh" || exit 7
+  rm -rf "$st/artcraft" "$st/unmanaged"
+  exit 0
+) && t_ok "migration: the office suites are no longer managed, nothing is deleted, and it says so once" \
+  || t_fail "office suites migration (step $?)"
 # A fresh install marks every migration done; a Mac with a theme does not.
 fh="$tmp/fresh"; mkdir -p "$fh"
 plan="$(HOME="$fh" bash "$ROOT/setup.sh" --dry-run --only folders 2>&1)"

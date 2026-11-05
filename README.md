@@ -1,6 +1,6 @@
 # Grand Line
 
-One command turns a new Mac into a ready workstation: apps, command line tools, the ArtCraft office apps as defaults, an Omarchy-style keyboard layer on Caps Lock, tiling windows, themes and system settings. Running it again only fixes what is missing, so the same command also repairs a Mac.
+One command turns a new Mac into a ready workstation: apps, command line tools, the ArtCraft PDF and video apps, Microsoft Office as the default for documents once you install it, an Omarchy-style keyboard layer on Caps Lock, tiling windows, themes and system settings. Running it again only fixes what is missing, so the same command also repairs a Mac.
 
 ## On the new Mac
 
@@ -50,7 +50,7 @@ They do not update themselves. Install with setup to stop the message for good.
 | `migrate --pending` | Lists the one-time changes an update has not run yet (`migrate` runs them) |
 | `app install`, `app remove` | Installs or removes an app and updates the Brewfile to match (also in the menu). `grandline publish` shares the change with your other Macs |
 | `tidy-downloads` | Sorts Downloads now (`--dry-run` shows the plan, `--log` the recent moves) |
-| `default-apps fallback` | LibreOffice and Preview open documents instead of ArtCraft (`primary` switches back). Videos stay in IINA |
+| `default-apps fallback` | Preview opens PDFs instead of PdfCraft (`primary` switches back). Either way, Microsoft Word, Excel and PowerPoint open their documents once you install them yourself (until then macOS keeps its own defaults), and videos stay in IINA |
 | `bash ~/grand-line/setup.sh --only artcraft` | Re-runs one step (`--list` shows them) |
 | `bash ~/grand-line/setup.sh --dry-run` | Shows what setup would do, changes nothing |
 
@@ -180,9 +180,6 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + Shift + G | WhatsApp |
 | Caps + Shift + M | Spotify |
 | Caps + Shift + R | RStudio |
-| Caps + Shift + W | WordCraft (documents) |
-| Caps + Shift + S | GridCraft (spreadsheets) |
-| Caps + Shift + K | DeckCraft (presentations) |
 | Caps + Shift + O | PdfCraft (PDFs) |
 | Caps + Shift + V | FilmCraft (video) |
 | Caps + Shift + / | Passwords |
@@ -275,7 +272,7 @@ Typing "nexus settings", "sight settings" or "iceberg settings" opens that app's
 | --- | --- |
 | An app | Add a `cask "name"` line to `Brewfile`, then `bash ~/grand-line/setup.sh --only apps` |
 | An ArtCraft app | Add a line to `config/grand-line/artcraft.tsv` (its Team ID, or `-` until the first install prints it), then `--only artcraft` |
-| A default app for a file type | Add a line to `config/grand-line/default-apps.tsv`, then `--only default-apps` |
+| A default app for a file type | Add a line to `config/grand-line/default-apps.tsv` (a `-` fallback leaves the types to macOS while the app is missing), then `--only default-apps` |
 | A shortcut | Add a line to `BINDINGS` in `tools/bindings.py`, run `python3 tools/bindings.py`, then `--only dotfiles` |
 | A menu entry | Add a line to `config/grand-line/menu.tsv`. It works at once. A third column `?test` shows it only when the test succeeds, a fourth `✓test` gives it a check mark (helpers in `lib/toggle-state.sh`) |
 | A command | Add an executable script to `bin/` with a `# grandline:summary=` line under the first. It is on the PATH at once, and `grandline commands` and Sight list it. Arguments Sight should ask for go in `# grandline:arg1=` lines (up to three), as `{"type":"text"\|"dropdown","placeholder":"…","data":[…],"optional":true}` |

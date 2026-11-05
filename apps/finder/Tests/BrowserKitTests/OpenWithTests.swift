@@ -5,23 +5,27 @@ import XCTest
 final class OpenWithTests: XCTestCase {
     let table = DefaultAppsTable.parse("""
     # App name\tFile extensions it opens\tFallback app
-    WordCraft\t.docx .doc .odt .rtf\tLibreOffice
-    PdfCraft\t.pdf\tPreview
-    IINA\t.mp4 .mov .m4v .mkv\tIINA
+    Document Editor\t.docx .doc .odt .rtf\tText Editor
+    PDF Editor\t.pdf\tPDF Viewer
+    Video Player\t.mp4 .mov .m4v .mkv\tVideo Player
+    Office App\t.xlsx\t-
 
     broken line
     """)
 
     func testParsesTheTable() {
-        XCTAssertEqual(table.rows.count, 3)
+        XCTAssertEqual(table.rows.count, 4)
+        XCTAssertEqual(table.rows[0].app, "Document Editor", "app names may contain spaces")
         XCTAssertEqual(table.rows[0].extensions, ["docx", "doc", "odt", "rtf"])
-        XCTAssertEqual(table.rows[1].fallback, "Preview")
+        XCTAssertEqual(table.rows[1].fallback, "PDF Viewer")
+        XCTAssertNil(table.rows[3].fallback, "- means no fallback app")
     }
 
     func testAppsForAnExtension() {
-        XCTAssertEqual(table.apps(for: "docx"), ["WordCraft", "LibreOffice"])
-        XCTAssertEqual(table.apps(for: ".PDF"), ["PdfCraft", "Preview"])
-        XCTAssertEqual(table.apps(for: "mkv"), ["IINA"], "an app that is its own fallback is listed once")
+        XCTAssertEqual(table.apps(for: "docx"), ["Document Editor", "Text Editor"])
+        XCTAssertEqual(table.apps(for: ".PDF"), ["PDF Editor", "PDF Viewer"])
+        XCTAssertEqual(table.apps(for: "mkv"), ["Video Player"], "an app that is its own fallback is listed once")
+        XCTAssertEqual(table.apps(for: "xlsx"), ["Office App"], "no fallback app is listed for -")
         XCTAssertEqual(table.apps(for: "png"), [])
     }
 
@@ -29,11 +33,11 @@ final class OpenWithTests: XCTestCase {
         let temp = try TempFolder()
         defer { temp.remove() }
         let apps = try temp.folder("Applications")
-        try temp.folder("Applications/LibreOffice.app")
+        try temp.folder("Applications/Text Editor.app")
         try temp.folder("Applications/TextEdit.app")
-        let system = [apps.appendingPathComponent("TextEdit.app"), apps.appendingPathComponent("LibreOffice.app")]
+        let system = [apps.appendingPathComponent("TextEdit.app"), apps.appendingPathComponent("Text Editor.app")]
         let choices = OpenWithMenu.choices(forExtension: "docx", table: table, folders: [apps], system: system)
-        XCTAssertEqual(choices.map(\.name), ["LibreOffice", "TextEdit"], "WordCraft is not installed")
+        XCTAssertEqual(choices.map(\.name), ["Text Editor", "TextEdit"], "Document Editor is not installed")
         XCTAssertEqual(choices.map(\.isPreferred), [true, false])
     }
 

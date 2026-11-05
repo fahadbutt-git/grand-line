@@ -1,6 +1,6 @@
 // Sets or reads the default app for file types through NSWorkspace, the API
 // Finder itself uses, then reads the result back so a silent refusal shows.
-//   setdefault /Applications/WordCraft.app docx doc odt   set, then confirm
+//   setdefault /Applications/PdfCraft.app pdf            set, then confirm
 //   setdefault --uti docx                                print the type identifier
 // Exit codes: 0 done, 1 usage, 2 macOS kept another app, 3 unknown type or app.
 import AppKit

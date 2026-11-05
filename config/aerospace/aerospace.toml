@@ -81,23 +81,7 @@ if.app-id = 'com.google.GeminiMacOS'
 run = 'move-node-to-workspace 3'
 
 [[on-window-detected]]
-if.app-id = 'ai.storyteller.wordcraft'
-run = 'move-node-to-workspace 4'
-
-[[on-window-detected]]
-if.app-id = 'ai.storyteller.gridcraft'
-run = 'move-node-to-workspace 4'
-
-[[on-window-detected]]
-if.app-id = 'ai.storyteller.deckcraft'
-run = 'move-node-to-workspace 4'
-
-[[on-window-detected]]
 if.app-id = 'ai.storyteller.pdfcraft'
-run = 'move-node-to-workspace 4'
-
-[[on-window-detected]]
-if.app-id = 'org.libreoffice.script'
 run = 'move-node-to-workspace 4'
 
 [[on-window-detected]]

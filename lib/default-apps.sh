@@ -5,6 +5,10 @@
 
 # apply_default_apps primary    first app in each row, its fallback if missing
 # apply_default_apps fallback   the fallback app in every row
+# A row whose fallback is "-" names an app you install yourself (Microsoft
+# Word, Excel, PowerPoint): it is the default in both modes once installed,
+# and while it is missing its types keep whatever macOS opens them with,
+# quietly.
 # Writes the default app for one type into macOS's own settings file,
 # replacing any earlier entry for that type so the list never grows.
 LS_PREFS=com.apple.LaunchServices/com.apple.launchservices.secure
@@ -48,8 +52,12 @@ apply_default_apps() {
   while IFS=$'\t' read -r primary exts fallback; do
     [[ -z "$primary" || "$primary" == \#* ]] && continue
     app="$primary"
-    [[ "$mode" == fallback ]] && app="$fallback"
+    [[ "$mode" == fallback && "$fallback" != "-" ]] && app="$fallback"
     id="$(bundle_id_of "$app")"
+    if [[ -z "$id" && "$fallback" == "-" ]]; then
+      [[ "$DRY_RUN" == 1 ]] && info "$app opens $exts once it is installed"
+      continue
+    fi
     if [[ -z "$id" && "$app" != "$fallback" ]]; then
       [[ "$DRY_RUN" == 0 ]] && warn "$app is not installed. Using $fallback for $exts for now."
       app="$fallback"; id="$(bundle_id_of "$app")"

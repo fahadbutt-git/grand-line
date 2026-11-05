@@ -68,7 +68,7 @@ Setup/Privacy and Security	open 'x-apple.systempreferences:com.apple.settings.Pr
 Setup/Edit this menu	open -a TextEdit "$GRAND_LINE_CONFIG/menu.tsv"
 Setup/Edit window tiling settings	open -a TextEdit "$HOME/.aerospace.toml"
 Setup/Default apps: ArtCraft and built-in	default-apps primary
-Setup/Default apps: LibreOffice and Preview	default-apps fallback
+Setup/Default apps: Preview for PDFs	default-apps fallback
 Hardware/Battery	notice battery
 Hardware/System information	open -a 'System Information'
 Hardware/Disk space	notice disk

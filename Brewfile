@@ -67,9 +67,6 @@ cask "plaud"                # the Plaud recorder, for in-person conversations
 cask "handy"                # dictation into any app: hold Caps + Ctrl + X, as Voxtype in Omarchy
 cask "meetily"              # records and transcribes online meetings (both sides), Caps + Ctrl + Option + M
 
-# Office fallback (the ArtCraft apps are installed by the artcraft step)
-cask "libreoffice"
-
 # Clinical remote access
 cask "citrix-workspace"
 cask "omnissa-horizon-client"

@@ -6,16 +6,13 @@
 # the way instead.
 
 # App              replaced by
-#   Pages          WordCraft and LibreOffice
-#   Numbers        GridCraft and LibreOffice
-#   Keynote        DeckCraft and LibreOffice
 #   iMovie         FilmCraft
 #   GarageBand     not needed (with its 2 to 6 GB sound library)
-DECLUTTER_APPS=(Pages Numbers Keynote iMovie GarageBand)
+DECLUTTER_APPS=(iMovie GarageBand)
 DECLUTTER_DATA=("/Library/Application Support/GarageBand" "/Library/Application Support/Logic" "/Library/Audio/Apple Loops")
 
 # The Dock starts with these; anything you add later is kept.
-DOCK_APPS=(/Applications/Zen.app /Applications/Ghostty.app /Applications/Claude.app /Applications/WordCraft.app)
+DOCK_APPS=(/Applications/Zen.app /Applications/Ghostty.app /Applications/Claude.app)
 
 
 step_declutter() {
