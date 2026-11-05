@@ -82,10 +82,10 @@ struct BatteryView: View {
         if let r = model.reading {
             HStack(spacing: 5) {
                 Text("\(r.percent)%")
-                    .font(.system(size: 11).monospacedDigit())
+                    .font(TypeScale.numeral.weight(.medium))
                     .foregroundStyle(r.isLow ? theme.color(.theme(.red)) ?? theme.foreground : theme.foreground)
                 Image(systemName: r.symbol)
-                    .font(.system(size: 13))
+                    .font(SymbolScale.body)
                     .foregroundStyle(r.isLow ? theme.color(.theme(.red)) ?? theme.foreground : theme.muted)
             }
             .help(r.summary)

@@ -21,11 +21,11 @@ struct DiagnosticsView: View {
                      + (user.lastReload.map { "; last read at \($0.formatted(date: .omitted, time: .standard))." } ?? "."))
                     .foregroundStyle(theme.muted)
             }
-            .font(.system(size: 11))
+            .font(TypeScale.caption)
 
             if user.widgets.isEmpty {
                 Text("No widget is in the panel.")
-                    .font(.system(size: 13)).foregroundStyle(theme.muted)
+                    .font(TypeScale.body).foregroundStyle(theme.muted)
             }
             ForEach(user.widgets) { w in
                 DiagnosticsRow(widget: w, stats: user.stats[w.id] ?? WidgetStats(), status: user.status(of: w),
@@ -49,16 +49,16 @@ private struct DiagnosticsRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(widget.title).font(.system(size: 13, weight: .medium)).foregroundStyle(theme.foreground)
-                Text(widget.mode.description).font(.system(size: 11)).foregroundStyle(theme.muted)
+                Text(widget.title).font(TypeScale.body.weight(.medium)).foregroundStyle(theme.foreground)
+                Text(widget.mode.description).font(TypeScale.caption).foregroundStyle(theme.muted)
                 Spacer(minLength: 8)
                 Button(widget.stream ? "Restart" : "Run now", action: runNow)
                     .controlSize(.small)
                     .disabled(busy && !widget.stream)
             }
-            Text(line).font(.system(size: 11)).foregroundStyle(theme.muted)
+            Text(line).font(TypeScale.caption).foregroundStyle(theme.muted)
             if let status {
-                Text(status).font(.system(size: 11)).foregroundStyle(theme.foreground)
+                Text(status).font(TypeScale.caption).foregroundStyle(theme.foreground)
             }
             if let output = stats.lastOutput, !output.isEmpty {
                 labelled("Last output", output, colour: theme.foreground)
@@ -79,14 +79,14 @@ private struct DiagnosticsRow: View {
         if let d = stats.lastDuration, !widget.stream {
             parts.append(String(format: "took %.2f s", d))
         }
-        return parts.joined(separator: " · ")
+        return parts.joined(separator: ", ")
     }
 
     private func labelled(_ label: String, _ text: String, colour: Color) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(label).font(.system(size: 10, weight: .medium)).foregroundStyle(theme.muted)
+            Text(label).font(TypeScale.label).foregroundStyle(theme.muted)
             Text(text)
-                .font(.system(size: 11).monospaced())
+                .font(TypeScale.code)
                 .foregroundStyle(colour)
                 .lineLimit(5)
                 .textSelection(.enabled)
@@ -107,15 +107,15 @@ struct ProblemRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(issue.location)
-                        .font(.system(size: 11, weight: .medium).monospaced())
+                        .font(TypeScale.code.weight(.medium))
                         .foregroundStyle(theme.foreground)
                     Text(issue.message)
-                        .font(.system(size: 11))
+                        .font(TypeScale.caption)
                         .foregroundStyle(theme.foreground)
                 }
                 if let fix = issue.fix {
                     Text("Fix: " + fix)
-                        .font(.system(size: 11))
+                        .font(TypeScale.caption)
                         .foregroundStyle(theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -134,21 +134,21 @@ struct NowPlayingHealthRow: View {
         let health = model.health
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: symbol(health.source))
-                .font(.system(size: 13))
+                .font(TypeScale.body)
                 .foregroundStyle(health.source == .none ? (theme.color(.theme(.red)) ?? theme.muted) : theme.highlight)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
                 Text(health.summary)
-                    .font(.system(size: 13))
+                    .font(TypeScale.body)
                     .foregroundStyle(theme.foreground)
                     .fixedSize(horizontal: false, vertical: true)
                 if let fix = health.fix {
-                    Text(fix).font(.system(size: 11)).foregroundStyle(theme.muted)
+                    Text(fix).font(TypeScale.caption).foregroundStyle(theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if let at = health.lastCheckAt {
                     Text("Last checked at \(at.formatted(date: .omitted, time: .standard)).")
-                        .font(.system(size: 11)).foregroundStyle(theme.muted)
+                        .font(TypeScale.caption).foregroundStyle(theme.muted)
                 }
             }
             Spacer(minLength: 8)

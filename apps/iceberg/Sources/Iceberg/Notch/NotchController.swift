@@ -12,8 +12,10 @@ import IcebergKit
 /// notch), so the menu bar, status items and the wings' neighbours below it
 /// keep working; a mouse-moved monitor, a rectangle test per event, tells
 /// it when the pointer reaches that zone. Opening grows the window first and
-/// then animates the shape; closing animates first and then shrinks the
-/// window.
+/// then animates the shape; closing animates first and then fits the
+/// window once the spring has finished (not after a fixed wait). Every
+/// spring starts from what is on screen, so a hover that comes back while
+/// the panel closes reverses it in place; nothing waits for an animation.
 @MainActor
 final class NotchController {
     let model: NotchModel
@@ -22,7 +24,8 @@ final class NotchController {
     private let container: HoverContainerView
     private var openWork: DispatchWorkItem?
     private var closeWork: DispatchWorkItem?
-    private var shrinkWork: DispatchWorkItem?
+    /// Counts the changes that fit the window afterwards: only the latest one does.
+    private var settleToken = 0
     private var pauseWork: DispatchWorkItem?
     private var hudWork: DispatchWorkItem?
     private var bag: Set<AnyCancellable> = []
@@ -40,16 +43,11 @@ final class NotchController {
     /// How long the wings stay, with still bars, after the music pauses.
     private static let pauseGrace: TimeInterval = 20
 
-    // Springs, or short fades with Reduce Motion.
-    private var openAnimation: Animation {
-        model.reduceMotion ? .easeOut(duration: 0.12) : .spring(response: 0.34, dampingFraction: 0.86)
-    }
-    private var closeAnimation: Animation {
-        model.reduceMotion ? .easeOut(duration: 0.1) : .spring(response: 0.28, dampingFraction: 1)
-    }
-    private var wingAnimation: Animation? {
-        model.reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.88)
-    }
+    // Critically damped springs (MotionSpec): opening on hover must not
+    // overshoot. Short cross-fades with Reduce Motion.
+    private var openAnimation: Animation { Motion.open(reduceMotion: model.reduceMotion) }
+    private var closeAnimation: Animation { Motion.close(reduceMotion: model.reduceMotion) }
+    private var wingAnimation: Animation { Motion.wings(reduceMotion: model.reduceMotion) }
 
     init(screen: ScreenInfo, style: PanelStyle, host: PanelHost) {
         self.host = host
@@ -83,9 +81,13 @@ final class NotchController {
         }
         model.onTap = { [weak self] in self?.tapped() }
         // Files dropped on the open panel go on the shelf (while it is turned on).
-        container.drops.onDrop = { [weak host] urls in _ = host?.shelf.add(urls) }
+        // The drop carries the drag's momentum, so the new row settles with a small bounce.
+        container.drops.onDrop = { [weak host] urls in
+            withAnimation(Motion.drop(reduceMotion: DisplayOptions.shared.reduceMotion)) { _ = host?.shelf.add(urls) }
+        }
         container.drops.onHover = { [weak host] on in
-            if host?.shelf.isDropTargeted != on { host?.shelf.isDropTargeted = on }
+            guard let host, host.shelf.isDropTargeted != on else { return }
+            withAnimation(Motion.hover) { host.shelf.isDropTargeted = on }
         }
         container.setTakesFiles(host.takesFiles)
 
@@ -105,30 +107,16 @@ final class NotchController {
         stopClickMonitors()
         // A pointer still on the notch must leave and come back to reopen it.
         pointerInHitZone = NotchGeometry.contains(hitZone, NSEvent.mouseLocation)
-        if animated {
-            withAnimation(closeAnimation) { model.isOpen = false }
-        } else {
-            model.isOpen = false
-        }
+        animate(animated ? closeAnimation : nil) { model.isOpen = false }
         updatePassThrough()
         host.panelDidClose()
-        shrinkWork?.cancel()
-        let work = DispatchWorkItem { [weak self] in
-            MainActor.assumeIsolated {
-                guard let self, !self.model.isOpen else { return }
-                self.panel.setFrame(self.model.frame(open: false), display: true)
-                self.refreshClosedVisibility()
-            }
-        }
-        shrinkWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + (animated ? (model.reduceMotion ? 0.12 : 0.32) : 0), execute: work)
     }
 
     /// `byKeyboard`: the shortcut, a URL or the menu bar item, with the
     /// pointer possibly elsewhere (see PanelDismissal).
     func open(byKeyboard: Bool = false) {
         guard !model.isOpen else { return }
-        shrinkWork?.cancel()
+        settleToken &+= 1
         closeWork?.cancel()
         openWork?.cancel()
         model.update(content: host.content)
@@ -353,17 +341,11 @@ final class NotchController {
         if wanted {
             // Grow the window, then the shape.
             let size = NotchGeometry.collapsedPanelSize(of: model.screen, liveActivity: true)
+            settleToken &+= 1
             panel.setFrame(NotchGeometry.topCentred(size, on: model.screen), display: true)
             withAnimation(wingAnimation) { model.showsLiveActivity = true }
         } else {
-            withAnimation(wingAnimation) { model.showsLiveActivity = false }
-            let delay = model.reduceMotion ? 0 : 0.3
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                MainActor.assumeIsolated {
-                    guard let self, !self.model.isOpen, !self.model.showsLiveActivity, self.model.hud == nil else { return }
-                    self.panel.setFrame(self.model.frame(open: false), display: true)
-                }
-            }
+            animate(wingAnimation) { model.showsLiveActivity = false }
         }
     }
 
@@ -376,10 +358,12 @@ final class NotchController {
         hudWork?.cancel()
         if model.hud == nil {
             // Grow the window, then the shape.
+            settleToken &+= 1
             panel.setFrame(NotchGeometry.topCentred(NotchGeometry.hudPanelSize(of: model.screen), on: model.screen), display: true)
             panel.alphaValue = 1
             withAnimation(wingAnimation) { model.hud = event }
         } else if model.hud != event {
+            // The level and its text follow in place (HUDView).
             model.hud = event
         }
         let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.hideHUD() } }
@@ -389,14 +373,37 @@ final class NotchController {
 
     private func hideHUD() {
         guard model.hud != nil, !model.isOpen else { return }
-        withAnimation(wingAnimation) { model.hud = nil }
-        let delay = model.reduceMotion ? 0 : 0.3
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            MainActor.assumeIsolated {
-                guard let self, !self.model.isOpen, self.model.hud == nil else { return }
-                self.panel.setFrame(self.model.frame(open: false), display: true)
-                self.refreshClosedVisibility()
-            }
+        animate(wingAnimation) { model.hud = nil }
+    }
+
+    // MARK: Fitting the window after a spring
+
+    /// Runs `change` with `animation`, then fits the closed window to the
+    /// shape once the spring has logically finished: SwiftUI's own
+    /// completion, not a guess at its length. Any later change (opening,
+    /// growing the wings again) supersedes it, so an interrupted spring
+    /// never shrinks the window under the one that replaced it.
+    private func animate(_ animation: Animation?, _ change: () -> Void) {
+        settleToken &+= 1
+        let token = settleToken
+        let fit: @Sendable () -> Void = { [weak self] in
+            MainActor.assumeIsolated { self?.settle(token) }
         }
+        guard let animation else {
+            change()
+            fit()
+            return
+        }
+        withAnimation(animation, completionCriteria: .logicallyComplete, change, completion: fit)
+        // Should SwiftUI not report the end (nothing drawn meanwhile), fit it anyway.
+        DispatchQueue.main.asyncAfter(deadline: .now() + MotionSpec.settleFallback, execute: fit)
+    }
+
+    private func settle(_ token: Int) {
+        guard token == settleToken else { return }
+        settleToken &+= 1
+        guard !model.isOpen else { return }
+        panel.setFrame(model.frame(open: false), display: true)
+        refreshClosedVisibility()
     }
 }

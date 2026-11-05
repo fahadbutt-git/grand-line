@@ -185,7 +185,7 @@ struct SettingsView: View {
                     Image(systemName: "exclamationmark.triangle")
                     Text(failure).lineLimit(3)
                 }
-                .font(.system(size: 11))
+                .font(TypeScale.caption)
                 .foregroundStyle(theme.color(.theme(.red)) ?? theme.foreground)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 8)
@@ -206,7 +206,7 @@ struct SettingsView: View {
                     }
                     if shown.isEmpty {
                         Text("Nothing is shown. Turn something on below.")
-                            .font(.system(size: 13)).foregroundStyle(theme.muted)
+                            .font(TypeScale.body).foregroundStyle(theme.muted)
                     }
                 } header: {
                     SettingsHeader(text: "Shown in the panel", note: "Drag, or use the arrows, to change the order.")
@@ -232,7 +232,7 @@ struct SettingsView: View {
                     }
                     .controlSize(.small)
                     Text("A widget is a small file in the widgets folder: a title, an SF Symbol and a shell command. New ones appear here, turned off.")
-                        .font(.system(size: 11)).foregroundStyle(theme.muted)
+                        .font(TypeScale.caption).foregroundStyle(theme.muted)
                 } header: {
                     SettingsHeader(text: "Widgets")
                 }
@@ -326,7 +326,7 @@ struct SettingsView: View {
             settingToggle("Iceberg in the menu bar", key: "menu_bar_icon", value: host.settings.menuBarIcon)
             settingToggle("Open at login", key: "launch_at_login", value: host.settings.launchAtLogin)
         }
-        .font(.system(size: 13))
+        .font(TypeScale.body)
     }
 
     private var shelfSettings: some View {
@@ -337,7 +337,7 @@ struct SettingsView: View {
             SettingNote(text: "Shake the pointer left and right while dragging. What you drop in the basket goes on the shelf; drag it out again from there.")
             SettingNote(text: "The shelf keeps only a link to each file. Removing a file from the shelf, or clearing it, never touches the file. Dragging one out gives the other app a copy.")
         }
-        .font(.system(size: 13))
+        .font(TypeScale.body)
     }
 
     private var hudSettings: some View {
@@ -366,7 +366,7 @@ struct SettingsView: View {
                 }
             }
         }
-        .font(.system(size: 13))
+        .font(TypeScale.body)
     }
 
     /// A HUD switch whose HUD needs Accessibility: turning it on asks macOS
@@ -385,7 +385,7 @@ struct SettingsView: View {
                 Text("Open or close with")
                 Button(action: recordShortcut) {
                     Text(recorder.recording ? "Type a shortcut…" : (host.settings.toggleShortcut?.symbols ?? "None"))
-                        .font(.system(size: 12, weight: .medium).monospaced())
+                        .font(TypeScale.callout.weight(.medium).monospaced())
                         .frame(minWidth: 90)
                 }
                 .help("Click, then press the keys. Escape cancels.")
@@ -399,9 +399,9 @@ struct SettingsView: View {
                 }
             }
             if let hint = recorder.hint {
-                Text(hint).font(.system(size: 11)).foregroundStyle(theme.muted)
+                Text(hint).font(TypeScale.caption).foregroundStyle(theme.muted)
             } else if let problem = host.hotKeyProblem {
-                Text(problem).font(.system(size: 11)).foregroundStyle(theme.color(.theme(.red)) ?? theme.foreground)
+                Text(problem).font(TypeScale.caption).foregroundStyle(theme.color(.theme(.red)) ?? theme.foreground)
             }
         }
     }
@@ -480,7 +480,7 @@ private struct SettingNote: View {
     let text: String
 
     var body: some View {
-        Text(text).font(.system(size: 11)).foregroundStyle(theme.muted).fixedSize(horizontal: false, vertical: true)
+        Text(text).font(TypeScale.caption).foregroundStyle(theme.muted).fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -491,8 +491,8 @@ private struct SettingsHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(text).font(.system(size: 13, weight: .semibold)).foregroundStyle(theme.foreground)
-            if let note { Text(note).font(.system(size: 11)).foregroundStyle(theme.muted) }
+            Text(text).font(TypeScale.title).foregroundStyle(theme.foreground)
+            if let note { Text(note).font(TypeScale.caption).foregroundStyle(theme.muted) }
         }
         .padding(.top, 6)
     }
@@ -511,15 +511,15 @@ private struct SettingsRowView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: row.symbol)
-                .font(.system(size: 13))
+                .font(TypeScale.body)
                 .foregroundStyle(on ? theme.highlight : theme.muted)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
-                Text(row.title).font(.system(size: 13)).foregroundStyle(theme.foreground)
-                Text(row.detail).font(.system(size: 11)).foregroundStyle(theme.muted).fixedSize(horizontal: false, vertical: true)
+                Text(row.title).font(TypeScale.body).foregroundStyle(theme.foreground)
+                Text(row.detail).font(TypeScale.caption).foregroundStyle(theme.muted).fixedSize(horizontal: false, vertical: true)
                 if let permission = row.permission, let note = note(permission) {
                     HStack(spacing: 6) {
-                        Text(note).font(.system(size: 11)).foregroundStyle(theme.muted)
+                        Text(note).font(TypeScale.caption).foregroundStyle(theme.muted)
                             .fixedSize(horizontal: false, vertical: true)
                         if permissions.states[permission] == .denied {
                             Button("Open Privacy Settings") { permissions.openPrivacySettings(permission) }
@@ -557,7 +557,7 @@ private struct SettingsRowView: View {
 
     private func arrow(_ symbol: String, enabled: Bool, help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol).font(.system(size: 11, weight: .semibold)).frame(width: 18, height: 18)
+            Image(systemName: symbol).font(SymbolScale.accessory).frame(width: 18, height: 18)
         }
         .buttonStyle(.borderless)
         .disabled(!enabled)

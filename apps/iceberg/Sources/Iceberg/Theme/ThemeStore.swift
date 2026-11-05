@@ -87,6 +87,14 @@ final class ThemeStore: ObservableObject {
     var card: Color { notch.card.color }
     /// Dividers between the panel's columns.
     var line: Color { notch.line.color }
+    /// Lines with Increase Contrast: the theme's line leaning towards its text colour.
+    var strongLine: Color { line(emphasis: SurfaceStyle.lineEmphasis(increaseContrast: true)) }
+    /// The theme's line leaning `emphasis` of the way towards its text colour.
+    func line(emphasis: Double) -> Color {
+        emphasis <= 0 ? line : notch.line.mixed(with: theme.foreground, emphasis).color
+    }
+    /// The line colour for the current contrast setting.
+    func line(increaseContrast: Bool) -> Color { increaseContrast ? strongLine : line }
     var colorScheme: ColorScheme { theme.mode == .light ? .light : .dark }
 
     func color(_ c: WidgetColor?) -> Color? {

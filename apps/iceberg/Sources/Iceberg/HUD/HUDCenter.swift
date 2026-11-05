@@ -134,7 +134,10 @@ final class HUDCenter: ObservableObject {
 
 /// A HUD in the closed notch: the symbol in the left wing, the level bar
 /// and its text (or the text alone) in the right one. White on the black
-/// notch; the bar and the symbol's state colours come from the theme.
+/// notch, which it is part of, so it takes no material; the bar and the
+/// symbol's state colours come from the theme. A new level slides the bar
+/// and rolls the digits in place, and a new symbol (muted, charging)
+/// replaces the old one, all critically damped.
 struct HUDView: View {
     let event: HUDEvent
     /// The closed notch's height.
@@ -142,25 +145,34 @@ struct HUDView: View {
     /// The flare at each top corner, which nothing is drawn in.
     let inset: CGFloat
     @EnvironmentObject var theme: ThemeStore
+    @ObservedObject private var display = DisplayOptions.shared
 
     var body: some View {
         let wing = NotchGeometry.hudWingWidth(collapsedHeight: height)
         let pad = NotchGeometry.wingPadding(collapsedHeight: height) + 4
+        let change = Motion.content(reduceMotion: display.reduceMotion)
         HStack(spacing: 0) {
+            // Sized to the notch, not to text: the hardware sets the scale.
             Image(systemName: event.symbol)
-                .font(.system(size: max(11, height * 0.42), weight: .semibold))
+                .font(.system(size: (height * 0.42).rounded(), weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(symbolColor)
+                .contentTransition(.symbolEffect(.replace))
+                .animation(change, value: event.symbol)
                 .padding(.leading, pad)
                 .frame(width: wing, height: height, alignment: .leading)
             Spacer(minLength: 0)
             HStack(spacing: 6) {
                 if let level = event.level {
-                    LevelBar(level: level, color: theme.theme.accent.color)
+                    LevelBar(level: level, color: theme.theme.accent.color, trackOpacity: display.increaseContrast ? 0.36 : 0.2)
                         .frame(height: 4)
+                        .animation(change, value: level)
                 }
                 Text(event.text)
-                    .font(.system(size: 11, weight: .medium).monospacedDigit())
-                    .foregroundStyle(Color.white.opacity(0.9))
+                    .font(TypeScale.numeral.weight(.medium))
+                    .foregroundStyle(Color.white.opacity(display.increaseContrast ? 1 : 0.9))
+                    .contentTransition(.numericText(value: event.level ?? 0))
+                    .animation(change, value: event.text)
                     .lineLimit(1)
                     .fixedSize()
             }
@@ -184,16 +196,20 @@ struct HUDView: View {
     }
 }
 
-/// A thin level bar: a faint track and the level in `color`.
+/// A thin level bar: a faint track and the level in `color`, its end on
+/// whole device pixels.
 struct LevelBar: View {
     let level: Double
     let color: Color
+    var trackOpacity: Double = 0.2
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         GeometryReader { g in
+            let filled = PixelGrid.align(max(0, min(1, level)) * g.size.width, scale: displayScale)
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.white.opacity(0.18))
-                Capsule().fill(color).frame(width: max(0, min(1, level)) * g.size.width)
+                Capsule().fill(Color.white.opacity(trackOpacity))
+                Capsule().fill(color).frame(width: filled)
             }
         }
     }
