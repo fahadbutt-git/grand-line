@@ -79,8 +79,8 @@ Ghostty with Omarchy's shell tools, set up in `config/zsh/grand-line.zsh`, `conf
 
 | Place | Holds | Why |
 | --- | --- | --- |
-| `~/Drive` (Google Drive, My Drive) | Documents, research, everything to keep | Synced and backed up. Finder windows and the first save dialog in each app open here |
-| `~/Developer` | Code and anything you build | Local and on GitHub. Drive sync corrupts git folders and slows builds |
+| `~/Drive` (Google Drive, My Drive) | Everything to keep, in four folders: `0 Inbox` (new files waiting to be filed, including old ones from Downloads), `1 Projects` (work with an end, one folder each), `2 Areas` (ongoing areas, with Research by subspecialty) and `3 Resources` (reference material). There is no archive folder | Synced and backed up. Finder windows and the first save dialog in each app open here |
+| `~/Code` (formerly `~/Developer`) | Code and anything you build | Local and on GitHub. Drive sync corrupts git folders and slows builds. The first `update` moves an empty `~/Developer` to the Trash, and suggests moving the contents of one that has files |
 | `~/Downloads` | An inbox only | Sorted as files arrive (below), then filed into Drive by you |
 | `~/Pictures/Screenshots` | Screenshots and recordings | Keeps the Desktop clear |
 | Inside the Docker VM | Containers and their data | Removed with `colima delete` when no longer needed |
@@ -111,7 +111,7 @@ Setup builds the package's own apps with Apple's command line tools. Xcode (abou
 
 ## Downloads
 
-New files are sorted as they arrive, by the rules in `config/grand-line/downloads-rules.tsv`. Files from Claude, ChatGPT and Gemini go to `Downloads/AI/<app>`, papers from journal and PubMed sites to `Downloads/Papers`, and everything else by type (Documents, Data, Slides, Images, Video, Installers and so on). Installers go to the Trash a week after they arrived, and anything left loose moves to `Downloads/Archive/<year-month>` 30 days after it arrived. Age is when the file arrived in its folder (as macOS records it, or else the inode's change time), never its modification time, which travels with a file unpacked from a zip or sent by AirDrop. A file the sorter is seeing for the first time is never moved by age, unfinished downloads (including the empty placeholder Firefox and Zen keep beside a `.part` file) are left alone, a move never replaces a file, and only one sort runs at a time. Nothing is deleted, and every move is logged. The first time it runs, macOS asks whether downloads-agent (the sorter's own small launcher) may use Downloads. Allow it. No other program gets that access.
+New files are sorted as they arrive, by the rules in `config/grand-line/downloads-rules.tsv`. Files from Claude, ChatGPT and Gemini go to `Downloads/AI/<app>`, papers from journal and PubMed sites to `Downloads/Papers`, and everything else by type (Documents, Data, Slides, Images, Video, Installers and so on). Installers go to the Trash a week after they arrived, and anything left loose moves to `~/Drive/0 Inbox/From Downloads/<year-month>` 30 days after it arrived (the `archive_folder` setting in the rules file; without it, `Downloads/Archive/<year-month>`). Until Drive is signed in and `0 Inbox` exists, those files wait in Downloads. Age is when the file arrived in its folder (as macOS records it, or else the inode's change time), never its modification time, which travels with a file unpacked from a zip or sent by AirDrop. A file the sorter is seeing for the first time is never moved by age, unfinished downloads (including the empty placeholder Firefox and Zen keep beside a `.part` file) are left alone, a move never replaces a file, and only one sort runs at a time. Nothing is deleted, and every move is logged. The first time it runs, macOS asks whether downloads-agent (the sorter's own small launcher) may use Downloads. Allow it. No other program gets that access.
 
 ## Text shortcuts
 
