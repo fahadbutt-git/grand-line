@@ -95,9 +95,10 @@ macOS requires these clicks from you. Work down the list once.
     Then allow Script Editor in System Settings, Notifications.
 
 13. Google Drive
-    Sign in. Then set it to Mirror files (needed for full-text search
-    on the Mac): Google Drive menu bar icon, Settings (gear),
-    Preferences, Google Drive, "Mirror files". Then run:  update
+    Sign in and keep "Stream files" (the default): every file shows in
+    Finder but downloads only when opened. Search finds every file by
+    name. To search inside a folder's files too, right-click it in
+    Finder, Google Drive, "Available offline". Then run:  update
 
 14. Screen capture and text capture
     The first time you use the capture menu, allow Screen Recording
