@@ -95,8 +95,9 @@ macOS requires these clicks from you. Work down the list once.
     Then allow Script Editor in System Settings, Notifications.
 
 13. Google Drive
-    Sign in. In Drive settings, under My Drive syncing options,
-    choose "Mirror files" (needed for full-text search on the Mac).
+    Sign in. Then set it to Mirror files (needed for full-text search
+    on the Mac): Google Drive menu bar icon, Settings (gear),
+    Preferences, Google Drive, "Mirror files". Then run:  update
 
 14. Screen capture and text capture
     The first time you use the capture menu, allow Screen Recording

@@ -14,6 +14,7 @@ GRAND_LINE_LOGS="$HOME/Library/Logs/grand-line"
 SCREENSHOTS_DIR="$HOME/Pictures/Screenshots"
 BACKGROUNDS_DIR="$HOME/Pictures/Backgrounds"
 DRIVE_LINK="$HOME/Drive"                       # link to Google Drive, My Drive
+CODE_DIR="$HOME/Code"                          # code, kept local (never in Drive)
 
 # GRAND_LINE_BREW_PREFIX lets the tests point at a pretend Homebrew, so they
 # behave the same whether or not the test machine has Homebrew.
@@ -27,4 +28,4 @@ fi
 BREW_BIN="$BREW_PREFIX/bin/brew"
 
 export GRAND_LINE_LINK GRAND_LINE_BIN GRAND_LINE_BUILD GRAND_LINE_STATE GRAND_LINE_LOGS
-export SCREENSHOTS_DIR BACKGROUNDS_DIR DRIVE_LINK BREW_PREFIX BREW_BIN
+export SCREENSHOTS_DIR BACKGROUNDS_DIR DRIVE_LINK CODE_DIR BREW_PREFIX BREW_BIN

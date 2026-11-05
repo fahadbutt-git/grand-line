@@ -10,7 +10,14 @@
 #
 # Files still downloading, hidden files and folders are never touched.
 # Nothing is ever deleted: installers go to the Trash after a week, and
-# anything left loose in Downloads moves to Archive/<year-month> after 30 days.
+# anything left loose in Downloads moves to <archive_folder>/<year-month>
+# after 30 days (archive_after_days).
+#
+# Settings: "set", the name, then the value, tab separated. A value may hold
+# spaces and needs no quotes. archive_folder is a folder inside Downloads, or
+# a full path starting with ~ or /. Without it, files go to Downloads/Archive.
+# A folder outside Downloads is used only while the folder holding it exists
+# (Drive signed in), and the files wait in Downloads until then.
 
 from	claude.ai anthropic.com claudeusercontent.com	AI/Claude
 from	chatgpt.com openai.com oaiusercontent.com	AI/ChatGPT
@@ -34,3 +41,4 @@ ext	ics vcf	Calendar and contacts
 
 set	trash_installers_after_days	7
 set	archive_after_days	30
+set	archive_folder	~/Drive/0 Inbox/From Downloads

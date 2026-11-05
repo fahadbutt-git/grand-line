@@ -63,12 +63,14 @@ sources_of() {
 }
 
 # Settings, then rules, read once.
-trash_days=7; archive_days=30
+# archive_folder is where old loose files go; left unset, Downloads/Archive.
+trash_days=7; archive_days=30; archive_folder=""
 kinds=(); matches=(); folders=(); onlys=()
 while IFS=$'\t' read -r kind match folder only; do
   case "$kind" in
     set) [[ "$match" == trash_installers_after_days ]] && trash_days="$folder"
-         [[ "$match" == archive_after_days ]] && archive_days="$folder" ;;
+         [[ "$match" == archive_after_days ]] && archive_days="$folder"
+         [[ "$match" == archive_folder ]] && archive_folder="$folder" ;;
     from|ext) kinds+=("$kind"); matches+=(" $(lower "$match") ")
               folders+=("$folder"); onlys+=("${only:+ $(lower "$only") }") ;;
   esac
@@ -81,6 +83,19 @@ dest_dir() {
     *) echo "$DL/$1" ;;
   esac
 }
+
+# The folder old loose files are archived into, by month. A folder of your
+# own (such as one in Drive) is used only while the folder holding it exists,
+# so a Drive that is not signed in yet never gets a stand-in folder made in
+# its place: the files wait in Downloads until it is there.
+archive_root="$DL/Archive"
+archive_folder="${archive_folder%/}"
+case "$archive_folder" in
+  "") ;;
+  "~") archive_root="$HOME" ;;
+  *) archive_root="$(dest_dir "$archive_folder")" ;;
+esac
+archive_ready() { [[ "$archive_root" == "$DL/Archive" || -d "$(dirname "$archive_root")" ]]; }
 
 # Moves a file, adding " 2", " 3" and so on if the name is taken. mv -n never
 # replaces a file, and the move is checked afterwards, so a name another
@@ -151,8 +166,8 @@ while IFS= read -r -d '' f; do
   else
     # Age is from when the file arrived in Downloads, never its own dates.
     added="$(date_added "$f")"
-    if [[ $((now - added)) -gt $((archive_days * 86400)) ]] && seen_earlier "$f"; then
-      move "$f" "$DL/Archive/$(perl -MPOSIX -e 'print strftime("%Y-%m", localtime shift)' "$added")"
+    if [[ $((now - added)) -gt $((archive_days * 86400)) ]] && seen_earlier "$f" && archive_ready; then
+      move "$f" "$archive_root/$(perl -MPOSIX -e 'print strftime("%Y-%m", localtime shift)' "$added")"
     fi
   fi
 done < <(find "$DL" -mindepth 1 -maxdepth 1 -type f -print0)

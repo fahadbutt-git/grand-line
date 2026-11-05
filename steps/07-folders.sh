@@ -2,19 +2,23 @@
 # Creates the local folders and links ~/Drive to Google Drive.
 #
 # Where things live:
-#   ~/Drive (Google Drive, My Drive)  documents, research, everything to keep
-#   ~/Developer                        code, kept local and on GitHub (Drive
+#   ~/Drive (Google Drive, My Drive)  everything to keep, in four folders:
+#     0 Inbox                            new files to file (old Downloads too)
+#     1 Projects                         work with an end, one folder each
+#     2 Areas                            ongoing areas (Research by subspecialty)
+#     3 Resources                        reference material
+#   ~/Code                             code, kept local and on GitHub (Drive
 #                                      sync breaks git and node_modules)
 #   ~/Downloads                        an inbox, sorted by tidy-downloads
 #   ~/Pictures/Screenshots             captures, never the Desktop
 
 step_folders() {
-  run mkdir -p "$SCREENSHOTS_DIR" "$BACKGROUNDS_DIR" "$HOME/Developer"
+  run mkdir -p "$SCREENSHOTS_DIR" "$BACKGROUNDS_DIR" "$CODE_DIR"
   local img
   for img in "$REPO_DIR"/backgrounds/*; do
     [[ -f "$img" && ! -f "$BACKGROUNDS_DIR/$(basename "$img")" ]] && run cp "$img" "$BACKGROUNDS_DIR/"
   done
-  ok "Folders ready: Pictures/Screenshots, Pictures/Backgrounds, Developer"
+  ok "Folders ready: Pictures/Screenshots, Pictures/Backgrounds, Code"
 
   # Google Drive appears only after signing in, so this part waits until then
   # (the update command runs this step again).

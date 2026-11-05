@@ -401,6 +401,8 @@ fi
 # modification time. The clock is set two minutes ahead, so every file made
 # here has settled.
 dl="$tmp/dl"; src="$tmp/sources"; mdates="$tmp/mdls"; mkdir -p "$dl/Documents" "$dl/My folder" "$src" "$mdates"
+# The rules archive into Drive's inbox, a path with spaces in it.
+inbox="$HOME/Drive/0 Inbox"; mkdir -p "$inbox"
 export GRAND_LINE_NO_RESCAN=1 XATTR_SOURCES="$src" GRAND_LINE_DOWNLOADS="$dl" GRAND_LINE_DOWNLOAD_RULES="$ROOT/config/grand-line/downloads-rules.tsv"
 export MDLS_DATES="$mdates" GRAND_LINE_NOW="$(( $(date +%s) + 120 ))" GRAND_LINE_DOWNLOADS_LOCK="$tmp/downloads.lock"
 age() { perl -e '$t = time - shift; utime $t, $t, @ARGV' "$1" "${@:2}"; }   # age SECONDS FILES (modification time)
@@ -448,7 +450,10 @@ check_at ".hidden.pdf" "hidden files are left alone"
 grep -q "report.pdf" "$HOME/Library/Logs/grand-line/downloads.log" 2>/dev/null && t_ok "Downloads: every move is logged" || t_fail "Downloads: no log"
 # Later runs: what was seen before may now be moved by age, by when it arrived.
 tidy; tidy
-[[ -n "$(find "$dl/Archive" -name old.xyz 2>/dev/null)" ]] && t_ok "Downloads: an old loose file is archived by the month it arrived" || t_fail "Downloads: old file not archived"
+archived="$(find "$inbox/From Downloads" -name old.xyz 2>/dev/null)"
+[[ "$archived" =~ /From\ Downloads/[0-9]{4}-[0-9]{2}/old\.xyz$ && ! -e "$dl/Archive" ]] \
+  && t_ok "Downloads: an old loose file is archived into archive_folder (spaces and all) by the month it arrived" \
+  || t_fail "Downloads: old file not archived into archive_folder" "$(cd "$HOME/Drive" && find . | tr '\n' ' ')"
 [[ -f "$HOME/.Trash/setup.dmg" ]] && t_ok "Downloads: an installer that arrived over a week ago goes to the Trash" || t_fail "Downloads: old installer not trashed"
 check_at "Installers/Foo.dmg" "an installer that arrived just now stays, whatever its modification time"
 check_at "unpacked.xyz" "a file that arrived just now is never archived, whatever its modification time"
@@ -479,6 +484,32 @@ tidy; check_at "Data/late.csv" "a lock left by a run that ended is taken over"
 [[ ! -e "$lockd" ]] && t_ok "Downloads: the lock is given back" || t_fail "Downloads: lock left behind"
 mkdir "$lockd"; mk later.csv; tidy; check_at "later.csv" "a lock just being taken (no owner yet) is respected"
 rmdir "$lockd"
+# archive_folder: unset keeps Downloads/Archive; a folder whose parent is
+# missing (Drive not signed in) is never made, and the file waits; a name
+# already taken there is kept, never replaced.
+archive_case() {   # archive_case NAME [SETTING]: a fresh Downloads with one old loose file
+  dl="$tmp/dl-$1"; mkdir -p "$dl"; export GRAND_LINE_DOWNLOADS="$dl"
+  grep -v '^set'$'\t''archive_folder' "$ROOT/config/grand-line/downloads-rules.tsv" > "$tmp/rules-$1.tsv"
+  [[ -n "${2:-}" ]] && printf 'set\tarchive_folder\t%s\n' "$2" >> "$tmp/rules-$1.tsv"
+  export GRAND_LINE_DOWNLOAD_RULES="$tmp/rules-$1.tsv"
+  mk aged.xyz; added aged.xyz $((40 * 86400)); tidy; tidy
+}
+archive_case unset
+[[ -n "$(find "$dl/Archive" -path '*/[0-9][0-9][0-9][0-9]-[0-9][0-9]/aged.xyz' 2>/dev/null)" ]] \
+  && t_ok "Downloads: with archive_folder unset, old files still go to Downloads/Archive/<year-month>" \
+  || t_fail "Downloads: default archive" "$(cd "$dl" && find . | tr '\n' ' ')"
+# shellcheck disable=SC2088  # a literal ~, as the rules file holds it
+archive_case nodrive "~/No Drive/0 Inbox/From Downloads"
+[[ -f "$dl/aged.xyz" && ! -e "$HOME/No Drive" ]] \
+  && t_ok "Downloads: an archive_folder whose parent is missing is never made, and the file waits" \
+  || t_fail "Downloads: archive_folder with a missing parent" "$(cd "$HOME" && ls)"
+mkdir -p "$tmp/Taken/Old Files"
+month="$(perl -MPOSIX -e 'print strftime("%Y-%m", localtime(time - shift))' $((40 * 86400)))"
+mkdir -p "$tmp/Taken/Old Files/$month"; printf theirs > "$tmp/Taken/Old Files/$month/aged.xyz"
+archive_case taken "$tmp/Taken/Old Files/"
+[[ "$(cat "$tmp/Taken/Old Files/$month/aged.xyz")" == theirs && -f "$tmp/Taken/Old Files/$month/aged 2.xyz" ]] \
+  && t_ok "Downloads: archiving into archive_folder never replaces a file there" \
+  || t_fail "Downloads: archive_folder clash" "$(ls "$tmp/Taken/Old Files/$month")"
 unset XATTR_SOURCES GRAND_LINE_DOWNLOADS GRAND_LINE_DOWNLOAD_RULES MDLS_DATES GRAND_LINE_NOW GRAND_LINE_DOWNLOADS_LOCK
 
 # --- locks: held while the holder runs, taken over once it is gone, one winner
@@ -679,6 +710,26 @@ GRAND_LINE_REPO="$ROOT" bash "$ROOT/migrations/1793404860-render-theme-templates
   exit 0
 ) && t_ok "migration: the office suites are no longer managed, nothing is deleted, and it says so once" \
   || t_fail "office suites migration (step $?)"
+# ~/Developer becomes ~/Code: an empty one goes to the Trash, one with files
+# (hidden ones too) stays exactly as it is, with one line said.
+(
+  m="$ROOT/migrations/1793898990-developer-folder-to-code.sh"
+  grep -qx '# grandline:unattended' "$m" || exit 1
+  rm -rf "$HOME/.Trash/Developer"; mkdir -p "$HOME/Developer/app" "$HOME/Developer/.hidden"; echo x > "$HOME/Developer/app/main.R"
+  out="$(GRAND_LINE_REPO="$ROOT" bash "$m")" || exit 2
+  [[ "$(grep -c . <<<"$out")" == 1 && "$out" == *"~/Code"* ]] || exit 3
+  [[ -f "$HOME/Developer/app/main.R" && ! -e "$HOME/.Trash/Developer" ]] || exit 4
+  rm -rf "$HOME/Developer/app"
+  GRAND_LINE_REPO="$ROOT" bash "$m" >/dev/null || exit 5
+  [[ -d "$HOME/Developer/.hidden" ]] || exit 6
+  rmdir "$HOME/Developer/.hidden"
+  GRAND_LINE_REPO="$ROOT" bash "$m" >/dev/null || exit 7
+  [[ ! -e "$HOME/Developer" && -d "$HOME/.Trash/Developer" ]] || exit 8
+  GRAND_LINE_REPO="$ROOT" bash "$m" >/dev/null || exit 9   # again: nothing to do
+  rm -rf "$HOME/.Trash/Developer"
+  exit 0
+) && t_ok "migration: an empty ~/Developer goes to the Trash, one with files is kept and a move to ~/Code suggested" \
+  || t_fail "Developer to Code migration (step $?)"
 # A fresh install marks every migration done; a Mac with a theme does not.
 fh="$tmp/fresh"; mkdir -p "$fh"
 plan="$(HOME="$fh" bash "$ROOT/setup.sh" --dry-run --only folders 2>&1)"
