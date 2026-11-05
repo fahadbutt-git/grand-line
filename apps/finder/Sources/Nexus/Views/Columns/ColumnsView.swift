@@ -11,6 +11,7 @@ struct ColumnsView: View {
     @ObservedObject var pane: PaneModel
     let palette: Palette
     @StateObject private var listings = ColumnListings()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let chain = folders
@@ -19,7 +20,7 @@ struct ColumnsView: View {
                 HStack(spacing: 0) {
                     ForEach(chain, id: \.self) { (folder: URL) in
                         column(for: folder, in: chain)
-                        Rectangle().fill(palette.hairline).frame(width: 1)
+                        Hairline(palette: palette, axis: .vertical)
                     }
                     if pane.selectedItems.count == 1, let item = pane.selectedItems.first, !item.isFolder {
                         PreviewPane(pane: pane, palette: palette).frame(width: 300).id("preview")
@@ -27,7 +28,9 @@ struct ColumnsView: View {
                 }
             }
             .onChange(of: chain.count) { _, _ in
-                if let last = chain.last { withAnimation { reader.scrollTo(last, anchor: .trailing) } }
+                // The new column slides in from the trailing edge on a
+                // critically damped spring; at once with Reduce Motion.
+                if let last = chain.last { withAnimation(Motion.follow(reduceMotion)) { reader.scrollTo(last, anchor: .trailing) } }
             }
         }
         .onAppear { listings.track(Array(chain.dropLast()), hidden: model.showHidden) }
@@ -103,6 +106,7 @@ private struct Column: View {
             }
             .padding(.vertical, 4)
         }
+        .scrollIndicators(.automatic)
         .frame(width: width)
     }
 
@@ -110,31 +114,33 @@ private struct Column: View {
         let selected = isSelected(item)
         let base = HStack(spacing: 6) {
             Image(systemName: FileSymbol.name(for: item))
-                .font(.system(size: 12))
+                .font(NexusType.rowSymbol)
+                .imageScale(.small)
                 .foregroundStyle(item.isFolder ? palette.accent : palette.dim)
                 .frame(width: 18)
             Text(item.shownName(allExtensions: NexusPreferencesStore.shared.current.showAllExtensions))
-                .font(.system(size: 13)).lineLimit(1).truncationMode(.middle)
+                .font(NexusType.body).lineLimit(1).truncationMode(.middle)
                 .foregroundStyle(selected ? palette.selectionText : palette.text)
             Spacer(minLength: 4)
             if item.isFolder {
-                Image(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(palette.faint)
+                Image(systemName: "chevron.right").font(NexusType.tinySymbol).foregroundStyle(selected ? palette.selectionText : palette.faint)
             }
         }
         .padding(.horizontal, 8)
         .frame(height: 24)
-        .background(RoundedRectangle(cornerRadius: 5).fill(selected ? palette.selection : Color.clear).padding(.horizontal, 4))
+        .background(SelectionFill(palette: palette, isSelected: selected, radius: 5).padding(.horizontal, 4))
         .contentShape(Rectangle())
         let name = item.shownName(allExtensions: NexusPreferencesStore.shared.current.showAllExtensions)
         if interactive {
             base.modifier(ItemInteraction(model: model, pane: pane, item: item))
-                .simultaneousGesture(TapGesture().onEnded { if item.isFolder { choose(item) } })
+                // A folder opens its column on mouse-down, as in Finder.
+                .onPress { if item.isFolder { choose(item) } }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel(name)
                 .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
                 .accessibilityAction { choose(item) }
         } else {
-            base.onTapGesture { choose(item) }
+            base.onPress { choose(item) }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel(name)
                 .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)

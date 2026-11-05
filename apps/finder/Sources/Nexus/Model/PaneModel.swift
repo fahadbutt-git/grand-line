@@ -14,6 +14,11 @@ final class PaneModel: ObservableObject, Identifiable {
     @Published private(set) var isLoading = false
     @Published private(set) var problem: String?
     @Published private(set) var freeSpace: Int64?
+    /// The "Found in Google Drive" section of a search, less what the local
+    /// results already show.
+    @Published private(set) var drive: DriveSection = .hidden
+    /// A new Drive search is under way while the last one's rows stay shown.
+    @Published private(set) var driveRefreshing = false
     /// Where the column view starts; follows the pane when it leaves.
     @Published var columnRoot: URL?
     private(set) var listing: ArchiveListing?
@@ -26,6 +31,10 @@ final class PaneModel: ObservableObject, Identifiable {
     private var loadTask: Task<Void, Never>?
     private var sizeTask: Task<Void, Never>?
     private var search: SearchRunner?
+    private let driveSearch = DriveSearchRunner()
+    /// Drive's own answer, before the local results are taken out of it.
+    private var driveAnswer: DriveSection = .hidden
+    private var driveTerms: String?
     /// Rows already read for the search shown, by path, so a Spotlight update
     /// reads only what changed instead of every result again.
     private var searchItems: [String: FileItem] = [:]
@@ -175,6 +184,8 @@ final class PaneModel: ObservableObject, Identifiable {
         reading = false
         readAgain = false
         search?.stop()
+        driveSearch.stop()
+        if case .search = location {} else { setDrive(.hidden) }
         problem = nil
         isLoading = true
         switch location {
@@ -196,6 +207,7 @@ final class PaneModel: ObservableObject, Identifiable {
 
     private func finish(_ items: [FileItem], ranks: [String: SearchRank]? = nil) {
         if let ranks { state.loadSearch(items, ranks: ranks) } else { state.load(items) }
+        if ranks != nil { refreshDrive() }
         state.applyPendingSelection()
         isLoading = false
         onSelectionChange?()
@@ -381,7 +393,7 @@ final class PaneModel: ObservableObject, Identifiable {
         search = runner
         searchItems = [:]
         let content = NexusPreferencesStore.shared.current.includeContentMatches && !state.hidesInsideFiles
-        runner.start(text, scope: scope, content: content) { [weak self] hits, changed in
+        let plan = runner.start(text, scope: scope, content: content) { [weak self] hits, changed in
             guard let self else { return }
             for path in changed { self.searchItems[path] = nil }
             var items: [FileItem] = []
@@ -397,6 +409,44 @@ final class PaneModel: ObservableObject, Identifiable {
             self.searchItems = known
             self.finish(items, ranks: ranks)
         }
+        // Google Drive, beside the local search and never in its way.
+        driveTerms = plan.flatMap(DriveResults.terms(for:))
+        startDriveSearch()
+    }
+
+    private func startDriveSearch() {
+        driveSearch.start(terms: driveTerms) { [weak self] section in
+            self?.setDrive(section)
+        }
+    }
+
+    /// Runs the Drive half of the search shown again (an account connected
+    /// or disconnected); the local results stay as they are.
+    func restartDriveSearch() {
+        guard case .search = location else { return }
+        startDriveSearch()
+    }
+
+    private func setDrive(_ section: DriveSection) {
+        // The last answer's rows stay while the next one is fetched, so the
+        // section does not flicker as the query changes.
+        if section == .searching, case .results = driveAnswer {
+            driveRefreshing = true
+            return
+        }
+        driveRefreshing = false
+        driveAnswer = section
+        refreshDrive()
+    }
+
+    /// Drive's files that the local results already show are left out.
+    private func refreshDrive() {
+        var shown = driveAnswer
+        if case .results(let hits) = driveAnswer {
+            let local = Set(state.items.lazy.filter { !$0.isInArchive }.map(\.path))
+            shown = .results(DriveResults.dedupe(hits, local: local))
+        }
+        if shown != drive { drive = shown }
     }
 
     /// The search bar's "inside files" toggle: this search with or without
@@ -494,5 +544,6 @@ final class PaneModel: ObservableObject, Identifiable {
         reading = false
         sizeTask?.cancel()
         search?.stop()
+        driveSearch.stop()
     }
 }

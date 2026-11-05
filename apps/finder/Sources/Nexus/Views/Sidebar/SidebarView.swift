@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 
 /// The sidebar (R29): 14 pt text in 30 pt rows, SF Symbols, sections Places,
 /// Active projects, Saved searches and Locations with every mounted drive.
+/// It sits on the macOS sidebar material, tinted with the theme's panel
+/// colour, and a row is chosen on mouse-down, as in Finder.
 struct SidebarView: View {
     @ObservedObject var model: BrowserModel
     @ObservedObject var sidebar: SidebarModel
@@ -15,12 +17,13 @@ struct SidebarView: View {
                 Color.clear.frame(height: 40)
                 ForEach(sidebar.groups) { group in
                     Text(group.section.title)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(NexusType.section)
                         .foregroundStyle(palette.faint)
                         .lineLimit(1)
-                        .padding(.horizontal, 14)
-                        .padding(.top, 12)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 14)
                         .padding(.bottom, 4)
+                        .accessibilityAddTraits(.isHeader)
                         .contextMenu {
                             Button("Hide \(group.section.title)") { model.services.hideSection(group.section) }
                             Button("Show All in Sidebar") { model.perform(.showAllInSidebar) }
@@ -42,7 +45,7 @@ struct SidebarView: View {
                 Color.clear.frame(height: 12)
             }
         }
-        .background(palette.panel)
+        .background(SidebarBackground(palette: palette))
     }
 
     private func isCurrent(_ item: SidebarItem) -> Bool {
@@ -85,6 +88,7 @@ struct SidebarRow: View {
     let open: () -> Void
     let eject: (URL) -> Void
     @Local private var hovering = false
+    @Local private var pressed = false
 
     var body: some View {
         let traits: AccessibilityTraits = isCurrent ? [.isButton, .isSelected] : .isButton
@@ -110,34 +114,38 @@ struct SidebarRow: View {
     private var row: some View {
         HStack(spacing: 8) {
             Image(systemName: item.symbol)
-                .font(.system(size: 14))
+                .font(NexusType.sidebarSymbol)
+                .imageScale(.small)
+                .symbolRenderingMode(.monochrome)
                 .foregroundStyle(isCurrent ? palette.accent : palette.dim)
                 .frame(width: SidebarMetrics.symbolWidth)
             Text(item.title)
-                .font(.system(size: SidebarMetrics.fontSize))
+                .font(NexusType.sidebar)
                 .foregroundStyle(isCurrent ? palette.strong : palette.text)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 4)
             if let badge = item.badge {
-                Text(badge).font(.system(size: 11)).foregroundStyle(palette.accent).lineLimit(1).fixedSize()
+                Text(badge).font(NexusType.labelNumbers).foregroundStyle(palette.accent).lineLimit(1).fixedSize()
             } else if let detail = item.detail, hovering {
-                Text(detail).font(.system(size: 11).monospacedDigit()).foregroundStyle(palette.faint).lineLimit(1).fixedSize()
+                Text(detail).font(NexusType.labelNumbers).foregroundStyle(palette.faint).lineLimit(1).fixedSize()
             }
             if let volume = item.ejectable {
                 Button { eject(volume) } label: {
-                    Image(systemName: "eject").font(.system(size: 11)).foregroundStyle(palette.dim).frame(width: 18, height: 18)
+                    Image(systemName: "eject").font(NexusType.smallSymbol).foregroundStyle(palette.dim).frame(width: 18, height: 18)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ToolbarButtonStyle(palette: palette))
                 .help("Eject \(item.title)")
             }
         }
         .padding(.horizontal, 10)
         .frame(height: SidebarMetrics.rowHeight)
-        .background(RoundedRectangle(cornerRadius: 5).fill(isCurrent ? palette.selection : Color.clear))
-        .padding(.horizontal, 6)
+        .background(SelectionFill(palette: palette, isSelected: isCurrent, isHovered: hovering || pressed))
+        .padding(.horizontal, 8)
         .contentShape(Rectangle())
-        .onTapGesture(perform: open)
+        // Opens on mouse-down, as Finder's sidebar does; the row shows it is
+        // pressed until the place has loaded under it.
+        .onPress({ pressed = true; open() }, release: { _ in pressed = false })
         .onHover { hovering = $0 }
     }
 }

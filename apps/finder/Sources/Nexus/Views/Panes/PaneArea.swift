@@ -13,12 +13,12 @@ struct PaneArea: View {
             let grid = model.layout.grid
             VStack(spacing: 0) {
                 ForEach(0..<grid.rows, id: \.self) { row in
-                    if row > 0 { Rectangle().fill(palette.line).frame(height: 1) }
+                    if row > 0 { Hairline(palette: palette) }
                     HStack(spacing: 0) {
                         ForEach(0..<grid.columns, id: \.self) { column in
                             let index = row * grid.columns + column
                             if index < panes.count {
-                                if column > 0 { Rectangle().fill(palette.line).frame(width: 1) }
+                                if column > 0 { Hairline(palette: palette, axis: .vertical) }
                                 PaneView(model: model, pane: panes[index], palette: palette, showsHeader: true,
                                          isFocused: index == model.layout.focused)
                             }
@@ -38,6 +38,9 @@ struct PaneView: View {
     let palette: Palette
     let showsHeader: Bool
     let isFocused: Bool
+    /// The spinner shows only for a load that takes a while, so a quick
+    /// folder never flashes it.
+    @Local private var slowLoad = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -45,11 +48,28 @@ struct PaneView: View {
             ZStack {
                 content
                 if let problem = pane.problem {
-                    Text(problem).font(.system(size: 13)).foregroundStyle(palette.dim)
-                        .multilineTextAlignment(.center).padding(24)
+                    VStack(spacing: 10) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(NexusType.emptySymbol)
+                            .foregroundStyle(palette.faint)
+                            .accessibilityHidden(true)
+                        Text(problem).font(NexusType.body).foregroundStyle(palette.dim)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(24)
                 } else if !pane.isLoading, pane.items.isEmpty {
                     emptyState
+                } else if pane.isLoading, pane.items.isEmpty, slowLoad {
+                    ProgressView()
+                        .controlSize(.small)
+                        .accessibilityLabel("Loading")
                 }
+            }
+            .task(id: pane.isLoading) {
+                slowLoad = false
+                guard pane.isLoading else { return }
+                try? await Task.sleep(nanoseconds: 400_000_000)
+                if !Task.isCancelled { slowLoad = pane.isLoading }
             }
             // Always the whole area under the toolbar, whatever the view inside
             // measures: a view with no height of its own would otherwise shrink
@@ -60,24 +80,43 @@ struct PaneView: View {
             // 16 pt "Empty folder" line as the file area.
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("nexus.pane")
+            if case .search = pane.location {
+                DriveResultsSection(pane: pane, account: GoogleDriveAccount.shared, palette: palette,
+                                    home: model.services.paths.home)
+            }
         }
         .background(isFocused || !showsHeader ? palette.background : palette.panel.opacity(0.5))
-        .simultaneousGesture(TapGesture().onEnded { model.focus(pane) })
+        // The pane takes the keys on mouse-down, before the click lands.
+        .onPress { model.focus(pane) }
     }
 
     @ViewBuilder private var emptyState: some View {
         let empty = PaneEmptyState.make(for: pane.location, folderTitle: searchFolderTitle)
-        HStack(spacing: 4) {
-            Text(empty.message).font(.system(size: 13)).foregroundStyle(palette.faint)
-            if let wider = empty.widen, case .search(let query, _) = pane.location {
-                Button(empty.widenTitle) { pane.replace(.search(query: query, scope: wider)) }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 13))
-                    .foregroundStyle(palette.accent)
-                    .accessibilityIdentifier("nexus.empty.widen")
+        VStack(spacing: 10) {
+            Image(systemName: emptySymbol)
+                .font(NexusType.emptySymbol)
+                .foregroundStyle(palette.faint.opacity(0.8))
+                .accessibilityHidden(true)
+            HStack(spacing: 4) {
+                Text(empty.message).font(NexusType.body).foregroundStyle(palette.faint)
+                if let wider = empty.widen, case .search(let query, _) = pane.location {
+                    Button(empty.widenTitle) { pane.replace(.search(query: query, scope: wider)) }
+                        .buttonStyle(LinkButtonStyle(palette: palette))
+                        .font(NexusType.body)
+                        .accessibilityIdentifier("nexus.empty.widen")
+                }
             }
         }
         .padding(24)
+    }
+
+    private var emptySymbol: String {
+        switch pane.location {
+        case .search: return "magnifyingglass"
+        case .recents: return "clock"
+        case .archive: return "doc.zipper"
+        case .folder: return "folder"
+        }
     }
 
     /// The folder a search started in, by the name its chip shows ("Trash").
@@ -103,14 +142,14 @@ struct PaneView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(headerPath).font(.system(size: 11)).foregroundStyle(palette.faint).lineLimit(1).truncationMode(.head)
+            Text(headerPath).font(NexusType.label).foregroundStyle(palette.faint).lineLimit(1).truncationMode(.head)
             HStack(spacing: 6) {
                 Image(systemName: pane.location.isArchive ? "doc.zipper" : "folder")
-                    .font(.system(size: 12)).foregroundStyle(isFocused ? palette.accent : palette.dim)
-                Text(pane.location.title).font(.system(size: 13, weight: .semibold))
+                    .font(NexusType.smallSymbol).foregroundStyle(isFocused ? palette.accent : palette.dim)
+                Text(pane.location.title).font(NexusType.headline)
                     .foregroundStyle(isFocused ? palette.strong : palette.text).lineLimit(1).truncationMode(.middle)
                 if pane.location.isArchive {
-                    Text("nothing extracted yet").font(.system(size: 11)).foregroundStyle(palette.faint).lineLimit(1)
+                    Text("nothing extracted yet").font(NexusType.label).foregroundStyle(palette.faint).lineLimit(1)
                 }
                 Spacer(minLength: 0)
             }
@@ -119,7 +158,7 @@ struct PaneView: View {
         .frame(height: 40)
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(alignment: .top) { Rectangle().fill(isFocused ? palette.accent : Color.clear).frame(height: 2) }
-        .overlay(alignment: .bottom) { Rectangle().fill(palette.hairline).frame(height: 1) }
+        .overlay(alignment: .bottom) { Hairline(palette: palette) }
     }
 
     private var headerPath: String {

@@ -29,8 +29,10 @@ final class SearchRunner {
     ///     "Include content matches", unless this search hides them).
     ///   - results: every time the results change, with the paths Spotlight
     ///     reported as changed since the last call (their rows are read again).
+    /// Returns the plan it runs (nil when there is nothing to look for).
+    @discardableResult
     func start(_ text: String, scope: SearchScope, content: Bool,
-               results: @escaping (SearchHits, Set<String>) -> Void) {
+               results: @escaping (SearchHits, Set<String>) -> Void) -> SearchPlan? {
         let saved = services.savedSearches
         let plan = SearchPlan.make(
             text, scope: scope, home: services.paths.home.path,
@@ -41,7 +43,7 @@ final class SearchRunner {
         // predicate would match every file in the scope, so nothing is run.
         guard !plan.isUnconstrained else {
             results(SearchHits(), [])
-            return
+            return nil
         }
         if let words = plan.nameText {
             let index = services.index
@@ -71,6 +73,7 @@ final class SearchRunner {
         if content || plan.nameText == nil {
             startSpotlight(plan, results: results)
         }
+        return plan
     }
 
     private func combined(_ plan: SearchPlan) -> SearchHits {

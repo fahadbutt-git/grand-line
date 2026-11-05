@@ -33,7 +33,7 @@ final class FileCellView: NSTableCellView {
     init(column: FileColumn, identifier: NSUserInterfaceItemIdentifier) {
         super.init(frame: .zero)
         self.identifier = identifier
-        label.font = .systemFont(ofSize: 13)
+        label.font = column.usesDigits ? NexusAppKitType.bodyNumbers : NexusAppKitType.body
         label.lineBreakMode = column == .name ? .byTruncatingMiddle : .byTruncatingTail
         label.alignment = column.alignment
         label.cell?.usesSingleLineMode = true
@@ -44,6 +44,9 @@ final class FileCellView: NSTableCellView {
         if column == .name {
             label.isEditable = true
             icon.translatesAutoresizingMaskIntoConstraints = false
+            icon.symbolConfiguration = NexusAppKitType.rowSymbol
+            icon.imageScaling = .scaleProportionallyDown
+            extra.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 11, weight: .regular)
             extra.translatesAutoresizingMaskIntoConstraints = false
             tagDots.translatesAutoresizingMaskIntoConstraints = false
             tagDots.spacing = 2
@@ -118,7 +121,6 @@ final class FileCellView: NSTableCellView {
             let bytes = item.isFolder ? info.folderSize : item.size
             label.stringValue = bytes.map(ItemFormat.size) ?? (item.isFolder ? "…" : "--")
             label.textColor = dim
-            label.font = .monospacedDigitSystemFont(ofSize: 13, weight: .regular)
         case .kind:
             label.stringValue = item.kind
             label.textColor = dim
@@ -139,6 +141,16 @@ final class FileCellView: NSTableCellView {
             }
             dot.toolTip = tag
             tagDots.addArrangedSubview(dot)
+        }
+    }
+}
+
+extension FileColumn {
+    /// Sizes and dates line up when their digits share one width.
+    var usesDigits: Bool {
+        switch self {
+        case .size, .modified, .created, .added: return true
+        case .name, .path, .kind: return false
         }
     }
 }

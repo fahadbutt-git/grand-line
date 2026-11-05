@@ -219,7 +219,7 @@ struct NexusTagsPane: View {
                                 .toggleStyle(.checkbox)
                                 .accessibilityIdentifier(settingID("tags.favourite.\(tag)"))
                         }
-                        .font(.system(size: 12))
+                        .font(NexusType.callout)
                     }
                 }
             }
@@ -287,7 +287,7 @@ struct NexusViewsPane: View {
                         Slider(value: view(\.iconSize), in: ViewSettings.iconSizes, step: 16)
                             .frame(width: 180)
                             .accessibilityIdentifier(settingID("views.iconSize"))
-                        Text("\(Int(defaults.iconSize)) pt").font(.system(size: 12).monospacedDigit()).frame(width: 48, alignment: .trailing)
+                        Text("\(Int(defaults.iconSize)) pt").font(NexusType.calloutNumbers).frame(width: 48, alignment: .trailing)
                     }
                 }
             }
@@ -366,11 +366,54 @@ struct NexusSearchPane: View {
                                 set: { on in store.update { $0.includeContentMatches = on } }))
             }
             IndexStatusSection(model: index, idPrefix: NexusSettingsWindow.idPrefix, home: services.paths.home.path)
+            DriveSettingsSection(account: GoogleDriveAccount.shared, palette: services.theme.palette)
             SettingsSection("Saved searches", note: "\(services.savedSearches.names.count) saved. Each is also @name in any search.") {
                 SettingsRow("saved-searches.tsv", detail: NexusSettingsFormat.abbreviate(services.paths.savedSearches.path)) {
                     Button("Open") { NexusSettingsFormat.openFile(services.paths.savedSearches) }
                 }
             }
+        }
+    }
+}
+
+// MARK: Google Drive
+
+/// Search inside Google Drive: connect with the person's own OAuth client,
+/// or disconnect, which revokes the token and deletes it from the Keychain.
+struct DriveSettingsSection: View {
+    @ObservedObject var account: GoogleDriveAccount
+    let palette: Palette
+
+    var body: some View {
+        SettingsSection("Google Drive", note: "Searches also look inside your Drive files, under \u{201C}Found in Google Drive\u{201D}, without downloading them.") {
+            SettingsRow("Search inside Google Drive", detail: detail, symbol: "cloud") {
+                HStack(spacing: 8) {
+                    switch account.status {
+                    case .notSetUp:
+                        Button("How to set up") { DriveHelpSheet.present(account: account, palette: palette) }
+                            .accessibilityIdentifier(settingID("search.drive.help"))
+                    case .disconnected:
+                        Button("How to set up") { DriveHelpSheet.present(account: account, palette: palette) }
+                        Button("Connect") { account.connect() }
+                            .accessibilityIdentifier(settingID("search.drive.connect"))
+                    case .connecting:
+                        Button("Cancel") { account.cancelConnect() }
+                    case .connected:
+                        Button("Disconnect") { account.disconnect() }
+                            .accessibilityIdentifier(settingID("search.drive.disconnect"))
+                    }
+                }
+            }
+        }
+        .onAppear { account.reload() }
+    }
+
+    private var detail: String {
+        switch account.status {
+        case .notSetUp: return "Needs an OAuth client file at ~/.config/grand-line/google-oauth.json."
+        case .disconnected: return "Not connected."
+        case .connecting: return "Waiting for Google in your browser."
+        case .connected: return "Connected, with read-only access."
         }
     }
 }

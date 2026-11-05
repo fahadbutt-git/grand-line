@@ -18,7 +18,7 @@ struct BatchRenameSheet: View {
         let rows = rename.preview(items, date: now) { listings[$0] ?? [] }
         VStack(alignment: .leading, spacing: 12) {
             Text("Rename \(ItemFormat.count(items.count))")
-                .font(.system(size: 15, weight: .semibold))
+                .font(NexusType.title)
                 .foregroundStyle(palette.strong)
             Picker("", selection: $rename.mode) {
                 ForEach(BatchRename.Mode.allCases, id: \.self) { mode in Text(mode.title).tag(mode) }
@@ -34,11 +34,11 @@ struct BatchRenameSheet: View {
                 .fixedSize()
                 Toggle("Change the extension too", isOn: $rename.includeExtension)
             }
-            .font(.system(size: 13))
+            .font(NexusType.body)
             preview(rows)
             HStack {
                 Text(summary(rows))
-                    .font(.system(size: 11))
+                    .font(NexusType.label)
                     .foregroundStyle(rows.contains { $0.problem != nil } ? Color(nsColor: .systemRed) : palette.dim)
                     .lineLimit(2)
                 Spacer(minLength: 12)
@@ -64,14 +64,14 @@ struct BatchRenameSheet: View {
         case .replace:
             textField("Find", $rename.find, id: "nexus.rename.find")
             textField("Replace with", $rename.replacement, id: "nexus.rename.replace")
-            Toggle("Match case", isOn: $rename.matchCase).font(.system(size: 13))
+            Toggle("Match case", isOn: $rename.matchCase).font(NexusType.body)
         case .regex:
             textField("Pattern, such as (\\d+)-(.*)", $rename.find, id: "nexus.rename.find")
             textField("Replace with, using $1, $2", $rename.replacement, id: "nexus.rename.replace")
             HStack {
-                Toggle("Match case", isOn: $rename.matchCase).font(.system(size: 13))
+                Toggle("Match case", isOn: $rename.matchCase).font(NexusType.body)
                 if let problem = rename.patternProblem {
-                    Text(problem).font(.system(size: 11)).foregroundStyle(Color(nsColor: .systemRed))
+                    Text(problem).font(NexusType.label).foregroundStyle(Color(nsColor: .systemRed))
                 }
             }
         case .add:
@@ -99,7 +99,7 @@ struct BatchRenameSheet: View {
             HStack {
                 textField("Custom format, such as Trip", $rename.customFormat, id: "nexus.rename.format")
                 if rename.format != .date {
-                    Text("Start at").font(.system(size: 13)).foregroundStyle(palette.dim)
+                    Text("Start at").font(NexusType.body).foregroundStyle(palette.dim)
                     TextField("1", value: $rename.startAt, format: .number)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 60)
@@ -111,7 +111,7 @@ struct BatchRenameSheet: View {
     private func textField(_ placeholder: String, _ text: Binding<String>, id: String) -> some View {
         TextField(placeholder, text: text)
             .textFieldStyle(.roundedBorder)
-            .font(.system(size: 13))
+            .font(NexusType.body)
             .accessibilityIdentifier(id)
     }
 
@@ -122,14 +122,14 @@ struct BatchRenameSheet: View {
                     HStack(spacing: 8) {
                         Text(row.old).foregroundStyle(palette.dim).lineLimit(1).truncationMode(.middle)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        Image(systemName: "arrow.right").font(.system(size: 10)).foregroundStyle(palette.faint)
+                        Image(systemName: "arrow.right").font(NexusType.footnote).foregroundStyle(palette.faint)
                         Text(row.new)
                             .foregroundStyle(row.problem != nil ? Color(nsColor: .systemRed) : (row.changes ? palette.strong : palette.dim))
                             .lineLimit(1).truncationMode(.middle)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .help(row.problem ?? "")
                     }
-                    .font(.system(size: 12))
+                    .font(NexusType.callout)
                     .frame(height: 22)
                 }
             }

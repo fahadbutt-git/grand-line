@@ -16,14 +16,14 @@ final class InsideFilesHeaderView: NSTableCellView {
     init() {
         super.init(frame: .zero)
         identifier = Self.identifier
-        label.font = .systemFont(ofSize: 11, weight: .medium)
+        label.font = NexusAppKitType.labelMedium
         label.lineBreakMode = .byTruncatingTail
         label.translatesAutoresizingMaskIntoConstraints = false
         rule.boxType = .custom
         rule.borderWidth = 0
         rule.translatesAutoresizingMaskIntoConstraints = false
         hide.isBordered = false
-        hide.font = .systemFont(ofSize: 11)
+        hide.font = NexusAppKitType.label
         hide.target = self
         hide.action = #selector(hideClicked(_:))
         hide.setAccessibilityLabel("Hide matches inside files")

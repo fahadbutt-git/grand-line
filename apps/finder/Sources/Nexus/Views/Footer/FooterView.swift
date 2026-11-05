@@ -15,7 +15,7 @@ struct FooterView: View {
         HStack(spacing: 12) {
             Text(ItemFormat.searchStatus(pane.state.searchCounts, selected: selection.count, total: pane.items.count,
                                          selectedBytes: selectedBytes(selection)))
-                .font(.system(size: 11).monospacedDigit())
+                .font(NexusType.labelNumbers)
                 .foregroundStyle(palette.dim)
                 .lineLimit(1)
                 .fixedSize()
@@ -23,7 +23,7 @@ struct FooterView: View {
                 Button { model.perform(.showTransfers) } label: {
                     HStack(spacing: 4) {
                         ProgressView(value: services.transfers.running?.fraction ?? 0).frame(width: 60)
-                        Text(transfer).font(.system(size: 11)).foregroundStyle(palette.accent).lineLimit(1)
+                        Text(transfer).font(NexusType.label).foregroundStyle(palette.accent).lineLimit(1)
                     }
                 }
                 .buttonStyle(.plain)
@@ -41,7 +41,7 @@ struct FooterView: View {
             .frame(maxWidth: .infinity)
             if let free = pane.freeSpace {
                 Text(ItemFormat.free(free))
-                    .font(.system(size: 11).monospacedDigit())
+                    .font(NexusType.labelNumbers)
                     .foregroundStyle(palette.dim)
                     .lineLimit(1)
                     .fixedSize()
@@ -77,7 +77,7 @@ struct FooterView: View {
             ForEach(list, id: \.self) { hint in
                 HStack(spacing: 4) {
                     KeyCap(text: hint.keys, palette: palette)
-                    Text(hint.label).font(.system(size: 11)).foregroundStyle(palette.faint).lineLimit(1).fixedSize()
+                    Text(hint.label).font(NexusType.label).foregroundStyle(palette.faint).lineLimit(1).fixedSize()
                 }
             }
         }
@@ -97,17 +97,16 @@ struct TasksView: View {
         let list = services.transfers
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Tasks").font(.system(size: 13, weight: .semibold)).foregroundStyle(palette.strong)
+                Text("Tasks").font(NexusType.headline).foregroundStyle(palette.strong)
                 Spacer(minLength: 8)
                 if !list.ended.isEmpty {
                     Button("Clear") { services.clearEndedTasks() }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 11))
-                        .foregroundStyle(palette.accent)
+                        .buttonStyle(LinkButtonStyle(palette: palette))
+                        .font(NexusType.label)
                 }
             }
             if list.tasks.isEmpty {
-                Text("Nothing running").font(.system(size: 12)).foregroundStyle(palette.dim)
+                Text("Nothing running").font(NexusType.callout).foregroundStyle(palette.dim)
             }
             ForEach(list.active) { entry in
                 TaskRow(entry: entry, palette: palette) { services.cancelTask(entry.id) }
@@ -116,18 +115,17 @@ struct TasksView: View {
                 TaskRow(entry: entry, palette: palette, stop: nil)
             }
             if !services.undoHistory.isEmpty {
-                Rectangle().fill(palette.hairline).frame(height: 1)
-                Text("Undo history").font(.system(size: 11, weight: .semibold)).foregroundStyle(palette.dim)
+                Hairline(palette: palette)
+                Text("Undo history").font(NexusType.section).foregroundStyle(palette.dim)
                 ForEach(Array(services.undoHistory.prefix(8).enumerated()), id: \.offset) { index, record in
                     HStack(spacing: 8) {
                         Text(TaskTitles.history(record))
-                            .font(.system(size: 12)).foregroundStyle(palette.text)
+                            .font(NexusType.callout).foregroundStyle(palette.text)
                             .lineLimit(1).truncationMode(.middle)
                         Spacer(minLength: 8)
                         Button(index == 0 ? "Undo" : "Undo to Here") { model.undoHistory(through: index) }
-                            .buttonStyle(.plain)
-                            .font(.system(size: 11))
-                            .foregroundStyle(palette.accent)
+                            .buttonStyle(LinkButtonStyle(palette: palette))
+                            .font(NexusType.label)
                     }
                 }
             }
@@ -148,11 +146,11 @@ struct TaskRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
-                Text(entry.title).font(.system(size: 12)).foregroundStyle(palette.text).lineLimit(1).truncationMode(.middle)
+                Text(entry.title).font(NexusType.callout).foregroundStyle(palette.text).lineLimit(1).truncationMode(.middle)
                 Spacer(minLength: 6)
                 if let stop, !entry.cancelling {
                     Button(action: stop) {
-                        Image(systemName: "xmark.circle.fill").font(.system(size: 12)).foregroundStyle(palette.faint)
+                        Image(systemName: "xmark.circle.fill").font(NexusType.callout).foregroundStyle(palette.faint)
                     }
                     .buttonStyle(.plain)
                     .help("Stop")
@@ -163,7 +161,7 @@ struct TaskRow: View {
                 ProgressView(value: fraction).controlSize(.small)
             }
             Text(entry.status)
-                .font(.system(size: 11))
+                .font(NexusType.label)
                 .foregroundStyle(isFailure ? Color(nsColor: .systemRed) : palette.dim)
                 .lineLimit(2)
         }

@@ -13,17 +13,38 @@ struct ItemInteraction: ViewModifier {
     func body(content: Content) -> some View {
         content
             .contentShape(Rectangle())
+            // Selects on mouse-down, as Finder does. Only the double-click
+            // waits for its second click; a single click never waits for it.
+            .onPress(press, release: release)
             .onTapGesture(count: 2) { model.open([item], in: pane) }
-            .onTapGesture { click() }
             .onDrag { provider() }
             .contextMenu {
                 ItemMenu(model: model)
             }
     }
 
-    private func click() {
-        model.focus(pane)
+    /// A plain press on an item already in a selection of several keeps the
+    /// selection until mouse-up, so the whole selection can be dragged; a
+    /// release without a drag then selects the item alone.
+    private func press() {
         let flags = NSEvent.modifierFlags
+        let plain = !flags.contains(.command) && !flags.contains(.shift)
+        if plain, pane.state.selection.contains(item.id), pane.selectedItems.count > 1 {
+            model.focus(pane)
+            return
+        }
+        click(flags)
+    }
+
+    private func release(_ moved: Bool) {
+        let flags = NSEvent.modifierFlags
+        guard !moved, !flags.contains(.command), !flags.contains(.shift), pane.selectedItems.count > 1,
+              pane.state.selection.contains(item.id) else { return }
+        click(flags)
+    }
+
+    private func click(_ flags: NSEvent.ModifierFlags) {
+        model.focus(pane)
         pane.updateSelection { selection, order in
             if flags.contains(.command) {
                 selection.toggle(item.id, in: order)

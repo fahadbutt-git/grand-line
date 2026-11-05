@@ -20,15 +20,15 @@ struct InspectorView: View {
             VStack(alignment: .leading, spacing: 10) {
                 if let summary, !selection.isEmpty {
                     Text(InspectorRows.title(summary, single: selection.first))
-                        .font(.system(size: 15, weight: .semibold)).foregroundStyle(palette.strong)
+                        .font(NexusType.title).foregroundStyle(palette.strong)
                         .lineLimit(2).truncationMode(.middle)
                     Text(InspectorRows.size(summary) + ", measured now")
-                        .font(.system(size: 12).monospacedDigit()).foregroundStyle(palette.dim).lineLimit(1)
-                    Rectangle().fill(palette.hairline).frame(height: 1)
+                        .font(NexusType.calloutNumbers).foregroundStyle(palette.dim).lineLimit(1)
+                    Hairline(palette: palette)
                     ForEach(InspectorRows.rows(summary, home: model.services.paths.home), id: \.self) { row in
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text(row.label).font(.system(size: 11)).foregroundStyle(palette.faint).frame(width: 64, alignment: .leading)
-                            Text(row.value).font(.system(size: 12)).foregroundStyle(palette.text).lineLimit(2).truncationMode(.middle)
+                            Text(row.label).font(NexusType.label).foregroundStyle(palette.faint).frame(width: 64, alignment: .leading)
+                            Text(row.value).font(NexusType.callout).foregroundStyle(palette.text).lineLimit(2).truncationMode(.middle)
                         }
                     }
                     field("Tags", text: $tagText, prompt: "Add tags, comma separated") {
@@ -40,14 +40,14 @@ struct InspectorView: View {
                             try? FinderComment.write(comment, to: selection[0].url)
                         }
                     }
-                    Rectangle().fill(palette.hairline).frame(height: 1)
-                    Text("Actions").font(.system(size: 11, weight: .semibold)).foregroundStyle(palette.faint)
+                    Hairline(palette: palette)
+                    Text("Actions").font(NexusType.section).foregroundStyle(palette.faint)
                     ForEach([BrowserCommand.compress, .duplicate, .makeAlias, .copyPath, .share, .openClaude], id: \.self) { command in
                         actionRow(command)
                     }
                 } else {
                     Text(selection.isEmpty ? "Select items to see their details" : "Measuring…")
-                        .font(.system(size: 12)).foregroundStyle(palette.faint)
+                        .font(NexusType.callout).foregroundStyle(palette.faint)
                 }
             }
             .padding(14)
@@ -77,7 +77,7 @@ struct InspectorView: View {
                         tagsVersion += 1
                     } label: {
                         Text(tag)
-                            .font(.system(size: 11))
+                            .font(NexusType.label)
                             .lineLimit(1)
                             .foregroundStyle(on ? palette.selectionText : palette.text)
                             .padding(.horizontal, 6)
@@ -96,13 +96,13 @@ struct InspectorView: View {
 
     private func field(_ label: String, text: Binding<String>, prompt: String, commit: @escaping () -> Void) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(.system(size: 11)).foregroundStyle(palette.faint)
+            Text(label).font(NexusType.label).foregroundStyle(palette.faint)
             TextField(prompt, text: text)
                 .textFieldStyle(.plain)
-                .font(.system(size: 12))
+                .font(NexusType.callout)
                 .padding(.horizontal, 6)
                 .frame(height: 24)
-                .background(RoundedRectangle(cornerRadius: 5).fill(palette.field))
+                .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(palette.field))
                 .onSubmit(commit)
         }
     }
@@ -110,16 +110,18 @@ struct InspectorView: View {
     private func actionRow(_ command: BrowserCommand) -> some View {
         Button { model.perform(command) } label: {
             HStack(spacing: 6) {
-                Text(model.title(for: command)).font(.system(size: 12)).foregroundStyle(palette.text).lineLimit(1)
+                Text(model.title(for: command)).font(NexusType.callout).foregroundStyle(palette.text).lineLimit(1)
                 Spacer(minLength: 6)
                 if let shortcut = CommandCatalog.spec(command).shortcuts.first {
                     KeyCap(text: shortcut.description, palette: palette)
                 }
             }
+            .padding(.horizontal, 6)
             .frame(height: 24)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ToolbarButtonStyle(palette: palette))
+        .padding(.horizontal, -6)
         .disabled(!model.isEnabled(command))
     }
 }

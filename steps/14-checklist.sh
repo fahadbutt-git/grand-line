@@ -100,12 +100,24 @@ macOS requires these clicks from you. Work down the list once.
     name. To search inside a folder's files too, right-click it in
     Finder, Google Drive, "Available offline". Then run:  update
 
-14. Screen capture and text capture
+14. Search inside Google Drive files (Nexus)
+    Nexus can search the text of Drive files without downloading them.
+    It needs a sign-in client of your own:
+    a. Go to console.cloud.google.com, make a project, and enable the
+       Google Drive API.
+    b. Set up the OAuth consent screen and add your Google account as a
+       test user.
+    c. Under Credentials, create an OAuth client ID of type Desktop app
+       and download its JSON file.
+    d. Save it as ~/.config/grand-line/google-oauth.json
+    e. In Nexus, Settings, Search, choose Connect and allow access.
+
+15. Screen capture and text capture
     The first time you use the capture menu, allow Screen Recording
     for karabiner_console_user_server when macOS asks. This lets the
     package's own shortcut commands see the screen, nothing else.
 
-15. Sign in to your apps
+16. Sign in to your apps
     Zen (to bring your Chrome bookmarks, export them on the old Mac:
     Chrome, Bookmarks, Bookmark Manager, Export; then in Zen: Bookmarks,
     Manage Bookmarks, Import), Claude, Claude Code (claude), Codex (codex), Antigravity
@@ -115,7 +127,7 @@ macOS requires these clicks from you. Work down the list once.
     can block Citrix and Horizon. Run one VPN at a time: turn Proton
     off while using Tailscale to reach the homelab.
 
-16. Keep start-up light
+17. Keep start-up light
     In Spotify and Discord settings, turn off "Open at login".
     Then review System Settings, General, Login Items and turn off
     anything you do not need at start-up. An app listed there that is no
@@ -123,11 +135,11 @@ macOS requires these clicks from you. Work down the list once.
     name) is removed with the minus button. In System Settings, Menu Bar,
     turn off the icons you do not need to see.
 
-17. Install by hand (not available through Homebrew)
+18. Install by hand (not available through Homebrew)
     VoiceStudio.
     Microsoft Defender, only if your school or hospital IT requires it.
 
-18. Keep this package in sync with GitHub
+19. Keep this package in sync with GitHub
     In Terminal: gh auth login
     Updates from GitHub apply by themselves only when each commit is
     signed by a key in ~/.config/grand-line/allowed_signers (made from
@@ -142,13 +154,13 @@ macOS requires these clicks from you. Work down the list once.
     so they keep Accessibility, Calendars and Automation across updates.
     The first time they are signed this way, allow them once more.
 
-19. Google Drive from Terminal (optional, for bulk tidying and the NAS)
+20. Google Drive from Terminal (optional, for bulk tidying and the NAS)
     In Terminal: rclone config, choose "drive", and follow the prompts.
 
-20. Xcode, only when you start building Mac apps
+21. Xcode, only when you start building Mac apps
     Install it from the App Store (about 15 GB).
 
-21. Restart the Mac once.
+22. Restart the Mac once.
 
 Everyday commands, from Terminal or the Caps Lock menu:
    update          update every app and tool

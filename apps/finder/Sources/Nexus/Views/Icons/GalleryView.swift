@@ -10,14 +10,14 @@ struct GalleryView: View {
     var body: some View {
         VStack(spacing: 0) {
             PreviewPane(pane: pane, palette: palette)
-            Rectangle().fill(palette.hairline).frame(height: 1)
+            Hairline(palette: palette)
             ScrollViewReader { reader in
                 ScrollView(.horizontal) {
                     LazyHStack(spacing: 6) {
                         ForEach(pane.items) { item in
                             Thumbnail(item: item, size: 72, palette: palette)
                                 .padding(4)
-                                .background(RoundedRectangle(cornerRadius: 6).fill(pane.state.selection.contains(item.id) ? palette.selection : Color.clear))
+                                .background(SelectionFill(palette: palette, isSelected: pane.state.selection.contains(item.id), radius: 8))
                                 .id(item.id)
                                 .help(item.name)
                                 // One image per item, named, as Finder's gallery strip reads.

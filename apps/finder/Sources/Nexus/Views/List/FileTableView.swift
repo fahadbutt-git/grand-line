@@ -51,14 +51,22 @@ final class FileTableView: NSTableView {
     }
 }
 
-/// Selected rows in the theme's selection colour, not the system accent.
+/// Selected rows in the theme's selection colour while the list has the
+/// keys, and in the system's unemphasized grey when the list or the window
+/// does not, as Finder shows a selection it is not acting on.
 final class ThemedRowView: NSTableRowView {
     var selectionColor: NSColor = .selectedContentBackgroundColor
 
     override func drawSelection(in dirtyRect: NSRect) {
         guard selectionHighlightStyle != .none else { return }
-        selectionColor.setFill()
-        NSBezierPath(roundedRect: bounds.insetBy(dx: 4, dy: 1), xRadius: 5, yRadius: 5).fill()
+        let color = isEmphasized ? selectionColor : NSColor.unemphasizedSelectedContentBackgroundColor
+        color.setFill()
+        let rect = backingAlignedRect(bounds.insetBy(dx: 5, dy: 0.5), options: .alignAllEdgesNearest)
+        NSBezierPath(roundedRect: rect, xRadius: 5, yRadius: 5).fill()
+    }
+
+    override var isEmphasized: Bool {
+        didSet { if isSelected { needsDisplay = true } }
     }
 
     override var interiorBackgroundStyle: NSView.BackgroundStyle { .normal }

@@ -14,10 +14,14 @@ struct Thumbnail: View {
     var body: some View {
         Group {
             if let image {
-                Image(nsImage: image).resizable().aspectRatio(contentMode: .fit)
+                Image(nsImage: image).resizable().interpolation(.high).aspectRatio(contentMode: .fit)
+            } else if let icon = WorkspaceIcons.icon(for: item) {
+                // The file's real icon, as Finder draws it, until a thumbnail
+                // arrives (and for folders and files without one).
+                Image(nsImage: icon).resizable().interpolation(.high).aspectRatio(contentMode: .fit)
             } else {
                 Image(systemName: FileSymbol.name(for: item))
-                    .font(.system(size: size * 0.42, weight: .light))
+                    .font(.system(size: (size * 0.42).rounded(), weight: .light))
                     .foregroundStyle(item.isFolder ? palette.accent : palette.dim)
             }
         }

@@ -158,7 +158,7 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
         let names = items.count > 2_000
             ? items.map { $0.shownName(allExtensions: all) }.sorted { $0.count > $1.count }.prefix(300).map { $0 }
             : items.map { $0.shownName(allExtensions: all) }
-        let font = NSFont.systemFont(ofSize: 13)
+        let font = NexusAppKitType.body
         column.width = ColumnWidth.fitting(names) { Double(($0 as NSString).size(withAttributes: [.font: font]).width) }
     }
 

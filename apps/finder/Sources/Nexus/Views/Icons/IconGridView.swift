@@ -67,15 +67,14 @@ struct InsideFilesHeader: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(ItemFormat.insideFilesHeader(pane.state.searchCounts?.insideFiles ?? 0))
-                .font(.system(size: 11, weight: .medium))
+                .font(NexusType.labelMedium)
                 .foregroundStyle(palette.dim)
                 .lineLimit(1)
                 .fixedSize()
-            Rectangle().fill(palette.hairline).frame(height: 1)
+            Hairline(palette: palette)
             Button("Hide") { pane.setHidesInsideFiles(true) }
-                .buttonStyle(.plain)
-                .font(.system(size: 11))
-                .foregroundStyle(palette.accent)
+                .buttonStyle(LinkButtonStyle(palette: palette))
+                .font(NexusType.label)
                 .accessibilityLabel("Hide matches inside files")
         }
         .padding(.horizontal, 4)
@@ -97,14 +96,18 @@ struct IconCell: View {
         VStack(spacing: 4) {
             Thumbnail(item: item, size: size, palette: palette)
                 .padding(4)
-                .background(RoundedRectangle(cornerRadius: 6).fill(selected ? palette.selection : Color.clear))
+                .background(SelectionFill(palette: palette, isSelected: selected, radius: 8))
+            // The name sits on its own selection pill, as in Finder.
             Text(item.shownName(allExtensions: NexusPreferencesStore.shared.current.showAllExtensions))
-                .font(.system(size: 12))
+                .font(NexusType.callout)
                 .foregroundStyle(selected ? palette.selectionText : palette.text)
                 .lineLimit(2)
                 .truncationMode(.middle)
                 .multilineTextAlignment(.center)
-                .frame(height: 32, alignment: .top)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(SelectionFill(palette: palette, isSelected: selected, radius: 4))
+                .frame(height: 34, alignment: .top)
         }
         .opacity(isCut ? 0.45 : 1)
         .help(item.name)

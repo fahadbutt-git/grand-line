@@ -21,7 +21,7 @@ struct PathBarView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: 26)
-        .background(RoundedRectangle(cornerRadius: 6).fill(palette.field))
+        .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(palette.field))
     }
 
     private var crumbs: some View {
@@ -29,10 +29,13 @@ struct PathBarView: View {
             if let folder = pane.location.diskFolder {
                 let segments = PathSegments.segments(for: folder, home: model.services.paths.home, aliases: model.pathAliases)
                 ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
-                    if index > 0 { Text("›").font(.system(size: 12)).foregroundStyle(palette.faint) }
+                    if index > 0 {
+                        Image(systemName: "chevron.compact.right").font(NexusType.smallSymbol).foregroundStyle(palette.faint)
+                            .accessibilityHidden(true)
+                    }
                     Button(segment.title) { pane.go(.folder(segment.url)) }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 13, weight: index == segments.count - 1 ? .semibold : .regular))
+                        .buttonStyle(PathSegmentStyle(palette: palette))
+                        .font(index == segments.count - 1 ? NexusType.headline : NexusType.body)
                         .foregroundStyle(index == segments.count - 1 ? palette.strong : palette.dim)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -40,7 +43,7 @@ struct PathBarView: View {
                 }
                 if case .archive(_, let entry) = pane.location, !entry.isEmpty {
                     Text("› " + entry.replacingOccurrences(of: "/", with: " › "))
-                        .font(.system(size: 13)).foregroundStyle(palette.strong).lineLimit(1).truncationMode(.head)
+                        .font(NexusType.body).foregroundStyle(palette.strong).lineLimit(1).truncationMode(.head)
                 }
                 if pane.state.isFlat {
                     Chip(title: "and subfolders", symbol: "list.bullet.indent", palette: palette, isOn: true) { model.perform(.toggleFlatView) }
@@ -48,7 +51,7 @@ struct PathBarView: View {
                         .accessibilityIdentifier("nexus.flat")
                 }
             } else {
-                Text(pane.location.title).font(.system(size: 13, weight: .semibold)).foregroundStyle(palette.strong).lineLimit(1)
+                Text(pane.location.title).font(NexusType.headline).foregroundStyle(palette.strong).lineLimit(1)
             }
             Spacer(minLength: 6)
             KeyCap(text: "⇧⌘G", palette: palette)
@@ -69,7 +72,7 @@ struct PathBarView: View {
                       onMove: move)
             if let problem = model.pathProblem {
                 Text(problem)
-                    .font(.system(size: 11))
+                    .font(NexusType.label)
                     .foregroundStyle(Color(nsColor: .systemRed))
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -77,7 +80,7 @@ struct PathBarView: View {
                     .accessibilityIdentifier("nexus.path.problem")
             } else if case .filter(let text) = mode, !text.isEmpty {
                 Text("\(pane.items.count) of \(pane.state.unfilteredCount)")
-                    .font(.system(size: 11).monospacedDigit())
+                    .font(NexusType.labelNumbers)
                     .foregroundStyle(palette.dim)
                     .fixedSize()
                     .accessibilityIdentifier("nexus.filter.count")
@@ -144,10 +147,10 @@ struct PathBarView: View {
                 if !match.shortcut.isEmpty { KeyCap(text: match.shortcut, palette: palette) }
             }
         }
-        .font(.system(size: 13))
+        .font(NexusType.body)
         .padding(.horizontal, 6)
         .frame(width: 400, height: 26, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 5).fill(highlighted ? palette.selection.opacity(0.6) : Color.clear))
+        .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(highlighted ? palette.selection.opacity(0.6) : Color.clear))
         .contentShape(Rectangle())
     }
 
@@ -229,8 +232,8 @@ struct OmnibarBadge: View {
             return false
         }()
         HStack(spacing: 3) {
-            Image(systemName: mode.symbol).font(.system(size: 10, weight: .semibold))
-            Text(mode.badge).font(.system(size: 11, weight: .medium))
+            Image(systemName: mode.symbol).font(NexusType.footnoteStrong)
+            Text(mode.badge).font(NexusType.labelMedium)
         }
         .foregroundStyle(filled ? palette.selectionText : palette.accent)
         .padding(.horizontal, 6)
@@ -266,7 +269,7 @@ struct PathField: NSViewRepresentable {
         field.isBezeled = false
         field.drawsBackground = false
         field.focusRingType = .none
-        field.font = .systemFont(ofSize: 13)
+        field.font = NexusAppKitType.body
         field.placeholderString = placeholder
         field.lineBreakMode = .byTruncatingHead
         field.cell?.isScrollable = true
@@ -332,5 +335,20 @@ final class FocusingTextField: NSTextField {
             guard let self, self.window === window else { return }
             if window.makeFirstResponder(self) { self.currentEditor()?.selectAll(nil) }
         }
+    }
+}
+
+/// A path bar folder: a quiet fill while pressed, from mouse-down.
+private struct PathSegmentStyle: ButtonStyle {
+    let palette: Palette
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, 3)
+            .padding(.vertical, 1)
+            .background(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(configuration.isPressed ? palette.text.opacity(0.12) : Color.clear)
+            )
     }
 }

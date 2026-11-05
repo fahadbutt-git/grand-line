@@ -16,7 +16,7 @@ struct PreviewPane: View {
             if selection.count == 1, let url {
                 QuickLookPreview(url: url)
                 Text(selection[0].name)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(NexusType.headline)
                     .foregroundStyle(palette.strong)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -24,7 +24,7 @@ struct PreviewPane: View {
             } else {
                 Spacer()
                 Text(selection.isEmpty ? "No selection" : ItemFormat.count(selection.count) + " selected")
-                    .font(.system(size: 13)).foregroundStyle(palette.faint)
+                    .font(NexusType.body).foregroundStyle(palette.faint)
                 Spacer()
             }
         }

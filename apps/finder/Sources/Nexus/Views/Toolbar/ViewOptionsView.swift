@@ -11,7 +11,7 @@ struct ViewOptionsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(pane.location.title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(NexusType.headline)
                 .foregroundStyle(palette.strong)
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -20,21 +20,21 @@ struct ViewOptionsView: View {
                     Text(field.title).tag(field)
                 }
             }
-            .font(.system(size: 13))
+            .font(NexusType.body)
             Picker("Group By", selection: orderBinding(\.grouping)) {
                 ForEach(ItemGrouping.allCases, id: \.self) { grouping in
                     Text(grouping.title).tag(grouping)
                 }
             }
-            .font(.system(size: 13))
+            .font(NexusType.body)
             Toggle("Keep folders on top", isOn: orderBinding(\.foldersFirst))
-                .font(.system(size: 13))
+                .font(NexusType.body)
             HStack(spacing: 8) {
-                Text("Icon size").font(.system(size: 13)).foregroundStyle(palette.text).lineLimit(1).fixedSize()
+                Text("Icon size").font(NexusType.body).foregroundStyle(palette.text).lineLimit(1).fixedSize()
                 Slider(value: iconBinding, in: ViewSettings.iconSizes, step: 16)
             }
             Toggle("Show hidden files", isOn: Binding(get: { model.showHidden }, set: { _ in model.perform(.toggleHidden) }))
-                .font(.system(size: 13))
+                .font(NexusType.body)
             Divider()
             HStack(spacing: 8) {
                 Button("Remember for This Folder") { model.perform(.rememberView) }
@@ -42,7 +42,7 @@ struct ViewOptionsView: View {
                 Button("Use as Default") { model.perform(.useAsDefaultView) }
                     .lineLimit(1).fixedSize()
             }
-            .font(.system(size: 12))
+            .font(NexusType.callout)
         }
         .padding(14)
         .frame(width: 340, alignment: .leading)

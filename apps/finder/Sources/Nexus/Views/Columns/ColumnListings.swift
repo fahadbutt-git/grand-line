@@ -75,7 +75,7 @@ final class ColumnListings: ObservableObject {
     }
 
     private static func measure(_ items: [FileItem]) -> CGFloat {
-        let font = NSFont.systemFont(ofSize: 13)
+        let font = NexusAppKitType.body
         let names = items.count > 2_000
             ? Array(items.map(\.name).sorted { $0.count > $1.count }.prefix(300))
             : items.map(\.name)

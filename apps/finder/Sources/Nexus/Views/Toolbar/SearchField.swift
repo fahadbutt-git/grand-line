@@ -9,10 +9,10 @@ struct SearchField: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(palette.faint)
+            Image(systemName: "magnifyingglass").font(NexusType.smallSymbol).foregroundStyle(palette.faint)
             TextField("Search this folder", text: $model.searchText)
                 .textFieldStyle(.plain)
-                .font(.system(size: 13))
+                .font(NexusType.body)
                 .foregroundStyle(palette.strong)
                 .focused($focused)
                 .onExitCommand { model.endSearch(); focused = false }
@@ -25,7 +25,7 @@ struct SearchField: View {
                 KeyCap(text: "⌘F", palette: palette)
             } else {
                 Button { model.endSearch() } label: {
-                    Image(systemName: "xmark.circle.fill").font(.system(size: 12)).foregroundStyle(palette.faint)
+                    Image(systemName: "xmark.circle.fill").font(NexusType.smallSymbol).foregroundStyle(palette.faint)
                 }
                 .buttonStyle(.plain)
                 .help("End the search")
@@ -34,7 +34,13 @@ struct SearchField: View {
         }
         .padding(.horizontal, 8)
         .frame(height: 26)
-        .background(RoundedRectangle(cornerRadius: 6).fill(palette.field))
+        .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(palette.field))
+        // The focus ring, in the theme's accent, while the field has the keys.
+        .overlay(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .strokeBorder(palette.accent.opacity(focused ? 0.55 : 0), lineWidth: 2)
+                .allowsHitTesting(false)
+        )
         .onChange(of: model.searchFocused) { _, wanted in
             if wanted { focused = true; model.searchFocused = false }
         }

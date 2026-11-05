@@ -57,7 +57,7 @@ struct ViewModePicker: View {
             }
         }
         .padding(2)
-        .background(RoundedRectangle(cornerRadius: 6).fill(palette.field))
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(palette.field))
         .fixedSize()
     }
 }
@@ -78,7 +78,7 @@ struct SearchChips: View {
                     }
                     .accessibilityIdentifier(identifier(of: chip))
                 }
-                Rectangle().fill(palette.line).frame(width: 1, height: 14)
+                Hairline(palette: palette, axis: .vertical).frame(height: 14)
                 ForEach(model.queryChips(query), id: \.self) { text in
                     Chip(title: text, palette: palette)
                 }
@@ -87,9 +87,8 @@ struct SearchChips: View {
                 }
                 Spacer(minLength: 0)
                 Button("Save Search…") { model.perform(.saveSearch) }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 11))
-                    .foregroundStyle(palette.accent)
+                    .buttonStyle(LinkButtonStyle(palette: palette))
+                    .font(NexusType.label)
                     .fixedSize()
             }
             .padding(.horizontal, 12)
@@ -160,24 +159,23 @@ struct FilterBar: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "line.3.horizontal.decrease")
-                .font(.system(size: 11, weight: .semibold))
+                .font(NexusType.smallSymbol)
                 .foregroundStyle(palette.accent)
-            Text("Filter").font(.system(size: 11, weight: .medium)).foregroundStyle(palette.accent)
+            Text("Filter").font(NexusType.labelMedium).foregroundStyle(palette.accent)
             Chip(title: pane.state.filter, palette: palette) { model.beginFilter() }
                 .help("Edit the filter  ⌥⌘G")
             Text("\(pane.items.count) of \(ItemFormat.count(pane.state.unfilteredCount)) in this folder")
-                .font(.system(size: 11).monospacedDigit())
+                .font(NexusType.labelNumbers)
                 .foregroundStyle(palette.dim)
                 .lineLimit(1)
             Spacer(minLength: 0)
             Button { model.clearFilter(in: pane) } label: {
                 HStack(spacing: 4) {
-                    Text("Clear").font(.system(size: 11))
+                    Text("Clear").font(NexusType.label)
                     KeyCap(text: "Esc", palette: palette)
                 }
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(palette.accent)
+            .buttonStyle(LinkButtonStyle(palette: palette))
             .accessibilityIdentifier("nexus.filter.clear")
         }
         .padding(.horizontal, 12)
