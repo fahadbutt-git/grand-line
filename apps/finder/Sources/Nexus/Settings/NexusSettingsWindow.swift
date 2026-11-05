@@ -278,7 +278,7 @@ struct NexusViewsPane: View {
                 SettingsPicker("Sort by", id: settingID("views.sort"), selection: Binding(
                     get: { defaults.sort.field },
                     set: { field in change { $0.sort = ItemSort(field: field, foldersFirst: $0.sort.foldersFirst, grouping: $0.sort.grouping) } }),
-                    options: SortField.allCases.map { ($0, $0.title) })
+                    options: SortField.folderFields.map { ($0, $0.title) })
                 SettingsToggle("Keep folders on top", id: settingID("views.foldersFirst"), isOn: view(\.sort.foldersFirst))
                 SettingsPicker("Group by", id: settingID("views.group"), selection: view(\.sort.grouping),
                                options: ItemGrouping.allCases.map { ($0, $0.title) })
@@ -360,7 +360,7 @@ struct NexusSearchPane: View {
                     get: { store.current.defaultSearchScope },
                     set: { value in store.update { $0.defaultSearchScope = value } }),
                     options: DefaultSearchScope.allCases.map { ($0, $0.title) })
-                SettingsToggle("Include content matches", detail: "Files whose text matches, from Spotlight, below the name matches.",
+                SettingsToggle("Include content matches", detail: "Files whose text matches, from Spotlight, under \u{201C}Found inside files\u{201D} below the name matches. Each search can hide them.",
                                id: settingID("search.content"), isOn: Binding(
                                 get: { store.current.includeContentMatches },
                                 set: { on in store.update { $0.includeContentMatches = on } }))

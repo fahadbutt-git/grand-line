@@ -69,6 +69,23 @@ final class FilesTests: XCTestCase {
         XCTAssertEqual(own.map(\.title), ["a.pdf", "A.app", "b.pdf"])
     }
 
+    /// Spotlight's files found only by what is inside them rank below every
+    /// name match, however Spotlight ordered them.
+    func testContentOnlyHitsRankBelowNameMatches() async throws {
+        let provider = FilesProvider(
+            paths: paths,
+            names: { _, _ in [IndexMatch(path: "/Users/me/Lid Study - CONJ", name: "Lid Study - CONJ", isFolder: true, tier: .wordStart, highlights: [])] },
+            spotlight: { _, _ in [FileHit(path: "/Users/me/Downloads/00_Abstract.docx", isFolder: false),
+                                  FileHit(path: "/Users/me/Downloads/conj notes.txt", isFolder: false)] }
+        )
+        let rows = try await provider.results(for: LaunchQuery(raw: ". conj", prefix: .files, term: "conj"))
+        func tier(_ title: String) -> MatchTier? { rows.first { $0.title == title }?.match.title }
+        XCTAssertEqual(tier("Lid Study - CONJ"), MatchTier.wordStart)
+        XCTAssertEqual(tier("conj notes.txt"), MatchTier.substring, "a Spotlight name match keeps its tier")
+        XCTAssertEqual(tier("00_Abstract.docx"), FileResults.insideFileTier)
+        XCTAssertGreaterThan(FileResults.insideFileTier, .fuzzy)
+    }
+
     func testFoldersTheIndexMayNotReadAreExplained() async throws {
         let provider = FilesProvider(
             paths: paths,

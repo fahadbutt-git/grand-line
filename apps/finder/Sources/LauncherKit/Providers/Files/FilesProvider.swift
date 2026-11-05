@@ -79,6 +79,7 @@ public struct FilesProvider: LaunchProvider {
         if let words = plan.names {
             hits = await names(words, own ? 40 : 12).map { FileHit($0) }
         }
+        let fromIndex = Set(hits.map(\.path))
         try Task.checkCancellation()
         if let text = plan.spotlight {
             var seen = Set(hits.map(\.path))
@@ -93,12 +94,19 @@ public struct FilesProvider: LaunchProvider {
         // A name the index found only by scattered letters is dropped unless
         // the matcher finds those letters close together too (TextMatcher.isTight).
         let matcher = plan.names.map { TextMatcher($0) }
+        // A Spotlight hit whose name does not match the words was found only
+        // by what is inside it: it ranks below every name match.
         let rows = hits.compactMap { hit -> LaunchResult? in
             var row = FileResults.result(hit, paths: paths, now: now)
             if let matcher {
                 let scored = matcher.match(FoldedText(hit.name, stripsExtension: !hit.isFolder))
                 if hit.tier == .fuzzy, scored.map({ $0.tier < .typo }) != true { return nil }
-                if let scored { row.match.quality = scored.quality }
+                if let scored {
+                    row.match.quality = scored.quality
+                } else if !fromIndex.contains(hit.path) {
+                    row.match.title = FileResults.insideFileTier
+                    row.match.quality = FileResults.insideFileQuality
+                }
             }
             return row
         }

@@ -62,7 +62,8 @@ enum IndexSearch {
                     original = UnsafeBufferPointer(rebasing: names[nameStart..<(nameStart + Int(storage.nameLength[i]))])
                 }
                 guard let rank = NameMatcher.match(
-                    name, original: original, query: queryBytes, words: words, ranges: &noRanges
+                    name, original: original, query: queryBytes, words: words,
+                    isFolder: flags & IndexStorage.folderFlag != 0, ranges: &noRanges
                 ) else { continue }
                 result.matched.append(Int32(i))
                 result.hits.append(Hit(
@@ -101,7 +102,8 @@ enum IndexSearch {
                         let nameStart = Int(storage.nameStart[index])
                         original = UnsafeBufferPointer(rebasing: names[nameStart..<(nameStart + Int(storage.nameLength[index]))])
                     }
-                    _ = NameMatcher.match(name, original: original, query: queryBytes, words: query.words, ranges: &ranges)
+                    _ = NameMatcher.match(name, original: original, query: queryBytes, words: query.words,
+                                          isFolder: storage.isFolder(index), ranges: &ranges)
                 }
             }
         }

@@ -16,6 +16,11 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
     /// items, so a row number always means the item drawn there, even while
     /// a reload is held back for a name being edited.
     private var shown: [FileItem] = []
+    /// The rows as last drawn, with the "Found inside files" header in
+    /// search results sorted by relevance. Table rows go through it to items.
+    private var rows = SectionedRows(itemCount: 0, headerBefore: nil)
+    /// The header's count as last drawn.
+    private var shownInsideCount = 0
     private var shownCut: Set<String> = []
     /// A reload that waited for a name being edited to end.
     private var heldReload = false
@@ -73,7 +78,9 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
             discardRename()
         }
         shownLocation = pane.location
-        if ids != shownIDs || cut != shownCut || themeChanged || displayChanged || columnsChanged || heldReload {
+        let headerChanged = pane.state.insideFilesStart != rows.headerRow
+            || (pane.state.searchCounts?.insideFiles ?? 0) != shownInsideCount
+        if ids != shownIDs || cut != shownCut || themeChanged || displayChanged || columnsChanged || heldReload || headerChanged {
             if editingField() != nil {
                 // A name is being edited (a download finished, a file changed
                 // nearby): reloading now would end the edit or move the row
@@ -97,6 +104,8 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
         let scrollToTop = shownIDs.isEmpty || ids.first != shownIDs.first && ids.count != shownIDs.count
         shownIDs = ids
         shown = pane.items
+        rows = SectionedRows(itemCount: shown.count, headerBefore: pane.state.insideFilesStart)
+        shownInsideCount = pane.state.searchCounts?.insideFiles ?? 0
         shownCut = cut
         table.reloadData()
         fitNameColumn()
@@ -123,8 +132,9 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
         guard let table else { return }
         let range = table.rows(in: table.visibleRect)
         guard range.length > 0 else { return }
-        let lower = max(0, range.location)
-        let upper = min(shown.count, range.location + range.length)
+        let visible = rows.items(inRows: max(0, range.location)..<max(0, range.location + range.length))
+        let lower = visible.lowerBound
+        let upper = min(shown.count, visible.upperBound)
         guard lower < upper else { return }
         pane.setVisible(shown[lower..<upper].map(\.id))
     }
@@ -132,7 +142,7 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
     private func syncSelection() {
         guard let table else { return }
         var wanted = IndexSet()
-        for (row, id) in shownIDs.enumerated() where pane.state.selection.contains(id) { wanted.insert(row) }
+        for (index, id) in shownIDs.enumerated() where pane.state.selection.contains(id) { wanted.insert(rows.row(ofItem: index)) }
         guard wanted != table.selectedRowIndexes else { return }
         syncing = true
         table.selectRowIndexes(wanted, byExtendingSelection: false)
@@ -165,8 +175,8 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
 
     func beginRename(target: String? = nil) {
         guard let table, table.selectedRowIndexes.count == 1, let row = table.selectedRowIndexes.first,
-              row < items.count, !items[row].isInArchive else { return }
-        if let target, items[row].id != target { return }
+              let index = rows.item(atRow: row), !items[index].isInArchive else { return }
+        if let target, items[index].id != target { return }
         renaming = true
         table.editColumn(0, row: row, with: nil, select: true)
         renaming = false
@@ -175,12 +185,44 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
     // MARK: Data source
 
     func numberOfRows(in tableView: NSTableView) -> Int {
-        items.count
+        rows.rowCount
+    }
+
+    /// The "Found inside files" header spans the row, above the files found
+    /// only by what is inside them.
+    func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool {
+        rows.isHeader(row)
+    }
+
+    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
+        !rows.isHeader(row)
+    }
+
+    func tableView(_ tableView: NSTableView, selectionIndexesForProposedSelection proposed: IndexSet) -> IndexSet {
+        guard let header = rows.headerRow, proposed.contains(header) else { return proposed }
+        var allowed = proposed
+        allowed.remove(header)
+        // An arrow key onto the header goes on to the row past it.
+        if allowed.isEmpty {
+            let target = tableView.selectedRow > header ? header - 1 : header + 1
+            if target >= 0, target < rows.rowCount { allowed.insert(target) }
+        }
+        return allowed
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        guard let tableColumn, row < items.count, let column = FileColumn(rawValue: tableColumn.identifier.rawValue) else { return nil }
-        let item = items[row]
+        if rows.isHeader(row) {
+            guard tableColumn == nil || tableColumn?.identifier == FileColumn.name.identifier else { return nil }
+            let header = (tableView.makeView(withIdentifier: InsideFilesHeaderView.identifier, owner: nil) as? InsideFilesHeaderView)
+                ?? InsideFilesHeaderView()
+            header.show(count: shownInsideCount, theme: theme) { [weak self] in
+                guard let self else { return }
+                self.pane.setHidesInsideFiles(true)
+            }
+            return header
+        }
+        guard let tableColumn, let index = rows.item(atRow: row), let column = FileColumn(rawValue: tableColumn.identifier.rawValue) else { return nil }
+        let item = items[index]
         let cell = (tableView.makeView(withIdentifier: tableColumn.identifier, owner: nil) as? FileCellView)
             ?? FileCellView(column: column, identifier: tableColumn.identifier)
         cell.textField?.delegate = self
@@ -211,7 +253,7 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
 
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard !syncing, let table else { return }
-        let ids = table.selectedRowIndexes.compactMap { $0 < shownIDs.count ? shownIDs[$0] : nil }
+        let ids = table.selectedRowIndexes.compactMap { row in rows.item(atRow: row).flatMap { $0 < shownIDs.count ? shownIDs[$0] : nil } }
         pane.select(ids: ids)
     }
 
@@ -221,7 +263,7 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
     }
 
     @objc func doubleClicked(_ sender: Any?) {
-        guard let table, table.clickedRow >= 0 else { return }
+        guard let table, table.clickedRow >= 0, rows.item(atRow: table.clickedRow) != nil else { return }
         model.open(pane.selectedItems, in: pane)
     }
 
@@ -235,7 +277,7 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
         // reloaded while a name is edited, and the cell says which item it is.
         var cell: NSView? = field.superview
         while let view = cell, !(view is FileCellView) { cell = view.superview }
-        let id = (cell as? FileCellView)?.itemID ?? (row >= 0 && row < items.count ? items[row].id : nil)
+        let id = (cell as? FileCellView)?.itemID ?? rows.item(atRow: row).map { items[$0].id }
         let item = id.flatMap { id in pane.items.first { $0.id == id } ?? items.first { $0.id == id } }
         guard !discarding, row >= 0, let item else {
             // The row has gone (reloaded away): nothing to rename, but the keys
@@ -313,8 +355,8 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
     }
 
     func menu(forRow row: Int) -> NSMenu {
-        if row >= 0, row < shownIDs.count, !pane.state.selection.contains(shownIDs[row]) {
-            pane.select(ids: [shownIDs[row]])
+        if let index = rows.item(atRow: row), index < shownIDs.count {
+            if !pane.state.selection.contains(shownIDs[index]) { pane.select(ids: [shownIDs[index]]) }
         } else if row < 0 {
             pane.select(ids: [])
         }
@@ -325,8 +367,8 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
     // MARK: Drag out
 
     func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
-        guard row < items.count else { return nil }
-        let item = items[row]
+        guard let index = rows.item(atRow: row) else { return nil }
+        let item = items[index]
         if let entry = item.archiveEntry, case .archive(let archive, _) = pane.location {
             let type = item.isFolder ? UTType.folder : (UTType(filenameExtension: item.ext) ?? .data)
             let provider = NSFilePromiseProvider(fileType: type.identifier, delegate: ArchivePromise.shared)
@@ -349,7 +391,7 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
     func tableView(_ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int,
                    proposedDropOperation operation: NSTableView.DropOperation) -> NSDragOperation {
         guard pane.location.folderURL != nil else { return [] }
-        if operation == .on, row < items.count, !items[row].isFolder {
+        if operation == .on, let index = rows.item(atRow: row), !items[index].isFolder {
             tableView.setDropRow(row, dropOperation: .above)
         }
         // A file promise (Mail, Photos, Safari, an archive pane) is always a copy.
@@ -364,7 +406,7 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
         let urls = FilePasteboard.read(info.draggingPasteboard)
         guard !urls.isEmpty else {
             guard let promises = Self.promises(in: info.draggingPasteboard) else { return false }
-            let target = dropOperation == .on && row < items.count && items[row].isFolder ? items[row].url : folder
+            let target = dropTarget(row: row, operation: dropOperation, folder: folder)
             model.receive(promises, into: target)
             return true
         }
@@ -372,13 +414,19 @@ final class FileListCoordinator: NSObject, NSTableViewDataSource, NSTableViewDel
             pane.moveManually(urls.map(\.lastPathComponent), to: row)
             return true
         }
-        let target = dropOperation == .on && row < items.count && items[row].isFolder ? items[row].url : folder
+        let target = dropTarget(row: row, operation: dropOperation, folder: folder)
         model.drop(urls, into: target, forceCopy: NSEvent.modifierFlags.contains(.option))
         return true
     }
 }
 
 extension FileListCoordinator {
+    /// A drop on a folder's row goes into it; anywhere else into the pane's folder.
+    func dropTarget(row: Int, operation: NSTableView.DropOperation, folder: URL) -> URL {
+        guard operation == .on, let index = rows.item(atRow: row), index < items.count, items[index].isFolder else { return folder }
+        return items[index].url
+    }
+
     /// The file promises on a drag's pasteboard, nil when there are none.
     static func promises(in pasteboard: NSPasteboard) -> [NSFilePromiseReceiver]? {
         let found = pasteboard.readObjects(forClasses: [NSFilePromiseReceiver.self], options: nil) as? [NSFilePromiseReceiver]

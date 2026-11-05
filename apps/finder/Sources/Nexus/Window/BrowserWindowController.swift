@@ -87,6 +87,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate, NSMen
         guard menuItem.action == #selector(performBrowserCommand(_:)),
               let raw = menuItem.representedObject as? String, let command = BrowserCommand(rawValue: raw) else { return true }
         menuItem.state = model.isChecked(command) ? .on : .off
+        // Relevance is offered only where there are search results.
+        if command == .sortRelevance { menuItem.isHidden = !model.isEnabled(command) }
         if let editing = TextFieldGuard.validate(menuItem, command, in: window) {
             menuItem.title = CommandCatalog.spec(command).title
             return editing

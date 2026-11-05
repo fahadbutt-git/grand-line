@@ -3,9 +3,9 @@ import Foundation
 /// ~/.config/grand-line/nexus/settings.json. Every key is optional.
 ///
 /// ```json
-/// { "places": ["~/Downloads", "~/Developer"],
-///   "projectFolders": ["~/Drive/Projects/Active"],
-///   "projects": ["~/Developer/glaucoma-model"] }
+/// { "places": ["~/Downloads", "~/Code"],
+///   "projectFolders": ["~/Drive/1 Projects", "~/Drive/2 Areas/Research/Retina"],
+///   "projects": ["~/Code/glaucoma-model"] }
 /// ```
 public struct NexusSettings: Codable, Equatable, Sendable {
     /// Sidebar Places; Finder's favourites when left out.
@@ -68,7 +68,7 @@ public struct NexusSettings: Codable, Equatable, Sendable {
         return copy
     }
 
-    /// "~/Developer" for a folder in home, the full path otherwise.
+    /// "~/Code" for a folder in home, the full path otherwise.
     public static func abbreviate(_ url: URL, home: URL) -> String {
         let path = url.standardizedFileURL.path
         let base = home.standardizedFileURL.path

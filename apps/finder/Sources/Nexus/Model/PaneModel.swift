@@ -26,6 +26,9 @@ final class PaneModel: ObservableObject, Identifiable {
     private var loadTask: Task<Void, Never>?
     private var sizeTask: Task<Void, Never>?
     private var search: SearchRunner?
+    /// Rows already read for the search shown, by path, so a Spotlight update
+    /// reads only what changed instead of every result again.
+    private var searchItems: [String: FileItem] = [:]
     /// A folder read is in flight; changes meanwhile ask for one more after it.
     private var reading = false
     private var readAgain = false
@@ -72,11 +75,21 @@ final class PaneModel: ObservableObject, Identifiable {
         if state.goUp() { applyFolderSettings(); reload() }
     }
 
-    /// A folder with its own stored view uses it (R6).
+    /// A folder with its own stored view uses it (R6). Search results start
+    /// in relevance order, with the window's view otherwise; folders never
+    /// take relevance.
     private func applyFolderSettings() {
+        if case .search = location {
+            var settings = windowSettings
+            settings.sort = .relevance
+            state.setSettings(settings)
+            return
+        }
         guard let folder = location.folderURL else { return }
         let prefs = services.viewPreferences
-        state.setSettings(prefs.settings(for: folder.path, window: windowSettings))
+        var settings = prefs.settings(for: folder.path, window: windowSettings)
+        settings.sort = settings.sort.forFolder
+        state.setSettings(settings)
         state.setManualOrder(prefs.manualOrder(for: folder.path))
     }
 
@@ -98,6 +111,14 @@ final class PaneModel: ObservableObject, Identifiable {
         readLastOpened()
         // Sorting by size needs every folder's size, not only those on screen.
         if bySize { measureSizes() }
+        // A sort chosen for search results (a header click, Relevance) stays
+        // with them: folders keep their own. The rest of the view carries on.
+        if case .search = location {
+            var window = settings
+            window.sort = windowSettings.sort
+            windowSettings = window
+            return
+        }
         if let folder = location.folderURL, services.viewPreferences.change(settings, in: folder.path) {
             services.saveViewPreferences()
         } else {
@@ -173,8 +194,8 @@ final class PaneModel: ObservableObject, Identifiable {
         }
     }
 
-    private func finish(_ items: [FileItem]) {
-        state.load(items)
+    private func finish(_ items: [FileItem], ranks: [String: SearchRank]? = nil) {
+        if let ranks { state.loadSearch(items, ranks: ranks) } else { state.load(items) }
         state.applyPendingSelection()
         isLoading = false
         onSelectionChange?()
@@ -358,10 +379,32 @@ final class PaneModel: ObservableObject, Identifiable {
     private func runSearch(_ text: String, scope: SearchScope) {
         let runner = SearchRunner(services: services)
         search = runner
-        runner.start(text, scope: scope) { [weak self] paths in
-            let items = paths.compactMap { FileItem.read(URL(fileURLWithPath: $0)) }
-            self?.finish(items)
+        searchItems = [:]
+        let content = NexusPreferencesStore.shared.current.includeContentMatches && !state.hidesInsideFiles
+        runner.start(text, scope: scope, content: content) { [weak self] hits, changed in
+            guard let self else { return }
+            for path in changed { self.searchItems[path] = nil }
+            var items: [FileItem] = []
+            var ranks: [String: SearchRank] = [:]
+            var known: [String: FileItem] = [:]
+            for path in hits.paths {
+                guard let item = self.searchItems[path] ?? FileItem.read(URL(fileURLWithPath: path)) else { continue }
+                known[path] = item
+                items.append(item)
+                ranks[item.path] = hits.ranks[path]
+            }
+            // Only what this answer holds is kept, so the cache never outgrows it.
+            self.searchItems = known
+            self.finish(items, ranks: ranks)
         }
+    }
+
+    /// The search bar's "inside files" toggle: this search with or without
+    /// the files found only by what is inside them.
+    func setHidesInsideFiles(_ hides: Bool) {
+        guard case .search = location, state.hidesInsideFiles != hides else { return }
+        state.hidesInsideFiles = hides
+        reload()
     }
 
     /// The list's rows on screen changed (a scroll, a resize): folders that

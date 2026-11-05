@@ -94,7 +94,9 @@ public enum CommandCatalog {
         item(.viewColumns, "as Columns", [cmd("3")], .view),
         item(.viewGallery, "as Gallery", [cmd("4")], .view),
         item(.viewPanes, "as Panes", [cmd("5")], .view),
-        item(.sortName, "Name", [cmd("1", [.control, .option])], .view, group: true, submenu: "Sort By"),
+        // Search results only (hidden elsewhere): back to relevance after a header click.
+        item(.sortRelevance, "Relevance", [cmd("r", [.control, .option])], .view, group: true, submenu: "Sort By"),
+        item(.sortName, "Name", [cmd("1", [.control, .option])], .view, submenu: "Sort By"),
         item(.sortKind, "Kind", [cmd("2", [.control, .option])], .view, submenu: "Sort By"),
         item(.sortLastOpened, "Date Last Opened", [cmd("3", [.control, .option])], .view, submenu: "Sort By"),
         item(.sortAdded, "Date Added", [cmd("4", [.control, .option])], .view, submenu: "Sort By"),

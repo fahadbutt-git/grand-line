@@ -19,18 +19,19 @@ enum NameMatcher {
         original: Bytes?,
         query: Bytes,
         words: [Range<Int>],
+        isFolder: Bool = false,
         ranges: inout [Range<Int>]?
     ) -> Rank? {
         if words.count == 1 {
-            return matchWord(name, original, query, &ranges, fuzzy: true)
+            return matchWord(name, original, query, &ranges, fuzzy: true, isFolder: isFolder)
         }
-        if let whole = matchWord(name, original, query, &ranges, fuzzy: false) {
+        if let whole = matchWord(name, original, query, &ranges, fuzzy: false, isFolder: isFolder) {
             return whole
         }
         var worst = MatchTier.exact
         var quality = 0
         for word in words {
-            guard let rank = matchWord(name, original, Bytes(rebasing: query[word]), &ranges, fuzzy: true) else {
+            guard let rank = matchWord(name, original, Bytes(rebasing: query[word]), &ranges, fuzzy: true, isFolder: isFolder) else {
                 return nil
             }
             worst = max(worst, rank.tier)
@@ -44,7 +45,8 @@ enum NameMatcher {
         _ original: Bytes?,
         _ word: Bytes,
         _ ranges: inout [Range<Int>]?,
-        fuzzy: Bool
+        fuzzy: Bool,
+        isFolder: Bool = false
     ) -> Rank? {
         let length = word.count
         guard length > 0, length <= name.count else { return nil }
@@ -70,59 +72,151 @@ enum NameMatcher {
             ranges?.append(first..<(first + length))
             return Rank(tier: .substring)
         }
-        return fuzzy ? subsequence(name, original, word, &ranges) : nil
+        return fuzzy ? subsequence(name, original, word, isFolder: isFolder, &ranges) : nil
     }
 
-    /// Letters in order. The first letter must start a word. Each later letter takes,
-    /// in order of preference, the next position, a word start, or the next occurrence.
-    static func subsequence(_ name: Bytes, _ original: Bytes?, _ word: Bytes, _ ranges: inout [Range<Int>]?) -> Rank? {
+    // MARK: Tight fuzzy matches
+
+    /// Letters inside one word may skip at most this many letters between
+    /// them ("spf" in "System Preferences" skips two). Sight's matcher
+    /// (LauncherKit's TextMatcher) uses the same limits.
+    static let maxGapInWord = 3
+    /// Words skipped between two words the match uses, at most.
+    static let maxSkippedWords = 2
+    /// Placements tried for one name before it is given up as no match, so a
+    /// name made of one repeated letter cannot make a search slow.
+    static let fuzzyBudget = 256
+
+    /// Letters in order, close together, in the name without its extension.
+    ///
+    /// - The first letter starts a word, and a letter that moves on to another
+    ///   word takes that word's first letter, skipping at most
+    ///   `maxSkippedWords` words.
+    /// - Letters inside one word skip at most `maxGapInWord` letters.
+    /// - A match leaves a word for the next only when the letters it took
+    ///   there are that word's start ("glau" of Glaucoma, then "r" of Review):
+    ///   "conj" is not "co" and an "n" further into "combined", then a "J".
+    /// - A file's extension never takes part: ".json" gives no "j".
+    ///
+    /// Each letter prefers the next position, then the start of a following
+    /// word, then a later letter in the same word. Letters scattered through a
+    /// long name ("conj" in "Astigmatic Refractive Correction - Jackson
+    /// Cross.pdf") are not a match.
+    static func subsequence(_ full: Bytes, _ original: Bytes?, _ word: Bytes, isFolder: Bool = false,
+                            _ ranges: inout [Range<Int>]?) -> Rank? {
+        let end = isFolder ? full.count : (extensionStart(full) ?? full.count)
+        guard word.count > 0, word.count <= end else { return nil }
+        let name = Bytes(rebasing: full[0..<end])
         guard isSubsequence(word, from: 0, of: name, from: 0) else { return nil }
-        var cursor = 0
+        var search = FuzzySearch(name: name, original: original, word: word, keepsPositions: ranges != nil)
+        for first in 0..<name.count where name[first] == word[0] && NameFold.isBoundary(name, original, first) {
+            guard search.budget > 0 else { return nil }
+            search.starts = 1
+            search.adjacent = 0
+            search.picked.removeAll(keepingCapacity: true)
+            if search.keepsPositions { search.picked.append(first) }
+            guard search.place(1, after: first, gapped: false) else { continue }
+            if ranges != nil {
+                var runs: [Range<Int>] = []
+                for position in search.picked {
+                    if let last = runs.last, last.upperBound == position {
+                        runs[runs.count - 1] = last.lowerBound..<(position + 1)
+                    } else {
+                        runs.append(position..<(position + 1))
+                    }
+                }
+                ranges?.append(contentsOf: runs)
+            }
+            return Rank(tier: .fuzzy, quality: UInt8(min(search.starts * 4 + search.adjacent, 31)))
+        }
+        return nil
+    }
+
+    /// Where a file's extension starts (its dot): the last dot after the first
+    /// byte, followed by one to ten letters or digits. "v1.0_302141.zip" gives
+    /// the dot of ".zip"; "Dr. Lee notes" has none.
+    static func extensionStart(_ name: Bytes) -> Int? {
+        guard let dot = lastDot(name) else { return nil }
+        let length = name.count - dot - 1
+        guard (1...10).contains(length) else { return nil }
+        for i in (dot + 1)..<name.count where !NameFold.isWordByte(name[i]) { return nil }
+        return dot
+    }
+
+    /// A depth-first placement of a word's letters under the rules of
+    /// `subsequence`, with its score.
+    struct FuzzySearch {
+        let name: Bytes
+        let original: Bytes?
+        let word: Bytes
+        let keepsPositions: Bool
+        var budget = NameMatcher.fuzzyBudget
         var starts = 0
         var adjacent = 0
         var picked: [Int] = []
-        for k in 0..<word.count {
+
+        init(name: Bytes, original: Bytes?, word: Bytes, keepsPositions: Bool) {
+            self.name = name
+            self.original = original
+            self.word = word
+            self.keepsPositions = keepsPositions
+        }
+
+        @inline(__always)
+        func startsWord(_ i: Int) -> Bool {
+            NameFold.isWordByte(name[i]) && NameFold.isBoundary(name, original, i)
+        }
+
+        /// Places letter `k` and the rest after position `previous`. `gapped`
+        /// is whether a letter was skipped in the word `previous` is in.
+        mutating func place(_ k: Int, after previous: Int, gapped: Bool) -> Bool {
+            if k == word.count { return true }
+            budget -= 1
+            guard budget > 0 else { return false }
             let letter = word[k]
-            var chosen = -1
-            if k > 0, cursor < name.count, name[cursor] == letter,
-               isSubsequence(word, from: k + 1, of: name, from: cursor + 1) {
-                chosen = cursor
-                adjacent += 1
+            let next = previous + 1
+            guard next < name.count else { return false }
+            // The next position: in the same word, or a following word's start.
+            if name[next] == letter {
+                let crosses = startsWord(next)
+                if !crosses || !gapped {
+                    if take(next, k, adjacent: true, start: false, gapped: crosses ? false : gapped) { return true }
+                }
             }
-            if chosen < 0 {
-                var i = cursor
+            // The start of a following word, when this word's letters were its start.
+            if !gapped {
+                var entered = 0
+                var i = next
                 while i < name.count {
-                    if name[i] == letter, NameFold.isBoundary(name, original, i),
-                       isSubsequence(word, from: k + 1, of: name, from: i + 1) {
-                        chosen = i
-                        starts += 1
-                        break
+                    if startsWord(i) {
+                        entered += 1
+                        if entered - 1 > NameMatcher.maxSkippedWords { break }
+                        if i != next, name[i] == letter,
+                           take(i, k, adjacent: false, start: true, gapped: false) { return true }
                     }
                     i += 1
                 }
             }
-            if chosen < 0 {
-                if k == 0 { return nil }
-                var i = cursor
-                while i < name.count, name[i] != letter { i += 1 }
-                guard i < name.count else { return nil }
-                chosen = i
+            // A later letter in the same word (not when the word ends here).
+            guard !startsWord(next) else { return false }
+            var i = next + 1
+            while i < name.count, i - previous - 1 <= NameMatcher.maxGapInWord, !startsWord(i) {
+                if name[i] == letter, take(i, k, adjacent: false, start: false, gapped: true) { return true }
+                i += 1
             }
-            if ranges != nil { picked.append(chosen) }
-            cursor = chosen + 1
+            return false
         }
-        if ranges != nil {
-            var runs: [Range<Int>] = []
-            for position in picked {
-                if let last = runs.last, last.upperBound == position {
-                    runs[runs.count - 1] = last.lowerBound..<(position + 1)
-                } else {
-                    runs.append(position..<(position + 1))
-                }
-            }
-            ranges?.append(contentsOf: runs)
+
+        private mutating func take(_ position: Int, _ k: Int, adjacent isAdjacent: Bool, start isStart: Bool, gapped: Bool) -> Bool {
+            if isAdjacent { adjacent += 1 }
+            if isStart { starts += 1 }
+            if keepsPositions { picked.append(position) }
+            if place(k + 1, after: position, gapped: gapped) { return true }
+            if isAdjacent { adjacent -= 1 }
+            if isStart { starts -= 1 }
+            if keepsPositions { picked.removeLast() }
+            return false
         }
-        return Rank(tier: .fuzzy, quality: UInt8(min(starts * 4 + adjacent, 31)))
     }
 
     @inline(__always)

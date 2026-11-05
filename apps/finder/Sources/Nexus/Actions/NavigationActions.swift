@@ -138,7 +138,7 @@ extension BrowserModel {
 
     func sort(by command: BrowserCommand) {
         let fields: [BrowserCommand: SortField] = [
-            .sortName: .name, .sortKind: .kind, .sortLastOpened: .lastOpened, .sortAdded: .added,
+            .sortRelevance: .relevance, .sortName: .name, .sortKind: .kind, .sortLastOpened: .lastOpened, .sortAdded: .added,
             .sortModified: .modified, .sortCreated: .created, .sortSize: .size, .sortTags: .tags, .sortManual: .manual,
         ]
         guard let field = fields[command] else { return }
@@ -153,7 +153,9 @@ extension BrowserModel {
     }
 
     /// View › Sort By, its shortcut or View Options: the field in its default direction.
+    /// Relevance is for search results only.
     func choose(_ pane: PaneModel, sort field: SortField) {
+        if field == .relevance, !pane.location.isSearch { return }
         var settings = pane.state.settings
         settings.sort = settings.sort.choosing(field)
         pane.setSettings(settings)
@@ -191,6 +193,8 @@ extension BrowserModel {
     func useAsDefaultView() {
         var settings = focused.state.settings
         settings.mode = mode
+        // From search results, the sort chosen there stays with them.
+        settings.sort = focused.location.isSearch ? services.viewPreferences.defaults.sort : settings.sort.forFolder
         services.viewPreferences.defaults = settings
         if let folder = focused.location.folderURL { services.viewPreferences.forget(folder.path) }
         services.saveViewPreferences()

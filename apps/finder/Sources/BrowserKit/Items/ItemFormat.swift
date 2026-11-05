@@ -44,6 +44,34 @@ public enum ItemFormat {
         return text
     }
 
+    /// The footer's left side in a search that looks inside files: how many
+    /// rows were found by name and how many only inside, so a long list of
+    /// content matches is never mistaken for name matches: "12 by name ·
+    /// 1,594 inside files", "12 by name · inside files hidden". A selection
+    /// reads as anywhere else; a search with no inside-file rows as "12 items".
+    public static func searchStatus(_ counts: SearchCounts?, selected: Int, total: Int, selectedBytes: Int64?) -> String {
+        guard selected == 0, let counts else { return status(selected: selected, total: total, selectedBytes: selectedBytes) }
+        if counts.insideFilesHidden { return grouped(counts.byName) + " by name · inside files hidden" }
+        guard counts.insideFiles > 0 else { return count(total) }
+        return grouped(counts.byName) + " by name · " + grouped(counts.insideFiles) + " inside files"
+    }
+
+    /// The header before the files found only inside: "Found inside files (1,594)".
+    public static func insideFilesHeader(_ count: Int) -> String {
+        "Found inside files (" + grouped(count) + ")"
+    }
+
+    /// 1594 as "1,594".
+    public static func grouped(_ n: Int) -> String {
+        let digits = String(abs(n))
+        var out = ""
+        for (i, c) in digits.enumerated() {
+            if i > 0, (digits.count - i) % 3 == 0 { out.append(",") }
+            out.append(c)
+        }
+        return (n < 0 ? "-" : "") + out
+    }
+
     /// The footer's right side: "1.62 TB free".
     public static func free(_ bytes: Int64) -> String {
         size(bytes) + " free"

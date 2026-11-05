@@ -14,6 +14,9 @@ final class SpotlightSearch: Sendable {
 
     func run(_ text: String, limit: Int, savedSearch: @escaping @Sendable (String) -> String?) async -> [FileHit] {
         let compiled = SpotlightCompiler.compile(QueryParser.parse(text), savedSearch: savedSearch)
+        // Nothing to look for (". kind:" while typing, an unknown @name):
+        // the predicate would match any file, so none are listed.
+        guard !compiled.isUnconstrained else { return [] }
         let search = MetadataSearch(compiled: compiled, limit: limit)
         let timeout = self.timeout
         return await withTaskCancellationHandler {

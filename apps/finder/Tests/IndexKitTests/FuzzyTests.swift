@@ -52,4 +52,57 @@ final class FuzzyTests: XCTestCase {
         XCTAssertEqual(tier("fvc", "FolderViewController.swift"), .fuzzy)
         XCTAssertEqual(rank("fvc", "FolderViewController.swift")?.quality, 12)
     }
+
+    // MARK: Tight matches
+
+    /// Names a search for "conj" once showed by scattered letters (c-o-n from
+    /// "config", the j from ".json"). Only real matches remain.
+    static let conjNames = [
+        "Projects/Conj Flap/",
+        "Papers/K1. Conjunctivitis in the First Month of Life.pdf",
+        "Studies/Lid Study - CONJ/",
+        "Downloads/prisma_config.json",
+        "Downloads/BO13. Astigmatic Refractive Correction - Jackson Cross.pdf",
+        "Downloads/c2_Early_anterior-chamber_injection_-_matched_30d_v1.0_302141.zip",
+        "Downloads/combined_Li_J_et_al_2025.txt",
+        "Downloads/completeness_summary.json",
+    ]
+
+    func testConjFindsOnlyNamesThatHoldIt() async {
+        let index = Fixture.index(Self.conjNames)
+        let results = await index.search("conj")
+        XCTAssertEqual(Set(names(results)), ["Conj Flap", "K1. Conjunctivitis in the First Month of Life.pdf", "Lid Study - CONJ"])
+        XCTAssertEqual(results.first?.name, "Conj Flap")
+        XCTAssertFalse(results.contains { $0.tier == .fuzzy })
+    }
+
+    func testScatteredLettersAreNotAMatch() {
+        XCTAssertNil(tier("conj", "prisma_config.json"), "the extension never gives a letter")
+        XCTAssertNil(tier("conj", "BO13. Astigmatic Refractive Correction - Jackson Cross.pdf"), "n is too far into Correction")
+        XCTAssertNil(tier("conj", "c2_Early_anterior-chamber_injection_-_matched_30d_v1.0_302141.zip"))
+        XCTAssertNil(tier("conj", "combined_Li_J_et_al_2025.txt"), "co and an n further in, then J: not the start of combined")
+        XCTAssertNil(tier("conj", "completeness_summary.json"))
+        XCTAssertEqual(tier("conj", "Conj Flap"), .prefix)
+        XCTAssertEqual(tier("conj", "K1. Conjunctivitis in the First Month of Life.pdf"), .wordStart)
+        XCTAssertEqual(tier("conj", "Lid Study - CONJ"), .wordStart)
+    }
+
+    func testTightMatchesStillFound() {
+        XCTAssertEqual(tier("spf", "System Preferences"), .fuzzy, "two letters skipped inside a word")
+        XCTAssertEqual(tier("glre", "Gold Lake Ridge Estate"), .fuzzy)
+        XCTAssertEqual(tier("rn", "Rain.txt"), .fuzzy)
+        XCTAssertNil(tier("rn", "Rxxxxn.txt"), "four letters skipped inside a word")
+        XCTAssertNil(tier("gn", "Glaucoma Review Cases Old Notes"), "three words skipped")
+        XCTAssertEqual(tier("gn", "Glaucoma Review Cases Notes"), .fuzzy, "two words skipped")
+    }
+
+    func testExtensionNeverTakesPart() async {
+        XCTAssertNil(tier("rnx", "Review Notes.xlsx"))
+        XCTAssertEqual(tier("rnx", "Review Notes xlsx"), .fuzzy, "a word, not an extension")
+        XCTAssertEqual(tier("drl", "Dr. Lee notes"), .fuzzy, "a dot followed by a space starts no extension")
+        // A folder has no extension: all of its name counts.
+        let index = Fixture.index(["a/Review Notes.xlsx", "b/Review Notes.xlsx/"])
+        let results = await index.search("rnx")
+        XCTAssertEqual(results.map(\.path), ["/Index/b/Review Notes.xlsx"])
+    }
 }

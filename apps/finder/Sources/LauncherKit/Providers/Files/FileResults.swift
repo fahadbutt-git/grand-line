@@ -28,6 +28,11 @@ public struct FileHit: Sendable, Equatable {
 /// Rows for files, with every file action: open (folders in Nexus), show in
 /// Nexus, Quick Look, open with, copy path or file, move, AirDrop, transcode.
 public enum FileResults {
+    /// A file Spotlight found only by its contents ranks in the last tier,
+    /// below every file whose name matches.
+    public static let insideFileTier = MatchTier.typo
+    public static let insideFileQuality = -1_000_000
+
     /// System Settings › Privacy & Security › Files and Folders.
     public static let filesAndFoldersPane = "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders"
 

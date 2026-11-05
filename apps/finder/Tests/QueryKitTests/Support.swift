@@ -15,8 +15,8 @@ enum Fixture {
         calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour))!
     }
 
-    static func compile(_ text: String, saved: (String) -> String? = { _ in nil }) -> SpotlightQuery {
-        SpotlightCompiler.compile(QueryParser.parse(text), now: now, calendar: calendar, home: home, savedSearch: saved)
+    static func compile(_ text: String, saved: (String) -> String? = { _ in nil }, content: Bool = true) -> SpotlightQuery {
+        SpotlightCompiler.compile(QueryParser.parse(text), now: now, calendar: calendar, home: home, savedSearch: saved, content: content)
     }
 }
 

@@ -13,7 +13,8 @@ struct FooterView: View {
     var body: some View {
         let selection = pane.selectedItems
         HStack(spacing: 12) {
-            Text(ItemFormat.status(selected: selection.count, total: pane.items.count, selectedBytes: selectedBytes(selection)))
+            Text(ItemFormat.searchStatus(pane.state.searchCounts, selected: selection.count, total: pane.items.count,
+                                         selectedBytes: selectedBytes(selection)))
                 .font(.system(size: 11).monospacedDigit())
                 .foregroundStyle(palette.dim)
                 .lineLimit(1)

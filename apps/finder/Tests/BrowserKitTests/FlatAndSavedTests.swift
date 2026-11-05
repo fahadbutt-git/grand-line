@@ -135,7 +135,7 @@ final class FlatAndSavedTests: XCTestCase {
         let rewritten = SavedSearches.parse(old.text())
         XCTAssertFalse(rewritten.isLegacy)
         XCTAssertEqual(rewritten, old)
-        let line = old.text().split(separator: "\n")[1].split(separator: "\t", omittingEmptySubsequences: false)
+        let line = old.text().split(separator: "\n")[2].split(separator: "\t", omittingEmptySubsequences: false)
         XCTAssertEqual(line.prefix(2).map(String.init), ["weekly", "modified:<7d"], "Sight reads the first two fields")
         XCTAssertFalse(SavedSearches.parse("").isLegacy, "an empty file needs nothing")
     }

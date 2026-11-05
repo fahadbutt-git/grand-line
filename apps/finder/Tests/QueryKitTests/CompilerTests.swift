@@ -162,4 +162,63 @@ final class CompilerTests: XCTestCase {
         XCTAssertFalse(SortKey.modified.ascending)
         XCTAssertTrue(SortKey.name.ascending)
     }
+
+    // MARK: A plain word, as Nexus and Sight search it
+
+    func testConjCompilesToNameOrContentAndNothingElse() {
+        let query = Fixture.compile("conj")
+        XCTAssertEqual(query.predicate.predicateFormat,
+                       "kMDItemFSName CONTAINS[cd] \"conj\" OR kMDItemTextContent CONTAINS[cd] \"conj\"")
+        XCTAssertEqual(query.scopes, [])
+        XCTAssertTrue(query.postFilter("/Users/me/Downloads/0.png"))
+        XCTAssertFalse(query.isUnconstrained)
+        XCTAssertTrue(query.searchesContent)
+        // No branch is always true: a file without conj in its name or text never matches.
+        XCTAssertFalse(query.predicate.evaluate(with: [Key.name: "0.png", Key.content: ""]))
+        XCTAssertFalse(query.predicate.evaluate(with: [Key.name: "00_Abstract.docx", Key.content: "Abstract and methods"]))
+        XCTAssertFalse(query.predicate.evaluate(with: [Key.name: "prisma_config.json"]))
+        XCTAssertTrue(query.predicate.evaluate(with: [Key.name: "conj notes.txt", Key.content: ""]))
+        XCTAssertTrue(query.predicate.evaluate(with: [Key.name: "0.png", Key.content: "bulbar conjunctiva, slide 3"]),
+                      "an image whose recognised text holds the word matches by content")
+    }
+
+    func testPlainWordWithoutContentMatchesNamesOnly() {
+        let query = Fixture.compile("conj", content: false)
+        XCTAssertEqual(query.predicate.predicateFormat, "kMDItemFSName CONTAINS[cd] \"conj\"")
+        XCTAssertFalse(query.searchesContent)
+        XCTAssertFalse(query.predicate.evaluate(with: [Key.name: "a.docx", Key.content: "conjunctiva"]))
+        // text: asks for content by name, so it stays.
+        XCTAssertEqual(Fixture.compile("text:conj", content: false).predicate.predicateFormat, "kMDItemTextContent CONTAINS[cd] \"conj\"")
+        XCTAssertTrue(Fixture.compile("text:conj", content: false).searchesContent)
+        XCTAssertEqual(Fixture.compile("conj kind:pdf", content: false).predicate.predicateFormat,
+                       "kMDItemFSName CONTAINS[cd] \"conj\" AND kMDItemContentTypeTree == \"com.adobe.pdf\"")
+    }
+
+    func testTwoWordsEachMatchNameOrContent() {
+        XCTAssertEqual(Fixture.compile("lid conj").predicate.predicateFormat,
+                       "(kMDItemFSName CONTAINS[cd] \"lid\" OR kMDItemTextContent CONTAINS[cd] \"lid\") AND (kMDItemFSName CONTAINS[cd] \"conj\" OR kMDItemTextContent CONTAINS[cd] \"conj\")")
+    }
+
+    /// A query left with nothing to look for would match every file in the
+    /// scope; it says so, so nothing is run.
+    func testNothingToLookForIsUnconstrained() {
+        XCTAssertTrue(Fixture.compile("").isUnconstrained)
+        XCTAssertTrue(Fixture.compile("@nothing-saved").isUnconstrained, "an unknown saved search")
+        XCTAssertTrue(Fixture.compile("kind:").isUnconstrained, "a filter still being typed")
+        XCTAssertTrue(Fixture.compile("kind:bogus").isUnconstrained)
+        XCTAssertTrue(Fixture.compile("sort:name").isUnconstrained)
+        XCTAssertTrue(Fixture.compile("@loop", saved: { _ in "@loop" }).isUnconstrained)
+        XCTAssertFalse(Fixture.compile("kind:pdf").isUnconstrained)
+        XCTAssertFalse(Fixture.compile("in:Downloads").isUnconstrained, "a folder listing is asked for")
+        XCTAssertFalse(Fixture.compile("@notes", saved: { _ in "conj" }).isUnconstrained)
+        XCTAssertFalse(Fixture.compile("kind:pdf").searchesContent)
+    }
+
+    func testExpandedReplacesSavedSearches() {
+        let saved: (String) -> String? = { $0.lowercased() == "lids" ? "conj kind:pdf sort:modified" : nil }
+        let expanded = SpotlightCompiler.expanded(QueryParser.parse("@lids \"lid study\""), savedSearch: saved)
+        XCTAssertEqual(expanded.root, .and([.and([word("conj"), .term(.kind(.pdf))]), .term(.text(.phrase("lid study")))]))
+        XCTAssertEqual(expanded.sort, .modified)
+        XCTAssertNil(SpotlightCompiler.expanded(QueryParser.parse("@missing"), savedSearch: saved).root)
+    }
 }

@@ -17,22 +17,37 @@ public struct SearchPlan {
     /// Words for IndexKit, when the query is only names and words; nil otherwise.
     public let nameText: String?
     /// The plain words of the query (not text:, name: or other filters), which
-    /// Spotlight matches by name or by content.
+    /// Spotlight matches by name or by content. Saved searches (`@name`) are
+    /// expanded first, so their words count too.
     public let words: [String]
+    /// Whether Spotlight may match files by what is inside them: a plain word
+    /// with content matches on, or `text:`.
+    public let searchesContent: Bool
+    /// Nothing in the query narrows the results (an empty or unknown `@name`,
+    /// a filter still being typed). Such a search runs nothing and shows
+    /// nothing, rather than every file in the scope.
+    public let isUnconstrained: Bool
+    /// The query with saved searches expanded.
+    let expanded: Node?
     let postFilter: @Sendable (String) -> Bool
     let home: String
     let drives: [GoogleDrive]
 
+    /// - Parameter content: whether plain words also match inside files
+    ///   (Settings, Search, "Include content matches", and the search's own
+    ///   "inside files" toggle). `text:` always does.
     public static func make(
         _ text: String, scope: SearchScope, home: String, drives: [GoogleDrive],
-        savedSearch: (String) -> String? = { _ in nil }, now: Date = Date()
+        savedSearch: (String) -> String? = { _ in nil }, now: Date = Date(), content: Bool = true
     ) -> SearchPlan {
         let parsed = QueryParser.parse(text)
-        let compiled = SpotlightCompiler.compile(parsed, now: now, home: home, savedSearch: savedSearch)
+        let expanded = SpotlightCompiler.expanded(parsed, savedSearch: savedSearch)
+        let compiled = SpotlightCompiler.compile(parsed, now: now, home: home, savedSearch: savedSearch, content: content)
         let scopes = compiled.scopes.isEmpty ? scope.spotlightScopes(home: home, drives: drives) : compiled.scopes
         return SearchPlan(
             text: text, scope: scope, parsed: parsed, chips: QueryChips.describe(parsed),
-            predicate: compiled.predicate, scopes: scopes, nameText: nameWords(parsed), words: plainWords(parsed),
+            predicate: compiled.predicate, scopes: scopes, nameText: nameWords(expanded), words: plainWords(expanded),
+            searchesContent: compiled.searchesContent, isUnconstrained: compiled.isUnconstrained, expanded: expanded.root,
             postFilter: compiled.postFilter, home: home, drives: drives
         )
     }
@@ -46,11 +61,31 @@ public struct SearchPlan {
         return inScope && postFilter(path)
     }
 
-    /// Whether a Spotlight result matched by its name: its name holds every plain
-    /// word. False means it was found only by what is inside it.
+    /// Whether a Spotlight result matched by its name: the query holds for the
+    /// name alone, its words found in the name (a filter such as kind: or
+    /// modified: already holds, since Spotlight returned it). False means it
+    /// was found only by what is inside it. A query that never looks inside
+    /// files matches everything by name or by its filters.
     public func matchesName(_ path: String) -> Bool {
-        let name = (path as NSString).lastPathComponent
-        return words.allSatisfy { name.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
+        guard searchesContent, let expanded else { return true }
+        return Self.nameHolds(expanded, (path as NSString).lastPathComponent)
+    }
+
+    static func nameHolds(_ node: Node, _ name: String) -> Bool {
+        let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
+        func holds(_ pattern: Pattern) -> Bool {
+            if pattern.style == .prefix { return name.range(of: pattern.text, options: options.union(.anchored)) != nil }
+            return name.range(of: pattern.text, options: options) != nil
+        }
+        switch node {
+        case .term(.text(let pattern)), .term(.field(.name, let pattern)): return holds(pattern)
+        case .term(.field(.content, _)): return false
+        case .term: return true
+        case .and(let children): return children.allSatisfy { nameHolds($0, name) }
+        case .or(let children): return children.contains { nameHolds($0, name) }
+        // An exclusion already held for the file as Spotlight found it.
+        case .not, .saved: return true
+        }
     }
 
     /// Whether a result may show at all, however it was found (the name index,
@@ -87,21 +122,23 @@ public struct SearchPlan {
     }
 
     static func plainWords(_ query: ParsedQuery) -> [String] {
-        guard let root = query.root else { return [] }
-        let parts: [Node]
-        if case .and(let children) = root { parts = children } else { parts = [root] }
-        return parts.compactMap { part in
+        query.root.map { plainWords($0) } ?? []
+    }
+
+    static func plainWords(_ root: Node) -> [String] {
+        conjuncts(root).compactMap { part in
             if case .term(.text(let pattern)) = part { return pattern.text }
             return nil
         }
     }
 
     static func nameWords(_ query: ParsedQuery) -> String? {
-        guard let root = query.root else { return nil }
-        let parts: [Node]
-        if case .and(let children) = root { parts = children } else { parts = [root] }
+        query.root.flatMap { nameWords($0) }
+    }
+
+    static func nameWords(_ root: Node) -> String? {
         var words: [String] = []
-        for part in parts {
+        for part in conjuncts(root) {
             switch part {
             case .term(.text(let pattern)), .term(.field(.name, let pattern)):
                 words.append(pattern.text)
@@ -110,5 +147,11 @@ public struct SearchPlan {
             }
         }
         return words.isEmpty ? nil : words.joined(separator: " ")
+    }
+
+    /// The parts ANDed together, a saved search's own ANDs included.
+    static func conjuncts(_ node: Node) -> [Node] {
+        guard case .and(let children) = node else { return [node] }
+        return children.flatMap { conjuncts($0) }
     }
 }

@@ -55,7 +55,7 @@ extension BrowserModel {
         case .selectAll: focused.updateSelection { $0.selectAll($1) }
         case .deselectAll: focused.updateSelection { selection, _ in selection.clear() }
         case .viewIcons, .viewList, .viewColumns, .viewGallery, .viewPanes: setMode(for: command)
-        case .sortName, .sortKind, .sortLastOpened, .sortAdded, .sortModified, .sortCreated, .sortSize, .sortTags, .sortManual:
+        case .sortRelevance, .sortName, .sortKind, .sortLastOpened, .sortAdded, .sortModified, .sortCreated, .sortSize, .sortTags, .sortManual:
             sort(by: command)
         case .keepFoldersOnTop: toggleFoldersOnTop()
         case .groupNone: group(by: .none)
@@ -154,7 +154,7 @@ extension BrowserModel {
             return services.sidebarHidden != SidebarHidden()
         case .goDrive:
             return !services.sidebar.groups.isEmpty
-        case .saveSearch:
+        case .saveSearch, .sortRelevance:
             if case .search = focused.location { return true }
             return false
         case .transcodeVideo, .transcodePNG, .transcodeJPEG, .transcodePDF, .transcodeText:
@@ -196,6 +196,7 @@ extension BrowserModel {
         case .viewColumns: return mode == .columns
         case .viewGallery: return mode == .gallery
         case .viewPanes: return mode == .panes
+        case .sortRelevance: return sort == .relevance
         case .sortName: return sort == .name
         case .sortKind: return sort == .kind
         case .sortLastOpened: return sort == .lastOpened

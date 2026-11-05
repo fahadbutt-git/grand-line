@@ -16,7 +16,7 @@ struct ViewOptionsView: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
             Picker("Sort By", selection: sortBinding) {
-                ForEach(SortField.allCases, id: \.self) { field in
+                ForEach(SortField.offered(searching: pane.location.isSearch), id: \.self) { field in
                     Text(field.title).tag(field)
                 }
             }

@@ -82,6 +82,9 @@ struct SearchChips: View {
                 ForEach(model.queryChips(query), id: \.self) { text in
                     Chip(title: text, palette: palette)
                 }
+                if NexusPreferencesStore.shared.current.includeContentMatches {
+                    InsideFilesChip(pane: model.focused, palette: palette)
+                }
                 Spacer(minLength: 0)
                 Button("Save Search…") { model.perform(.saveSearch) }
                     .buttonStyle(.plain)
@@ -108,6 +111,23 @@ struct SearchChips: View {
         case .drive: return "nexus.scope.drive"
         case .mac: return "nexus.scope.mac"
         }
+    }
+}
+
+/// Whether this search shows the files found only by what is inside them
+/// (Settings' "Include content matches" decides where searches start).
+struct InsideFilesChip: View {
+    @ObservedObject var pane: PaneModel
+    let palette: Palette
+
+    var body: some View {
+        let shown = !pane.state.hidesInsideFiles
+        Chip(title: "Inside files", symbol: shown ? "doc.text.magnifyingglass" : "eye.slash", palette: palette, isOn: shown) {
+            pane.setHidesInsideFiles(shown)
+        }
+        .help(shown ? "Hide files found only by what is inside them" : "Show files found by what is inside them")
+        .accessibilityLabel(shown ? "Hide matches inside files" : "Show matches inside files")
+        .accessibilityIdentifier("nexus.search.insideFiles")
     }
 }
 

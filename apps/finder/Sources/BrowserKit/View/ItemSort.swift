@@ -14,6 +14,10 @@ public enum SortField: String, Codable, CaseIterable, Sendable {
     case tags
     /// The order you dragged items into (R7), kept per folder.
     case manual
+    /// Search results only: name matches first, best first (the name index's
+    /// tier, then the newest), then Spotlight's other name matches, then files
+    /// found only by what is inside them, newest first (`SearchRank`).
+    case relevance
 
     public var title: String {
         switch self {
@@ -26,13 +30,22 @@ public enum SortField: String, Codable, CaseIterable, Sendable {
         case .added: return "Date Added"
         case .tags: return "Tags"
         case .manual: return "Manual"
+        case .relevance: return "Relevance"
         }
+    }
+
+    /// The sorts a folder offers: every one but relevance.
+    public static let folderFields: [SortField] = allCases.filter { $0 != .relevance }
+
+    /// The sorts offered where you are: search results add Relevance, first.
+    public static func offered(searching: Bool) -> [SortField] {
+        searching ? [.relevance] + folderFields : folderFields
     }
 
     /// Dates and sizes start newest and largest, like Finder.
     public var defaultAscending: Bool {
         switch self {
-        case .name, .kind, .manual, .tags: return true
+        case .name, .kind, .manual, .tags, .relevance: return true
         case .size, .modified, .created, .lastOpened, .added: return false
         }
     }
@@ -85,15 +98,26 @@ public struct ItemSort: Codable, Hashable, Sendable {
         ItemSort(field: field, foldersFirst: foldersFirst, grouping: grouping)
     }
 
+    /// How search results start: by relevance.
+    public static let relevance = ItemSort(field: .relevance)
+
+    /// This sort as a folder can use it: relevance belongs to search results,
+    /// so a folder shows it as Name, A to Z.
+    public var forFolder: ItemSort {
+        field == .relevance ? ItemSort(field: .name, foldersFirst: foldersFirst, grouping: grouping) : self
+    }
+
     enum CodingKeys: String, CodingKey {
         case field, ascending, foldersFirst, grouping
     }
 
     /// Settings saved before Keep Folders on Top was a choice had it on by
-    /// default, not by choice; they load with it off.
+    /// default, not by choice; they load with it off. A field this version
+    /// does not know (from a newer one) loads as Name.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        field = try container.decode(SortField.self, forKey: .field)
+        let raw = try container.decode(String.self, forKey: .field)
+        field = SortField(rawValue: raw) ?? .name
         ascending = try container.decodeIfPresent(Bool.self, forKey: .ascending) ?? field.defaultAscending
         if let grouping = try container.decodeIfPresent(ItemGrouping.self, forKey: .grouping) {
             self.grouping = grouping
@@ -110,9 +134,10 @@ public struct ItemSort: Codable, Hashable, Sendable {
 public enum ItemSorter {
     public static func sorted(
         _ items: [FileItem], by sort: ItemSort, folderSizes: [String: Int64] = [:],
-        lastOpened: [String: Date] = [:], manual: [String] = []
+        lastOpened: [String: Date] = [:], manual: [String] = [], ranks: [String: SearchRank] = [:]
     ) -> [FileItem] {
         if sort.field == .manual { return ManualOrder.apply(manual, to: items) }
+        if sort.field == .relevance { return byRelevance(items, ranks) }
         let names = items.map { $0.name as NSString }
         let order = items.indices.sorted { a, b in
             let x = items[a], y = items[b]
@@ -132,7 +157,7 @@ public enum ItemSorter {
         _ field: SortField, _ sizes: [String: Int64], _ opened: [String: Date]
     ) -> ComparisonResult {
         switch field {
-        case .name, .manual:
+        case .name, .manual, .relevance:
             return xName.localizedStandardCompare(yName as String)
         case .kind:
             return x.kind.localizedStandardCompare(y.kind)
@@ -154,6 +179,30 @@ public enum ItemSorter {
             case (nil, nil): return .orderedSame
             }
         }
+    }
+
+    /// Relevance: how each was found (name index, Spotlight's names, inside
+    /// files), the name index's tier, then the newest first, then the order
+    /// the search gave. Keep Folders on Top and Group By do not apply: the
+    /// best match leads whatever it is. Items without a rank (not a search)
+    /// keep their order, after those with one.
+    static func byRelevance(_ items: [FileItem], _ ranks: [String: SearchRank]) -> [FileItem] {
+        guard !ranks.isEmpty else { return items }
+        let keys = items.map { ranks[$0.path] }
+        let order = items.indices.sorted { a, b in
+            switch (keys[a], keys[b]) {
+            case (nil, nil): return a < b
+            case (nil, _): return false
+            case (_, nil): return true
+            case let (x?, y?):
+                if x.source != y.source { return x.source < y.source }
+                if x.tier != y.tier { return x.tier < y.tier }
+                let dx = items[a].modified ?? .distantPast, dy = items[b].modified ?? .distantPast
+                if dx != dy { return dx > dy }
+                return a < b
+            }
+        }
+        return order.map { items[$0] }
     }
 
     static func order<T: Comparable>(_ a: T, _ b: T) -> ComparisonResult {

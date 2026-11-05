@@ -1,6 +1,6 @@
 import Foundation
 
-/// One clickable part of the path bar: "Drive › 01 Research › _Active".
+/// One clickable part of the path bar: "Drive › 2 Areas › Research › Retina".
 public struct PathSegment: Hashable, Sendable {
     public let title: String
     public let url: URL

@@ -35,12 +35,19 @@ public struct SavedSearch: Equatable, Sendable {
 /// Files from before scope and columns were stored hold only name and query;
 /// they load with the home folder as scope (where they always ran) and are
 /// written back in the new form (`isLegacy`).
+///
+/// Searches sort by relevance unless one says otherwise. Files written before
+/// relevance existed (without the `formatLine`) stored the window's sort,
+/// Name A to Z by default, whether or not it was chosen; that sort loads as
+/// none, so they open by relevance too.
 public struct SavedSearches: Equatable, Sendable {
     public private(set) var searches: [SavedSearch]
     /// Read from a file in the old two-field form, so it should be written again.
     public private(set) var isLegacy = false
 
     public static let header = "# name\tquery\tscope\tcolumns\tsort\tgroup"
+    /// Marks files whose sort was chosen (see above).
+    public static let formatLine = "# an empty sort is relevance"
 
     public init(searches: [SavedSearch] = []) {
         self.searches = searches
@@ -61,9 +68,11 @@ public struct SavedSearches: Equatable, Sendable {
         var searches: [SavedSearch] = []
         var sawHeader = false
         var sawOldLine = false
+        var sawFormat = false
         for line in text.split(whereSeparator: \.isNewline) {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed == header { sawHeader = true }
+            if trimmed == formatLine { sawFormat = true }
             if trimmed.isEmpty || trimmed.hasPrefix("#") { continue }
             let fields = line.split(separator: "\t", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
             guard fields.count >= 2, !fields[0].isEmpty, !fields[1].isEmpty else { continue }
@@ -76,7 +85,15 @@ public struct SavedSearches: Equatable, Sendable {
             searches.removeAll { $0.name.lowercased() == name.lowercased() }
             searches.append(search)
         }
+        var unchosenSort = false
+        if !sawFormat {
+            for index in searches.indices where searches[index].sort == ItemSort() {
+                searches[index].sort = nil
+                unchosenSort = true
+            }
+        }
         var saved = SavedSearches(searches: searches)
+        if unchosenSort { saved.isLegacy = true }
         if !searches.isEmpty, !sawHeader || sawOldLine {
             saved.isLegacy = true
             // Old searches always ran from the home folder.
@@ -122,7 +139,7 @@ public struct SavedSearches: Equatable, Sendable {
     }
 
     public func text() -> String {
-        Self.header + "\n" + searches.map { search in
+        Self.header + "\n" + Self.formatLine + "\n" + searches.map { search in
             let sort = search.sort
             let fields = [
                 search.name, search.query, search.scope.map(Self.scopeText) ?? "",

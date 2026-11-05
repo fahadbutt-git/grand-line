@@ -43,6 +43,12 @@ public enum BrowserLocation: Hashable, Codable, Sendable {
         return false
     }
 
+    /// Search results, which alone sort by relevance.
+    public var isSearch: Bool {
+        if case .search = self { return true }
+        return false
+    }
+
     /// Up (Cmd+Up, R4): the enclosing folder, and the item to select there.
     public var parent: (location: BrowserLocation, select: URL?)? {
         switch self {

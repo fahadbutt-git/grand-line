@@ -93,6 +93,8 @@ enum FileTableSetup {
         table.style = .plain
         table.selectionHighlightStyle = .regular
         table.gridStyleMask = []
+        // The "Found inside files" header scrolls with the rows.
+        table.floatsGroupRows = false
         table.columnAutoresizingStyle = .noColumnAutoresizing
         for column in ListColumn.standard.map(FileColumn.init) { table.addTableColumn(makeColumn(column)) }
         table.dataSource = coordinator

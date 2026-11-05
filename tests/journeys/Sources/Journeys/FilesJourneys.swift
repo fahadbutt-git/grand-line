@@ -364,16 +364,39 @@ enum FilesJourneys {
                 }
                 if ctx.chip(snap, "drive", "Drive") == nil { ctx.note("no Drive scope chip shown") }
             },
-            step("name matches come first, app data never shows") { ctx in
-                let rows = ctx.rows()
+            step("relevance order: name matches first, files found inside under their header, app data never shows") { ctx in
+                let shown = ctx.rows()
+                let header = shown.firstIndex { FilesJourneys.isInsideFilesHeader($0) }
+                let rows = shown.filter { !FilesJourneys.isInsideFilesHeader($0) }
                 try ctx.check(!rows.isEmpty, "no results")
                 try ctx.check(ctx.fold(rows[0]).contains("conj"), "the first result \"\(rows[0])\" does not have conj in its name")
                 if let firstOther = rows.firstIndex(where: { !ctx.fold($0).contains("conj") }) {
                     let late = rows[firstOther...].filter { ctx.fold($0).contains("conj") }
                     try ctx.check(late.isEmpty, "name matches \(late) come after \"\(rows[firstOther])\", which matched by content")
+                    // Files found only inside sit below the "Found inside files" header.
+                    if let header, let other = shown.firstIndex(of: rows[firstOther]) {
+                        try ctx.check(header < other, "\"\(rows[firstOther])\" shows above the \"Found inside files\" header")
+                    } else if header == nil {
+                        ctx.note("content matches with no \"Found inside files\" header: \(Array(rows[firstOther...].prefix(3)))")
+                    }
                 }
                 let found = rows.filter { junk.contains($0) }
                 try ctx.check(found.isEmpty, "app data in the results: \(found)")
+            },
+            step("the Inside files chip hides the files found inside, and brings them back") { ctx in
+                guard let snap = ctx.browserSnapshot(), let chip = snap.identified(ctx.app.id("search.insideFiles")) else {
+                    throw StepSkip("no Inside files chip (content matches are off in Settings)")
+                }
+                try ctx.click(chip)
+                try ctx.wait("only name matches, and no header", timeout: 15) {
+                    let rows = ctx.rows()
+                    return !rows.isEmpty && rows.allSatisfy { ctx.fold($0).contains("conj") && !FilesJourneys.isInsideFilesHeader($0) }
+                }
+                guard let again = ctx.browserSnapshot()?.identified(ctx.app.id("search.insideFiles")) else {
+                    throw StepFailure("the Inside files chip went away")
+                }
+                try ctx.click(again)
+                try ctx.wait("results again", timeout: 15) { !ctx.rows().isEmpty }
             },
             step("Home scope finds the Desktop file") { ctx in
                 try ctx.clickChip("home", "Home")
@@ -798,13 +821,24 @@ enum FilesJourneys {
 
     static func statusCount(_ snap: Snapshot) -> Int? { statusNode(snap).flatMap { parseStatus($0.text) } }
 
-    /// "9 items", "1 item", "3 of 9 selected · 18.6 MB".
+    /// "9 items", "1 item", "3 of 9 selected · 18.6 MB", and in a search
+    /// that looks inside files "12 by name · 1,594 inside files" (1,606) or
+    /// "12 by name · inside files hidden" (12).
     static func parseStatus(_ text: String) -> Int? {
         let digits = { (s: Substring) in Int(s.replacingOccurrences(of: ",", with: "")) }
         let words = text.split(separator: " ")
         if words.count == 2, words[1] == "items" || words[1] == "item" { return digits(words[0]) }
         if words.count >= 4, words[1] == "of", words[3].hasPrefix("selected") { return digits(words[2]) }
+        if words.count >= 6, words[1] == "by", words[2] == "name", words[3] == "·", let byName = digits(words[0]) {
+            if words[4] == "inside", words[5] == "files" { return byName }
+            if words.count >= 7, words[5] == "inside", words[6] == "files", let inside = digits(words[4]) { return byName + inside }
+        }
         return nil
+    }
+
+    /// The list's header over the files a search found only inside them.
+    static func isInsideFilesHeader(_ row: String) -> Bool {
+        row.hasPrefix("Found inside files")
     }
 
     static func contentArea(_ snap: Snapshot, _ window: CGRect) -> CGRect {

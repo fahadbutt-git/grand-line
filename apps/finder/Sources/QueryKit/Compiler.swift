@@ -7,6 +7,24 @@ public struct SpotlightQuery {
     /// Applied to each result's path, for folder rules Spotlight cannot query.
     public let postFilter: @Sendable (String) -> Bool
     public let sort: SortKey?
+    /// True when nothing in the query narrows the results: no word, filter or
+    /// folder survived (an empty query, an unknown `@name`, a filter still
+    /// being typed such as `kind:`). The predicate then matches every file in
+    /// the scope, so callers run nothing instead of listing everything.
+    public let isUnconstrained: Bool
+    /// Whether the predicate can match a file by what is inside it (a plain
+    /// word with content matching on, or `text:`).
+    public let searchesContent: Bool
+
+    public init(predicate: NSPredicate, scopes: [String], postFilter: @escaping @Sendable (String) -> Bool,
+                sort: SortKey?, isUnconstrained: Bool = false, searchesContent: Bool = false) {
+        self.predicate = predicate
+        self.scopes = scopes
+        self.postFilter = postFilter
+        self.sort = sort
+        self.isUnconstrained = isUnconstrained
+        self.searchesContent = searchesContent
+    }
 }
 
 public enum SpotlightCompiler {
@@ -15,15 +33,14 @@ public enum SpotlightCompiler {
         now: Date = .now,
         calendar: Calendar = .current,
         home: String = NSHomeDirectory(),
-        savedSearch: (String) -> String? = { _ in nil }
+        savedSearch: (String) -> String? = { _ in nil },
+        content: Bool = true
     ) -> SpotlightQuery {
-        var sort = query.sort
-        var root: Node?
-        if let original = query.root {
-            root = expand(original, savedSearch, visiting: [], sort: &sort)
-        }
+        let expandedQuery = expanded(query, savedSearch: savedSearch)
+        let sort = expandedQuery.sort
+        let root = expandedQuery.root
 
-        let builder = PredicateBuilder(now: now, calendar: calendar, home: home)
+        let builder = PredicateBuilder(now: now, calendar: calendar, home: home, content: content)
         var predicates: [NSPredicate] = []
         var tests: [@Sendable (String) -> Bool] = []
         var scopes: [String] = []
@@ -39,12 +56,27 @@ public enum SpotlightCompiler {
         var seen = Set<String>()
         let uniqueScopes = scopes.filter { seen.insert($0).inserted }
         let finalTests = tests
+        let combined = PredicateBuilder.allOf(predicates)
         return SpotlightQuery(
-            predicate: PredicateBuilder.allOf(predicates) ?? PredicateBuilder.matchAll,
+            predicate: combined ?? PredicateBuilder.matchAll,
             scopes: uniqueScopes,
             postFilter: { path in finalTests.allSatisfy { $0(path) } },
-            sort: sort
+            sort: sort,
+            isUnconstrained: combined == nil && tests.isEmpty,
+            searchesContent: root.map { builder.searchesContent($0) } ?? false
         )
+    }
+
+    /// The query with every `@name` replaced by its saved query (a name not
+    /// found, or one that refers back to itself, drops out). A saved search's
+    /// own sort applies when the query has none.
+    public static func expanded(_ query: ParsedQuery, savedSearch: (String) -> String?) -> ParsedQuery {
+        var sort = query.sort
+        var root: Node?
+        if let original = query.root {
+            root = expand(original, savedSearch, visiting: [], sort: &sort)
+        }
+        return ParsedQuery(root: root, issues: query.issues, sort: sort)
     }
 
     static func conjuncts(_ node: Node) -> [Node] {
@@ -86,6 +118,8 @@ struct PredicateBuilder {
     let now: Date
     let calendar: Calendar
     let home: String
+    /// Whether a plain word also matches what is inside a file. `text:` always does.
+    var content = true
 
     static let nameKey = "kMDItemFSName"
     static let contentKey = "kMDItemTextContent"
@@ -125,6 +159,7 @@ struct PredicateBuilder {
         typealias B = PredicateBuilder
         switch term {
         case .text(let pattern):
+            guard content else { return nameMatch(pattern) }
             return B.oneOf([nameMatch(pattern), B.contains(B.contentKey, pattern.text)])
         case .field(let field, let pattern):
             return fieldMatch(field, pattern)
@@ -138,6 +173,17 @@ struct PredicateBuilder {
             return B.number("kMDItemFSSize", comparison)
         case .pages(let comparison):
             return B.number("kMDItemNumberOfPages", comparison)
+        }
+    }
+
+    /// Whether `node` can match a file by its contents (outside a NOT).
+    func searchesContent(_ node: Node) -> Bool {
+        switch node {
+        case .term(.text): return content
+        case .term(.field(.content, _)): return true
+        case .term: return false
+        case .and(let children), .or(let children): return children.contains { searchesContent($0) }
+        case .not, .saved: return false
         }
     }
 

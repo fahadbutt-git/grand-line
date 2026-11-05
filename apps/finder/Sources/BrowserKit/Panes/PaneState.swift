@@ -15,6 +15,21 @@ public struct OpenAction: Equatable, Sendable {
     public var isEmpty: Bool { navigate == nil && launch.isEmpty && windows.isEmpty && fromArchive.isEmpty }
 }
 
+/// A search's rows by how they were found, for the status bar and the
+/// "Found inside files" header: "12 by name · 1,594 inside files".
+public struct SearchCounts: Equatable, Sendable {
+    public var byName: Int
+    public var insideFiles: Int
+    /// The search's toggle left files found inside out.
+    public var insideFilesHidden: Bool
+
+    public init(byName: Int, insideFiles: Int, insideFilesHidden: Bool = false) {
+        self.byName = byName
+        self.insideFiles = insideFiles
+        self.insideFilesHidden = insideFilesHidden
+    }
+}
+
 /// One pane, without any UI: where it is, its rows in order, the selection and
 /// how it is sorted and shown.
 public struct PaneState: Equatable, Sendable {
@@ -34,6 +49,18 @@ public struct PaneState: Equatable, Sendable {
     /// Flat view: the folder and everything below it in one list. A transient
     /// scope of the pane, never stored with the folder's view settings.
     public var isFlat = false
+    /// How each search result was found, by path, for relevance order and
+    /// the "Found inside files" section. Empty outside a search.
+    public private(set) var searchRanks: [String: SearchRank] = [:]
+    /// This search leaves out files found only by what is inside them (the
+    /// toggle in the search bar). Refining the search keeps it; going
+    /// somewhere else ends it.
+    public var hidesInsideFiles = false
+    /// The rows found by name and those found inside files, as shown.
+    public private(set) var searchCounts: SearchCounts?
+    /// Where the files found only inside start, while sorted by relevance:
+    /// the list shows its "Found inside files" header before this row.
+    public private(set) var insideFilesStart: Int?
 
     public init(location: BrowserLocation, settings: ViewSettings = ViewSettings()) {
         self.history = NavigationHistory(location)
@@ -57,6 +84,12 @@ public struct PaneState: Equatable, Sendable {
         loaded = newItems
         resort()
         selection.prune(to: ids)
+    }
+
+    /// A search's results, with how each was found (`SearchHits.ranks`).
+    public mutating func loadSearch(_ newItems: [FileItem], ranks: [String: SearchRank]) {
+        searchRanks = ranks
+        load(newItems)
     }
 
     public mutating func setSettings(_ new: ViewSettings) {
@@ -106,9 +139,29 @@ public struct PaneState: Equatable, Sendable {
     public var unfilteredCount: Int { loaded.count }
 
     mutating func resort() {
-        let sorted = ItemSorter.sorted(loaded, by: settings.sort, folderSizes: folderSizes, lastOpened: lastOpened, manual: manualOrder)
+        let sorted = ItemSorter.sorted(loaded, by: settings.sort, folderSizes: folderSizes, lastOpened: lastOpened,
+                                       manual: manualOrder, ranks: searchRanks)
         items = filter.isEmpty ? sorted : sorted.filter { ItemFilter.matches($0.name, filter) }
         ids = items.map(\.id)
+        countSearch()
+    }
+
+    /// The name and inside-file counts of the rows shown, and where the
+    /// inside-file section starts in relevance order.
+    mutating func countSearch() {
+        guard !searchRanks.isEmpty || hidesInsideFiles, case .search = location else {
+            searchCounts = nil
+            insideFilesStart = nil
+            return
+        }
+        var inside = 0
+        var first: Int?
+        for (index, item) in items.enumerated() where searchRanks[item.path]?.isInsideFile == true {
+            inside += 1
+            if first == nil { first = index }
+        }
+        searchCounts = SearchCounts(byName: items.count - inside, insideFiles: inside, insideFilesHidden: hidesInsideFiles)
+        insideFilesStart = settings.sort.field == .relevance ? first : nil
     }
 
     // MARK: Navigation
@@ -122,6 +175,9 @@ public struct PaneState: Equatable, Sendable {
         selection.clear()
         manualOrder = []
         filter = ""
+        searchRanks = [:]
+        hidesInsideFiles = false
+        countSearch()
         pendingSelection = select.map { $0.standardizedFileURL.path }
     }
 
@@ -169,6 +225,8 @@ public struct PaneState: Equatable, Sendable {
         selection.clear()
         pendingSelection = []
         filter = ""
+        searchRanks = [:]
+        countSearch()
     }
 
     // MARK: Opening

@@ -16,13 +16,21 @@ struct IconGridView: View {
             let columns = max(1, Int((geometry.size.width - 16) / cell))
             ScrollViewReader { reader in
                 ScrollView(.vertical) {
+                    let items = pane.items
+                    let inside = pane.state.insideFilesStart
                     LazyVGrid(columns: Array(repeating: GridItem(.fixed(cell), spacing: 4), count: columns), spacing: 6) {
-                        ForEach(pane.items) { item in
-                            IconCell(item: item, size: size, selected: pane.state.selection.contains(item.id),
-                                     isCut: model.services.clipboard.isCut(item.url), palette: palette)
-                                .frame(width: cell)
-                                .id(item.id)
-                                .modifier(ItemInteraction(model: model, pane: pane, item: item))
+                        ForEach(inside.map { Array(items[..<$0]) } ?? items) { item in
+                            iconCell(item, size: size, width: cell)
+                        }
+                        // Search results by relevance: the files found only inside, under their header.
+                        if let inside {
+                            Section {
+                                ForEach(Array(items[inside...])) { item in
+                                    iconCell(item, size: size, width: cell)
+                                }
+                            } header: {
+                                InsideFilesHeader(pane: pane, palette: palette)
+                            }
                         }
                     }
                     .padding(8)
@@ -39,6 +47,42 @@ struct IconGridView: View {
             }
         }
         .background(palette.background)
+    }
+
+    private func iconCell(_ item: FileItem, size: CGFloat, width: CGFloat) -> some View {
+        IconCell(item: item, size: size, selected: pane.state.selection.contains(item.id),
+                 isCut: model.services.clipboard.isCut(item.url), palette: palette)
+            .frame(width: width)
+            .id(item.id)
+            .modifier(ItemInteraction(model: model, pane: pane, item: item))
+    }
+}
+
+/// "Found inside files (1,594)" over the files a search found only by what
+/// is inside them, with Hide (the list view's header, for icons).
+struct InsideFilesHeader: View {
+    @ObservedObject var pane: PaneModel
+    let palette: Palette
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(ItemFormat.insideFilesHeader(pane.state.searchCounts?.insideFiles ?? 0))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(palette.dim)
+                .lineLimit(1)
+                .fixedSize()
+            Rectangle().fill(palette.hairline).frame(height: 1)
+            Button("Hide") { pane.setHidesInsideFiles(true) }
+                .buttonStyle(.plain)
+                .font(.system(size: 11))
+                .foregroundStyle(palette.accent)
+                .accessibilityLabel("Hide matches inside files")
+        }
+        .padding(.horizontal, 4)
+        .padding(.top, 10)
+        .padding(.bottom, 4)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("nexus.search.insideFilesHeader")
     }
 }
 

@@ -62,4 +62,10 @@ final class ThemedRowView: NSTableRowView {
     }
 
     override var interiorBackgroundStyle: NSView.BackgroundStyle { .normal }
+
+    /// The "Found inside files" header row draws on the list's own background.
+    override func drawBackground(in dirtyRect: NSRect) {
+        if isGroupRowStyle { return }
+        super.drawBackground(in: dirtyRect)
+    }
 }
