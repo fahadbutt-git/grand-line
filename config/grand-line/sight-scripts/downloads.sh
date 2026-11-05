@@ -41,7 +41,7 @@ case "$choice" in
     # The second step: what to do with the chosen file.
     path="${choice#file:}"
     row "Open" "${path##*/}" "arrow.up.forward" "open:$path"
-    row "Show in Nexus" "${path##*/}" "folder" "reveal:$path"
+    row "Show in Finder" "${path##*/}" "folder" "reveal:$path"
     row "Copy path" "$path" "doc.on.clipboard" "copy:$path"
     ;;
   open:*) open "${choice#open:}"; echo '{"close": true}' ;;

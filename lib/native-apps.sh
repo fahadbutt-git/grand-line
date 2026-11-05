@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# Builds the package's own apps (Nexus, Sight, Iceberg) from apps/*/
+# Builds the package's own apps (Sight, Iceberg) from apps/*/
 # and installs each one in /Applications.
 #
 # Each app folder holds a Swift package and an apps.tsv naming what it makes:
@@ -441,7 +441,7 @@ EOF
 exclude_indexes_from_backup() {
   have tmutil || return 0
   local support="$HOME/Library/Application Support" item app
-  for app in Nexus Sight "Grand Line Index"; do
+  for app in Sight "Grand Line Index"; do
     for item in "$support/$app"/*index* "$support/$app"/*Index* "$support/$app"/*.snapshot "$support/$app/usage.json"; do
       [[ -e "$item" ]] || continue
       run tmutil addexclusion "$item" >/dev/null 2>&1

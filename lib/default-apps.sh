@@ -70,9 +70,20 @@ apply_default_apps() {
       failed=1; continue
     fi
     register_app "$(app_path_of "$app")"
+    # A type macOS refuses to give to the app (duti reports an error such as
+    # -50 for a type no installed app declares) is skipped with a warning,
+    # and the app is still made the default for the rest.
+    local kept="" out
     for ext in $exts; do
-      run duti -s "$id" "$ext" all || failed=1
+      if [[ "$DRY_RUN" == 1 ]]; then run duti -s "$id" "$ext" all; kept="$kept $ext"; continue; fi
+      if out="$(duti -s "$id" "$ext" all 2>&1)"; then
+        kept="$kept $ext"
+      else
+        warn "macOS does not accept $app as the app for $ext, so $ext keeps its current app (${out:-duti failed})."
+      fi
     done
+    exts="${kept# }"
+    [[ -n "$exts" ]] || continue
     # duti can report success while macOS keeps the old app, so read it back.
     # If macOS refused, try again through NSWorkspace (tools/setdefault.swift).
     if [[ "$DRY_RUN" == 0 && "$(default_app_for "${exts%% *}")" != "$app.app" ]]; then

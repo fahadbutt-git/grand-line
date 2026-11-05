@@ -56,10 +56,8 @@ osa() {
   fail 1 "macOS refused: ${out##*: }"
 }
 
-# The menus' font and colours, rendered by the theme command
-# (config/themed/menu-flags.tpl). The older location is read until the next
-# theme change.
-: "${GRAND_LINE_CHOOSE_FLAGS:=$(cat "$GRAND_LINE_STATE/current/theme/menu-flags" 2>/dev/null || cat "$GRAND_LINE_STATE/menu-flags" 2>/dev/null)}"
+# The pop-up menu keeps its own look. GRAND_LINE_CHOOSE_FLAGS, if you set it,
+# is passed to choose.
 
 # Pick one line from stdin in the pop-up menu. Prints the choice.
 pick() {
@@ -82,16 +80,8 @@ end run
 EOF
 }
 
-# Print the POSIX paths of the files selected in Nexus or Finder, one per line.
-# Nexus, when it is in front, keeps its selection in a file, one path per
-# line, so a shortcut can read it without asking the app.
+# Print the POSIX paths of the files selected in Finder, one per line.
 finder_selection() {
-  local front
-  front="$(lsappinfo info -only bundleid "$(lsappinfo front 2>/dev/null)" 2>/dev/null)"
-  if [[ "$front" == *com.grandline.nexus* ]]; then
-    cat "$GRAND_LINE_STATE/nexus-selection" 2>/dev/null
-    return 0
-  fi
   osascript <<'EOF' 2>/dev/null
 tell application "Finder" to set sel to selection as alias list
 set out to ""

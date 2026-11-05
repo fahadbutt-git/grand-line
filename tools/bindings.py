@@ -44,6 +44,11 @@ def web(url, title):
     return cmd(f"webapp '{url}' '{title}'")
 
 
+def terminal(command):
+    # A new Terminal window running COMMAND.
+    return sh(f"osascript -e 'tell application \"Terminal\" to do script \"{command}\"' -e 'tell application \"Terminal\" to activate'")
+
+
 def aero(args):
     return sh(f"{AERO} {args}")
 
@@ -93,14 +98,11 @@ for n in range(1, 10):
 
 BINDINGS += [
     # Apps
-    ("return_or_enter", [], "Apps", "Terminal (Ghostty)", app("Ghostty")),
-    # Ghostty's quick terminal listens for this key (config/ghostty/config).
-    ("grave_accent_and_tilde", [], "Apps", "Quick terminal (drops down from the top)",
-     key("grave_accent_and_tilde", "control", "option", "command")),
-    ("return_or_enter", ["option"], "Apps", "Terminal in a tmux session", sh(f"open -na Ghostty --args -e {BREW}/tmux new-session -A -s main")),
+    ("return_or_enter", [], "Apps", "Terminal", app("Terminal")),
+    ("return_or_enter", ["option"], "Apps", "Terminal in a tmux session", terminal(f"{BREW}/tmux new-session -A -s main")),
     ("return_or_enter", ["shift"], "Apps", "Browser (Zen)", app("Zen")),
     ("b", ["shift", "option"], "Apps", "Private browser window", sh("open -na Zen --args --private-window")),
-    ("f", ["shift"], "Apps", "Files (Nexus, or Finder if switched back)", sh("open \"$HOME\"")),
+    ("f", ["shift"], "Apps", "Files (Finder)", sh("open \"$HOME\"")),
     ("d", ["shift"], "Apps", "Google Drive folder", cmd("open-drive")),
     ("a", ["shift"], "Apps", "Claude", app("Claude")),
     ("a", ["shift", "option"], "Apps", "ChatGPT", app("ChatGPT")),
@@ -126,7 +128,7 @@ BINDINGS += [
     ("b", ["control"], "System", "Bluetooth menu", cmd("bluetooth")),
     ("w", ["control"], "System", "Wi-Fi settings", sh("open 'x-apple.systempreferences:com.apple.wifi-settings-extension'")),
     ("s", ["control"], "System", "Share with AirDrop", sh("open -a AirDrop")),
-    ("t", ["control"], "System", "What is using the Mac (btop)", sh(f"open -na Ghostty --args -e {BREW}/btop")),
+    ("t", ["control"], "System", "What is using the Mac (btop)", terminal(f"{BREW}/btop")),
     ("h", ["control"], "System", "Hardware menu", cmd("menu Hardware")),
     ("o", ["control"], "System", "Toggle menu", cmd("menu Toggle")),
     ("c", ["control"], "Capture", "Capture menu", cmd("menu Capture")),
@@ -154,10 +156,6 @@ BINDINGS += [
     ("t", ["control", "option"], "Notices", "Show the time", cmd("notice time")),
     ("b", ["control", "option"], "Notices", "Show the battery", cmd("notice battery")),
     ("w", ["control", "option"], "Notices", "Show the weather", cmd("notice weather")),
-
-    # Style
-    ("spacebar", ["control", "shift"], "Style", "Pick a theme", cmd("theme pick")),
-    ("spacebar", ["control"], "Style", "Next background", cmd("theme next-background")),
 ]
 
 KEY_LABEL = {

@@ -715,30 +715,6 @@
          "key_code": "spacebar",
          "modifiers": {
           "mandatory": [
-           "control",
-           "shift"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "$HOME/.grand-line/bin/theme pick"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "spacebar",
-         "modifiers": {
-          "mandatory": [
            "option"
           ]
          }
@@ -1163,7 +1139,7 @@
         },
         "to": [
          {
-          "shell_command": "open -na Ghostty --args -e /opt/homebrew/bin/tmux new-session -A -s main"
+          "shell_command": "osascript -e 'tell application \"Terminal\" to do script \"/opt/homebrew/bin/tmux new-session -A -s main\"' -e 'tell application \"Terminal\" to activate'"
          }
         ]
        },
@@ -1669,7 +1645,7 @@
         },
         "to": [
          {
-          "shell_command": "open -na Ghostty --args -e /opt/homebrew/bin/btop"
+          "shell_command": "osascript -e 'tell application \"Terminal\" to do script \"/opt/homebrew/bin/btop\"' -e 'tell application \"Terminal\" to activate'"
          }
         ]
        },
@@ -1982,29 +1958,6 @@
         "to": [
          {
           "shell_command": "$HOME/.grand-line/bin/reminder"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "spacebar",
-         "modifiers": {
-          "mandatory": [
-           "control"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "$HOME/.grand-line/bin/theme next-background"
          }
         ]
        },
@@ -2481,30 +2434,7 @@
         },
         "to": [
          {
-          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'Ghostty'"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "grave_accent_and_tilde"
-        },
-        "to": [
-         {
-          "key_code": "grave_accent_and_tilde",
-          "modifiers": [
-           "control",
-           "option",
-           "command"
-          ]
+          "shell_command": "$HOME/.grand-line/bin/focus-or-open 'Terminal'"
          }
         ]
        },

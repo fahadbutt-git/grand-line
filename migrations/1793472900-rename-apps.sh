@@ -1,10 +1,10 @@
 # shellcheck shell=bash
-# The package's apps have new names and bundle ids: Log Pose is now Nexus,
-# Byakugan is now Sight and Den Den is now Iceberg. This carries each app's
-# settings, saved state and file index over, so nothing is rebuilt or lost,
-# moves the old app to the Trash, and hands folders and Command + Space to the
-# new apps (the remembered takeover-files and takeover-search choices are kept,
-# and the default browser is left alone).
+# The package's apps have new names and bundle ids: Byakugan is now Sight and
+# Den Den is now Iceberg. This carries each app's settings, saved state and
+# file index over, so nothing is rebuilt or lost, moves the old app to the
+# Trash, and hands Command + Space to Sight (the remembered takeover-search
+# choice is kept, and the default browser is left alone). Log Pose, which
+# became Nexus, is no longer installed, so it is left alone here.
 #
 # Setup's native-tools step also runs this, every run, right after it installs
 # the new apps and before anything starts them, so their first launch finds the
@@ -12,8 +12,6 @@
 # that never had the old apps. An old app whose replacement is not installed
 # yet (its build failed) is left exactly as it is until a later run.
 source "$GRAND_LINE_REPO/lib/bin-common.sh"
-# shellcheck source=lib/default-apps.sh
-source "$GRAND_LINE_REPO/lib/default-apps.sh"
 # shellcheck source=lib/takeover.sh
 source "$GRAND_LINE_REPO/lib/takeover.sh"
 
@@ -93,20 +91,6 @@ retire() {
   fi
 }
 
-# Log Pose to Nexus: view settings, workspaces, Put Back records, recents, the
-# hidden sidebar items and the name index (Application Support), settings and
-# saved searches (~/.config), the selection file and the window's place.
-nexus_retired=0
-if ready "Log Pose" Nexus; then
-  quit LogPose com.grandline.nexus
-  move_once "$SUPPORT/Log Pose" "$SUPPORT/Nexus"
-  move_once "$CONFIG/logpose" "$CONFIG/nexus"
-  move_once "$GRAND_LINE_STATE/logpose-selection" "$GRAND_LINE_STATE/nexus-selection"
-  copy_defaults com.grandline.logpose com.grandline.nexus 's/NSWindow Frame LogPoseBrowser/NSWindow Frame NexusBrowser/'
-  [[ -d "$APPS/Log Pose.app" ]] && nexus_retired=1
-  retire "Log Pose"
-fi
-
 # Byakugan to Sight: learned ranking, the name index and exchange rates
 # (Application Support), aliases, quicklinks and providers (~/.config), and its
 # defaults (CloseAfterSettingChange and the rest; TakesCommandSpace is set again
@@ -140,11 +124,8 @@ if ready "Den Den" Iceberg; then
   retire "Den Den"
 fi
 
-# Folders and Command + Space named the old bundle ids: hand them to the new
-# apps, keeping the choice made with toggle files and toggle search.
-if [[ "$nexus_retired" == 1 && -d "$NEXUS_APP" ]]; then
-  takeover_files "$(takeover_mode files)" && echo "Folders open in $( [[ "$(takeover_mode files)" == on ]] && echo Nexus || echo Finder)"
-fi
+# Command + Space named the old bundle id: hand it to Sight, keeping the
+# choice made with toggle search.
 if [[ "$sight_retired" == 1 && -d "$SIGHT_APP" ]]; then
   takeover_search "$(takeover_mode search)" && echo "Command + Space opens $( [[ "$(takeover_mode search)" == on ]] && echo Sight || echo Spotlight)"
 fi

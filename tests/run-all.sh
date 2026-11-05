@@ -151,8 +151,6 @@ check "every theme has its own FORMAT=1, its background and all fields" bash -c 
       [[ "${t##*/}" == "$fam-dark.theme" || "${t##*/}" == "$fam-light.theme" ]] || { echo "$t: FAMILY=$fam needs the file named $fam-dark or $fam-light"; bad=1; }
       [[ -f "config/themes/$fam-dark.theme" && -f "config/themes/$fam-light.theme" ]] || { echo "$t: family $fam needs both a dark and a light file"; bad=1; }
     fi
-    nv=$(get NVIM)
-    grep -q "\"$nv\"" config/nvim/lua/plugins/theme.lua || { echo "$t: Neovim scheme $nv missing from config/nvim/lua/plugins/theme.lua"; bad=1; }
     bg=$(get BACKGROUND)
     [[ -f "backgrounds/$bg" ]] || { echo "$t: backgrounds/$bg missing"; bad=1; }
   done; exit $bad'
@@ -221,7 +219,7 @@ check "launch agents: no endless KeepAlive, watched jobs throttled, background p
 check "the budgets file has every limit the report reads" python3 -c '
 import sys; sys.path.insert(0, "tests/perf"); import measure
 b = measure.read_budgets("tests/perf/budgets.env")
-need = ["IDLE_CPU_PER_APP", "IDLE_CPU_TOTAL", "IDLE_WAKEUPS_PER_APP", "IDLE_GPU_MS_PER_S", "RSS_MB_Sight", "RSS_MB_Nexus",
+need = ["IDLE_CPU_PER_APP", "IDLE_CPU_TOTAL", "IDLE_WAKEUPS_PER_APP", "IDLE_GPU_MS_PER_S", "RSS_MB_Sight",
         "RSS_MB_Iceberg", "RSS_MB_GrandLineIndex", "DECAY_CPU", "DECAY_SECONDS", "RSS_GROWTH_PCT", "SHELL_MEDIAN_MS"]
 missing = [k for k in need if k not in b]
 print(missing); sys.exit(1 if missing else 0)'

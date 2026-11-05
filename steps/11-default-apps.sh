@@ -16,7 +16,7 @@ step_default_apps() {
   if first_time default-browser && [[ -d /Applications/Zen.app ]]; then
     run set_default_browser app.zen-browser.zen && ok "Links open in Zen" && mark_done default-browser
   fi
-  # Nexus for folders and Sight for Command + Space, once installed.
+  # Sight for Command + Space, once installed. Folders stay with Finder.
   # shellcheck source=lib/takeover.sh
   source "$REPO_DIR/lib/takeover.sh"
   apply_takeovers

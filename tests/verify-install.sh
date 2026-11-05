@@ -49,7 +49,7 @@ while IFS=$'\t' read -r app repo _; do
 done < "$ROOT/config/grand-line/artcraft.tsv"
 
 echo "Settings and commands"
-for target in "$GRAND_LINE_LINK" "$HOME/.aerospace.toml" "$HOME/.config/ghostty"; do
+for target in "$GRAND_LINE_LINK" "$HOME/.aerospace.toml"; do
   if [[ -L "$target" && -e "$target" ]]; then pass "$target"; else fail "$target is not linked"; fi
 done
 cmp -s "$ROOT/config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json" \
@@ -57,8 +57,6 @@ cmp -s "$ROOT/config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabine
 grep -q "$GRAND_LINE_BIN" "$HOME/.zprofile" && pass "package commands are on the PATH for new shells" || fail ".zprofile does not add the package commands"
 launchctl print "gui/$(id -u)/grand-line.downloads" >/dev/null 2>&1 \
   && pass "Downloads sorting is loaded" || fail "Downloads sorting is not loaded"
-[[ -L "$HOME/Library/Application Support/espanso/match/grand-line.yml" ]] \
-  && pass "Espanso has the text shortcuts" || fail "Espanso shortcuts are not linked"
 for cmd_path in "$ROOT"/bin/*; do
   name="$(basename "$cmd_path")"
   command -v "$name" >/dev/null && pass "command: $name" || fail "command $name is not on the PATH"
@@ -105,14 +103,8 @@ for list in "$ROOT"/apps/*/apps.tsv; do
   done < "$list"
 done
 state="$HOME/.local/state/grand-line"
-if [[ -d "/Applications/Nexus.app" ]]; then
-  viewer="$(defaults read -g NSFileViewer 2>/dev/null)"
-  if [[ "$(cat "$state/takeover-files" 2>/dev/null || echo on)" == on ]]; then
-    [[ "$viewer" == com.grandline.nexus ]] && pass "Show in Finder opens Nexus" || fail "Show in Finder opens ${viewer:-Finder}, not Nexus"
-  else
-    [[ -z "$viewer" ]] && pass "Show in Finder opens Finder (switched back)" || fail "Show in Finder still opens $viewer"
-  fi
-fi
+[[ -z "$(defaults read -g NSFileViewer 2>/dev/null)" ]] && pass "Show in Finder opens Finder" || fail "Show in Finder opens $(defaults read -g NSFileViewer 2>/dev/null)"
+[[ ! -d /Applications/Nexus.app ]] && pass "Nexus is not installed" || fail "Nexus is still installed"
 if [[ -d "/Applications/Sight.app" ]]; then
   spotlight="$(defaults read com.apple.symbolichotkeys AppleSymbolicHotKeys 2>/dev/null | awk '/^ *64 = /,/};/' | sed -nE 's/^ *enabled = ([01]);/\1/p' | head -1)"
   if [[ "$(cat "$state/takeover-search" 2>/dev/null || echo on)" == on ]]; then
@@ -131,7 +123,7 @@ if [[ -d "$index_app" ]]; then
     && pass "the index agent is loaded" || { if [[ "$CI" == 1 ]]; then note "the index agent is not loaded"; else fail "the index agent is not loaded"; fi; }
 fi
 # The apps are signed with hardened runtime (and, off test machines, by the package's own identity).
-for app in /Applications/Nexus.app /Applications/Sight.app /Applications/Iceberg.app "$index_app"; do
+for app in /Applications/Sight.app /Applications/Iceberg.app "$index_app"; do
   [[ -d "$app" ]] || continue
   if codesign -d --verbose "$app" 2>&1 | grep -qE 'flags=0x[0-9a-f]+\([^)]*runtime'; then pass "$(basename "$app" .app) has hardened runtime"
   else fail "$(basename "$app" .app) is not signed with hardened runtime"; fi
@@ -142,12 +134,9 @@ for app in /Applications/Nexus.app /Applications/Sight.app /Applications/Iceberg
   fi
 done
 
-echo "Preinstalled apps the package replaces"
-# shellcheck source=steps/05-declutter.sh
-source "$ROOT/steps/05-declutter.sh"
-for app in "${DECLUTTER_APPS[@]}"; do
-  [[ -d "/Applications/$app.app" ]] && fail "$app is still installed" || pass "$app removed"
-done
+echo "The look of macOS"
+[[ "$(defaults read com.apple.dock autohide 2>/dev/null)" != 1 ]] && pass "the Dock is as macOS has it" || fail "the Dock is set to hide"
+[[ "$(defaults read com.apple.finder CreateDesktop 2>/dev/null)" != 0 ]] && pass "the desktop shows its files" || fail "desktop icons are hidden"
 [[ -L "$HOME/.config/nvim" ]] && pass "Neovim uses the package's LazyVim setup" || fail "Neovim config is not linked"
 git config --global --get-all include.path | grep -q "config/git/config" && pass "git defaults included" || fail "git defaults not included"
 

@@ -152,12 +152,6 @@ jobs:
         # links them on a real Mac; without the link every settings action
         # would fail here for that reason alone.
         run: ln -sfn "$GITHUB_WORKSPACE" "$HOME/.grand-line"
-      - name: "Journeys: the files app"
-        if: always() && steps.build.outcome == 'success'
-        timeout-minutes: 15
-        run: >-
-          "$DRIVER" --apps "$APPS_OUT" --fixture-script tests/journeys/make-fixture.sh
-          --out "$RESULTS" --only files --github --total-timeout 840
       - name: "Journeys: the launcher"
         if: always() && steps.build.outcome == 'success'
         timeout-minutes: 15

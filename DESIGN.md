@@ -6,19 +6,19 @@ Everything in this package, and every app built for it, follows these rules so t
 
 Apple's own type for every letter and number. The one exception is a few terminal icons, below.
 
-- **Interface text: SF Pro**, the macOS system font, in every window, menu, panel and notice. Apps use the system font API (SwiftUI `.body`, `.callout` and so on), never a hard-coded family. The pop-up menus use it by name (`SFProText-Regular`, installed by the `font-sf-pro` cask).
-- **Code and terminal: SF Mono** (the `font-sf-mono` cask), and nowhere else. File paths in app windows are interface text, so they use SF Pro too. The one exception: the terminal falls back to Symbols Nerd Font Mono (the `font-symbols-only-nerd-font` cask) for the file and git icons eza and starship draw, which SF Mono does not have. That font holds icons only, no letters, so every word on screen is still SF.
+- **Interface text: SF Pro**, the macOS system font, in every window, menu, panel and notice of Sight and Iceberg. Apps use the system font API (SwiftUI `.body`, `.callout` and so on), never a hard-coded family.
+- **Code: SF Mono** (the `font-sf-mono` cask) inside Sight and Iceberg. The package sets no font in Terminal, Neovim or any other app.
 - **Icons: SF Symbols** for every interface icon (buttons, sidebar, menus, chips). No icon fonts. The apps and files themselves keep the icons and thumbnails macOS draws for them, as in Finder and Spotlight, because that is how you recognise them.
 - One size scale: 11 (labels, shortcuts), 13 (rows), 15 to 17 (inputs and titles). Numbers that line up in columns use tabular figures.
 
 ## Colour
 
-- Every colour comes from the active theme file in `config/themes/<name>.theme`. Nothing has a colour of its own.
+- Themes colour the package's own apps, Sight and Iceberg, and nothing else. macOS (appearance, accent colour, wallpaper, Dock, desktop) and every other app and tool (Terminal, Neovim, tmux, starship, btop, lazygit, Claude Code, Zen) keep their own default look. Without a chosen theme, Sight and Iceberg use their built-in look.
+- In Sight and Iceberg, every colour comes from the active theme file in `config/themes/<name>.theme`.
 - Themes are built from Apple's system colours (the Human Interface Guidelines palette for light and dark appearance), so the package matches macOS. Daylight, the light theme, is Finder's neutral white with Apple's light system colours.
 - `TERM_BG`, `TERM_FG` and `TERM_SELECTION` are the background, text and selected-row colours for every surface, not only the terminal.
-- `HIGHLIGHT` marks matches and the focused item. `PALETTE` holds the 16 terminal colours, which terminal tools use.
-- The semantic keys name a role, not a hue: `ACCENT_HEX` (the accent as a colour, beside `ACCENT`, the macOS accent number), `MUTED` (secondary text), `BG_LIGHTER` and `BG_DARKER` (raised and sunken surfaces). Templates use these, so a new theme only fills them in.
-- Each app's colours come from a template in `config/themed/`. `theme set` fills it in with the theme's values into `~/.local/state/grand-line/current/theme/`, all at once.
+- `HIGHLIGHT` marks matches and the focused item. `PALETTE` holds 16 colours, kept for older themes.
+- The semantic keys name a role, not a hue: `ACCENT_HEX` (the accent as a colour, while `ACCENT`, a macOS accent number, is no longer applied to macOS), `MUTED` (secondary text), `BG_LIGHTER` and `BG_DARKER` (raised and sunken surfaces).
 - Apps built for the package read the theme from `~/.local/state/grand-line/theme` (the theme's name) and the theme file, and follow light or dark mode from it. With Follow macOS chosen in Settings, Appearance, a theme with a dark and a light variant switches with the system.
 - Text keeps at least 4.5:1 contrast against its background in every theme, including Daylight, where every terminal colour reads at 4.5:1 on white (the tests check it).
 
@@ -35,7 +35,7 @@ Theme files are format 1: `KEY=value` lines, `#` comments, values in quotes when
 | `LABEL`, `MODE` | required | The name shown in menus, and `dark` or `light` |
 | `FAMILY` | optional | The family a dark and light pair belongs to, in files named `FAMILY-dark.theme` and `FAMILY-light.theme`. `theme set FAMILY` picks the variant for the current macOS appearance, and `theme mode toggle` switches between them (Graphite and Daylight pair up without it) |
 | `ACCENT` | optional | The macOS accent colour number (-1 graphite, 0 red, 1 orange, 2 yellow, 3 green, 4 blue, 5 purple, 6 pink, or `multicolor`). Default -1 |
-| `BACKGROUND`, `NVIM` | optional | The wallpaper in `backgrounds/` (default `graphite.jpg` for dark, `daylight.jpg` for light) and the Neovim scheme (default `vscode`) |
+| `BACKGROUND`, `NVIM` | optional | Kept for older themes and no longer applied: a picture in `backgrounds/` and a Neovim scheme. The theme never sets the wallpaper or Neovim's colours |
 
 **Colour.** Every colour is six hex digits (`57b4f0`, and a leading `#` is accepted and dropped).
 
@@ -75,22 +75,20 @@ Theme files are format 1: `KEY=value` lines, `#` comments, values in quotes when
 | `ICON_STYLE` | optional | The app icons: `line` (a dark tile, a light glyph and the app's colour as its hot point), `solid` (the app's colour as the tile, a dark glyph) or `mono` (a black tile, the glyph in the app's colour). Default `line`. Shipped themes keep it in every file, since the icon script reads files as written |
 | `ICON_TILE`, `ICON_INK` | optional | The tile (line and mono) and the glyph (line and solid). Missing: a dark tile (the theme's surface when it is dark) and light ink, while mono is black and solid ink is near black |
 | `ICON_ACCENT`, `ICON_SOFT` | optional | Every app's colour, and the quiet fills (the sea, the iceberg under water). Missing: `ACCENT_HEX`, then `HIGHLIGHT`, and soft is the tile with a quarter of the accent |
-| `ICON_FILES`, `ICON_SEARCH`, `ICON_NOTCH` | optional | One app's own colour: the file browser (Nexus), search (Sight, also the warm tone of its eye) and the notch app (Iceberg). Missing: `ICON_ACCENT` |
+| `ICON_FILES`, `ICON_SEARCH`, `ICON_NOTCH` | optional | One app's own colour: the file browser (Nexus, no longer installed), search (Sight, also the warm tone of its eye) and the notch app (Iceberg). Missing: `ICON_ACCENT` |
 
 **Kinds**
 
 | Key | | Meaning and default |
 | --- | --- | --- |
-| `KIND_STYLE` | optional | How Nexus and Sight mark a file's kind: `tag` (a tinted tag with the extension), `dot`, `solid` (a filled tag) or `text` (the kind's name in its colour). Default `tag` |
+| `KIND_STYLE` | optional | How Sight marks a file's kind: `tag` (a tinted tag with the extension), `dot`, `solid` (a filled tag) or `text` (the kind's name in its colour). Default `tag` |
 | `KIND_FOLDER`, `KIND_DOCUMENT`, `KIND_PDF`, `KIND_PRESENTATION`, `KIND_SPREADSHEET`, `KIND_IMAGE`, `KIND_VIDEO`, `KIND_CODE`, `KIND_ARCHIVE`, `KIND_TEXT` | optional | The colour of each kind. Default the accent, then `COLOR4`, `COLOR1`, `COLOR3`, `COLOR2`, `COLOR5`, `COLOR13`, `COLOR11`, `COLOR9`, and `MUTED` |
 
 **Contrast.** The checker warns when text (`TERM_FG`) falls under 4.5:1, or secondary text (`MUTED`) under 3:1, on the window (`TERM_BG`) or the sidebar (`SIDEBAR`, else `BG_LIGHTER`). It is a warning, not an error, because the apps lift text that falls short. `theme check --strict` fails on it too.
 
-**Templates.** `theme set` renders every `config/themed/*.tpl` with the resolved theme (parent and defaults filled). `{{ KEY }}` takes any key, plus `NAME` (the theme's file name). A colour comes in four forms: `{{ KEY }}` is `#57b4f0`, `{{ KEY.hex }}` is `57b4f0`, `{{ KEY.rgb }}` is `87,180,240` and `{{ KEY.dec }}` is `0.341 0.706 0.941`. A template written as `#{{ KEY }}` still gets one `#`. An unknown key or form stays as written.
+**Commands.** `theme check [--strict] [NAME|FILE...]` checks themes (all of them by default). `theme resolve NAME` prints a theme with its parent and defaults filled in. `theme set NAME` records the theme for Sight and Iceberg, and nothing else. `theme apply` tells them to read it again, and `theme refresh` (what the updates run) does nothing, since they watch the file themselves. Only one theme change runs at a time. `theme import-base16 FILE.yaml NAME` makes a theme from a base16 scheme (flat or with a `palette:` block): `base00` the surface, `base01` raised surfaces, `base02` the selection, `base04` secondary text, `base05` text and cursor, `base07` the brightest palette entry, `base08` to `base0F` red, orange, yellow, green, cyan, blue, magenta and brown, with `base0D` as the accent. It is dark unless the scheme says it is light, and is kept only if it passes the checker.
 
-**Commands.** `theme check [--strict] [NAME|FILE...]` checks themes (all of them by default). `theme resolve NAME` prints a theme with its parent and defaults filled in. `theme apply` renders every template for the current theme again and reloads each tool: Ghostty and btop by `SIGUSR2` (only from Ghostty 1.2 and btop 1.3.1, which reload on it, while older ones keep their colours until they next start), tmux and its status bar by `source-file`, every running Neovim through its server socket, and the apps. `theme refresh` (what the updates run) renders the same way but reloads the tools and apps only when the rendered files changed. A theme change renders first, so a failed render leaves the appearance and accent as they were, and only one theme change runs at a time. `theme import-base16 FILE.yaml NAME` makes a theme from a base16 scheme (flat or with a `palette:` block): `base00` the surface, `base01` raised surfaces, `base02` the selection, `base04` secondary text, `base05` text and cursor, `base07` the brightest palette entry, `base08` to `base0F` red, orange, yellow, green, cyan, blue, magenta and brown, with `base0D` as the accent. It is dark unless the scheme says it is light, and is kept only if it passes the checker.
-
-**Live switching.** After `theme set`, `theme mode` and `theme apply` the command posts the distributed notification `com.grandline.theme.changed` (with the theme's name), through JavaScript for Automation, so no helper is built and no Apple event is sent. Nexus, Sight and Iceberg reload on it at once. They also watch the state and theme files, which catches edits made by hand.
+**Live switching.** After `theme set`, `theme mode` and `theme apply` the command posts the distributed notification `com.grandline.theme.changed` (with the theme's name), through JavaScript for Automation, so no helper is built and no Apple event is sent. Sight and Iceberg reload on it at once. They also watch the state and theme files, which catches edits made by hand.
 
 The icons are original, generic glyphs drawn from one table (`apps/icons`): a sailing ship for the file browser, the back of an eye (optic disc, vessels arching around the macula) for search, and an iceberg for the notch app. They sit on Apple's icon grid (an 824 point tile on a 1024 canvas, corners of 185), use no gradients or shadows, and leave fine detail out at 16 and 32 pixels.
 

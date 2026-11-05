@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# A stable code-signing identity for the package's own apps (Nexus, Sight,
+# A stable code-signing identity for the package's own apps (Sight and
 # Iceberg), so macOS permissions (Accessibility, Calendars, Automation)
 # survive every rebuild.
 #

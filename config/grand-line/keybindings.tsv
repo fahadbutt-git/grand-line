@@ -57,12 +57,11 @@ Caps + Option + Shift + 8	Workspaces	Move window to workspace 8, stay here	/opt/
 Caps + 9	Workspaces	Go to workspace 9	/opt/homebrew/bin/aerospace workspace 9
 Caps + Shift + 9	Workspaces	Move window to workspace 9 and follow	/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 9
 Caps + Option + Shift + 9	Workspaces	Move window to workspace 9, stay here	/opt/homebrew/bin/aerospace move-node-to-workspace 9
-Caps + Return	Apps	Terminal (Ghostty)	$HOME/.grand-line/bin/focus-or-open 'Ghostty'
-Caps + `	Apps	Quick terminal (drops down from the top)	
-Caps + Option + Return	Apps	Terminal in a tmux session	open -na Ghostty --args -e /opt/homebrew/bin/tmux new-session -A -s main
+Caps + Return	Apps	Terminal	$HOME/.grand-line/bin/focus-or-open 'Terminal'
+Caps + Option + Return	Apps	Terminal in a tmux session	osascript -e 'tell application "Terminal" to do script "/opt/homebrew/bin/tmux new-session -A -s main"' -e 'tell application "Terminal" to activate'
 Caps + Shift + Return	Apps	Browser (Zen)	$HOME/.grand-line/bin/focus-or-open 'Zen'
 Caps + Option + Shift + B	Apps	Private browser window	open -na Zen --args --private-window
-Caps + Shift + F	Apps	Files (Nexus, or Finder if switched back)	open "$HOME"
+Caps + Shift + F	Apps	Files (Finder)	open "$HOME"
 Caps + Shift + D	Apps	Google Drive folder	$HOME/.grand-line/bin/open-drive
 Caps + Shift + A	Apps	Claude	$HOME/.grand-line/bin/focus-or-open 'Claude'
 Caps + Option + Shift + A	Apps	ChatGPT	$HOME/.grand-line/bin/focus-or-open 'ChatGPT'
@@ -86,7 +85,7 @@ Caps + Ctrl + Option + V	System	Volume for each app (FineTune)	$HOME/.grand-line
 Caps + Ctrl + B	System	Bluetooth menu	$HOME/.grand-line/bin/bluetooth
 Caps + Ctrl + W	System	Wi-Fi settings	open 'x-apple.systempreferences:com.apple.wifi-settings-extension'
 Caps + Ctrl + S	System	Share with AirDrop	open -a AirDrop
-Caps + Ctrl + T	System	What is using the Mac (btop)	open -na Ghostty --args -e /opt/homebrew/bin/btop
+Caps + Ctrl + T	System	What is using the Mac (btop)	osascript -e 'tell application "Terminal" to do script "/opt/homebrew/bin/btop"' -e 'tell application "Terminal" to activate'
 Caps + Ctrl + H	System	Hardware menu	$HOME/.grand-line/bin/menu Hardware
 Caps + Ctrl + O	System	Toggle menu	$HOME/.grand-line/bin/menu Toggle
 Caps + Ctrl + C	Capture	Capture menu	$HOME/.grand-line/bin/menu Capture
@@ -111,5 +110,3 @@ Caps + Ctrl + Option + R	Reminders	Reminders due today	$HOME/.grand-line/bin/not
 Caps + Ctrl + Option + T	Notices	Show the time	$HOME/.grand-line/bin/notice time
 Caps + Ctrl + Option + B	Notices	Show the battery	$HOME/.grand-line/bin/notice battery
 Caps + Ctrl + Option + W	Notices	Show the weather	$HOME/.grand-line/bin/notice weather
-Caps + Ctrl + Shift + Space	Style	Pick a theme	$HOME/.grand-line/bin/theme pick
-Caps + Ctrl + Space	Style	Next background	$HOME/.grand-line/bin/theme next-background

@@ -12,7 +12,7 @@
 # Options: --apps DIR uses bundles already built there, --out DIR, --no-build,
 # --quit-running quits a running copy of an app first (otherwise it stops).
 # The first run asks for Accessibility and Screen Recording for the app you
-# run it from (Terminal, Ghostty); allow both, then run it again.
+# run it from (Terminal). Allow it, then run it again.
 # While it runs, leave the keyboard and mouse alone: it types and clicks.
 # Moving a file to the Trash in a journey uses your Trash; the journey undoes it.
 # launcher-settings switches system settings and back, so it runs only when

@@ -1,1 +1,0 @@
--f SFProText-Regular -s 17 -n 12 -w 40 -c {{ HIGHLIGHT.hex }} -b {{ TERM_SELECTION.hex }} -u -a

@@ -68,60 +68,32 @@ KEYBINDINGS_FILE="$ROOT/config/grand-line/keybindings.tsv" "$ROOT/bin/keybinding
 lines="$(KEYBINDINGS_FILE="$ROOT/config/grand-line/keybindings.tsv" "$ROOT/bin/keybindings" --print | wc -l | tr -d ' ')"
 [[ "$lines" -ge 90 ]] && t_ok "shortcut list prints all $lines shortcuts" || t_fail "shortcut list printed $lines lines"
 
-# --- themes
-cur="$HOME/.local/state/grand-line/current/theme"
+# --- themes: only Sight and Iceberg take them, nothing else changes
 mkdir -p "$HOME/.claude"
-"$ROOT/bin/theme" set nord --no-wallpaper >/dev/null 2>&1
-if grep -q "background = 2e3440" "$HOME/.config/ghostty/theme.conf" 2>/dev/null; then t_ok "theme writes terminal colours"; else t_fail "theme did not write terminal colours"; fi
-grep -q "palette = 15=#eceff4" "$HOME/.config/ghostty/theme.conf" && t_ok "theme writes all 16 terminal colours" || t_fail "theme palette missing"
-[[ "$(head -1 "$cur/nvim-theme" 2>/dev/null)" == nord ]] && t_ok "theme picks the matching Neovim scheme" || t_fail "theme did not set the Neovim scheme"
-grep -q -- "-f SFProText-Regular" "$cur/menu-flags" && t_ok "theme gives the menus the system font and theme colours" || t_fail "menu style not written"
-grep -q 'pane-active-border-style "fg=#88c0d0"' "$cur/tmux.conf" && t_ok "theme renders tmux colours" || t_fail "tmux colours not rendered"
-grep -q 'theme\[hi_fg\]="#88c0d0"' "$HOME/.config/btop/themes/grand-line.theme" 2>/dev/null && t_ok "theme installs a btop theme" || t_fail "btop theme missing"
-grep -qx 'color_theme = "grand-line"' "$HOME/.config/btop/btop.conf" && t_ok "theme chooses it in btop when you had not" || t_fail "btop setting not written"
-[[ -L "$HOME/Library/Application Support/lazygit/config.yml" ]] && t_ok "theme links lazygit's colours when it had no settings" || t_fail "lazygit not linked"
-jq -e '.base == "dark" and .overrides.claude == "#88c0d0"' "$HOME/.claude/themes/grand-line.json" >/dev/null 2>&1 \
-  && t_ok "theme writes a Claude Code custom theme" || t_fail "Claude Code theme missing or invalid"
-printf 'color_theme = "Default"\n' > "$HOME/.config/btop/btop.conf"
-"$ROOT/bin/theme" set daylight --no-wallpaper >/dev/null 2>&1
-grep -qx 'color_theme = "grand-line"' "$HOME/.config/btop/btop.conf" && t_ok "theme takes over btop's own Default setting" || t_fail "btop Default not replaced"
-printf 'color_theme = "nord"\n' > "$HOME/.config/btop/btop.conf"
-rm "$HOME/Library/Application Support/lazygit/config.yml"; echo "mine: true" > "$HOME/Library/Application Support/lazygit/config.yml"
-mkdir -p "$HOME/.config/grand-line/themed"; echo "mine {{ LABEL }} {{ COLOR1 }} {{ NOPE }}" > "$HOME/.config/grand-line/themed/menu-flags.tpl"
-"$ROOT/bin/theme" set daylight --no-wallpaper >/dev/null 2>&1
-grep -qx 'color_theme = "nord"' "$HOME/.config/btop/btop.conf" && t_ok "theme leaves a btop theme you chose" || t_fail "btop setting overwritten"
-grep -qx "mine: true" "$HOME/Library/Application Support/lazygit/config.yml" && t_ok "theme leaves your own lazygit settings" || t_fail "lazygit settings replaced"
-[[ "$(cat "$cur/menu-flags")" == "mine Daylight #d70015 {{ NOPE }}" ]] && t_ok "your own template overrides the package's, unknown keys stay as written" \
-  || t_fail "user template not used" "$(cat "$cur/menu-flags")"
-[[ "$(sed -n 2p "$cur/nvim-theme")" == light && ! -d "$HOME/.local/state/grand-line/current/next-theme" ]] \
-  && t_ok "theme swaps the rendered folder in whole" || t_fail "rendered folder not swapped"
-rm -rf "$HOME/.config/grand-line/themed"
-# Every built-in template fills every placeholder, in every theme.
+: > "$STUB_LOG"
+"$ROOT/bin/theme" set nord >/dev/null 2>&1
+[[ "$(cat "$HOME/.local/state/grand-line/theme" 2>/dev/null)" == nord ]] && t_ok "theme remembers the current theme" || t_fail "theme state not saved"
+! grep -qE "AppleAccentColor|AppleHighlightColor|dark mode|picture" "$STUB_LOG" \
+  && t_ok "theme set leaves the macOS appearance, accent colour and wallpaper alone" || t_fail "theme touched macOS" "$(cat "$STUB_LOG")"
+[[ ! -e "$HOME/.config/ghostty/theme.conf" && ! -e "$HOME/.config/btop/themes/grand-line.theme" && ! -e "$HOME/Library/Application Support/lazygit/config.yml" \
+   && ! -e "$HOME/.claude/themes/grand-line.json" && ! -d "$HOME/.local/state/grand-line/current" ]] \
+  && t_ok "theme set writes nothing into other apps' settings" || t_fail "theme wrote other apps' settings"
 # shellcheck source=lib/templates.sh
 source "$ROOT/lib/templates.sh"
-for th in "$ROOT"/config/themes/*.theme; do
-  n="$(basename "$th" .theme)"; render_templates "$th" "$n" "$tmp/render-$n" "$ROOT/config/themed"
-  left="$(grep -l '{{' "$tmp/render-$n"/* 2>/dev/null)"
-  [[ -z "$left" ]] && t_ok "templates: $n fills every placeholder" || t_fail "templates: $n left placeholders" "$left"
-  jq -e . "$tmp/render-$n/claude.json" >/dev/null 2>&1 || t_fail "templates: $n claude.json is not valid JSON"
-done
-"$ROOT/bin/theme" set nord --no-wallpaper >/dev/null 2>&1
-[[ "$(cat "$HOME/.local/state/grand-line/theme" 2>/dev/null)" == nord ]] && t_ok "theme remembers the current theme" || t_fail "theme state not saved"
-grep -q "defaults write -g AppleAccentColor -int 4" "$STUB_LOG" && t_ok "theme sets the accent colour" || t_fail "accent colour not set"
 if ! "$ROOT/bin/theme" set nonexistent >/dev/null 2>&1; then t_ok "unknown theme fails cleanly"; else t_fail "unknown theme did not fail"; fi
 # A family name picks the variant for the current appearance (the defaults stub says light).
-"$ROOT/bin/theme" set harbour --no-wallpaper >/dev/null 2>&1
+"$ROOT/bin/theme" set harbour >/dev/null 2>&1
 [[ "$(cat "$HOME/.local/state/grand-line/theme" 2>/dev/null)" == harbour-light ]] && t_ok "theme set FAMILY picks the variant for the appearance" || t_fail "family not resolved" "$(cat "$HOME/.local/state/grand-line/theme")"
 "$ROOT/bin/theme" mode toggle >/dev/null 2>&1
 [[ "$(cat "$HOME/.local/state/grand-line/theme" 2>/dev/null)" == harbour-dark ]] && t_ok "theme mode toggle switches to the other variant" || t_fail "theme mode toggle"
-"$ROOT/bin/theme" set graphite --no-wallpaper >/dev/null 2>&1; "$ROOT/bin/theme" mode light >/dev/null 2>&1
+"$ROOT/bin/theme" set graphite >/dev/null 2>&1; "$ROOT/bin/theme" mode light >/dev/null 2>&1
 [[ "$(cat "$HOME/.local/state/grand-line/theme" 2>/dev/null)" == daylight ]] && t_ok "Graphite and Daylight pair up as dark and light" || t_fail "graphite to daylight"
 (source "$ROOT/lib/toggle-state.sh"; echo signal-dark > "$HOME/.local/state/grand-line/theme"; theme_is signal && ! theme_is sig) \
   && t_ok "theme_is matches a family by its variants" || t_fail "theme_is family"
 names="$("$ROOT/bin/theme" list)"
 [[ "$(printf '%s\n' "$names" | sed -n 1p)" == atlas ]] && grep -qx paper <<< "$names" && grep -qx paper-light <<< "$names" \
   && t_ok "theme list names families and every variant" || t_fail "theme list"
-"$ROOT/bin/theme" set nord --no-wallpaper >/dev/null 2>&1
+"$ROOT/bin/theme" set nord >/dev/null 2>&1
 
 # --- theme format 1: EXTENDS, the checker, colour forms, live switching, apply, base16
 tt="$tmp/themes"; mkdir -p "$tt"
@@ -211,36 +183,25 @@ render_templates "$tt/bad.theme" bad "$tmp/forms-bad" "$tmp/forms" 2>/dev/null &
 
 # A copy of the package, so test themes never land in the real themes folder.
 pkg="$tmp/pkg"; mkdir -p "$pkg/config"
-cp -R "$ROOT/bin" "$ROOT/lib" "$pkg/"; cp -R "$ROOT/config/themes" "$ROOT/config/themed" "$pkg/config/"
+cp -R "$ROOT/bin" "$ROOT/lib" "$pkg/"; cp -R "$ROOT/config/themes" "$pkg/config/"
 
 # theme set: a broken theme changes nothing; a good one tells the apps at once.
 cp "$tt/bad.theme" "$pkg/config/themes/bad.theme"
-"$pkg/bin/theme" set bad --no-wallpaper >/dev/null 2>&1; rc=$?
+"$pkg/bin/theme" set bad >/dev/null 2>&1; rc=$?
 [[ $rc != 0 && "$(cat "$HOME/.local/state/grand-line/theme")" == nord ]] && t_ok "theme set refuses a theme with errors" || t_fail "broken theme applied"
 : > "$STUB_LOG"
-"$ROOT/bin/theme" set harbour-light --no-wallpaper >/dev/null 2>&1
+"$ROOT/bin/theme" set harbour-light >/dev/null 2>&1
 grep -q "osascript -l JavaScript .*postNotificationNameObjectUserInfoDeliverImmediately.*com.grandline.theme.changed.* harbour-light$" "$STUB_LOG" \
   && t_ok "theme set posts com.grandline.theme.changed for the apps" || t_fail "no theme notification" "$(grep JavaScript "$STUB_LOG")"
 
-# theme apply: renders again and reloads each running tool that can reload.
-mkdir -p "$tmp/tools"
-printf '#!/bin/bash\necho "Ghostty 1.2.3"\n' > "$tmp/tools/ghostty"
-printf '#!/bin/bash\necho "btop version: 1.4.0"\n' > "$tmp/tools/btop"
-chmod +x "$tmp/tools/ghostty" "$tmp/tools/btop"
-printf 'ghostty\nbtop\n' > "$tmp/running"
-rm -f "$HOME/.config/ghostty/theme.conf"; : > "$STUB_LOG"
-PATH="$PATH:$tmp/tools" STUB_RUNNING="$tmp/running" "$ROOT/bin/theme" apply >/dev/null 2>&1
-grep -q "background = ffffff" "$HOME/.config/ghostty/theme.conf" 2>/dev/null && grep -qx "pkill -USR2 -x ghostty" "$STUB_LOG" \
-  && grep -qx "pkill -USR2 -x btop" "$STUB_LOG" && grep -q "com.grandline.theme.changed" "$STUB_LOG" \
-  && t_ok "theme apply renders again, reloads Ghostty and btop, and tells the apps" || t_fail "theme apply" "$(cat "$STUB_LOG")"
-printf '#!/bin/bash\necho "Ghostty 1.1.3"\n' > "$tmp/tools/ghostty"
-printf 'ghostty\nbtop\n' > "$tmp/running"; : > "$STUB_LOG"
-PATH="$PATH:$tmp/tools" STUB_RUNNING="$tmp/running" "$ROOT/bin/theme" apply >/dev/null 2>&1
-! grep -q "USR2 -x ghostty" "$STUB_LOG" && grep -q "USR2 -x btop" "$STUB_LOG" \
-  && t_ok "theme apply leaves a Ghostty too old to reload (it would quit)" || t_fail "old Ghostty signalled"
-printf '#!/bin/bash\necho "Ghostty 1.2.3"\n' > "$tmp/tools/ghostty"; : > "$STUB_LOG"
-PATH="$PATH:$tmp/tools" STUB_RUNNING="$tmp/running" "$ROOT/bin/theme" refresh >/dev/null 2>&1
-! grep -qE "USR2|theme.changed" "$STUB_LOG" && t_ok "theme refresh reloads nothing when the rendered theme did not change" || t_fail "refresh reloaded" "$(cat "$STUB_LOG")"
+# theme apply tells Sight and Iceberg and reloads no other tool. refresh does nothing.
+: > "$STUB_LOG"
+"$ROOT/bin/theme" apply >/dev/null 2>&1
+grep -q "com.grandline.theme.changed" "$STUB_LOG" && ! grep -q "USR2" "$STUB_LOG" \
+  && t_ok "theme apply tells the apps and reloads no other tool" || t_fail "theme apply" "$(cat "$STUB_LOG")"
+: > "$STUB_LOG"
+"$ROOT/bin/theme" refresh >/dev/null 2>&1
+! grep -qE "USR2|theme.changed" "$STUB_LOG" && t_ok "theme refresh does nothing" || t_fail "refresh reloaded" "$(cat "$STUB_LOG")"
 
 # base16 import (into the copy of the package).
 if "$pkg/bin/theme" import-base16 "$ROOT/tests/fixtures/base16-flat.yaml" tide >/dev/null 2>&1; then
@@ -259,17 +220,12 @@ else t_fail "import-base16 failed"; fi
 grep -v base0F "$ROOT/tests/fixtures/base16-flat.yaml" > "$tmp/short.yaml"
 out="$("$pkg/bin/theme" import-base16 "$tmp/short.yaml" short 2>&1)"
 [[ "$out" == *"lacks base0F"* && ! -e "$pkg/config/themes/short.theme" ]] && t_ok "import-base16 refuses a scheme with a colour missing" || t_fail "short scheme" "$out"
-"$ROOT/bin/theme" set nord --no-wallpaper >/dev/null 2>&1
+"$ROOT/bin/theme" set nord >/dev/null 2>&1
 
-mkdir -p "$HOME/Pictures/Backgrounds"
-touch "$HOME/Pictures/Backgrounds/a.jpg" "$HOME/Pictures/Backgrounds/b.jpg" "$HOME/Pictures/Backgrounds/c.png"
-echo "$HOME/Pictures/Backgrounds/c.png" > "$HOME/.local/state/grand-line/background"
-"$ROOT/bin/theme" next-background
-[[ "$(cat "$HOME/.local/state/grand-line/background")" == "$HOME/Pictures/Backgrounds/a.jpg" ]] \
-  && t_ok "next background wraps around to the first image" || t_fail "next background did not wrap"
-"$ROOT/bin/theme" next-background
-[[ "$(cat "$HOME/.local/state/grand-line/background")" == "$HOME/Pictures/Backgrounds/b.jpg" ]] \
-  && t_ok "next background advances" || t_fail "next background did not advance"
+echo "$HOME/Pictures/Backgrounds/a.jpg" > "$HOME/.local/state/grand-line/background"; : > "$STUB_LOG"
+! "$ROOT/bin/theme" next-background >/dev/null 2>&1 && ! grep -q "picture" "$STUB_LOG" \
+  && t_ok "the theme command no longer changes the wallpaper" || t_fail "next-background still runs"
+rm -f "$HOME/.local/state/grand-line/background"
 
 # --- setup.sh options
 if ! bash "$ROOT/setup.sh" --dry-run --only artcraf >/dev/null 2>&1; then t_ok "setup rejects a misspelled step name"; else t_fail "misspelled step name was accepted"; fi
@@ -391,6 +347,11 @@ fi
   apply_default_apps fallback "$table" >/dev/null || exit 9
   grep -q '^duti -s com.apple.Preview .pdf all$' "$STUB_LOG" && grep -q '^duti -s com.microsoft.Word .docx all$' "$STUB_LOG" || exit 10
   grep -qE '\.(pptx|ppt|odp) ' "$STUB_LOG" && exit 11
+  # A type macOS rejects (error -50) is skipped with a warning, not a failure.
+  : > "$STUB_LOG"; WARNINGS=()
+  export STUB_DUTI_REJECT=".odt"; apply_default_apps primary "$table" >/dev/null || exit 12; unset STUB_DUTI_REJECT
+  [[ "${#WARNINGS[@]}" == 1 && "${WARNINGS[0]}" == *".odt"*"error -50"* ]] || exit 13
+  grep -q '^duti -s com.microsoft.Word .rtf all$' "$STUB_LOG" || exit 14
   exit 0
 ) && t_ok "default apps: Word, Excel and PowerPoint take their types once installed, missing ones leave macOS's defaults quietly" \
   || t_fail "default apps (step $?)" "$(cat "$tmp/default-apps.log" 2>/dev/null)"
@@ -685,13 +646,9 @@ mkdir -p "$HOME/Desktop"; echo old > "$HOME/Desktop/Finish setup.txt"
 GRAND_LINE_REPO="$ROOT" bash "$ROOT/migrations/1793404800-desktop-checklist-to-trash.sh"
 [[ ! -e "$HOME/Desktop/Finish setup.txt" && -f "$HOME/.Trash/Finish setup.txt" ]] && t_ok "migration: the old Desktop checklist goes to the Trash" || t_fail "Desktop checklist migration"
 GRAND_LINE_REPO="$ROOT" bash "$ROOT/migrations/1793404800-desktop-checklist-to-trash.sh" && t_ok "migration: running it again is harmless" || t_fail "Desktop migration not repeatable"
-# The template migration re-applies the current theme, and moves Paper to Daylight.
-echo paper > "$HOME/.local/state/grand-line/theme"; rm -rf "$HOME/.local/state/grand-line/current"
-GRAND_LINE_REPO="$ROOT" bash "$ROOT/migrations/1793404860-render-theme-templates.sh" >/dev/null 2>&1
-[[ "$(cat "$HOME/.local/state/grand-line/theme")" == daylight && -f "$HOME/.local/state/grand-line/current/theme/tmux.conf" ]] \
-  && t_ok "migration: the old Paper theme becomes Daylight, rendered from the templates" || t_fail "theme template migration"
+# The old template migration now does nothing.
 rm -f "$HOME/.local/state/grand-line/theme"
-GRAND_LINE_REPO="$ROOT" bash "$ROOT/migrations/1793404860-render-theme-templates.sh" && t_ok "migration: with no theme yet it does nothing" || t_fail "theme migration with no theme"
+GRAND_LINE_REPO="$ROOT" bash "$ROOT/migrations/1793404860-render-theme-templates.sh" && t_ok "migration: the old theme template migration does nothing" || t_fail "theme migration"
 # The office suites leave the package's care: nothing deleted, their remembered
 # state moved aside, FilmCraft and PdfCraft untouched, one line said.
 (
@@ -748,13 +705,13 @@ printf '#!/bin/bash\nexit 1\n' > "$hd/theme-set.d/15-fails"; chmod +x "$hd/theme
 [[ "$(tr '\n' '|' < "$tmp/hooks.log")" == "main nord|a nord|b nord|" ]] && t_ok "hooks run in order with their arguments, skipping samples, plain files and failures" \
   || t_fail "hooks ran" "$(cat "$tmp/hooks.log")"
 ! "$ROOT/bin/hook" ../x 2>/dev/null && t_ok "a hook name cannot leave the hooks folder" || t_fail "hook name not checked"
-: > "$tmp/hooks.log"; "$ROOT/bin/theme" set forest --no-wallpaper >/dev/null 2>&1
+: > "$tmp/hooks.log"; "$ROOT/bin/theme" set forest >/dev/null 2>&1
 grep -q "^main forest" "$tmp/hooks.log" && t_ok "theme set fires the theme-set hook with the theme name" || t_fail "theme-set hook not fired"
 rm -rf "$hd"
 
 # --- focus or open, web apps, update lock and window
-export AEROSPACE_WINDOWS=$'7|Ghostty|~\n9|Zen|Inbox (3) - Gmail'
-: > "$STUB_LOG"; "$ROOT/bin/focus-or-open" Ghostty
+export AEROSPACE_WINDOWS=$'7|Terminal|~\n9|Zen|Inbox (3) - Gmail'
+: > "$STUB_LOG"; "$ROOT/bin/focus-or-open" Terminal
 grep -q "aerospace focus --window-id 7" "$STUB_LOG" && ! grep -q "open -a" "$STUB_LOG" && t_ok "an app key focuses its open window" || t_fail "focus-or-open did not focus" "$(cat "$STUB_LOG")"
 : > "$STUB_LOG"; "$ROOT/bin/focus-or-open" Notion
 grep -q "open -a Notion" "$STUB_LOG" && t_ok "an app key opens an app with no window" || t_fail "focus-or-open did not open"
@@ -771,13 +728,13 @@ out="$(GRAND_LINE_HOME="$ROOT" GRAND_LINE_UPDATE_LOCK="$lock" bash "$ROOT/setup.
 [[ "$code" == 1 ]] && grep -q "An update or another setup is running" <<<"$out" && t_ok "setup waits while an update runs" || t_fail "setup lock" "$out"
 rm -rf "$locktmp"
 : > "$STUB_LOG"; "$ROOT/bin/update" --window
-grep -q "open -na Ghostty --args -e .*/bin/in-window --run .*/bin/update" "$STUB_LOG" && t_ok "update --window opens its own Ghostty window" || t_fail "update --window" "$(cat "$STUB_LOG")"
+grep -q "osascript - .*/bin/in-window --run .*/bin/update" "$STUB_LOG" && t_ok "update --window opens its own Terminal window" || t_fail "update --window" "$(cat "$STUB_LOG")"
 code="$("$ROOT/bin/in-window" --run false </dev/null 2>/dev/null; echo "$?")"
 [[ "$code" == *"Failed (1)"*1 ]] && t_ok "the window reports a failure with its code" || t_fail "in-window failure" "$code"
 [[ "$("$ROOT/bin/in-window" --run bash -c 'echo "$GRAND_LINE_IN_WINDOW"' </dev/null 2>/dev/null | head -1)" == 1 ]] \
   && t_ok "the window tells the command it is in sight" || t_fail "in-window did not set GRAND_LINE_IN_WINDOW"
 : > "$STUB_LOG"; "$ROOT/bin/app" install --window zoom
-grep -q "open -na Ghostty --args -e .*/bin/in-window --run .*/bin/app install zoom" "$STUB_LOG" \
+grep -q "osascript - .*/bin/in-window --run .*/bin/app install zoom" "$STUB_LOG" \
   && t_ok "app install from the menu works in its own window" || t_fail "app install --window" "$(cat "$STUB_LOG")"
 : > "$STUB_LOG"; GRAND_LINE_IN_WINDOW=1 "$ROOT/bin/app" install mpv
 grep -qx 'cask "mpv"' "$HOME/.grand-line/Brewfile" && grep -q "brew install --cask mpv" "$STUB_LOG" \
@@ -880,13 +837,8 @@ mkdir -p "${PERSONAL_FILE%/*}"
 printf '%s\n' '# comment' 'NAME=Ada Lovelace' 'SIGNOFF="Ada"' 'SIGNATURE=Ada Lovelace\nAnalytical Engines' 'LOCATION=51.5 -0.13 London' > "$PERSONAL_FILE"
 [[ "$(personal_get NAME)" == "Ada Lovelace" && "$(personal_get SIGNOFF)" == Ada && -z "$(personal_get EMAIL)" ]] \
   && t_ok "personal details are read, quotes removed, missing ones empty" || t_fail "personal_get" "$(personal_get NAME)|$(personal_get SIGNOFF)"
-esp="$tmp/personal.yml"; personal_espanso "$esp"
-grep -q 'replace: "Best regards,\\nAda"' "$esp" && grep -q 'replace: "Ada Lovelace\\nAnalytical Engines"' "$esp" \
-  && t_ok "your sign-off and signature become Espanso shortcuts" || t_fail "personal Espanso file" "$(cat "$esp")"
 read -r lat lon place <<<"$(personal_get LOCATION)"
 [[ "$lat $lon $place" == "51.5 -0.13 London" ]] && t_ok "the weather reads your town from personal details" || t_fail "LOCATION"
-printf 'NAME=x\n' > "$PERSONAL_FILE"; personal_espanso "$esp"
-[[ ! -f "$esp" ]] && t_ok "the Espanso file goes to the Trash when there is no signature" || t_fail "stale personal.yml kept"
 rm -f "$PERSONAL_FILE"
 
 # --- gl is grandline
@@ -952,30 +904,24 @@ chmod +x "$tmp/bin-apps/"*
   build_native_apps >/dev/null 2>&1 && [[ -x "$app/Contents/MacOS/Demo" ]] || exit 19
 ) && t_ok "own apps are built, bundled, signed, rebuilt on any change (a deletion too), old copy trashed or kept whole" || t_fail "native apps (step $?)"
 
-# --- Nexus and Sight take over Finder and Spotlight, and switch back
+# --- Sight takes over Command + Space, and switches back
 (
   export GRAND_LINE_APPS_DEST="$tmp/Applications" GRAND_LINE_STATE="$HOME/.local/state/grand-line"
-  mkdir -p "$tmp/Applications/Nexus.app" "$tmp/Applications/Sight.app"
-  source "$ROOT/lib/default-apps.sh"; source "$ROOT/lib/takeover.sh"; source "$ROOT/lib/toggle-state.sh"
-  [[ "$(takeover_mode files)" == on && "$(takeover_mode search)" == on ]] || exit 1   # on by default
-  : > "$STUB_LOG"; takeover_files on
-  grep -q "defaults write -g NSFileViewer -string com.grandline.nexus" "$STUB_LOG" && grep -q "public.folder.*com.grandline.nexus" "$STUB_LOG" || exit 2
-  : > "$STUB_LOG"; takeover_files off
-  grep -q "defaults delete -g NSFileViewer" "$STUB_LOG" && grep -q "public.folder.*com.apple.finder" "$STUB_LOG" || exit 3
-  ! is_on files || exit 4
+  mkdir -p "$tmp/Applications/Sight.app"
+  source "$ROOT/lib/takeover.sh"; source "$ROOT/lib/toggle-state.sh"
+  [[ "$(takeover_mode search)" == on ]] || exit 1   # on by default
   : > "$STUB_LOG"; takeover_search on
   grep -q "AppleSymbolicHotKeys -dict-add 64 <dict><key>enabled</key><false/>" "$STUB_LOG" && grep -q "com.grandline.sight TakesCommandSpace -bool true" "$STUB_LOG" || exit 5
   : > "$STUB_LOG"; takeover_search off
   grep -q "<key>enabled</key><true/>" "$STUB_LOG" && grep -q "TakesCommandSpace -bool false" "$STUB_LOG" || exit 6
-  rmdir "$tmp/Applications/Nexus.app"; ! takeover_files on || exit 7   # nothing to switch to
-) && t_ok "Nexus and Sight take over Finder and Spotlight by default, and switch back" || t_fail "takeover (step $?)"
+  ! is_on search || exit 4
+  : > "$STUB_LOG"; apply_takeovers >/dev/null
+  grep -q "NSFileViewer\|public.folder" "$STUB_LOG" && exit 7   # folders are never handed to another app
+  rmdir "$tmp/Applications/Sight.app"; ! takeover_search on || exit 8   # nothing to switch to
+  exit 0
+) && t_ok "Sight takes over Spotlight by default and switches back, folders stay with Finder" || t_fail "takeover (step $?)"
 
-# --- the selection comes from Nexus when it is in front
-mkdir -p "$HOME/.local/state/grand-line"; printf '/Users/me/a.pdf\n/Users/me/b c.pdf\n' > "$HOME/.local/state/grand-line/nexus-selection"
-got="$(FRONT_APP=com.grandline.nexus bash -c 'source "$1/lib/bin-common.sh"; finder_selection' _ "$ROOT")"
-[[ "$got" == $'/Users/me/a.pdf\n/Users/me/b c.pdf' ]] && t_ok "the selection comes from Nexus when it is in front" || t_fail "Nexus selection" "$got"
-
-# --- the rename: Log Pose, Byakugan and Den Den become Nexus, Sight and Iceberg
+# --- the rename: Byakugan and Den Den become Sight and Iceberg
 rn="$tmp/rename"
 rename_env() {
   export HOME="$rn/$1" GRAND_LINE_APPS_DEST="$rn/$1/Applications" STUB_DEFAULTS="$rn/$1/defaults" STUB_RUNNING="$rn/$1/running"
@@ -986,7 +932,7 @@ rename_run() { GRAND_LINE_REPO="$ROOT" bash "$ROOT/migrations/1793472900-rename-
 logged() { local _; for _ in 1 2 3 4 5 6 7 8 9 10; do grep -qF -- "$1" "$STUB_LOG" && return 0; sleep 0.2; done; return 1; }
 (
   rename_env fresh
-  mkdir -p "$GRAND_LINE_APPS_DEST/Nexus.app" "$GRAND_LINE_APPS_DEST/Sight.app" "$GRAND_LINE_APPS_DEST/Iceberg.app"
+  mkdir -p "$GRAND_LINE_APPS_DEST/Sight.app" "$GRAND_LINE_APPS_DEST/Iceberg.app"
   : > "$STUB_LOG"; rename_run || exit 1
   [[ -z "$(find "$HOME" -mindepth 1 -not -path "$HOME/Applications*" -not -path "$HOME/.local*" -print)" ]] || exit 2
   [[ -z "$(find "$HOME/.local" -type f 2>/dev/null)" && ! -d "$STUB_DEFAULTS" ]] || exit 3
@@ -997,58 +943,49 @@ logged() { local _; for _ in 1 2 3 4 5 6 7 8 9 10; do grep -qF -- "$1" "$STUB_LO
 (
   rename_env old
   A="$GRAND_LINE_APPS_DEST"; sup="$HOME/Library/Application Support"; cfg="$HOME/.config/grand-line"; st="$HOME/.local/state/grand-line"
-  for app in Nexus Sight Iceberg "Log Pose" Byakugan "Den Den"; do mkdir -p "$A/$app.app/Contents"; done
-  printf 'LogPose\nByakugan\nDenDen\n' > "$STUB_RUNNING"
-  mkdir -p "$sup/Log Pose/Workspaces" "$sup/Byakugan" "$sup/Den Den" "$cfg/logpose" "$cfg/byakugan" "$cfg/denden/widgets" "$st" "$HOME/Library/Logs/grand-line" "$STUB_DEFAULTS"
-  echo index > "$sup/Log Pose/name-index.snapshot"; echo names > "$sup/Byakugan/names.index"; echo usage > "$sup/Byakugan/usage.json"
-  echo '{"places":["~/Drive"]}' > "$cfg/logpose/settings.json"; printf 'g\tgoogle\n' > "$cfg/byakugan/aliases.tsv"
+  for app in Sight Iceberg Byakugan "Den Den"; do mkdir -p "$A/$app.app/Contents"; done
+  printf 'Byakugan\nDenDen\n' > "$STUB_RUNNING"
+  mkdir -p "$sup/Byakugan" "$sup/Den Den" "$cfg/byakugan" "$cfg/denden/widgets" "$st" "$HOME/Library/Logs/grand-line" "$STUB_DEFAULTS"
+  echo names > "$sup/Byakugan/names.index"; echo usage > "$sup/Byakugan/usage.json"
+  printf 'g\tgoogle\n' > "$cfg/byakugan/aliases.tsv"
   printf '# mine\nopen_on = "click"\n' > "$cfg/denden/denden.toml"
   printf 'command = "echo $GRAND_LINE_DENDEN_THEME"\n' > "$cfg/denden/widgets/theme.toml"
-  printf '/Users/me/a.pdf\n' > "$st/logpose-selection"; echo off > "$st/takeover-files"
   echo log > "$HOME/Library/Logs/grand-line/denden.log"
   printf '<dict>\n<key>CloseAfterSettingChange</key><true/>\n<key>TakesCommandSpace</key><true/>\n</dict>\n' > "$STUB_DEFAULTS/com.grandline.byakugan.plist"
-  printf '<dict>\n<key>NSWindow Frame LogPoseBrowser</key><string>0 0 800 600</string>\n</dict>\n' > "$STUB_DEFAULTS/com.grandline.logpose.plist"
   # setup already gave Sight its takeover setting, which must not stop the copy
   printf '<dict>\n<key>TakesCommandSpace</key><true/>\n</dict>\n' > "$STUB_DEFAULTS/com.grandline.sight.plist"
   : > "$STUB_LOG"; rename_run || exit 1
-  for app in "Log Pose" Byakugan "Den Den"; do [[ ! -e "$A/$app.app" && -d "$HOME/.Trash/$app.app" ]] || exit 2; done
-  [[ -d "$A/Nexus.app" && -d "$A/Sight.app" && -d "$A/Iceberg.app" ]] || exit 3
-  [[ "$(cat "$sup/Nexus/name-index.snapshot")" == index && -d "$sup/Nexus/Workspaces" && ! -e "$sup/Log Pose" ]] || exit 4
+  for app in Byakugan "Den Den"; do [[ ! -e "$A/$app.app" && -d "$HOME/.Trash/$app.app" ]] || exit 2; done
+  [[ -d "$A/Sight.app" && -d "$A/Iceberg.app" ]] || exit 3
   [[ "$(cat "$sup/Sight/names.index")" == names && -f "$sup/Sight/usage.json" && ! -e "$sup/Byakugan" && -d "$sup/Iceberg" ]] || exit 5
-  [[ -f "$cfg/nexus/settings.json" && -f "$cfg/sight/aliases.tsv" && ! -e "$cfg/logpose" && ! -e "$cfg/byakugan" ]] || exit 6
+  [[ -f "$cfg/sight/aliases.tsv" && ! -e "$cfg/byakugan" ]] || exit 6
   [[ "$(head -1 "$cfg/iceberg/iceberg.toml")" == "# mine" && ! -e "$cfg/iceberg/denden.toml" && -f "$cfg/iceberg/widgets/theme.toml" && ! -e "$cfg/denden" ]] || exit 7
-  [[ -f "$st/nexus-selection" && ! -e "$st/logpose-selection" && -f "$HOME/Library/Logs/grand-line/iceberg.log" ]] || exit 8
+  [[ -f "$HOME/Library/Logs/grand-line/iceberg.log" ]] || exit 8
   grep -q CloseAfterSettingChange "$STUB_DEFAULTS/com.grandline.sight.plist" || exit 9
-  grep -q 'NSWindow Frame NexusBrowser' "$STUB_DEFAULTS/com.grandline.nexus.plist" && ! grep -q LogPoseBrowser "$STUB_DEFAULTS/com.grandline.nexus.plist" || exit 10
   grep -qF "defaults write com.grandline.byakugan TakesCommandSpace -bool false" "$STUB_LOG" || exit 11
   [[ ! -s "$STUB_RUNNING" ]] && grep -qF "pkill -x DenDen" "$STUB_LOG" || exit 12     # the old apps were stopped first
-  # files stay with Finder as chosen; Command + Space goes to Sight
-  # (takeover changes nothing when folders already open in Finder, as on a
-  # macOS runner, so either the switch back is logged or nothing names Nexus)
-  [[ "$(cat "$st/takeover-files")" == off ]] || exit 13
-  if ! { grep -qF "defaults delete -g NSFileViewer" "$STUB_LOG" && grep -q "public.folder.*com.apple.finder" "$STUB_LOG"; }; then
-    grep -q "NSFileViewer.*com.grandline.nexus\|public.folder.*com.grandline.nexus" "$STUB_LOG" && exit 13
-  fi
+  # Command + Space goes to Sight, and folders are left alone
+  grep -q "NSFileViewer\|public.folder" "$STUB_LOG" && exit 13
   grep -qF "defaults write com.grandline.sight TakesCommandSpace -bool true" "$STUB_LOG" || exit 14
   grep -q "zen" "$STUB_LOG" && exit 15                                                  # the default browser is left alone
-  logged "open -g -b com.grandline.iceberg" && logged "open -g -b com.grandline.nexus" && logged "open -g -b com.grandline.sight" || exit 16
-  grep -q "widgets/theme.toml" "$rn/out" && grep -q "Login Items still lists Log Pose, Byakugan, Den Den" "$rn/out" || exit 17
+  logged "open -g -b com.grandline.iceberg" && logged "open -g -b com.grandline.sight" || exit 16
+  grep -q "widgets/theme.toml" "$rn/out" && grep -q "Login Items still lists Byakugan, Den Den" "$rn/out" || exit 17
   # Again: nothing left to do, so nothing changes
   : > "$STUB_LOG"; trash="$(ls "$HOME/.Trash" | wc -l)"; rename_run || exit 18
   grep -qE '^(defaults (write|import|delete)|pkill|open|mv) ' "$STUB_LOG" && exit 19
   [[ "$(ls "$HOME/.Trash" | wc -l)" == "$trash" && "$(cat "$sup/Sight/names.index")" == names && ! -s "$rn/out" ]] || exit 20
   exit 0
-) && t_ok "rename migration: settings, index and state move to the new apps, old apps go to the Trash, takeovers follow, and a second run changes nothing" \
+) && t_ok "rename migration: settings, index and state move to the new apps, old apps go to the Trash, Command + Space follows, and a second run changes nothing" \
   || t_fail "rename migration on an existing Mac (step $?)" "$(cat "$rn/out" 2>/dev/null)"
 (
   rename_env waiting
   A="$GRAND_LINE_APPS_DEST"; sup="$HOME/Library/Application Support"; cfg="$HOME/.config/grand-line"
-  mkdir -p "$A/Log Pose.app" "$A/Den Den.app" "$A/Iceberg.app" "$sup/Log Pose" "$cfg/denden" "$cfg/iceberg"
+  mkdir -p "$A/Byakugan.app" "$A/Den Den.app" "$A/Iceberg.app" "$sup/Byakugan" "$cfg/denden" "$cfg/iceberg"
   echo keep > "$cfg/denden/denden.toml"
   : > "$STUB_LOG"; rename_run || exit 1
-  [[ -d "$A/Log Pose.app" && -d "$sup/Log Pose" && ! -e "$sup/Nexus" ]] || exit 2       # no Nexus yet: Log Pose stays
-  grep -q "Nexus is not installed yet" "$rn/out" || exit 3
-  grep -qF "NSFileViewer" "$STUB_LOG" && exit 4
+  [[ -d "$A/Byakugan.app" && -d "$sup/Byakugan" && ! -e "$sup/Sight" ]] || exit 2       # no Sight yet: Byakugan stays
+  grep -q "Sight is not installed yet" "$rn/out" || exit 3
+  grep -qF "TakesCommandSpace -bool true" "$STUB_LOG" && exit 4
   [[ -f "$cfg/denden/denden.toml" && ! -e "$cfg/iceberg/iceberg.toml" ]] || exit 5      # an existing new folder is never overwritten
   grep -q "Kept both" "$rn/out" || exit 6
   exit 0
@@ -1204,11 +1141,11 @@ logged() { local _; for _ in 1 2 3 4 5 6 7 8 9 10; do grep -qF -- "$1" "$STUB_LO
 (
   export REPO_DIR="$apps_root" DRY_RUN=0
   source "$ROOT/lib/common.sh"; source "$ROOT/lib/native-apps.sh"
-  sup="$HOME/Library/Application Support"; mkdir -p "$sup/Nexus" "$sup/Sight" "$HOME/Library/Caches/com.grandline.sight"
+  sup="$HOME/Library/Application Support"; mkdir -p "$sup/Sight" "$HOME/Library/Caches/com.grandline.sight"
   mkdir -p "$sup/Grand Line Index"; : > "$sup/Grand Line Index/names.index"
-  : > "$sup/Nexus/name-index.snapshot"; : > "$sup/Sight/names.index"; : > "$sup/Sight/usage.json"; : > "$sup/Nexus/view-settings.json"
+  : > "$sup/Sight/names.index"; : > "$sup/Sight/usage.json"; : > "$sup/Sight/view-settings.json"
   : > "$STUB_LOG"; exclude_indexes_from_backup
-  for f in "$sup/Nexus/name-index.snapshot" "$sup/Sight/names.index" "$sup/Sight/usage.json" "$sup/Grand Line Index/names.index" "$HOME/Library/Caches/com.grandline.sight"; do
+  for f in "$sup/Sight/names.index" "$sup/Sight/usage.json" "$sup/Grand Line Index/names.index" "$HOME/Library/Caches/com.grandline.sight"; do
     grep -qxF "tmutil addexclusion $f" "$STUB_LOG" || exit 1
   done
   grep -q "view-settings" "$STUB_LOG" && exit 2   # settings stay in the backup
@@ -1494,12 +1431,62 @@ grep -q '^UNATTENDED_STEPS="folders,dotfiles,native-tools,downloads"$' "$ROOT/se
   source "$ROOT/lib/common.sh"; source "$ROOT/steps/10-macos-defaults.sh"
   mkdir -p "$GRAND_LINE_STATE"; touch "$GRAND_LINE_STATE/done-macos-defaults"
   : > "$STUB_LOG"; step_macos_defaults >/dev/null
-  grep -q "defaults write org.p0deje.Maccy ignoredApps -array com.citrix.receiver.icaviewer.mac com.citrix.receiver.nomas com.vmware.horizon com.omnissa.horizon.client.mac" "$STUB_LOG" || exit 1
+  grep -q "defaults write org.p0deje.Maccy ignoredApps -array com.vmware.horizon com.omnissa.horizon.client.mac" "$STUB_LOG" || exit 1
   grep -q "ignoredPasteboardTypes -array Pasteboard generator type com.agilebits.onepassword .* org.nspasteboard.ConcealedType org.nspasteboard.TransientType" "$STUB_LOG" || exit 2
   grep -q "historySize" "$STUB_LOG" && exit 3      # your other settings are still set only once
   rm -f "$GRAND_LINE_STATE/done-macos-defaults"
   exit 0
 ) && t_ok "Maccy's ignore list is checked on every run, keeping its own defaults" || t_fail "Maccy ignore list (step $?)" "$(cat "$STUB_LOG")"
+(
+  export REPO_DIR="$ROOT" DRY_RUN=0 ONLY=""
+  source "$ROOT/lib/common.sh"; source "$ROOT/steps/10-macos-defaults.sh"
+  rm -f "$GRAND_LINE_STATE/done-macos-defaults"
+  : > "$STUB_LOG"; step_macos_defaults >/dev/null
+  grep -q "defaults write NSGlobalDomain KeyRepeat -int 2" "$STUB_LOG" && grep -q "AppleShowAllExtensions -bool true" "$STUB_LOG" || exit 1
+  grep -qE "com.apple.dock|WindowManager|com.apple.spaces|CreateDesktop|FXPreferredViewStyle|ShowPathbar|NSAutomaticWindowAnimationsEnabled|disable-shadow|NSWindowShouldDragOnGesture" "$STUB_LOG" && exit 2
+  : > "$STUB_LOG"; source "$ROOT/steps/05-declutter.sh"; step_declutter >/dev/null
+  grep -qE "persistent-apps|GarageBand|iMovie" "$STUB_LOG" && exit 3
+  rm -f "$GRAND_LINE_STATE/done-macos-defaults"
+  exit 0
+) && t_ok "setup leaves the Dock, desktop, animations, tiling and Finder views to macOS, and Apple's apps where they are" || t_fail "macOS look left alone (step $?)" "$(cat "$STUB_LOG")"
+
+# --- the migration back to macOS's own look, Finder for folders, and fewer apps
+(
+  m="$ROOT/migrations/1793914462-default-look-fewer-apps.sh"
+  mh="$tmp/lookhome"; mkdir -p "$mh"; export HOME="$mh" GRAND_LINE_APPS_DEST="$mh/Applications"
+  st="$mh/.local/state/grand-line"; export GRAND_LINE_STATE="$st"
+  mkdir -p "$st/current/theme" "$GRAND_LINE_APPS_DEST/Nexus.app/Contents" "$mh/.config/btop/themes" "$mh/.claude/themes" "$mh/Library/Application Support/lazygit" \
+           "$mh/Library/Application Support/espanso/match" "$mh/Pictures/Backgrounds"
+  echo graphite > "$st/theme"; touch "$st/done-macos-defaults" "$st/dock-set" "$st/background" "$st/takeover-files"
+  echo theme > "$mh/.config/btop/themes/grand-line.theme"; printf 'color_theme = "grand-line"\nupdate_ms = 1000\n' > "$mh/.config/btop/btop.conf"
+  echo '{}' > "$mh/.claude/themes/grand-line.json"; echo mine > "$mh/.claude/themes/mine.json"
+  ln -s "$st/current/theme/lazygit.yml" "$mh/Library/Application Support/lazygit/config.yml"
+  ln -s "$ROOT/config/ghostty" "$mh/.config/ghostty"
+  ln -s "$ROOT/config/grand-line/menu.tsv" "$mh/Library/Application Support/espanso/match/grand-line.yml"
+  echo mine > "$mh/Library/Application Support/espanso/match/base.yml"
+  export BREW_INSTALLED="ghostty espanso zen" OSASCRIPT_REPLY="$mh/Pictures/Backgrounds/graphite.jpg"
+  : > "$STUB_LOG"; out="$(TERM_PROGRAM=Apple_Terminal GHOSTTY_RESOURCES_DIR="" GRAND_LINE_REPO="$ROOT" bash "$m" 2>&1)" || exit 1
+  grep -q "defaults delete -g AppleAccentColor" "$STUB_LOG" && grep -q "defaults delete -g AppleHighlightColor" "$STUB_LOG" || exit 2
+  grep -q "defaults delete com.apple.dock autohide" "$STUB_LOG" && grep -q "defaults delete com.apple.finder CreateDesktop" "$STUB_LOG" \
+    && grep -q "defaults delete com.apple.dock persistent-apps" "$STUB_LOG" && grep -q "defaults delete com.apple.dock wvous-br-corner" "$STUB_LOG" || exit 3
+  grep -q "defaults delete NSGlobalDomain KeyRepeat" "$STUB_LOG" && exit 4                      # behaviour settings stay
+  grep -q "killall Dock Finder SystemUIServer" "$STUB_LOG" && [[ ! -e "$st/dock-set" ]] || exit 5
+  [[ -d "$mh/.Trash/Nexus.app" && ! -e "$GRAND_LINE_APPS_DEST/Nexus.app" && ! -e "$st/takeover-files" ]] || exit 6
+  grep -q "brew uninstall --cask ghostty" "$STUB_LOG" && grep -q "brew uninstall --cask espanso" "$STUB_LOG" || exit 7
+  grep -q "brew uninstall --cask zen\|brew uninstall --cask tailscale-app\|--zap" "$STUB_LOG" && exit 8   # only what is installed, never zapped
+  [[ ! -e "$mh/.config/btop/themes/grand-line.theme" && "$(cat "$mh/.config/btop/btop.conf")" == "update_ms = 1000" ]] || exit 9
+  [[ ! -e "$mh/.claude/themes/grand-line.json" && -f "$mh/.claude/themes/mine.json" ]] || exit 10
+  [[ ! -L "$mh/Library/Application Support/lazygit/config.yml" && ! -L "$mh/.config/ghostty" && ! -d "$st/current" ]] || exit 11
+  [[ ! -e "$mh/Library/Application Support/espanso/match/grand-line.yml" && -f "$mh/Library/Application Support/espanso/match/base.yml" ]] || exit 12
+  # Run inside Ghostty: Ghostty stays, and the migration asks to be run again.
+  : > "$STUB_LOG"; export BREW_INSTALLED="ghostty"
+  ! TERM_PROGRAM=ghostty GRAND_LINE_REPO="$ROOT" bash "$m" > "$tmp/look.out" 2>&1 || exit 13
+  grep -q "brew uninstall" "$STUB_LOG" && exit 14
+  grep -q "Open Terminal and run update once more" "$tmp/look.out" || exit 15
+  grep -q "com.apple.dock" "$STUB_LOG" && exit 16                                               # the look is not reset twice
+  exit 0
+) && t_ok "migration: macOS's look and Dock come back, Nexus goes to the Trash, the four apps are uninstalled, only the package's own files go" \
+  || t_fail "default look migration (step $?)" "$(cat "$STUB_LOG")"
 
 # --- the unattended update never swaps an app in use
 (

@@ -68,7 +68,6 @@ cask "handy"                # dictation into any app: hold Caps + Ctrl + X, as V
 cask "meetily"              # records and transcribes online meetings (both sides), Caps + Ctrl + Option + M
 
 # Clinical remote access
-cask "citrix-workspace"
 cask "omnissa-horizon-client"
 
 # Communication
@@ -84,19 +83,16 @@ cask "finetune"             # volume and mute for each app separately (macOS has
 
 # Privacy and the homelab
 cask "protonvpn"            # free VPN with no data cap; open-source, audited apps
-cask "tailscale-app"        # private network to your own NAS and servers, from anywhere
 brew "nmap"             # find devices and open ports on your network
 brew "mtr"              # trace where a connection slows or drops
 brew "iperf3"           # measure speed between two machines
 brew "wakeonlan"        # wake the NAS or a server from sleep
 
-# Browser, terminal and music
+# Browser and music
 cask "zen"              # the one browser, and the default
-cask "ghostty"
 cask "spotify"
 
 # Keyboard, windows and clipboard
 cask "karabiner-elements"
 cask "nikitabobko/tap/aerospace"
 cask "maccy"
-cask "espanso"              # text shortcuts (config/espanso)

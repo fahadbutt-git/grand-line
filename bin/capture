@@ -23,7 +23,7 @@ case "${1:-area}" in
     text="$(ocr "$tmp")"
     if [[ -n "$text" ]]; then
       printf '%s' "$text" | pbcopy
-      # Only the length: the text may be patient information from a Citrix
+      # Only the length: the text may be patient information from a Horizon
       # window, and notifications stay in Notification Center and can show
       # on the lock screen.
       notify "Text copied" "Copied $(printf '%s' "$text" | wc -m | tr -d ' ') characters"

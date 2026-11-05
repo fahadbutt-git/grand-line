@@ -56,20 +56,3 @@ personal_ask() {
     } > "$PERSONAL_FILE" )
   printf '\n  Saved to %s\n\n' "$PERSONAL_FILE"
 }
-
-# personal_espanso FILE: write the email shortcuts from your details.
-# Writes nothing (and removes an old copy) when there are none.
-personal_espanso() {
-  local out="$1" signoff signature
-  signoff="$(personal_get SIGNOFF)"; signature="$(personal_get SIGNATURE)"
-  if [[ -z "$signoff$signature" ]]; then
-    [[ -f "$out" ]] && move_to_trash "$out"
-    return 0
-  fi
-  {
-    echo "# Written by setup from $PERSONAL_FILE. Change that file, not this one."
-    echo "matches:"
-    [[ -n "$signoff" ]] && printf '  - trigger: ";br"\n    replace: "Best regards,\\n%s"\n' "${signoff//\"/\\\"}"
-    [[ -n "$signature" ]] && printf '  - trigger: ";sig"\n    replace: "%s"\n' "${signature//\"/\\\"}"
-  } > "$out"
-}

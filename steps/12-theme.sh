@@ -1,14 +1,7 @@
 # shellcheck shell=bash
-# Applies the starting theme once. Later changes come from: theme pick
+# The package no longer styles macOS or any app. Sight and Iceberg use their
+# built-in look until a theme is chosen for them (theme pick).
 
 step_theme() {
-  if [[ -f "$GRAND_LINE_STATE/theme" ]]; then
-    ok "Keeping the current theme: $(cat "$GRAND_LINE_STATE/theme")"
-    return 0
-  fi
-  if [[ "$CI_MODE" == 1 ]]; then
-    run "$REPO_DIR/bin/theme" set graphite --no-wallpaper
-  else
-    run "$REPO_DIR/bin/theme" set graphite
-  fi
+  ok "macOS and your apps keep their own look"
 }

@@ -39,9 +39,9 @@ setopt SHARE_HISTORY HIST_IGNORE_DUPS HIST_IGNORE_SPACE
 
 # Listing files (eza)
 if command -v eza >/dev/null; then
-  alias ls='eza --group-directories-first --icons=auto'
+  alias ls='eza --group-directories-first'
   alias lsa='ls -a'
-  alias lt='eza --tree --level=2 --long --icons=auto --git'
+  alias lt='eza --tree --level=2 --long --git'
   alias lta='lt -a'
 fi
 
@@ -68,9 +68,9 @@ alias gcam='git commit -a -m'
 alias gcad='git commit -a --amend'
 alias lzg='lazygit'
 
-# nx [folder]: open this folder (or another) in Nexus, or Finder if Nexus
-# is not installed. lp, its earlier name, still works for now.
-nx() { open -b com.grandline.nexus "${1:-.}" 2>/dev/null || open "${1:-.}"; }
+# nx [folder]: open this folder (or another) in Finder. lp, its earlier
+# name, still works for now.
+nx() { open "${1:-.}"; }
 alias lp='nx'
 
 # ga branch: a new branch in its own folder beside this one (a git worktree),

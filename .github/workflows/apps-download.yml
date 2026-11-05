@@ -1,6 +1,6 @@
 name: Apps download
 
-# Builds Nexus, Sight and Iceberg exactly as setup does and publishes
+# Builds Sight and Iceberg exactly as setup does and publishes
 # them as a download on the run's page (signed-in GitHub users only), so
 # they can be tried on any Mac without running setup.
 on:
@@ -44,7 +44,7 @@ jobs:
           downloaded in a browser ("Apple could not verify..."). Move them to
           Applications, then run this once in Terminal:
 
-              xattr -dr com.apple.quarantine /Applications/Nexus.app /Applications/Sight.app /Applications/Iceberg.app "/Applications/Grand Line Index.app"
+              xattr -dr com.apple.quarantine /Applications/Sight.app /Applications/Iceberg.app "/Applications/Grand Line Index.app"
 
           These copies do not update themselves. The standard installation builds
           the apps on the Mac instead, which macOS never blocks, and keeps them up

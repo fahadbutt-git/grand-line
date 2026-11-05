@@ -10,7 +10,7 @@
 # DIR is emptied first. Every name is generic test data. --files N adds a
 # bigger tree for the resource budgets (tests/perf): Documents/Bulk with
 # 2,000 items in one folder, and the rest of N spread over nested project
-# folders, so the index and Nexus have a realistic amount to hold.
+# folders, so the index and Sight have a realistic amount to hold.
 
 set -euo pipefail
 

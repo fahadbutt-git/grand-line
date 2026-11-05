@@ -1,3 +1,9 @@
 #!/bin/bash
 echo "duti $*" >> "${STUB_LOG:-/dev/null}"
+# STUB_DUTI_REJECT lists extensions macOS refuses, as it does for a type no
+# installed app declares.
+if [[ "${1:-}" == -s && " ${STUB_DUTI_REJECT:-} " == *" ${3:-} "* ]]; then
+  echo "failed to set ${2:-} as handler for dyn.ah62d4qmxhk2x43dtqq (error -50)" >&2
+  exit 1
+fi
 exit 0

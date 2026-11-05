@@ -13,10 +13,9 @@ let package = Package(
         .library(name: "ThemeKit", targets: ["ThemeKit"]),
         .library(name: "LaunchKit", targets: ["LaunchKit"]),
         .library(name: "BrowserKit", targets: ["BrowserKit"]),
-        .executable(name: "Nexus", targets: ["Nexus"]),
         .library(name: "LauncherKit", targets: ["LauncherKit"]),
         .executable(name: "Sight", targets: ["Sight"]),
-        // The background agent both apps search through (Grand Line Index.app).
+        // The background agent Sight searches through (Grand Line Index.app).
         .executable(name: "GrandLineIndex", targets: ["GrandLineIndex"]),
     ],
     dependencies: [
@@ -58,13 +57,8 @@ let package = Package(
             // SystemPasteboard: files on NSPasteboard.
             linkerSettings: [.linkedFramework("AppKit")]
         ),
-        .executableTarget(
-            name: "Nexus",
-            dependencies: ["BrowserKit", "QueryKit", "IndexKit", "IndexService", "FileKit", "ArchiveKit", "ThemeKit", "LaunchKit", "SettingsKit",
-                           .product(name: "AppIcon", package: "icons"), .product(name: "AppRuntime", package: "icons")],
-            swiftSettings: [.swiftLanguageMode(.v5)],
-            linkerSettings: [.linkedFramework("AppKit"), .linkedFramework("SwiftUI"), .linkedFramework("Quartz"), .linkedFramework("QuickLookThumbnailing")]
-        ),
+        // The Nexus file browser is no longer built or installed. Its sources
+        // stay in Sources/Nexus, outside the build.
         .target(
             name: "LauncherKit",
             dependencies: ["IndexKit", "QueryKit"],

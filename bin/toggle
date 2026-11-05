@@ -2,7 +2,7 @@
 # grandline:summary=Turn a setting on or off (keep awake, dark mode, Wi-Fi, Docker and more)
 # toggle NAME [on|off]   flips NAME, or sets it; a setting already as asked is left alone
 #   NAME: awake | dark | hidden | menubar | desktop-icons | dock | wifi | bluetooth | dnd
-#         mute | mic | ollama | docker | files (Nexus or Finder) | search (Sight or Spotlight)
+#         mute | mic | ollama | docker | search (Sight or Spotlight)
 #   mic is "microphone muted": toggle mic on mutes it, toggle mic off brings it back
 #   dock and menubar are "always shown": off hides them until the pointer reaches them
 # toggle volume N|up|down   sets the output volume (0 to 100) or moves it by 10
@@ -19,7 +19,7 @@ DND_ON_SHORTCUT="${GRAND_LINE_DND_ON:-Do Not Disturb On}"
 DND_OFF_SHORTCUT="${GRAND_LINE_DND_OFF:-Do Not Disturb Off}"
 
 usage() {
-  echo "usage: toggle awake|dark|hidden|menubar|desktop-icons|dock|wifi|bluetooth|dnd|mute|mic|ollama|docker|files|search [on|off]" >&2
+  echo "usage: toggle awake|dark|hidden|menubar|desktop-icons|dock|wifi|bluetooth|dnd|mute|mic|ollama|docker|search [on|off]" >&2
   echo "       toggle volume N|up|down   toggle status [NAME...]" >&2
   exit 2
 }
@@ -36,7 +36,7 @@ case "$name" in
         volume) v="$(volume_level)"; [[ -z "$v" ]] || echo "volume $v"; continue ;;
         bluetooth) command -v blueutil >/dev/null 2>&1 || continue ;;
         wifi) [[ -n "$(wifi_device)" ]] || continue ;;
-        dark|dnd|mute|hidden|dock|desktop-icons|menubar|awake|mic-muted|docker|ollama|files|search) ;;
+        dark|dnd|mute|hidden|dock|desktop-icons|menubar|awake|mic-muted|docker|ollama|search) ;;
         *) continue ;;
       esac
       if is_on "$n"; then echo "$n on"; else echo "$n off"; fi
@@ -213,17 +213,14 @@ case "$name" in
         || say "Docker did not start" "Run in Terminal: colima start"
     fi
     ;;
-  files|search)
-    # shellcheck source=lib/default-apps.sh
-    source "$(dirname "$(readlink -f "$0")")/../lib/default-apps.sh"
+  search)
     # shellcheck source=lib/takeover.sh
     source "$(dirname "$(readlink -f "$0")")/../lib/takeover.sh"
-    if [[ "$name" == files ]]; then app="Nexus" was=Finder; else app=Sight was=Spotlight; fi
     if [[ "$want" == off ]]; then
-      "takeover_$name" off && say "$was is back" "Switch to $app again from the same menu."
+      takeover_search off && say "Spotlight is back" "Switch to Sight again from the same menu."
     else
-      "takeover_$name" on || fail 4 "$app is not installed. Run: update"
-      say "$app is on" "Switch back to $was from the same menu."
+      takeover_search on || fail 4 "Sight is not installed. Run: update"
+      say "Sight is on" "Switch back to Spotlight from the same menu."
     fi
     ;;
   *) usage ;;

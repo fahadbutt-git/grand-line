@@ -13,7 +13,6 @@ step_dotfiles() {
   append_once "export PATH=\"$GRAND_LINE_BIN:$GRAND_LINE_BUILD:\$PATH\"" "$HOME/.zprofile"
 
   link_into_place "$cfg/aerospace/aerospace.toml" "$HOME/.aerospace.toml"
-  link_into_place "$cfg/ghostty" "$HOME/.config/ghostty"
   link_into_place "$cfg/tmux" "$HOME/.config/tmux"
   link_into_place "$cfg/starship.toml" "$HOME/.config/starship.toml"
   link_into_place "$cfg/nvim" "$HOME/.config/nvim"
@@ -41,16 +40,6 @@ step_dotfiles() {
     jq --arg p "$plug" '.cliPluginsExtraDirs = ((.cliPluginsExtraDirs // []) + [$p])' "$dcfg" > "$dcfg.new" \
       && mv "$dcfg.new" "$dcfg" || rm -f "$dcfg.new"
   fi
-
-  # Espanso: the package's shortcuts are linked, its settings copied once so
-  # changes made in Espanso itself are kept.
-  local esp="$HOME/Library/Application Support/espanso"
-  run mkdir -p "$esp/match" "$esp/config"
-  link_into_place "$cfg/espanso/match/grand-line.yml" "$esp/match/grand-line.yml"
-  # Your sign-off and signature, written from personal.env.
-  if [[ "$DRY_RUN" == 1 ]]; then run "write your email shortcuts to $esp/match/personal.yml"
-  else personal_espanso "$esp/match/personal.yml"; fi
-  [[ -f "$esp/config/default.yml" ]] || run cp "$cfg/espanso/config/default.yml" "$esp/config/default.yml"
 
   # Download Neovim's plugins now, so the first launch is instant.
   # Plugin versions are pinned in config/nvim/lazy-lock.json, so a new Mac

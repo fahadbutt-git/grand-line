@@ -444,7 +444,7 @@ def fmt(value, digits=1):
 
 def build_report(budgets, results):
     """Rows for the table and the list of budgets exceeded."""
-    names = ["GrandLineIndex", "Nexus", "Sight", "Iceberg"]
+    names = ["GrandLineIndex", "Sight", "Iceberg"]
     idle = load(results, "idle.json") or {}
     power = load(results, "power-idle.json") or {}
     power_after = load(results, "power-after.json") or {}
@@ -548,10 +548,10 @@ def cmd_report(budgets, results):
     table = ["| " + " | ".join(HEADERS) + " |", "|" + "---|" * len(HEADERS)]
     table += ["| " + " | ".join(r) + " |" for r in rows]
     limits = ("Budgets (tests/perf/budgets.env): idle CPU < %g%% per app and < %g%% in all; wakeups < %g/s; "
-              "GPU < %g ms/s; RSS Sight %g, Nexus %g, Iceberg %g, index %g MB; back under %g%% CPU within %g s "
+              "GPU < %g ms/s; RSS Sight %g, Iceberg %g, index %g MB; back under %g%% CPU within %g s "
               "of a burst; RSS growth < %g%% from burst 2 to 3; shell < %g ms."
               % (budgets["IDLE_CPU_PER_APP"], budgets["IDLE_CPU_TOTAL"], budgets["IDLE_WAKEUPS_PER_APP"],
-                 budgets["IDLE_GPU_MS_PER_S"], budgets["RSS_MB_Sight"], budgets["RSS_MB_Nexus"],
+                 budgets["IDLE_GPU_MS_PER_S"], budgets["RSS_MB_Sight"],
                  budgets["RSS_MB_Iceberg"], budgets["RSS_MB_GrandLineIndex"], budgets["DECAY_CPU"],
                  budgets["DECAY_SECONDS"], budgets["RSS_GROWTH_PCT"], budgets["SHELL_MEDIAN_MS"]))
     text = "\n".join(table)

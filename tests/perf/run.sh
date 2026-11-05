@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Resource budgets: starts Grand Line Index, Nexus, Sight and Iceberg with a
+# Resource budgets: starts Grand Line Index, Sight and Iceberg with a
 # fixture home of a few thousand files (the journeys' fixture, bigger),
 # measures them idle and after bursts of use, checks that nothing takes the
 # keyboard from the app you are typing in, and compares everything with
@@ -64,12 +64,12 @@ if [ -z "$apps_dir" ]; then
       || { echo "Could not build $folder" >&2; exit 1; }
   done
 fi
-for app in Nexus Sight Iceberg "Grand Line Index"; do
+for app in Sight Iceberg "Grand Line Index"; do
   [ -d "$apps_dir/$app.app" ] || { echo "No $app.app in $apps_dir" >&2; exit 1; }
 done
 
 running=""
-for name in Nexus Sight Iceberg; do pgrep -x "$name" >/dev/null && running="$running $name"; done
+for name in Sight Iceberg; do pgrep -x "$name" >/dev/null && running="$running $name"; done
 if [ -n "$running" ]; then
   if [ "$quit_running" = 1 ]; then
     for name in $running; do osascript -e "tell application id \"com.grandline.$(echo "$name" | tr '[:upper:]' '[:lower:]')\" to quit" >/dev/null 2>&1 || pkill -TERM -x "$name"; done
@@ -110,7 +110,7 @@ PY
 
 stop_all() {
   [ -n "${focus_file:-}" ] && pkill -x TextEdit >/dev/null 2>&1
-  for name in Nexus Sight Iceberg; do pkill -TERM -x "$name" >/dev/null 2>&1; done
+  for name in Sight Iceberg; do pkill -TERM -x "$name" >/dev/null 2>&1; done
   launchctl bootout "$domain/$label" >/dev/null 2>&1
   return 0
 }
@@ -123,9 +123,8 @@ bash "$repo/tests/journeys/make-fixture.sh" --files "$files" "$home" >/dev/null 
 count="$(find "$home" -not -path '*/Library/*' -not -path '*/.Trash/*' | wc -l | tr -d ' ')"
 printf '{"files": %s}\n' "$count" > "$results/fixture.json"
 
-say "Starting Grand Line Index, Nexus, Sight and Iceberg"
+say "Starting Grand Line Index, Sight and Iceberg"
 start_index || { echo "launchctl would not start the index" >&2; exit 1; }
-start_app Nexus
 start_app Sight
 start_app Iceberg
 
@@ -135,8 +134,8 @@ for _ in $(seq 1 180); do [ -f "$snapshot" ] && break; sleep 1; done
 [ -f "$snapshot" ] || notice "the index wrote no snapshot within 3 minutes; measuring anyway"
 pid="$(index_pid)"
 [ -n "$pid" ] || { echo "The index is not running" >&2; exit 1; }
-specs=("GrandLineIndex=$pid" Nexus Sight Iceberg)
-for name in Nexus Sight Iceberg; do pgrep -x "$name" >/dev/null || { echo "$name did not start" >&2; exit 1; }; done
+specs=("GrandLineIndex=$pid" Sight Iceberg)
+for name in Sight Iceberg; do pgrep -x "$name" >/dev/null || { echo "$name did not start" >&2; exit 1; }; done
 say "Settling for $SETTLE_SECONDS s"
 sleep "$SETTLE_SECONDS"
 
@@ -163,16 +162,13 @@ burst() {
     escape
     sleep 0.2
   done
-  # One folder of 2,000 items in Nexus (the same window each round).
-  open -g -a "$apps_dir/Nexus.app" "$home/Documents/Bulk" >/dev/null 2>&1
-  sleep 3
   for _ in 1 2 3 4 5 6 7 8 9 10; do
     open -g -a "$apps_dir/Iceberg.app" "iceberg://open" >/dev/null 2>&1
     sleep 0.6
     open -g -a "$apps_dir/Iceberg.app" "iceberg://close" >/dev/null 2>&1
     sleep 0.4
   done
-  # 500 changed files for the index (and Nexus's watcher) to take in.
+  # 500 changed files for the index to take in.
   find "$home/Documents/Tree" -type f | head -500 | xargs touch
   sleep 2
 }

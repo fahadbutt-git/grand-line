@@ -1,34 +1,27 @@
 #!/bin/bash
-# grandline:summary=Change the theme (terminal, editor, menus, tools, wallpaper) or background
+# grandline:summary=Choose the colours of Sight and Iceberg (nothing else is restyled)
 # theme pick                    choose a theme from a menu
-# theme set NAME [--no-wallpaper]   a theme, or a family (harbour, lantern, signal,
+# theme set NAME                a theme, or a family (harbour, lantern, signal,
 #                               ledger, atlas, paper) in the variant matching the
 #                               current macOS appearance
 # theme mode dark|light|toggle  the other variant of the current family
 #                               (Graphite and Daylight pair up too)
-# theme apply                   render every template for the current theme again
-#                               and reload the terminal, tmux, btop, Neovim and
-#                               the apps
-# theme refresh                 the same, but the tools and apps are reloaded
-#                               only when the rendered theme changed (the
-#                               updates use it, so they never interrupt you)
+# theme apply | refresh         tell Sight and Iceberg to read the theme again
 # theme check [--strict] [NAME|FILE...]   check themes (all of them by default):
 #                               FILE:LINE messages, fails on an error (with
 #                               --strict, on a warning too)
 # theme resolve NAME|FILE       the theme with its parent and defaults filled in
 # theme import-base16 FILE.yaml NAME [--force]   a theme made from a base16 scheme
-# theme next-background         cycle through ~/Pictures/Backgrounds
 # theme list
-# theme icons [NAME]            the installed apps' Finder icons in the theme's
+# theme icons [NAME]            the package's apps' Finder icons in the theme's
 #                               colours (set and mode do this in the background)
+# A theme only colours the package's own apps, Sight and Iceberg. It never
+# changes macOS (appearance, accent colour, wallpaper) or any other app or
+# tool. With no theme chosen, Sight and Iceberg use their built-in look.
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 
 REPO="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 THEMES="$REPO/config/themes"
-BACKGROUNDS="$BACKGROUNDS_DIR"
-CURRENT="$GRAND_LINE_STATE/current"
-THEME_OUT="$CURRENT/theme"                       # rendered templates, read by apps
-USER_TEMPLATES="$HOME/.config/grand-line/themed"  # your templates win over the package's
 # shellcheck source=lib/templates.sh
 source "$REPO/lib/templates.sh"
 # shellcheck source=lib/signing.sh
@@ -38,7 +31,7 @@ source "$REPO/lib/app-icons.sh"
 # shellcheck source=lib/lock.sh
 source "$REPO/lib/lock.sh"
 
-# One theme change at a time: two of them share the rendered folders, and
+# One theme change at a time: two of them share the state file, and
 # one could remove the other's work. A change waits a few seconds for one
 # already running (they take well under a second).
 THEME_LOCK="$GRAND_LINE_STATE/theme.lock"
@@ -63,137 +56,7 @@ icons_in_background() {
     </dev/null >/dev/null 2>&1 &
 }
 
-set_wallpaper() {
-  local img="$1"
-  [[ -f "$img" ]] || return 1
-  osascript - "$img" <<'EOF' >/dev/null 2>&1
-on run argv
-  tell application "System Events" to tell every desktop to set picture to (POSIX file (item 1 of argv))
-end run
-EOF
-  printf '%s\n' "$img" > "$GRAND_LINE_STATE/background"
-}
-
-# Render every template into a fresh folder, then swap it in whole, so an
-# app never reads a half-written theme. THEME_CHANGED is 1 when the result
-# differs from what was in place.
-render_theme() {
-  local name="$1" file="$2" next="$CURRENT/next-theme"
-  THEME_CHANGED=1
-  rm -rf "$next" "$CURRENT/theme.old"
-  mkdir -p "$CURRENT"
-  render_templates "$file" "$name" "$next" "$USER_TEMPLATES" "$REPO/config/themed" || { rm -rf "$next"; return 1; }
-  [[ -d "$THEME_OUT" ]] && diff -rq "$next" "$THEME_OUT" >/dev/null 2>&1 && THEME_CHANGED=0
-  if [[ -d "$THEME_OUT" ]]; then
-    mv "$THEME_OUT" "$CURRENT/theme.old" || { rm -rf "$next"; return 1; }
-  fi
-  if mv "$next" "$THEME_OUT"; then
-    rm -rf "$CURRENT/theme.old"
-  else
-    [[ -d "$CURRENT/theme.old" ]] && mv "$CURRENT/theme.old" "$THEME_OUT"
-    rm -rf "$next"
-    return 1
-  fi
-}
-
-# put SRC DEST: copy only when different, so a file an app watches is
-# rewritten only when it changed.
-put() { cmp -s "$1" "$2" || cp "$1" "$2"; }
-
-# Put the rendered files where each app looks for them.
-install_theme_outputs() {
-  local out="$THEME_OUT"
-  # ~/.config/ghostty links to the package; theme.conf is listed in .gitignore.
-  if [[ -f "$out/ghostty.conf" ]]; then
-    [[ -d "$HOME/.config/ghostty" ]] || mkdir -p "$HOME/.config/ghostty"
-    put "$out/ghostty.conf" "$HOME/.config/ghostty/theme.conf"
-  fi
-
-  # btop: the theme file always, the setting only if you have not chosen one.
-  if [[ -f "$out/btop.theme" ]]; then
-    local btop="$HOME/.config/btop"
-    mkdir -p "$btop/themes" && put "$out/btop.theme" "$btop/themes/grand-line.theme"
-    if [[ ! -f "$btop/btop.conf" ]] || ! grep -q '^color_theme' "$btop/btop.conf"; then
-      printf 'color_theme = "grand-line"\n' >> "$btop/btop.conf"
-    elif grep -qE '^color_theme *= *"Default"' "$btop/btop.conf"; then
-      perl -i -pe 's/^color_theme *= *"Default"/color_theme = "grand-line"/' "$btop/btop.conf"
-    fi
-  fi
-
-  # lazygit: linked only when you have no settings file of your own.
-  local lg="$HOME/Library/Application Support/lazygit/config.yml"
-  if [[ -f "$out/lazygit.yml" && ! -e "$lg" && ! -L "$lg" ]]; then
-    mkdir -p "$(dirname "$lg")" && ln -s "$out/lazygit.yml" "$lg"
-  fi
-
-  # Claude Code lists ~/.claude/themes in /theme and reloads it on change.
-  # Choosing it there (once) is left to you.
-  if [[ -f "$out/claude.json" && -d "$HOME/.claude" ]]; then
-    mkdir -p "$HOME/.claude/themes" && put "$out/claude.json" "$HOME/.claude/themes/grand-line.json"
-  fi
-}
-
-# version_at_least VERSION MINIMUM: both dotted numbers (1.2.3).
-version_at_least() {
-  local a b i x y
-  IFS=. read -r -a a <<< "$1"
-  IFS=. read -r -a b <<< "$2"
-  for i in 0 1 2; do
-    x="${a[$i]:-0}"; y="${b[$i]:-0}"
-    x="${x%%[!0-9]*}"; y="${y%%[!0-9]*}"
-    [[ "${x:-0}" -gt "${y:-0}" ]] && return 0
-    [[ "${x:-0}" -lt "${y:-0}" ]] && return 1
-  done
-  return 0
-}
-
-# The ghostty command: on the PATH, or inside the app.
-ghostty_command() {
-  local p
-  for p in "$(command -v ghostty 2>/dev/null)" /Applications/Ghostty.app/Contents/MacOS/ghostty \
-           "$HOME/Applications/Ghostty.app/Contents/MacOS/ghostty"; do
-    [[ -n "$p" && -x "$p" ]] && { echo "$p"; return 0; }
-  done
-  return 1
-}
-
-# Every running tool takes the rendered theme now. A signal goes only to a
-# version that handles it (Ghostty 1.2 and btop 1.3.1 reload their settings
-# on SIGUSR2; older ones would quit), so an older one keeps its colours until
-# it next starts.
-reload_tools() {
-  local mode="$1" scheme="$2" bin version sock
-
-  # Ghostty: the new theme.conf in every open window.
-  if pgrep -x ghostty >/dev/null 2>&1 && bin="$(ghostty_command)"; then
-    version="$("$bin" +version 2>/dev/null | sed -n 's/^Ghostty \([0-9][0-9.]*\).*/\1/p' | head -1)"
-    [[ -n "$version" ]] && version_at_least "$version" 1.2 && pkill -USR2 -x ghostty >/dev/null 2>&1
-  fi
-
-  # tmux sources the colours from config/tmux/tmux.conf; a running server
-  # takes them now, status bar included.
-  if [[ -f "$THEME_OUT/tmux.conf" ]] && command -v tmux >/dev/null 2>&1 && tmux info >/dev/null 2>&1; then
-    tmux source-file "$THEME_OUT/tmux.conf" >/dev/null 2>&1
-  fi
-
-  # btop: reread btop.conf and the theme file.
-  if pgrep -x btop >/dev/null 2>&1 && command -v btop >/dev/null 2>&1; then
-    version="$(btop --version 2>/dev/null | sed -n 's/.*version:* *\([0-9][0-9.]*\).*/\1/p' | head -1)"
-    [[ -n "$version" ]] && version_at_least "$version" 1.3.1 && pkill -USR2 -x btop >/dev/null 2>&1
-  fi
-
-  # Neovim: every running editor switches scheme (lazy.nvim loads it on use).
-  # MODE and NVIM passed the checker, so they are plain lower-case words.
-  if command -v nvim >/dev/null 2>&1; then
-    for sock in "${TMPDIR:-/tmp}"/nvim."${USER:-$(id -un)}"/*/nvim.*.0; do
-      [[ -S "$sock" ]] || continue
-      nvim --server "$sock" --remote-expr "execute('set background=$mode | silent! colorscheme $scheme')" \
-        </dev/null >/dev/null 2>&1 &
-    done
-  fi
-}
-
-# Nexus, Sight and Iceberg reload at once on this notification (they also
+# Sight and Iceberg reload at once on this notification (they also
 # watch the files, which takes a moment longer). JavaScript for Automation
 # posts it, so no helper needs building; it sends no Apple events.
 THEME_CHANGED_JS='function run(argv) { ObjC.import("Foundation"); $.NSDistributedNotificationCenter.defaultCenter.postNotificationNameObjectUserInfoDeliverImmediately("com.grandline.theme.changed", argv[0], null, true); }'
@@ -249,27 +112,11 @@ value() {
   line="${line#*=}"; line="${line#\"}"; printf '%s\n' "${line%\"}"
 }
 
-# apply_outputs NAME FILE [changed]: render the templates, put them in
-# place, reload every tool and tell the apps (apply). With "changed" (refresh),
-# the tools and apps are reloaded only when the rendered theme changed.
-apply_outputs() {
-  local name="$1" file="$2" when="${3:-always}" resolved
-  resolved="$(theme_resolve "$file" "$REPO" 2>/dev/null)" || resolved=""
-  theme_lock || return 1
-  if ! render_theme "$name" "$file"; then
-    echo "theme $name could not be rendered; nothing changed" >&2
-    theme_unlock; return 1
-  fi
-  install_theme_outputs
-  theme_unlock
-  [[ "$when" == changed && "$THEME_CHANGED" == 0 ]] && return 0
-  reload_tools "$(value MODE)" "$(value NVIM)"
-  post_theme_changed "$name"
-}
-
+# apply_theme NAME [MODE]: record the theme for Sight and Iceberg and tell
+# them. Nothing else changes.
 apply_theme() {
-  local name wallpaper="${2:-yes}" file resolved
-  name="$(resolve_name "$1" "${3:-}")"
+  local name file resolved
+  name="$(resolve_name "$1" "${2:-}")"
   file="$THEMES/$name.theme"
   if [[ ! -f "$file" ]]; then
     echo "No theme called '$name'. Themes: $(cd "$THEMES" && ls ./*.theme | sed -e 's#^\./##' -e 's/\.theme$//' | tr '\n' ' ')" >&2
@@ -277,39 +124,11 @@ apply_theme() {
   fi
   # The checker's messages (errors stop here, warnings go to stderr).
   resolved="$(theme_resolve "$file" "$REPO")" || { echo "theme $name has errors; nothing changed" >&2; return 1; }
-  local label mode accent background
-  label="$(value LABEL)"; mode="$(value MODE)"; accent="$(value ACCENT)"; background="$(value BACKGROUND)"
-
-  # The theme's files first: if they cannot be made, nothing else changes
-  # (not the appearance, not the accent), and the reason is shown.
   theme_lock || return 1
-  if ! render_theme "$name" "$file"; then
-    echo "theme $name could not be rendered; nothing changed" >&2
-    theme_unlock; return 1
-  fi
-
-  # Test machines cannot answer macOS's Automation prompt, so they skip it.
-  if [[ -z "${GRAND_LINE_NO_APPLEEVENTS:-}" ]]; then
-    local dark=false; [[ "$mode" == dark ]] && dark=true
-    osascript -e "tell application \"System Events\" to tell appearance preferences to set dark mode to $dark" >/dev/null 2>&1
-  fi
-
-  if [[ "$accent" == multicolor ]]; then
-    defaults delete -g AppleAccentColor >/dev/null 2>&1
-  else
-    defaults write -g AppleAccentColor -int "$accent"
-  fi
-
-  install_theme_outputs
-
-  if [[ "$wallpaper" == yes && -z "${GRAND_LINE_NO_APPLEEVENTS:-}" ]]; then
-    set_wallpaper "$BACKGROUNDS/$background" || set_wallpaper "$REPO/backgrounds/$background"
-  fi
-  printf '%s\n' "$name" > "$GRAND_LINE_STATE/theme"
+  mkdir -p "$GRAND_LINE_STATE" && printf '%s\n' "$name" > "$GRAND_LINE_STATE/theme"
   theme_unlock
-  reload_tools "$mode" "$(value NVIM)"
   post_theme_changed "$name"
-  notify "Theme: $label" "Accent colour applies to newly opened windows."
+  notify "Theme: $(value LABEL)" "Sight and Iceberg use it now."
   icons_in_background "$name"
   "$REPO/bin/hook" theme-set "$name"
 }
@@ -433,15 +252,15 @@ case "${1:-pick}" in
     theme_names
     ;;
   set)
-    [[ -n "${2:-}" ]] || { echo "usage: theme set NAME [--no-wallpaper]" >&2; exit 2; }
-    if [[ "${3:-}" == "--no-wallpaper" ]]; then apply_theme "$2" no; else apply_theme "$2" yes; fi
+    [[ -n "${2:-}" ]] || { echo "usage: theme set NAME" >&2; exit 2; }
+    apply_theme "$2"
     ;;
   pick)
     current="$(cat "$GRAND_LINE_STATE/theme" 2>/dev/null)"
     choice="$(theme_names | while IFS= read -r n; do
                 if [[ "$n" == "$current" ]]; then echo "$n (current)"; else echo "$n"; fi
               done | pick)" || exit 0
-    [[ -n "$choice" ]] && apply_theme "${choice% (current)}" yes
+    [[ -n "$choice" ]] && apply_theme "${choice% (current)}"
     ;;
   mode)
     current="$(cat "$GRAND_LINE_STATE/theme" 2>/dev/null)"
@@ -459,14 +278,16 @@ case "${1:-pick}" in
       *) target="$family-$want" ;;
     esac
     [[ -f "$THEMES/$target.theme" ]] || { echo "No $want variant of $current" >&2; exit 1; }
-    apply_theme "$target" no
+    apply_theme "$target"
     ;;
-  apply|refresh)
+  apply)
     current="$(cat "$GRAND_LINE_STATE/theme" 2>/dev/null)"
     [[ -n "$current" ]] || exit 0
-    [[ -f "$THEMES/$current.theme" ]] || current=daylight
-    when=always; [[ "$1" == refresh ]] && when=changed
-    apply_outputs "$current" "$THEMES/$current.theme" "$when"
+    post_theme_changed "$current"
+    ;;
+  refresh)
+    # The apps watch the theme file themselves, so an update has nothing to do.
+    exit 0
     ;;
   check)
     shift
@@ -496,22 +317,5 @@ case "${1:-pick}" in
     [[ -n "$current" && -f "$THEMES/$current.theme" ]] || exit 0
     refresh_app_icons "$current" "$REPO"
     ;;
-  next-background)
-    images=()
-    while IFS= read -r img; do images+=("$img"); done < <(
-      find "$BACKGROUNDS" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.heic' \) | sort)
-    if [[ ${#images[@]} -eq 0 ]]; then
-      notify "No backgrounds" "Add images to $BACKGROUNDS"; exit 1
-    fi
-    current="$(cat "$GRAND_LINE_STATE/background" 2>/dev/null)"
-    next="${images[0]}"
-    for i in "${!images[@]}"; do
-      if [[ "${images[$i]}" == "$current" ]]; then
-        next="${images[$(( (i + 1) % ${#images[@]} ))]}"
-        break
-      fi
-    done
-    set_wallpaper "$next"
-    ;;
-  *) echo "usage: theme pick | set NAME | mode dark|light|toggle | apply | check [--strict] [NAME...] | resolve NAME | import-base16 FILE NAME | next-background | list | icons [NAME]" >&2; exit 2 ;;
+  *) echo "usage: theme pick | set NAME | mode dark|light|toggle | apply | check [--strict] [NAME...] | resolve NAME | import-base16 FILE NAME | list | icons [NAME]" >&2; exit 2 ;;
 esac
