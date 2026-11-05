@@ -11,6 +11,7 @@ final class ThemeStore: ObservableObject {
 
     init() {
         theme = watcher.theme
+        Motion.themeReduced = theme.tokens.motion == .reduced
         watcher.start()
         let themes = watcher.themes
         task = Task { [weak self] in
@@ -20,6 +21,7 @@ final class ThemeStore: ObservableObject {
     }
 
     private func apply(_ theme: Theme) {
+        Motion.themeReduced = theme.tokens.motion == .reduced
         self.theme = theme
         applyIcon(theme)
     }

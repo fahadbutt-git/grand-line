@@ -3,6 +3,13 @@ import Combine
 import LauncherKit
 import SwiftUI
 
+/// Whether the window is materialised: the view scales and blurs in and out
+/// with it, anchored to the top edge, while the window fades.
+@MainActor
+final class PanelPresence: ObservableObject {
+    @Published var shown = false
+}
+
 /// Shows and hides the one resident search window, routes keys to the model,
 /// and remembers the app that was in front.
 @MainActor
@@ -10,7 +17,12 @@ final class PanelController: NSObject, NSWindowDelegate {
     let services: Services
     let model: SearchModel
     let themes = ThemeStore()
+    let presence = PanelPresence()
     private let panel: SearchPanel
+    /// Counts each show and hide, so a fade that finishes late never hides a window shown again.
+    private var generation = 0
+    /// The window is fading out: still on screen, no longer taking clicks.
+    private var dismissing = false
     private var monitor: Any?
     private var changes: AnyCancellable?
     private var shadowPending = false
@@ -24,11 +36,13 @@ final class PanelController: NSObject, NSWindowDelegate {
         self.model = SearchModel(services: services)
         self.panel = SearchPanel(size: NSSize(width: Metrics.width + Metrics.preview + 40, height: 560))
         super.init()
-        let root = SearchView(model: model, themes: themes)
+        let root = SearchView(model: model, themes: themes, presence: presence)
         panel.contentView = NSHostingView(rootView: root)
         panel.delegate = self
         model.hide = { [weak self] in self?.hide() }
         model.show = { [weak self] in self?.show() }
+        // Typing, pasting or pressing a menu item in the app in front needs the keys at once.
+        model.performer.willActInFrontApp = { [weak self] in self?.finishDismissal() }
         // App icons are read in the background; the rows redraw when they arrive.
         IconCache.onLoad = { [weak self] in
             guard let self, self.panel.isVisible else { return }
@@ -61,7 +75,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.layoutIfNeeded()
     }
 
-    var isVisible: Bool { panel.isVisible }
+    var isVisible: Bool { panel.isVisible && !dismissing }
 
     func toggle() {
         isVisible ? hide() : show()
@@ -82,9 +96,19 @@ final class PanelController: NSObject, NSWindowDelegate {
         if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
             model.performer.previousApp = front
         }
-        position()
+        // Shown again while it fades out: it turns back from where it is, in place.
+        if !panel.isVisible {
+            position()
+            panel.alphaValue = 0
+        } else if !dismissing {
+            position()
+        }
+        dismissing = false
+        panel.ignoresMouseEvents = false
+        generation += 1
         panel.appearance = NSAppearance(named: themes.theme.appearanceName)
         panel.makeKeyAndOrderFront(nil)
+        materialise()
         onVisibilityChange?(true)
         // The field exists once SwiftUI has laid the window out, the first time only.
         if model.field == nil { panel.layoutIfNeeded() }
@@ -104,14 +128,83 @@ final class PanelController: NSObject, NSWindowDelegate {
         }
     }
 
-    func hide() {
+    /// Hides the window along the path it came in: it fades, scales and blurs
+    /// towards its top edge. `animated: false` takes it away at once (Settings
+    /// opening, an action that needs the keys in the app in front).
+    func hide(animated: Bool = true) {
         StallPhase.begin("hide")
         defer { StallPhase.end() }
         model.actionPanel = nil
         model.didHide()
-        let wasVisible = panel.isVisible
+        let wasVisible = panel.isVisible && !dismissing
+        guard wasVisible else {
+            if !animated { finishDismissal() }
+            return
+        }
+        onVisibilityChange?(false)
+        guard animated else {
+            generation += 1
+            dismissing = false
+            orderOutNow()
+            return
+        }
+        dematerialise()
+    }
+
+    /// Fades in and, unless Reduce Motion is on, scales and unblurs from the top edge.
+    private func materialise() {
+        let reduced = Motion.reduced
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = reduced ? Motion.fadeDuration : Motion.windowIn
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            context.allowsImplicitAnimation = true
+            panel.animator().alphaValue = 1
+        } completionHandler: { [weak self] in
+            // The shadow follows the settled shape, not a frame of the scale.
+            MainActor.assumeIsolated { self?.panel.invalidateShadow() }
+        }
+        withAnimation(reduced ? Motion.fade : Motion.present) { presence.shown = true }
+    }
+
+    /// The same path out: the window stops taking clicks at once, fades, and
+    /// orders out when the fade ends, unless it was shown again meanwhile.
+    private func dematerialise() {
+        dismissing = true
+        panel.ignoresMouseEvents = true
+        generation += 1
+        let mine = generation
+        let reduced = Motion.reduced
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = reduced ? Motion.fadeDuration : Motion.windowOut
+            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            context.allowsImplicitAnimation = true
+            panel.animator().alphaValue = 0
+        } completionHandler: { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.generation == mine, self.dismissing else { return }
+                self.dismissing = false
+                self.orderOutNow()
+            }
+        }
+        withAnimation(reduced ? Motion.fade : Motion.present) { presence.shown = false }
+    }
+
+    /// Ends a fade at once, so the window no longer holds the keys.
+    func finishDismissal() {
+        guard dismissing else { return }
+        generation += 1
+        dismissing = false
+        orderOutNow()
+    }
+
+    private func orderOutNow() {
         panel.orderOut(nil)
-        if wasVisible { onVisibilityChange?(false) }
+        panel.alphaValue = 1
+        panel.ignoresMouseEvents = false
+        // Away, so the next show materialises from the same place.
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { presence.shown = false }
     }
 
     /// Centred on the screen with the pointer, a fifth of the way down.
@@ -130,7 +223,7 @@ final class PanelController: NSObject, NSWindowDelegate {
             if model.settingsRunningOpen > 0 { model.keysLostDuringSetting = true }
             let justChanged = model.lastSettingEnded.map { Date().timeIntervalSince($0) < 3 } ?? false
             if model.settingsRunningOpen > 0 || justChanged { comeBackIfFinderRestarts() }
-            hide()
+            if !dismissing { hide() }
         }
     }
 
@@ -179,7 +272,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         )
         if flags == .command, event.charactersIgnoringModifiers == ",", let openSettings {
             // Hidden first, so Settings never opens under the floating search window.
-            hide()
+            hide(animated: false)
             openSettings()
             return true
         }

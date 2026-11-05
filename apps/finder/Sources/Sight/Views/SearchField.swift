@@ -12,25 +12,33 @@ struct SearchField: NSViewRepresentable {
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
-        field.font = .systemFont(ofSize: 17)
+        field.font = Typo.fieldNS
         field.cell?.lineBreakMode = .byTruncatingTail
         field.cell?.isScrollable = true
         field.delegate = context.coordinator
         model.field = field
-        style(field)
+        style(field, context.coordinator)
         return field
     }
 
     func updateNSView(_ field: NSTextField, context: Context) {
         if field.stringValue != model.text { field.stringValue = model.text }
-        style(field)
+        style(field, context.coordinator)
     }
 
-    private func style(_ field: NSTextField) {
+    /// Colours and the placeholder, set again only when the theme or the
+    /// placeholder changes, never on each keystroke.
+    private func style(_ field: NSTextField, _ coordinator: Coordinator) {
+        let key = "\(theme.strong.hex) \(theme.faint.hex) \(theme.accent.hex) \(model.placeholder)"
+        if let editor = field.currentEditor() as? NSTextView {
+            editor.insertionPointColor = NSColor(theme.accent)
+        }
+        guard coordinator.styled != key else { return }
+        coordinator.styled = key
         field.textColor = NSColor(theme.strong)
         field.placeholderAttributedString = NSAttributedString(
             string: model.placeholder,
-            attributes: [.foregroundColor: NSColor(theme.faint), .font: NSFont.systemFont(ofSize: 17)]
+            attributes: [.foregroundColor: NSColor(theme.faint), .font: Typo.fieldNS]
         )
     }
 
@@ -38,6 +46,8 @@ struct SearchField: NSViewRepresentable {
 
     final class Coordinator: NSObject, NSTextFieldDelegate {
         let model: SearchModel
+        /// What the field was last styled with.
+        var styled = ""
 
         init(model: SearchModel) { self.model = model }
 

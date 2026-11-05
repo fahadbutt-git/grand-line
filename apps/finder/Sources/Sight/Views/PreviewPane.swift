@@ -14,7 +14,7 @@ struct PreviewPane: View {
         } else {
             ScrollView {
                 Text(row.detail ?? "")
-                    .font(.system(size: 13))
+                    .font(Typo.row)
                     .foregroundStyle(Color(theme.text))
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)

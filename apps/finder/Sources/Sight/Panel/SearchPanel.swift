@@ -1,7 +1,8 @@
 import AppKit
 
 /// A borderless panel that takes keys without activating Sight, so the app
-/// in front stays in front. Clear, so the rounded window draws its own shape.
+/// in front stays in front. Clear, so the rounded material draws its own
+/// shape and the window shadow follows it.
 final class SearchPanel: NSPanel {
     init(size: NSSize) {
         super.init(
@@ -20,7 +21,9 @@ final class SearchPanel: NSPanel {
         hasShadow = true
         isMovableByWindowBackground = false
         isReleasedWhenClosed = false
-        // No fade: the window is there the moment the shortcut is pressed.
+        // No system animation: PanelController materialises the window itself
+        // (fade, scale and blur together, from the top edge), starting on the
+        // frame the shortcut is pressed.
         animationBehavior = .none
     }
 

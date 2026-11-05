@@ -2,10 +2,13 @@ import LauncherKit
 import SwiftUI
 import ThemeKit
 
-/// Section headers and rows; the selected row is kept in view.
+/// Section headers and rows; the selected row is kept in view. The list
+/// itself never animates as the query changes, so typing is never held up.
+/// Only the highlight glides when the arrow keys move it.
 struct ResultsList: View {
     @ObservedObject var model: SearchModel
     let theme: Theme
+    @Namespace private var selection
 
     var body: some View {
         let selectedID = model.list.selected?.id
@@ -14,24 +17,29 @@ struct ResultsList: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(model.list.groups) { group in
                         Text(group.section.title)
-                            .font(.system(size: 11, weight: .medium))
+                            .font(Typo.heading)
                             .foregroundStyle(Color(theme.dim))
                             .lineLimit(1)
                             .frame(maxWidth: .infinity, minHeight: Metrics.header, alignment: .leading)
-                            .padding(.horizontal, 14)
+                            .padding(.horizontal, Space.column)
+                            .accessibilityAddTraits(.isHeader)
                         ForEach(group.rows) { row in
-                            ResultRow(row: row, selected: row.id == selectedID, number: model.list.shortcutNumber(of: row.id),
-                                      held: row.id == selectedID ? model.held : .none, theme: theme)
-                                .modifier(SettingRowAccessibility(row: row))
-                                .id(row.id)
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    model.select(row)
-                                    if let action = row.primary { model.run(action, on: row) }
-                                }
+                            let selected = row.id == selectedID
+                            PressableRow(action: {
+                                model.select(row)
+                                if let action = row.primary { model.run(action, on: row) }
+                            }) { pressed, hovered in
+                                ResultRow(row: row, selected: selected, number: model.list.shortcutNumber(of: row.id),
+                                          held: selected ? model.held : .none, theme: theme)
+                                    .background(RowHighlight(theme: theme, selected: selected, pressed: pressed,
+                                                             hovered: hovered, namespace: selection))
+                            }
+                            .modifier(SettingRowAccessibility(row: row))
+                            .id(row.id)
                         }
                     }
                 }
+                .padding(.vertical, Metrics.listInset)
             }
             .scrollIndicators(.never)
             .onChange(of: selectedID) { _, id in
@@ -60,7 +68,9 @@ struct SettingRowAccessibility: ViewModifier {
     }
 }
 
-/// One dense row: icon, title with matched letters, where it is, a date or keys, and ⌘N.
+/// One dense row: icon, title with matched letters, where it is, a date or
+/// keys, and ⌘N. The title keeps its weight when selected, so nothing reflows
+/// as the highlight moves.
 struct ResultRow: View {
     let row: LaunchResult
     let selected: Bool
@@ -71,17 +81,17 @@ struct ResultRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            ResultIconView(icon: row.icon, theme: theme)
+            ResultIconView(icon: row.icon, theme: theme, selected: selected)
                 .frame(width: 22, height: 22)
             Text(title)
-                .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                .font(Typo.row)
                 .foregroundStyle(Color(selected ? theme.selectionText : theme.text))
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .layoutPriority(1)
             Text(ModifierPreview.subtitle(for: row, held: held) ?? row.subtitle)
-                .font(.system(size: 11))
+                .font(Typo.detail)
                 .foregroundStyle(Color(held == .none ? theme.dim : theme.highlight))
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -89,33 +99,26 @@ struct ResultRow: View {
             trailing
                 .frame(minWidth: 70, alignment: .trailing)
             Text(number.map { "⌘\($0)" } ?? "")
-                .font(.system(size: 11).monospacedDigit())
+                .font(Typo.detail.monospacedDigit())
                 .foregroundStyle(Color(theme.faint))
                 .frame(width: 24, alignment: .trailing)
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, Space.column)
         .frame(height: Metrics.row)
-        .background(selected ? Color(theme.selection) : Color.clear)
-        .overlay(alignment: .top) { Rectangle().fill(Color(theme.hairline)).frame(height: 1) }
     }
 
     @ViewBuilder private var trailing: some View {
         if !row.keys.isEmpty {
             HStack(spacing: 3) {
                 ForEach(Array(row.keys.enumerated()), id: \.offset) { _, key in
-                    Text(key)
-                        .font(.system(size: 11))
-                        .lineLimit(1)
-                        .padding(.horizontal, 4)
-                        .background(RoundedRectangle(cornerRadius: 5).fill(Color(theme.chip)))
+                    Keycap(keys: key, theme: theme)
                 }
             }
-            .foregroundStyle(Color(theme.text))
             // Key caps keep their size; the title gives way.
             .fixedSize()
         } else {
             Text(row.accessory)
-                .font(.system(size: 11).monospacedDigit())
+                .font(Typo.detail.monospacedDigit())
                 .foregroundStyle(Color(theme.dim))
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -140,26 +143,31 @@ struct ResultRow: View {
 struct ResultIconView: View {
     let icon: ResultIcon
     let theme: Theme
+    var selected = false
 
     var body: some View {
         switch icon {
         case .symbol(let name):
             Image(systemName: name)
-                .font(.system(size: 14))
-                .foregroundStyle(Color(theme.dim))
+                .font(.title3)
+                .imageScale(.small)
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color(selected ? theme.selectionText : theme.dim))
         case .app(let path):
             if let image = IconCache.cached(path) {
                 Image(nsImage: image)
                     .resizable()
-                    .frame(width: 20, height: 20)
+                    .interpolation(.high)
+                    .frame(width: 22, height: 22)
             } else {
-                Image(systemName: "app")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color(theme.faint))
+                // The same size and place as the icon that is on its way, so nothing moves when it lands.
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(Color(theme.text).opacity(0.06))
+                    .frame(width: 18, height: 18)
             }
         case .glyph(let character):
             Text(character)
-                .font(.system(size: 16))
+                .font(.title3)
                 .foregroundStyle(Color(theme.text))
         }
     }

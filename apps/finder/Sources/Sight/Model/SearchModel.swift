@@ -1,6 +1,8 @@
 import AppKit
 import LauncherKit
 import QueryKit
+import SwiftUI
+import ThemeKit
 
 /// The action panel (Command+K): the selected row's actions, the buffer's,
 /// or a list of apps for Open With. Its keys are LauncherKit's ActionPanelModel.
@@ -107,6 +109,13 @@ final class SearchModel: ObservableObject {
         history = walking
     }
 
+    /// The arrow keys: the highlight glides to the next row with a quick
+    /// critically damped spring (none under Reduce Motion). Only this change
+    /// is animated, never the list itself as the query changes.
+    private func moveSelection(by step: Int) {
+        withAnimation(Motion.selectionAnimation()) { list.moveSelection(by: step) }
+    }
+
     private func moveCursorToEnd() {
         guard let editor = field?.currentEditor() else { return }
         editor.selectedRange = NSRange(location: (text as NSString).length, length: 0)
@@ -126,11 +135,11 @@ final class SearchModel: ObservableObject {
             if let recalled = history.up(text: text, atTop: (list.selectedIndex ?? 0) == 0) {
                 setText(recalled, fromField: false)
             } else {
-                list.moveSelection(by: -1)
+                moveSelection(by: -1)
             }
-        case .moveDown: list.moveSelection(by: 1)
-        case .pageUp: list.moveSelection(by: -8)
-        case .pageDown: list.moveSelection(by: 8)
+        case .moveDown: moveSelection(by: 1)
+        case .pageUp: moveSelection(by: -8)
+        case .pageDown: moveSelection(by: 8)
         case .primary: runSelected(index: 0)
         case .secondary: runSelected(index: 1)
         case .alternate:
@@ -438,7 +447,7 @@ final class SearchModel: ObservableObject {
     /// The list's height: every row, up to about nine, with section headers.
     var listHeight: CGFloat {
         let rows = CGFloat(list.rows.count) * Metrics.row + CGFloat(list.groups.count) * Metrics.header
-        return min(rows, Metrics.maxList)
+        return min(rows, Metrics.maxList) + Metrics.listInset * 2
     }
 }
 
@@ -449,7 +458,19 @@ enum Metrics {
     static var row: CGFloat = 30
     static let header: CGFloat = 24
     static let maxList: CGFloat = 9 * 30 + 3 * 24
+    /// Space above the first row and below the last, so their highlight clears the dividers.
+    static let listInset: CGFloat = 4
+    /// The field row and the footer.
+    static let field: CGFloat = 44
+    static let footer: CGFloat = 30
     /// The preview pane is as tall as the field, a full list and the footer.
-    static let previewHeight: CGFloat = 44 + maxList + 30
-    static let radius: CGFloat = 10
+    static let previewHeight: CGFloat = field + maxList + listInset * 2 + footer
+
+    /// The window's corners: the theme's RADIUS_WINDOW (10 by default) plus
+    /// 4, as a larger floating surface reads with a larger radius.
+    static func radius(_ theme: Theme) -> CGFloat { CGFloat(theme.tokens.radiusWindow) + 4 }
+    /// The action panel, a smaller surface inside the window.
+    static func panelRadius(_ theme: Theme) -> CGFloat { CGFloat(theme.tokens.radiusWindow) }
+    /// The selection highlight: the theme's RADIUS_CHIP (5 by default) plus 1.
+    static func rowRadius(_ theme: Theme) -> CGFloat { CGFloat(theme.tokens.radiusChip) + 1 }
 }
