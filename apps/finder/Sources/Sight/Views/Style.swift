@@ -167,9 +167,9 @@ struct VisualEffectBackground: NSViewRepresentable {
 struct PressableRow<Label: View>: View {
     let action: () -> Void
     @ViewBuilder let label: (_ pressed: Bool, _ hovered: Bool) -> Label
-    @State private var pressed = false
-    @State private var hovered = false
-    @State private var size = CGSize.zero
+    @Local private var pressed = false
+    @Local private var hovered = false
+    @Local private var size = CGSize.zero
 
     var body: some View {
         label(pressed, hovered)
