@@ -12,7 +12,8 @@
 #
 # What protects the permissions is the private key, so it is kept apart:
 #   - its own keychain, ~/Library/Keychains/grand-line-signing.keychain-db,
-#     locked after each use and after 5 minutes, never in the search list
+#     locked after each use and after 5 minutes, kept off the search list
+#     (added for one signature only where codesign needs it, then removed)
 #   - the keychain password is random and stored only in the login keychain
 #   - the key is imported non-extractable (it cannot be exported) and its
 #     partition list allows only Apple's own tools, so of the programs on the
@@ -214,8 +215,32 @@ sign_code() {
   fi
   SIGN_ERROR=""
   SIGN_ERROR="$(codesign "${args[@]}" "$path" 2>&1 >/dev/null)" && return 0
+  # Some macOS versions find the identity only in a keychain on the search
+  # list, whatever --keychain says ("no identity found"). Put the signing
+  # keychain on the list for this one signature, then restore the list.
+  if [[ "$SIGN_ERROR" == *"no identity found"* && -n "${hash:-}" ]] && signing_with_search_list codesign "${args[@]}" "$path"; then
+    SIGN_ERROR=""
+    return 0
+  fi
   SIGN_ERROR="$(printf '%s' "$SIGN_ERROR" | tail -n 3 | tr '\n' ' ')"
   return 1
+}
+
+# signing_with_search_list CMD...: run CMD with the signing keychain added to
+# the user's keychain search list, then put the list back exactly as it was.
+signing_with_search_list() {
+  local -a before=()
+  local line status
+  while IFS= read -r line; do
+    line="${line#"${line%%[![:space:]]*}"}"; line="${line#\"}"; line="${line%\"}"
+    [[ -n "$line" ]] && before+=("$line")
+  done < <(security list-keychains -d user 2>/dev/null)
+  # bash 3.2 treats an empty array as unset under set -u.
+  [[ ${#before[@]} -gt 0 ]] || before=("$SIGN_LOGIN_KEYCHAIN")
+  security list-keychains -d user -s "${before[@]}" "$SIGN_KEYCHAIN" >/dev/null 2>&1 || return 1
+  SIGN_ERROR="$("$@" 2>&1 >/dev/null)"; status=$?
+  security list-keychains -d user -s "${before[@]}" >/dev/null 2>&1
+  return "$status"
 }
 
 # sign_code_adhoc PATH [ENTITLEMENTS]: the fallback when the identity cannot
