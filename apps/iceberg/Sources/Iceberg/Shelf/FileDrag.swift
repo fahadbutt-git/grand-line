@@ -35,16 +35,23 @@ final class DragOutView: NSView {
     var icon: NSImage?
     var onDoubleClick: (() -> Void)?
     var menuProvider: (() -> NSMenu?)?
+    /// The button went down (true) or up, or a drag took over (false), so
+    /// the row can show the press at once.
+    var onPress: ((Bool) -> Void)?
     private var downEvent: NSEvent?
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func mouseDown(with event: NSEvent) {
         downEvent = event
+        onPress?(true)
         if event.clickCount == 2 { onDoubleClick?() }
     }
 
-    override func mouseUp(with event: NSEvent) { downEvent = nil }
+    override func mouseUp(with event: NSEvent) {
+        downEvent = nil
+        onPress?(false)
+    }
 
     override func mouseDragged(with event: NSEvent) {
         guard let down = downEvent, let url else { return }
@@ -52,6 +59,7 @@ final class DragOutView: NSView {
         let now = convert(event.locationInWindow, from: nil)
         guard hypot(now.x - start.x, now.y - start.y) > 3 else { return }
         downEvent = nil
+        onPress?(false)
         let item = NSDraggingItem(pasteboardWriter: url as NSURL)
         let side: CGFloat = 32
         let frame = NSRect(x: start.x - side / 2, y: start.y - side / 2, width: side, height: side)
@@ -76,6 +84,7 @@ struct DragOutArea: NSViewRepresentable {
     let icon: NSImage?
     let onDoubleClick: () -> Void
     let menu: () -> NSMenu?
+    var onPress: (Bool) -> Void = { _ in }
 
     func makeNSView(context: Context) -> DragOutView {
         let view = DragOutView()
@@ -90,6 +99,7 @@ struct DragOutArea: NSViewRepresentable {
         view.icon = icon
         view.onDoubleClick = onDoubleClick
         view.menuProvider = menu
+        view.onPress = onPress
     }
 }
 

@@ -506,57 +506,59 @@ struct UserWidgetGrid: View {
 
 private struct UserWidgetChip: View {
     @EnvironmentObject var theme: ThemeStore
+    @ObservedObject private var options = DisplayOptions.shared
+    @Environment(\.displayScale) private var displayScale
     let widget: WidgetConfig
     let display: WidgetDisplay?
     let busy: Bool
     let action: @MainActor () -> Void
-    @Local private var hovering = false
 
     var body: some View {
-        let tint = theme.color(display?.color)
-        let shown = display.map { ChipText.shown($0.text) }
-        let quiet = display?.failed == true || shown?.needsSetup == true
+        let output = display
+        let tint = theme.color(output?.color)
+        let shown = output.map { ChipText.shown($0.text) }
+        let quiet = output?.failed == true || shown?.needsSetup == true
+        let value = shown?.text ?? (busy ? "…" : "")
         Button(action: action) {
             HStack(spacing: 6) {
-                Image(systemName: Self.symbol(display?.icon ?? widget.icon))
-                    .font(.system(size: 11))
+                Image(systemName: Self.symbol(output?.icon ?? widget.icon))
+                    .font(SymbolScale.row)
                     .foregroundStyle(tint ?? theme.muted)
                     .frame(width: 14)
                 Text(widget.title)
-                    .font(.system(size: 11))
+                    .font(TypeScale.caption)
                     .foregroundStyle(theme.muted)
                     .lineLimit(1)
                     .layoutPriority(0)
                 Spacer(minLength: 4)
-                Text(shown?.text ?? (busy ? "…" : ""))
-                    .font(.system(size: 13).monospacedDigit())
+                Text(value)
+                    .font(TypeScale.value)
                     .foregroundStyle(quiet ? theme.muted : (tint ?? theme.foreground))
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .layoutPriority(1)
+                    .contentTransition(.numericText())
+                    .animation(Motion.content(reduceMotion: options.reduceMotion), value: value)
             }
             .padding(.horizontal, 8)
             .frame(height: NotchMetrics.chipHeight)
-            .background(
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(hovering ? theme.selection : theme.card)
-            )
             .overlay(alignment: .bottom) {
                 // Waybar's `percentage`: a thin bar along the chip's foot.
-                if let p = display?.percentage {
+                if let p = output?.percentage {
                     GeometryReader { geo in
+                        let width = PixelGrid.align(max(2, (geo.size.width - 12) * p / 100), scale: displayScale)
                         Capsule()
                             .fill(tint ?? theme.highlight)
-                            .frame(width: max(2, (geo.size.width - 12) * p / 100), height: 2)
+                            .frame(width: width, height: 2)
                             .offset(x: 6, y: geo.size.height - 3)
+                            .animation(Motion.content(reduceMotion: options.reduceMotion), value: p)
                     }
                     .allowsHitTesting(false)
                 }
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .buttonStyle(PanelButtonStyle(kind: .plate(radius: 7)))
         .help(helpText)
     }
 

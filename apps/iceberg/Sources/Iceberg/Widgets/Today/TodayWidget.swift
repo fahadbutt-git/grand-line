@@ -120,8 +120,7 @@ struct TodayView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Button(action: model.openCalendar) { SectionCaption(text: "Today") }
-                .buttonStyle(.plain)
+            CaptionLink(text: "Today", help: "Open Calendar", action: model.openCalendar)
             switch model.access {
             case .denied:
                 EmptyNote(text: "Allow Calendars in System Settings", action: model.openSettings)
@@ -149,11 +148,11 @@ private struct EventRow: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(Agenda.timeLabel(event))
-                .font(.system(size: 11).monospacedDigit())
+                .font(isCurrent ? TypeScale.numeral.weight(.semibold) : TypeScale.numeral)
                 .foregroundStyle(isCurrent ? theme.highlight : theme.muted)
                 .frame(width: 46, alignment: .leading)
             Text(event.title)
-                .font(.system(size: 13))
+                .font(TypeScale.body)
                 .foregroundStyle(theme.foreground)
                 .lineLimit(1)
                 .truncationMode(.tail)

@@ -48,15 +48,53 @@ extension NotchWidget {
     func shutDown() {}
 }
 
-/// The small caption above a section ("Today"), 11 pt and muted.
+/// The small caption above a section ("Today"): 11 pt medium, muted.
 struct SectionCaption: View {
     @EnvironmentObject var theme: ThemeStore
     let text: String
+    /// A count beside the caption (the shelf's files), in tabular digits.
+    var count: Int?
+
     var body: some View {
-        Text(text)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(theme.muted)
-            .lineLimit(1)
+        HStack(alignment: .firstTextBaseline, spacing: 5) {
+            Text(text)
+                .font(TypeScale.captionEmphasis)
+                .foregroundStyle(theme.muted)
+                .lineLimit(1)
+            if let count {
+                Text("\(count)")
+                    .font(TypeScale.numeral)
+                    .foregroundStyle(theme.muted.opacity(0.75))
+                    .contentTransition(.numericText(value: Double(count)))
+            }
+        }
+    }
+}
+
+/// A section caption that opens its app ("Today" opens Calendar): a
+/// chevron comes in beside it while the pointer rests on it, and it dims
+/// on mouse-down.
+struct CaptionLink: View {
+    @EnvironmentObject var theme: ThemeStore
+    let text: String
+    let help: String
+    let action: @MainActor () -> Void
+    @Local private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 3) {
+                SectionCaption(text: text)
+                Image(systemName: "chevron.right")
+                    .font(TypeScale.label.weight(.semibold))
+                    .foregroundStyle(theme.muted)
+                    .opacity(hovering ? 1 : 0)
+                    .offset(x: hovering ? 0 : -3)
+            }
+        }
+        .buttonStyle(PanelButtonStyle(kind: .text))
+        .onHover { inside in withAnimation(Motion.hover) { hovering = inside } }
+        .help(help)
     }
 }
 
@@ -68,11 +106,11 @@ struct EmptyNote: View {
     var body: some View {
         if let action {
             Button(action: action) {
-                Text(text).font(.system(size: 13)).foregroundStyle(theme.highlight).lineLimit(2)
+                Text(text).font(TypeScale.body).foregroundStyle(theme.highlight).lineLimit(2)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PanelButtonStyle(kind: .text))
         } else {
-            Text(text).font(.system(size: 13)).foregroundStyle(theme.muted).lineLimit(2)
+            Text(text).font(TypeScale.body).foregroundStyle(theme.muted).lineLimit(2)
         }
     }
 }

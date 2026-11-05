@@ -126,8 +126,7 @@ struct RemindersView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Button(action: model.openReminders) { SectionCaption(text: "Reminders") }
-                .buttonStyle(.plain)
+            CaptionLink(text: "Reminders", help: "Open Reminders", action: model.openReminders)
             switch model.access {
             case .denied:
                 EmptyNote(text: "Allow Reminders in System Settings", action: model.openSettings)
@@ -149,6 +148,7 @@ struct RemindersView: View {
 
 private struct ReminderRow: View {
     @EnvironmentObject var theme: ThemeStore
+    @ObservedObject private var display = DisplayOptions.shared
     let item: AgendaReminder
     let done: Bool
     let toggle: @MainActor () -> Void
@@ -162,18 +162,24 @@ private struct ReminderRow: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Button(action: toggle) {
                 Image(systemName: done ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 13))
+                    .font(SymbolScale.body)
                     .foregroundStyle(done ? theme.highlight : theme.muted)
+                    .contentTransition(.symbolEffect(.replace))
+                    .animation(Motion.content(reduceMotion: display.reduceMotion), value: done)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PanelButtonStyle(kind: .icon))
             .help(done ? "Mark as not done" : "Mark as done")
+            .accessibilityLabel(done ? "Mark \(item.title) as not done" : "Mark \(item.title) as done")
             Text(item.title)
-                .font(.system(size: 13))
+                .font(TypeScale.body)
                 .strikethrough(done, color: theme.muted)
                 .foregroundStyle(done ? theme.muted : theme.foreground)
                 .lineLimit(1)
+                .animation(Motion.content(reduceMotion: display.reduceMotion), value: done)
             if overdue && !done {
-                Text("overdue").font(.system(size: 11)).foregroundStyle(theme.muted)
+                Text("Overdue")
+                    .font(TypeScale.caption)
+                    .foregroundStyle(theme.color(.theme(.red)) ?? theme.muted)
             }
         }
     }

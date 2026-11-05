@@ -9,6 +9,8 @@ struct NotchRootView: View {
     @ObservedObject var model: NotchModel
     @ObservedObject var host: PanelHost
     @ObservedObject var theme: ThemeStore
+    @ObservedObject private var display = DisplayOptions.shared
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         let open = model.isOpen
@@ -18,24 +20,30 @@ struct NotchRootView: View {
         let top = open ? NotchMetrics.expandedTopRadius : closed.top
         let bottom = open ? NotchMetrics.expandedBottomRadius : closed.bottom
         let shape = NotchShape(topRadius: top, bottomRadius: bottom)
+        // Everything inside materialises from the notch and goes back into it.
+        let appear = AnyTransition.materialise(anchor: .top, reduceMotion: model.reduceMotion)
 
         ZStack(alignment: .top) {
             surface(open: open)
             if open {
-                shape.stroke(theme.line, lineWidth: 0.5)
+                // The shape clips the outer half of the stroke, which leaves
+                // whole device pixels inside the edge.
+                shape.stroke(theme.line(increaseContrast: display.increaseContrast),
+                             lineWidth: 2 * PixelGrid.width(pixels: display.increaseContrast ? 2 : 1, scale: displayScale))
+                    .transition(.opacity)
             }
             Group {
                 if open {
                     ExpandedPanel(model: model, host: host, user: host.user)
-                        .transition(.opacity.animation(.easeOut(duration: 0.14).delay(0.06)))
+                        .transition(appear)
                 } else if let hud = model.hud {
                     HUDView(event: hud, height: model.bandHeight, inset: closed.top)
-                        .transition(.opacity)
+                        .transition(appear)
                 } else if model.showsLiveActivity, let nowPlaying = host.nowPlaying {
                     LiveActivityView(model: nowPlaying, height: model.bandHeight,
                                      inset: closed.top,
                                      reduceMotion: !model.barsMove(playing: nowPlaying.isPlaying))
-                        .transition(.opacity)
+                        .transition(appear)
                 }
             }
             .frame(width: size.width, height: size.height, alignment: .top)
@@ -87,6 +95,8 @@ struct ExpandedPanel: View {
     @ObservedObject var host: PanelHost
     @ObservedObject var user: UserWidgets
     @EnvironmentObject var theme: ThemeStore
+    @ObservedObject private var display = DisplayOptions.shared
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         let inset = NotchMetrics.expandedTopRadius + NotchMetrics.sidePadding
@@ -99,7 +109,10 @@ struct ExpandedPanel: View {
                 HStack(alignment: .top, spacing: 0) {
                     ForEach(Array(sections.enumerated()), id: \.offset) { index, widget in
                         if index > 0 {
-                            Rectangle().fill(theme.line).frame(width: 0.5).padding(.horizontal, 12)
+                            Rectangle()
+                                .fill(theme.line(increaseContrast: display.increaseContrast))
+                                .frame(width: PixelGrid.hairline(scale: displayScale))
+                                .padding(.horizontal, 12)
                         }
                         widget.makeView()
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -134,7 +147,7 @@ struct ExpandedPanel: View {
             Group {
                 if host.showsDate {
                     Text(Self.dateText(Date()))
-                        .font(.system(size: 11, weight: .medium))
+                        .font(TypeScale.captionEmphasis)
                         .foregroundStyle(theme.muted)
                         .lineLimit(1)
                 } else {
@@ -153,8 +166,13 @@ struct ExpandedPanel: View {
     }
 
     static func dateText(_ date: Date) -> String {
+        dateFormatter.string(from: date)
+    }
+
+    /// Made once: a formatter per redraw costs a frame while the panel grows.
+    private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.setLocalizedDateFormatFromTemplate("EEEEdMMMM")
-        return f.string(from: date)
-    }
+        return f
+    }()
 }

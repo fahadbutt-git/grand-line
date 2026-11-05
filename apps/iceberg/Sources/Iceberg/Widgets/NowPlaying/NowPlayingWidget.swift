@@ -299,6 +299,7 @@ final class NowPlayingWidget: ObservableObject, NotchWidget {
 struct NowPlayingView: View {
     @ObservedObject var model: NowPlayingWidget
     @EnvironmentObject var theme: ThemeStore
+    @ObservedObject private var display = DisplayOptions.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -306,56 +307,65 @@ struct NowPlayingView: View {
             if model.state.hasMedia {
                 HStack(alignment: .top, spacing: 10) {
                     Button(action: model.openPlayer) {
-                        ArtworkView(image: model.artwork, side: 64, radius: 5)
+                        ArtworkView(image: model.artwork, side: 64, radius: 8)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PanelButtonStyle(kind: .text))
                     .help("Open \(model.appName ?? "the player")")
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 1) {
                         Text(model.state.title ?? "")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(TypeScale.title)
                             .foregroundStyle(theme.foreground)
                             .lineLimit(1)
                         Text([model.state.artist, model.state.album].compactMap { $0 }.joined(separator: " – "))
-                            .font(.system(size: 11))
+                            .font(TypeScale.caption)
                             .foregroundStyle(theme.muted)
                             .lineLimit(1)
                         PlaybackProgress(state: model.state)
-                            .padding(.top, 4)
-                        HStack(spacing: 18) {
-                            ControlButton(symbol: "backward.fill", help: "Previous") { model.send(.previous) }
+                            .padding(.top, 5)
+                        HStack(spacing: 20) {
+                            ControlButton(symbol: "backward.fill", font: SymbolScale.transport, help: "Previous") { model.send(.previous) }
                             ControlButton(symbol: model.state.isPlaying ? "pause.fill" : "play.fill",
+                                          font: SymbolScale.transportPrimary,
                                           help: model.state.isPlaying ? "Pause" : "Play") { model.send(.toggle) }
-                            ControlButton(symbol: "forward.fill", help: "Next") { model.send(.next) }
+                            ControlButton(symbol: "forward.fill", font: SymbolScale.transport, help: "Next") { model.send(.next) }
                         }
-                        .padding(.top, 2)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 1)
                     }
                 }
+                .transition(.opacity)
             } else {
                 EmptyNote(text: "Nothing playing")
+                    .transition(.opacity)
             }
             Spacer(minLength: 0)
         }
+        .animation(Motion.content(reduceMotion: display.reduceMotion), value: model.state.hasMedia)
     }
 }
 
+/// Previous, play or pause, next: a plate on hover, smaller on mouse-down,
+/// and play and pause trade places with the symbol's own replace effect.
 private struct ControlButton: View {
     @EnvironmentObject var theme: ThemeStore
+    @ObservedObject private var display = DisplayOptions.shared
     let symbol: String
+    let font: Font
     let help: String
     let action: @MainActor () -> Void
-    @Local private var hovering = false
 
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 15))
-                .foregroundStyle(hovering ? theme.highlight : theme.foreground)
-                .frame(width: 22, height: 20)
-                .contentShape(Rectangle())
+                .font(font)
+                .foregroundStyle(theme.foreground)
+                .contentTransition(.symbolEffect(.replace))
+                .animation(Motion.content(reduceMotion: display.reduceMotion), value: symbol)
+                .frame(width: 24, height: 22)
         }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .buttonStyle(PanelButtonStyle(kind: .icon))
         .help(help)
+        .accessibilityLabel(help)
     }
 }
 
@@ -363,6 +373,7 @@ private struct ControlButton: View {
 /// and only while it is on screen (the panel is open and something plays).
 private struct PlaybackProgress: View {
     @EnvironmentObject var theme: ThemeStore
+    @Environment(\.displayScale) private var displayScale
     let state: NowPlayingState
 
     var body: some View {
@@ -378,21 +389,22 @@ private struct PlaybackProgress: View {
     }
 
     func bar(position: TimeInterval, duration: TimeInterval) -> some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 3) {
             GeometryReader { g in
+                let filled = PixelGrid.align(g.size.width * CGFloat(min(1, position / duration)), scale: displayScale)
                 ZStack(alignment: .leading) {
                     Capsule().fill(theme.selection)
                     Capsule().fill(theme.muted)
-                        .frame(width: max(3, g.size.width * CGFloat(min(1, position / duration))))
+                        .frame(width: max(4, filled))
                 }
             }
-            .frame(height: 3)
+            .frame(height: 4)
             HStack {
                 Text(Self.clock(position))
                 Spacer()
                 Text("-" + Self.clock(max(0, duration - position)))
             }
-            .font(.system(size: 11).monospacedDigit())
+            .font(TypeScale.numeral)
             .foregroundStyle(theme.muted)
         }
     }
@@ -404,26 +416,34 @@ private struct PlaybackProgress: View {
     }
 }
 
-/// Album artwork, or a quiet placeholder.
+/// Album artwork, or a quiet placeholder, with a hairline edge so a dark
+/// cover keeps its shape on a dark panel.
 struct ArtworkView: View {
     @EnvironmentObject var theme: ThemeStore
+    @Environment(\.displayScale) private var displayScale
     let image: NSImage?
     let side: CGFloat
     let radius: CGFloat
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         Group {
             if let image {
                 Image(nsImage: image).resizable().interpolation(.high).aspectRatio(contentMode: .fill)
             } else {
                 ZStack {
                     theme.raised
-                    Image(systemName: "music.note").font(.system(size: side * 0.4)).foregroundStyle(theme.muted)
+                    // Sized to the artwork, which sets the scale here.
+                    Image(systemName: "music.note")
+                        .font(.system(size: (side * 0.4).rounded(), weight: .light))
+                        .foregroundStyle(theme.muted)
                 }
             }
         }
         .frame(width: side, height: side)
-        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+        .clipShape(shape)
+        .overlay(shape.strokeBorder(theme.foreground.opacity(0.1), lineWidth: PixelGrid.hairline(scale: displayScale)))
+        .shadow(color: Color.black.opacity(0.18), radius: 3, y: 1)
     }
 }
 
@@ -451,6 +471,7 @@ struct LiveActivityView: View {
                 .frame(width: wing, height: height, alignment: .leading)
             Spacer(minLength: 0)
             PlayingBars(playing: model.isPlaying, color: tint, reduceMotion: reduceMotion)
+                .animation(reduceMotion ? nil : Motion.spring(MotionSpec.content), value: model.artworkTint)
                 .frame(width: side * 0.8, height: side * 0.7)
                 .padding(.trailing, pad)
                 .frame(width: wing, height: height, alignment: .trailing)
@@ -466,6 +487,7 @@ struct LiveActivityView: View {
 struct CoverThumb: View {
     let image: NSImage?
     let side: CGFloat
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: side * 0.25, style: .continuous)
@@ -475,13 +497,16 @@ struct CoverThumb: View {
             } else {
                 ZStack {
                     Color.white.opacity(0.12)
-                    Image(systemName: "music.note").font(.system(size: side * 0.5)).foregroundStyle(Color.white.opacity(0.6))
+                    // Sized to the notch's wing, which sets the scale here.
+                    Image(systemName: "music.note")
+                        .font(.system(size: (side * 0.5).rounded(), weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.6))
                 }
             }
         }
         .frame(width: side, height: side)
         .clipShape(shape)
-        .overlay(shape.strokeBorder(Color.white.opacity(0.16), lineWidth: 0.5))
+        .overlay(shape.strokeBorder(Color.white.opacity(0.16), lineWidth: PixelGrid.hairline(scale: displayScale)))
     }
 }
 
@@ -494,6 +519,7 @@ struct PlayingBars: View {
     let color: Color
     let reduceMotion: Bool
     static let count = 5
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         if playing && !reduceMotion {
@@ -507,7 +533,9 @@ struct PlayingBars: View {
 
     private func bars(_ levels: [Double]) -> some View {
         GeometryReader { g in
-            let width = max(1.5, g.size.width / CGFloat(Self.count * 2 - 1))
+            // Bars and gaps on whole device pixels, so each edge stays crisp.
+            let width = max(PixelGrid.hairline(scale: displayScale) * 2,
+                            PixelGrid.floor(g.size.width / CGFloat(Self.count * 2 - 1), scale: displayScale))
             HStack(alignment: .center, spacing: width) {
                 ForEach(0..<Self.count, id: \.self) { i in
                     Capsule()
