@@ -22,7 +22,7 @@ final class MotionAndSurfaceTests: XCTestCase {
     func testTimingsStayShort() {
         XCTAssertLessThanOrEqual(MotionSpec.pressDuration, 0.1)
         XCTAssertLessThanOrEqual(MotionSpec.fadeDuration, 0.2)
-        let slowest = [MotionSpec.open, .close, .wings, .basket, .drop].map(\.response).max() ?? 0
+        let slowest = [MotionSpec.open, MotionSpec.close, MotionSpec.wings, MotionSpec.basket, MotionSpec.drop].map(\.response).max() ?? 0
         XCTAssertGreaterThan(MotionSpec.settleFallback, slowest * 2)
         XCTAssertLessThan(MotionSpec.pressedScale, 1)
         XCTAssertLessThan(MotionSpec.materialiseScale, 1)
