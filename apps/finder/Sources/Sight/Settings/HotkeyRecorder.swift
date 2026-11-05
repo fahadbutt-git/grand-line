@@ -114,7 +114,7 @@ struct HotkeyRecorder: NSViewRepresentable {
             (recording ? colors.accent : colors.dim.withAlphaComponent(0.4)).setStroke()
             path.lineWidth = recording ? 2 : 1
             path.stroke()
-            let font = NSFont.systemFont(ofSize: 13)
+            let font = NSFont.preferredFont(forTextStyle: .body)
             let text = NSAttributedString(string: caption, attributes: [
                 .font: font,
                 .foregroundColor: recording ? colors.dim : colors.text,

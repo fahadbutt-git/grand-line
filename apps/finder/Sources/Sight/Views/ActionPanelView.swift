@@ -25,25 +25,29 @@ struct ActionPanelView: View {
     }
 
     var body: some View {
+        let radius = Metrics.panelRadius(theme)
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         VStack(alignment: .leading, spacing: 0) {
             Text(state.title)
-                .font(.system(size: 11, weight: .medium))
+                .font(Typo.heading)
                 .foregroundStyle(Color(theme.dim))
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .padding(.horizontal, 10)
+                .padding(.horizontal, Space.column)
                 .frame(height: Self.titleHeight)
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
                     VStack(spacing: 0) {
                         ForEach(Array(state.actions.enumerated()), id: \.offset) { index, action in
-                            row(action, index: index)
-                                .id(index)
-                                .contentShape(Rectangle())
-                                .onTapGesture { onChoose(index) }
-                                .accessibilityElement(children: .combine)
-                                .accessibilityIdentifier("action." + Self.slug(action.title))
-                                .accessibilityAddTraits(.isButton)
+                            PressableRow(action: { onChoose(index) }) { pressed, hovered in
+                                row(action, index: index)
+                                    .background(RowHighlight(theme: theme, selected: index == state.selected,
+                                                             pressed: pressed, hovered: hovered))
+                            }
+                            .id(index)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("action." + Self.slug(action.title))
+                            .accessibilityAddTraits(.isButton)
                         }
                     }
                 }
@@ -54,30 +58,33 @@ struct ActionPanelView: View {
         }
         .padding(.vertical, 4)
         .frame(width: 280)
-        .background(Color(theme.panel))
-        .clipShape(RoundedRectangle(cornerRadius: Metrics.radius))
-        .overlay(RoundedRectangle(cornerRadius: Metrics.radius).stroke(Color(theme.line), lineWidth: 1))
+        // A separate surface floating over the results: solid, so translucency never stacks on translucency.
+        .background(shape.fill(Color(theme.panel)))
+        .clipShape(shape)
+        .overlay(PanelBorder(theme: theme, radius: radius))
+        .shadow(color: .black.opacity(theme.isDark ? 0.35 : 0.16), radius: 14, x: 0, y: 6)
     }
 
     private func row(_ action: LaunchAction, index: Int) -> some View {
-        HStack(spacing: 8) {
+        let selected = index == state.selected
+        return HStack(spacing: 8) {
             Image(systemName: action.symbol)
-                .font(.system(size: 12))
-                .frame(width: 16)
+                .font(Typo.row)
+                .imageScale(.small)
+                .foregroundStyle(Color(selected ? theme.selectionText : theme.dim))
+                .frame(width: 18)
             Text(action.title)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            // Return runs the selected action; the others show their own shortcut.
-            Text(index == state.selected ? "↩" : action.shortcut?.label ?? "")
-                .foregroundStyle(Color(theme.dim))
-                .lineLimit(1)
-                .fixedSize()
+            // Return runs the selected action. The others show their own shortcut.
+            if let keys = selected ? "↩" : action.shortcut?.label {
+                Keycap(keys: keys, theme: theme, color: Color(theme.dim))
+            }
         }
-        .font(.system(size: 13))
-        .foregroundStyle(Color(index == state.selected ? theme.selectionText : theme.text))
-        .padding(.horizontal, 10)
+        .font(Typo.row)
+        .foregroundStyle(Color(selected ? theme.selectionText : theme.text))
+        .padding(.horizontal, Space.column)
         .frame(height: Self.rowHeight)
-        .background(index == state.selected ? Color(theme.selection) : Color.clear)
     }
 }

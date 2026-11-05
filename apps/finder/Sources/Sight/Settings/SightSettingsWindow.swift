@@ -138,7 +138,7 @@ struct SightSourcesPane: View {
                         HStack(spacing: 10) {
                             if let prefix = source.prefix {
                                 Text(prefix.display)
-                                    .font(.system(size: 12, design: .monospaced))
+                                    .font(.system(.callout, design: .monospaced))
                                     .padding(.horizontal, 6)
                                     .frame(height: 18)
                                     .background(RoundedRectangle(cornerRadius: 5).strokeBorder(Color.secondary.opacity(0.4)))
@@ -197,7 +197,7 @@ struct SightSearchPane: View {
                             get: { count },
                             set: { value in store.update { $0.limits[section] = value == section.limit ? nil : value } }),
                                 in: ResultLayout.limitRange) {
-                            Text("\(count)").font(.system(size: 13).monospacedDigit()).frame(width: 24, alignment: .trailing)
+                            Text("\(count)").font(.body.monospacedDigit()).frame(width: 24, alignment: .trailing)
                         }
                         .accessibilityIdentifier(settingID("search.limit.\(section.name)"))
                         .accessibilityLabel("\(section.title) rows")
@@ -230,13 +230,13 @@ struct SightWebPane: View {
                     SettingsRow(engine.name, detail: engine.template, symbol: engine.search.symbol) {
                         HStack(spacing: 10) {
                             Text(engine.keyword.isEmpty ? "no keyword" : engine.keyword)
-                                .font(.system(size: 12, design: .monospaced))
+                                .font(.system(.callout, design: .monospaced))
                                 .foregroundStyle(.secondary)
                             Toggle("Fallback", isOn: Binding(
                                 get: { engine.fallback },
                                 set: { on in store.update { $0.engines[index].fallback = on } }))
                                 .toggleStyle(.checkbox)
-                                .font(.system(size: 12))
+                                .font(.callout)
                                 .accessibilityIdentifier(settingID("web.fallback.\(engine.id)"))
                             ReorderButtons(canMoveUp: index > 0, canMoveDown: index < engines.count - 1) { offset in
                                 store.update { prefs in
@@ -247,7 +247,7 @@ struct SightWebPane: View {
                             Button {
                                 store.update { _ = $0.engines.remove(at: index) }
                             } label: {
-                                Image(systemName: "minus.circle").font(.system(size: 12))
+                                Image(systemName: "minus.circle").font(.callout)
                             }
                             .buttonStyle(.borderless)
                             .help("Remove \(engine.name)")

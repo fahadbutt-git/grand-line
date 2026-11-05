@@ -170,10 +170,51 @@ final class ActionPerformer {
         _ = force ? app.forceTerminate() : app.terminate()
     }
 
-    /// Brings back the app that was in front, then acts in it once it is active.
+    /// The search window finishes going away at once, so keys reach the app in front.
+    var willActInFrontApp: (() -> Void)?
+    private var pending: OnceWork?
+    private var activationWatch: NSObjectProtocol?
+
+    /// Brings back the app that was in front, then acts in it the moment it
+    /// is active: at once when it already is, else on its activation, with a
+    /// short safety limit. No fixed pause.
     func inFrontApp(_ work: @escaping () -> Void) {
-        previousApp?.activate()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+        willActInFrontApp?()
+        pending?.cancel()
+        stopActivationWatch()
+        let once = OnceWork(work)
+        pending = once
+        let app = previousApp
+        switch FrontAppWait.plan(hasApp: app != nil, isActive: app?.isActive ?? false, isTerminated: app?.isTerminated ?? true) {
+        case .now:
+            app?.activate()
+            // The next turn of the run loop: the window's ordering out has reached the window server.
+            DispatchQueue.main.async { once.run() }
+        case .activation(let limit):
+            guard let app else { return once.run() }
+            let pid = app.processIdentifier
+            activationWatch = NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+            ) { [weak self] note in
+                let activated = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+                guard activated?.processIdentifier == pid else { return }
+                MainActor.assumeIsolated {
+                    self?.stopActivationWatch()
+                    once.run()
+                }
+            }
+            app.activate()
+            DispatchQueue.main.asyncAfter(deadline: .now() + limit) { [weak self] in
+                guard !once.isDone else { return }
+                self?.stopActivationWatch()
+                once.run()
+            }
+        }
+    }
+
+    private func stopActivationWatch() {
+        if let activationWatch { NSWorkspace.shared.notificationCenter.removeObserver(activationWatch) }
+        activationWatch = nil
     }
 
     /// Asks for a folder and moves the items there; an item of the same name is never replaced.

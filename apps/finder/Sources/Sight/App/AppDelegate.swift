@@ -115,7 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings.onKeyChange = { [weak self] key in
             NSApp.mainMenu = key ? AppDelegate.settingsMenu() : nil
             // Settings in front never sits under the search window.
-            if key { self?.panel.hide() }
+            if key { self?.panel.hide(animated: false) }
         }
     }
 
@@ -127,7 +127,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func openSettings(pane: String?) {
-        panel.hide()
+        panel.hide(animated: false)
         settings.show(pane: pane)
     }
 
