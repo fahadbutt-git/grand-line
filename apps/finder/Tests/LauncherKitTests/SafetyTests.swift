@@ -274,8 +274,8 @@ final class SafetyTests: XCTestCase {
 
     func testMenuRowsStayWhenNoSettingsRowAnswers() {
         let engine = engine()
-        let rows = engine.instantRanked(engine.plan("graphite"))
-        XCTAssertEqual(rows.first?.id, "menu:Style/Graphite")
+        let rows = engine.instantRanked(engine.plan("network speed test"))
+        XCTAssertEqual(rows.first?.id, "menu:Hardware/Network speed test")
         let menuOnly = SearchEngine(providers: engine.providers.filter { $0.id != SettingsActionsProvider.providerID })
         let dark = menuOnly.instantRanked(menuOnly.plan("dark mode"))
         XCTAssertTrue(dark.contains { $0.id == "menu:Toggle/Dark mode" }, "with the settings source off the menu row is still there")

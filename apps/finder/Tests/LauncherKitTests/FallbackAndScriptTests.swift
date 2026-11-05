@@ -196,7 +196,7 @@ final class FallbackAndScriptTests: XCTestCase {
             if ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] != nil { throw XCTSkip("the runner held the script's second run: \(reply)") }
             return XCTFail("no second step: \(reply)")
         }
-        XCTAssertEqual(next.map(\.title), ["Open", "Show in Nexus", "Copy path"])
+        XCTAssertEqual(next.map(\.title), ["Open", "Show in Finder", "Copy path"])
     }
 
     // MARK: Clipboard history (Maccy)
