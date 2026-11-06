@@ -591,6 +591,17 @@ grep -q "move-node-to-workspace --focus-follows-window 2" "$STUB_LOG" && t_ok "w
 grep -q "move-node-to-workspace --window-id 11 1" "$STUB_LOG" && grep -q "move-node-to-workspace --window-id 12 1" "$STUB_LOG" && grep -q "aerospace workspace 1" "$STUB_LOG" \
   && t_ok "workspace close moves every window to the previous workspace and goes there" || t_fail "workspace close" "$(cat "$STUB_LOG")"
 [[ "$(GRAND_LINE_AEROSPACE="$ws_stub" "$ROOT/bin/workspace" list | tr '\n' ' ')" == "1 3 * " ]] && t_ok "workspace list marks the current one" || t_fail "workspace list"
+# windows lists every window across workspaces, sorted by workspace
+win_stub="$tmp/aero-win"
+cat > "$win_stub" <<'STUB'
+#!/bin/bash
+echo "aerospace $*" >> "$STUB_LOG"
+[[ "$1" == list-windows ]] && printf '3|Claude|Chat|42\n1|Zen|Inbox|7\n'
+STUB
+chmod +x "$win_stub"
+got="$(GRAND_LINE_AEROSPACE="$win_stub" "$ROOT/bin/windows" --print)"
+[[ "$(head -1 <<<"$got")" == "1   Zen  —  Inbox   [7]" && "$(sed -n 2p <<<"$got")" == "3   Claude  —  Chat   [42]" ]] \
+  && t_ok "windows lists every window by workspace with its id" || t_fail "windows list" "$got"
 locktmp="$(mktemp -d)"; lock="$locktmp/update.lock"
 mkdir "$lock"; echo "$$" > "$lock/pid"
 out="$(GRAND_LINE_UPDATE_LOCK="$lock" "$ROOT/bin/update" 2>&1)"

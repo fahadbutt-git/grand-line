@@ -129,12 +129,13 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + W | Close window |
 | Caps + Q | Quit app |
 | Caps + Ctrl + L | Lock screen |
-| Caps + T | Toggle tiling and floating |
+| Caps + T | Tile this window beside the others (press again to float it) |
 | Caps + J | Toggle split direction |
 | Caps + F | Full screen |
 | Caps + G | Toggle grouping (stacked windows) |
 | Caps + = | Grow window |
 | Caps + - | Shrink window |
+| Caps + E | All windows on every workspace (type to filter, Return jumps there) |
 | Caps + Left | Focus window left |
 | Caps + Shift + Left | Swap window left |
 | Caps + Ctrl + Shift + Left | Move window to the monitor left |

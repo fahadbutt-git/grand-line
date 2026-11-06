@@ -2178,6 +2178,24 @@
          }
         ],
         "from": {
+         "key_code": "e"
+        },
+        "to": [
+         {
+          "shell_command": "$HOME/.grand-line/bin/windows"
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
          "key_code": "n"
         },
         "to": [

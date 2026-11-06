@@ -6,12 +6,13 @@ Caps + Escape	Menus	System menu (lock, sleep, restart, shut down)	$HOME/.grand-l
 Caps + W	Windows	Close window	
 Caps + Q	Windows	Quit app	
 Caps + Ctrl + L	Windows	Lock screen	
-Caps + T	Windows	Toggle tiling and floating	/opt/homebrew/bin/aerospace layout floating tiling
+Caps + T	Windows	Tile this window beside the others (press again to float it)	/opt/homebrew/bin/aerospace layout floating tiling
 Caps + J	Windows	Toggle split direction	/opt/homebrew/bin/aerospace layout horizontal vertical
 Caps + F	Windows	Full screen	/opt/homebrew/bin/aerospace fullscreen
 Caps + G	Windows	Toggle grouping (stacked windows)	/opt/homebrew/bin/aerospace layout accordion tiles
 Caps + =	Windows	Grow window	/opt/homebrew/bin/aerospace resize smart +50
 Caps + -	Windows	Shrink window	/opt/homebrew/bin/aerospace resize smart -50
+Caps + E	Windows	All windows on every workspace (type to filter, Return jumps there)	$HOME/.grand-line/bin/windows
 Caps + N	Workspaces	New workspace (takes this window to the next free number)	$HOME/.grand-line/bin/workspace new
 Caps + D	Workspaces	Close workspace (its windows move to the previous one)	$HOME/.grand-line/bin/workspace close
 Caps + Tab	Workspaces	Next workspace	/opt/homebrew/bin/aerospace workspace --no-stdin --wrap-around next

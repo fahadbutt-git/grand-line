@@ -35,6 +35,14 @@ outer.right = 10
 [mode.main.binding]
 # Intentionally empty. See config/karabiner/karabiner.json.
 
+# Every window opens floating, as a normal Mac window. Tile the ones you
+# want side by side with Caps + T; they share the workspace's tiled area.
+# The rules below still run (check-further-callbacks), so each app still
+# opens on its own workspace.
+[[on-window-detected]]
+check-further-callbacks = true
+run = 'layout floating'
+
 # Small utility windows float instead of tiling.
 [[on-window-detected]]
 if.app-id = 'com.apple.systempreferences'
