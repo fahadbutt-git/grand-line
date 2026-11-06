@@ -573,6 +573,24 @@ grep -q "aerospace focus --window-id 9" "$STUB_LOG" && ! grep -q "open " "$STUB_
 : > "$STUB_LOG"; "$ROOT/bin/webapp" "https://www.youtube.com" "YouTube"
 grep -q "open " "$STUB_LOG" && t_ok "a web app key opens a window when none matches" || t_fail "webapp did not open"
 unset AEROSPACE_WINDOWS
+# workspace new / close, with a stub that has workspaces 1 and 3 in use and 3 focused
+ws_stub="$tmp/aero-ws"
+cat > "$ws_stub" <<'STUB'
+#!/bin/bash
+echo "aerospace $*" >> "$STUB_LOG"
+case "$*" in
+  "list-workspaces --monitor all --empty no") printf '1\n3\n' ;;
+  "list-workspaces --focused") echo 3 ;;
+  "list-windows --workspace focused --format %{window-id}") printf '11\n12\n' ;;
+esac
+STUB
+chmod +x "$ws_stub"
+: > "$STUB_LOG"; GRAND_LINE_AEROSPACE="$ws_stub" "$ROOT/bin/workspace" new
+grep -q "move-node-to-workspace --focus-follows-window 2" "$STUB_LOG" && t_ok "workspace new takes the window to the lowest free number" || t_fail "workspace new" "$(cat "$STUB_LOG")"
+: > "$STUB_LOG"; GRAND_LINE_AEROSPACE="$ws_stub" "$ROOT/bin/workspace" close
+grep -q "move-node-to-workspace --window-id 11 1" "$STUB_LOG" && grep -q "move-node-to-workspace --window-id 12 1" "$STUB_LOG" && grep -q "aerospace workspace 1" "$STUB_LOG" \
+  && t_ok "workspace close moves every window to the previous workspace and goes there" || t_fail "workspace close" "$(cat "$STUB_LOG")"
+[[ "$(GRAND_LINE_AEROSPACE="$ws_stub" "$ROOT/bin/workspace" list | tr '\n' ' ')" == "1 3 * " ]] && t_ok "workspace list marks the current one" || t_fail "workspace list"
 locktmp="$(mktemp -d)"; lock="$locktmp/update.lock"
 mkdir "$lock"; echo "$$" > "$lock/pid"
 out="$(GRAND_LINE_UPDATE_LOCK="$lock" "$ROOT/bin/update" 2>&1)"

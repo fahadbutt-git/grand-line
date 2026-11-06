@@ -73,6 +73,8 @@ BINDINGS = [
     ("g", [], "Windows", "Toggle grouping (stacked windows)", aero("layout accordion tiles")),
     ("equal_sign", [], "Windows", "Grow window", aero("resize smart +50")),
     ("hyphen", [], "Windows", "Shrink window", aero("resize smart -50")),
+    ("n", [], "Workspaces", "New workspace (takes this window to the next free number)", cmd("workspace new")),
+    ("d", [], "Workspaces", "Close workspace (its windows move to the previous one)", cmd("workspace close")),
     ("tab", [], "Workspaces", "Next workspace", aero("workspace --no-stdin --wrap-around next")),
     ("tab", ["shift"], "Workspaces", "Previous workspace", aero("workspace --no-stdin --wrap-around prev")),
     ("tab", ["control"], "Workspaces", "Last used workspace", aero("workspace-back-and-forth")),

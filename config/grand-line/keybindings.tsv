@@ -12,6 +12,8 @@ Caps + F	Windows	Full screen	/opt/homebrew/bin/aerospace fullscreen
 Caps + G	Windows	Toggle grouping (stacked windows)	/opt/homebrew/bin/aerospace layout accordion tiles
 Caps + =	Windows	Grow window	/opt/homebrew/bin/aerospace resize smart +50
 Caps + -	Windows	Shrink window	/opt/homebrew/bin/aerospace resize smart -50
+Caps + N	Workspaces	New workspace (takes this window to the next free number)	$HOME/.grand-line/bin/workspace new
+Caps + D	Workspaces	Close workspace (its windows move to the previous one)	$HOME/.grand-line/bin/workspace close
 Caps + Tab	Workspaces	Next workspace	/opt/homebrew/bin/aerospace workspace --no-stdin --wrap-around next
 Caps + Shift + Tab	Workspaces	Previous workspace	/opt/homebrew/bin/aerospace workspace --no-stdin --wrap-around prev
 Caps + Ctrl + Tab	Workspaces	Last used workspace	/opt/homebrew/bin/aerospace workspace-back-and-forth

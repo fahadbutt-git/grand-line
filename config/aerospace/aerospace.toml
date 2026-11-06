@@ -6,7 +6,10 @@ config-version = 2
 
 start-at-login = true
 auto-reload-config = true
-persistent-workspaces = ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
+# Only workspace 1 always exists. The others appear when a window goes to
+# them (Caps + N, or an app below opening) and disappear when they are empty
+# (Caps + D moves their windows away), so there are never more than you use.
+persistent-workspaces = ["1"]
 
 enable-normalization-flatten-containers = true
 enable-normalization-opposite-orientation-for-nested-containers = true

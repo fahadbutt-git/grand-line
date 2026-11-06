@@ -147,6 +147,8 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + Right | Focus window right |
 | Caps + Shift + Right | Swap window right |
 | Caps + Ctrl + Shift + Right | Move window to the monitor right |
+| Caps + N | New workspace (takes this window to the next free number) |
+| Caps + D | Close workspace (its windows move to the previous one) |
 | Caps + Tab | Next workspace |
 | Caps + Shift + Tab | Previous workspace |
 | Caps + Ctrl + Tab | Last used workspace |

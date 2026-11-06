@@ -2178,6 +2178,42 @@
          }
         ],
         "from": {
+         "key_code": "n"
+        },
+        "to": [
+         {
+          "shell_command": "$HOME/.grand-line/bin/workspace new"
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "d"
+        },
+        "to": [
+         {
+          "shell_command": "$HOME/.grand-line/bin/workspace close"
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
          "key_code": "tab"
         },
         "to": [

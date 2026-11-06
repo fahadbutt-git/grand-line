@@ -1,0 +1,58 @@
+#!/bin/bash
+# grandline:summary=Add a workspace for the current window, or close the current workspace
+# workspace new     moves the current window to the lowest free workspace number
+#                   (1 to 9) and follows it; with no window, just goes there
+# workspace close   moves every window on this workspace to the previous one
+#                   in use and goes there, so this one disappears
+# workspace list    prints the workspaces in use, the current one marked *
+# Workspaces exist only while they hold a window (workspace 1 always exists),
+# so these two are all it takes to have as many or as few as you need.
+source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
+
+AERO="${GRAND_LINE_AEROSPACE:-/opt/homebrew/bin/aerospace}"
+[[ -x "$AERO" ]] || AERO="$(command -v aerospace)" || fail 4 "AeroSpace is not installed."
+
+in_use() { "$AERO" list-workspaces --monitor all --empty no 2>/dev/null; }
+current() { "$AERO" list-workspaces --focused 2>/dev/null; }
+windows_here() { "$AERO" list-windows --workspace focused --format '%{window-id}' 2>/dev/null; }
+
+case "${1:-}" in
+  new)
+    used="$(in_use; current)"
+    free=""
+    for n in 1 2 3 4 5 6 7 8 9; do
+      grep -qx "$n" <<<"$used" || { free="$n"; break; }
+    done
+    [[ -n "$free" ]] || { say "Workspaces" "All nine are in use. Close one first (Caps + D)."; exit 1; }
+    if [[ -n "$(windows_here)" ]]; then
+      "$AERO" move-node-to-workspace --focus-follows-window "$free"
+    else
+      "$AERO" workspace "$free"
+    fi
+    ;;
+  close)
+    here="$(current)"
+    target=""
+    while IFS= read -r ws; do
+      [[ "$ws" == "$here" ]] && break
+      target="$ws"
+    done < <(in_use | sort -n)
+    [[ -n "$target" ]] || target="$(in_use | sort -n | grep -vx "$here" | head -1)"
+    [[ -n "$target" ]] || target=1
+    [[ "$target" == "$here" ]] && exit 0
+    while IFS= read -r id; do
+      [[ -n "$id" ]] && "$AERO" move-node-to-workspace --window-id "$id" "$target"
+    done < <(windows_here)
+    "$AERO" workspace "$target"
+    ;;
+  list)
+    here="$(current)"
+    { in_use; echo "$here"; } | sort -nu | while IFS= read -r ws; do
+      [[ "$ws" == "$here" ]] && echo "$ws *" || echo "$ws"
+    done
+    ;;
+  *)
+    echo "usage: workspace new | close | list" >&2
+    exit 2
+    ;;
+esac
