@@ -32,7 +32,6 @@ expect "install FilmCraft from the latest release of github.com/storytold/filmcr
 expect "install PdfCraft from the latest release of github.com/storytold/pdfcraft"
 expect "install.packages"
 expect "ln -s $ROOT $tmp/home/.grand-line"
-expect "ln -s $ROOT/config/aerospace/aerospace.toml $tmp/home/.aerospace.toml"
 expect "cp $ROOT/config/karabiner/karabiner.json $tmp/home/.config/karabiner/karabiner.json"
 expect "ln -s $ROOT/config/tmux $tmp/home/.config/tmux"
 expect "config/zsh/grand-line.zsh"

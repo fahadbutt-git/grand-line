@@ -74,12 +74,6 @@ if have_tool tmux; then
 fi
 
 echo "Config files"
-check "aerospace.toml parses" python3 -c "
-try:
-    import tomllib
-except ModuleNotFoundError:
-    print('tomllib needs Python 3.11; skipped'); raise SystemExit(0)
-tomllib.load(open('config/aerospace/aerospace.toml', 'rb'))"
 check "karabiner.json parses" python3 -m json.tool config/karabiner/karabiner.json
 check "generated files are current with tools/bindings.py" python3 tools/bindings.py --check
 
@@ -100,7 +94,7 @@ check "every package command used by menus and shortcuts exists in bin/" bash -c
   for name in $names; do
     [[ -f "bin/$name" ]] && continue
     command -v "$name" >/dev/null 2>&1 && continue
-    case "$name" in open|pmset|osascript|aerospace|defaults) continue ;; esac
+    case "$name" in open|pmset|osascript|defaults) continue ;; esac
     echo "unknown command: $name"; bad=1
   done; exit $bad'
 

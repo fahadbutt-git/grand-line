@@ -19,7 +19,6 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BIN = "$HOME/.grand-line/bin"          # the package's commands (see lib/paths.sh)
 BREW = "/opt/homebrew/bin"            # Homebrew on Apple silicon
-AERO = f"{BREW}/aerospace"  # called directly: the fastest path for window keys
 
 
 def sh(cmd):
@@ -31,7 +30,7 @@ def key(code, *mods):
 
 
 def app(name):
-    # Focuses the app's open window (on any workspace), or opens the app.
+    # Brings the app forward (to the desktop its window is on), or opens it.
     return cmd(f"focus-or-open '{name}'")
 
 
@@ -40,7 +39,7 @@ def cmd(name_and_args):
 
 
 def web(url, title):
-    # Focuses the open window whose title contains TITLE, or opens one.
+    # Raises the open window whose title contains TITLE, or opens the site.
     return cmd(f"webapp '{url}' '{title}'")
 
 
@@ -49,11 +48,10 @@ def terminal(command):
     return sh(f"osascript -e 'tell application \"Terminal\" to do script \"{command}\"' -e 'tell application \"Terminal\" to activate'")
 
 
-def aero(args):
-    return sh(f"{AERO} {args}")
+def tile(code, *mods):
+    # macOS's own tiling keys (Window, Move & Resize): Fn + Control + ...
+    return key(code, "fn", "control", *mods)
 
-
-ARROWS = [("left_arrow", "left"), ("down_arrow", "down"), ("up_arrow", "up"), ("right_arrow", "right")]
 
 # (key, extra modifiers held with Caps Lock, group, description, action)
 BINDINGS = [
@@ -63,41 +61,25 @@ BINDINGS = [
     ("k", [], "Menus", "Shortcut list (type to filter, Return runs it)", cmd("keybindings")),
     ("escape", [], "Menus", "System menu (lock, sleep, restart, shut down)", cmd("menu System")),
 
-    # Windows and workspaces
+    # Windows and desktops, with what macOS has built in (macOS 15 and later)
     ("w", [], "Windows", "Close window", key("w", "command")),
     ("q", [], "Windows", "Quit app", key("q", "command")),
     ("l", ["control"], "Windows", "Lock screen", key("q", "control", "command")),
-    ("t", [], "Windows", "Tile this window beside the others (press again to float it)", aero("layout floating tiling")),
-    ("j", [], "Windows", "Toggle split direction", aero("layout horizontal vertical")),
-    ("f", [], "Windows", "Full screen", aero("fullscreen")),
-    ("g", [], "Windows", "Toggle grouping (stacked windows)", aero("layout accordion tiles")),
-    ("equal_sign", [], "Windows", "Grow window", aero("resize smart +50")),
-    ("hyphen", [], "Windows", "Shrink window", aero("resize smart -50")),
-    ("e", [], "Windows", "All windows on every workspace (type to filter, Return jumps there)", cmd("windows")),
-    ("n", [], "Workspaces", "New workspace (takes this window to the next free number)", cmd("workspace new")),
-    ("d", [], "Workspaces", "Close workspace (its windows move to the previous one)", cmd("workspace close")),
-    ("tab", [], "Workspaces", "Next workspace", aero("workspace --no-stdin --wrap-around next")),
-    ("tab", ["shift"], "Workspaces", "Previous workspace", aero("workspace --no-stdin --wrap-around prev")),
-    ("tab", ["control"], "Workspaces", "Last used workspace", aero("workspace-back-and-forth")),
-    ("tab", ["option"], "Workspaces", "Focus next monitor", aero("focus-monitor --wrap-around next")),
-    ("left_arrow", ["shift", "option"], "Workspaces", "Move workspace to previous monitor",
-     aero("move-workspace-to-monitor --wrap-around prev")),
-    ("right_arrow", ["shift", "option"], "Workspaces", "Move workspace to next monitor",
-     aero("move-workspace-to-monitor --wrap-around next")),
+    ("left_arrow", [], "Windows", "Tile window to the left half", tile("left_arrow")),
+    ("right_arrow", [], "Windows", "Tile window to the right half", tile("right_arrow")),
+    ("up_arrow", [], "Windows", "Tile window to the top half", tile("up_arrow")),
+    ("down_arrow", [], "Windows", "Tile window to the bottom half", tile("down_arrow")),
+    ("left_arrow", ["shift"], "Windows", "This window left, the previous one right", tile("left_arrow", "shift")),
+    ("right_arrow", ["shift"], "Windows", "This window right, the previous one left", tile("right_arrow", "shift")),
+    ("f", [], "Windows", "Fill the screen", tile("f")),
+    ("r", [], "Windows", "Return the window to its size before", tile("r")),
+    # Mission Control's Control + 1 to 9 and Control + arrows (setup turns the digits on).
+    ("tab", [], "Desktops", "Next desktop", key("right_arrow", "control")),
+    ("tab", ["shift"], "Desktops", "Previous desktop", key("left_arrow", "control")),
 ]
 
-for code, direction in ARROWS:
-    BINDINGS.append((code, [], "Windows", f"Focus window {direction}", aero(f"focus {direction}")))
-    BINDINGS.append((code, ["shift"], "Windows", f"Swap window {direction}", aero(f"move {direction}")))
-    BINDINGS.append((code, ["control", "shift"], "Windows", f"Move window to the monitor {direction}",
-                     aero(f"move-node-to-monitor --focus-follows-window --wrap-around {direction}")))
-
 for n in range(1, 10):
-    BINDINGS.append((str(n), [], "Workspaces", f"Go to workspace {n}", aero(f"workspace {n}")))
-    BINDINGS.append((str(n), ["shift"], "Workspaces", f"Move window to workspace {n} and follow",
-                     aero(f"move-node-to-workspace --focus-follows-window {n}")))
-    BINDINGS.append((str(n), ["shift", "option"], "Workspaces", f"Move window to workspace {n}, stay here",
-                     aero(f"move-node-to-workspace {n}")))
+    BINDINGS.append((str(n), [], "Desktops", f"Go to desktop {n}", key(str(n), "control")))
 
 BINDINGS += [
     # Apps
@@ -249,7 +231,7 @@ def readme(current):
     for code, mods, group, desc, _ in BINDINGS:
         groups.setdefault(group, []).append((label(code, mods), desc))
     for group, items in groups.items():
-        if group == "Workspaces":
+        if group == "Desktops":
             items = [i for i in items if not any(f"+ {n}" in i[0] for n in "2345678")]
         for keys, desc in items:
             rows.append(f"| {keys} | {desc} |")

@@ -10,7 +10,6 @@ public enum LauncherSource: String, CaseIterable, Sendable, Codable {
     case settingsActions = "settings"
     case commands
     case menu
-    case windows
     case files
     case bookmarks
     case snippets
@@ -23,7 +22,6 @@ public enum LauncherSource: String, CaseIterable, Sendable, Codable {
         case .units: return "Units and currency"
         case .commands: return "Grand Line commands"
         case .menu: return "Grand Line menu"
-        case .windows: return "Open windows"
         case .settingsActions: return "Settings you can change"
         case .bookmarks: return "Bookmarks (Zen)"
         case .snippets: return "Snippets (Espanso)"
@@ -39,7 +37,6 @@ public enum LauncherSource: String, CaseIterable, Sendable, Codable {
         case .units: return "\u{201C}5 km in mi\u{201D}, \u{201C}100 usd\u{201D}, with Bank of Canada rates."
         case .commands: return "Every command in the package's bin folder, with its arguments."
         case .menu: return "The main menu's entries, such as Toggle and Capture."
-        case .windows: return "Windows of the running apps."
         case .settingsActions: return "\u{201C}wifi off\u{201D}, \u{201C}dark mode\u{201D}, \u{201C}volume 30\u{201D}, changed in place."
         case .bookmarks: return "Bookmarks from Zen's profile."
         case .snippets: return "Espanso's text shortcuts."
@@ -55,7 +52,6 @@ public enum LauncherSource: String, CaseIterable, Sendable, Codable {
         case .units: return "ruler"
         case .commands: return "terminal"
         case .menu: return "menubar.rectangle"
-        case .windows: return "macwindow.on.rectangle"
         case .settingsActions: return "switch.2"
         case .bookmarks: return "bookmark"
         case .snippets: return "text.quote"
@@ -68,7 +64,6 @@ public enum LauncherSource: String, CaseIterable, Sendable, Codable {
     public var prefix: Prefix? {
         switch self {
         case .calculator, .units: return .calculator
-        case .windows: return .windows
         case .bookmarks: return .bookmarks
         case .snippets: return .snippets
         case .files: return .files
@@ -86,7 +81,6 @@ public enum LauncherSource: String, CaseIterable, Sendable, Codable {
         case .calculator, .units: return ["calculator"]
         case .commands: return ["commands"]
         case .menu: return ["menu"]
-        case .windows: return ["windows"]
         case .settingsActions: return [SettingsActionsProvider.providerID]
         case .bookmarks: return ["bookmarks"]
         case .snippets: return ["snippets"]
@@ -101,7 +95,6 @@ public enum LauncherSource: String, CaseIterable, Sendable, Codable {
         case .apps: return .apps
         case .calculator, .units: return .answers
         case .commands, .menu: return .grandLine
-        case .windows: return .windows
         case .settingsActions: return .system
         case .bookmarks: return .bookmarks
         case .snippets: return .snippets

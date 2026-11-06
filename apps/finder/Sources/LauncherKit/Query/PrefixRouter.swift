@@ -37,8 +37,6 @@ public struct PrefixRouter: Sendable {
             return LaunchQuery(raw: raw, prefix: .files, term: rest)
         case ":":
             return LaunchQuery(raw: raw, prefix: clipboardHistory() ? .clipboardHistory : .symbols, term: rest)
-        case "!", "<":
-            return LaunchQuery(raw: raw, prefix: .windows, term: rest)
         default:
             break
         }

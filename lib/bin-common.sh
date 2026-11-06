@@ -101,14 +101,30 @@ detach_self() {
   exit 0
 }
 
-# focus_window APP [TITLE]: focus an open window of APP (whose title contains
-# TITLE, when given) through AeroSpace, which also switches to its workspace.
-# Fails when there is no such window, so the caller can open one.
-focus_window() {
-  local app="$1" title="${2:-}" id
-  command -v aerospace >/dev/null 2>&1 || return 1
-  id="$(aerospace list-windows --all --format '%{window-id}|%{app-name}|%{window-title}' 2>/dev/null \
-        | awk -F'|' -v app="$app" -v title="$title" '
-            $2 == app && (title == "" || index(substr($0, length($1 $2) + 3), title)) { print $1; exit }')"
-  [[ -n "$id" ]] && aerospace focus --window-id "$id" >/dev/null 2>&1
+# raise_window APP TITLE: bring forward an open window of APP whose title
+# contains TITLE, through System Events (the app need not be scriptable).
+# Fails when there is no such window on this desktop, or when macOS has not
+# allowed it yet, so the caller can open one instead.
+raise_window() {
+  local reply
+  reply="$(osascript - "$1" "$2" <<'EOF' 2>/dev/null
+on run argv
+  set appName to item 1 of argv
+  set wanted to item 2 of argv
+  tell application "System Events"
+    repeat with p in (every process whose name is appName or displayed name is appName)
+      repeat with w in (every window of p)
+        if name of w contains wanted then
+          perform action "AXRaise" of w
+          set frontmost of p to true
+          return "raised"
+        end if
+      end repeat
+    end repeat
+  end tell
+  return ""
+end run
+EOF
+)"
+  [[ "$reply" == raised ]]
 }

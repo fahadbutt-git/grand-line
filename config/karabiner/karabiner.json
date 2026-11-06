@@ -64,366 +64,6 @@
          }
         ],
         "from": {
-         "key_code": "left_arrow",
-         "modifiers": {
-          "mandatory": [
-           "shift",
-           "option"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-workspace-to-monitor --wrap-around prev"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "right_arrow",
-         "modifiers": {
-          "mandatory": [
-           "shift",
-           "option"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-workspace-to-monitor --wrap-around next"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "left_arrow",
-         "modifiers": {
-          "mandatory": [
-           "control",
-           "shift"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-monitor --focus-follows-window --wrap-around left"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "down_arrow",
-         "modifiers": {
-          "mandatory": [
-           "control",
-           "shift"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-monitor --focus-follows-window --wrap-around down"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "up_arrow",
-         "modifiers": {
-          "mandatory": [
-           "control",
-           "shift"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-monitor --focus-follows-window --wrap-around up"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "right_arrow",
-         "modifiers": {
-          "mandatory": [
-           "control",
-           "shift"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-monitor --focus-follows-window --wrap-around right"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "1",
-         "modifiers": {
-          "mandatory": [
-           "shift",
-           "option"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-workspace 1"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "2",
-         "modifiers": {
-          "mandatory": [
-           "shift",
-           "option"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-workspace 2"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "3",
-         "modifiers": {
-          "mandatory": [
-           "shift",
-           "option"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-workspace 3"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "4",
-         "modifiers": {
-          "mandatory": [
-           "shift",
-           "option"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-workspace 4"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "5",
-         "modifiers": {
-          "mandatory": [
-           "shift",
-           "option"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-workspace 5"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "6",
-         "modifiers": {
-          "mandatory": [
-           "shift",
-           "option"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-workspace 6"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "7",
-         "modifiers": {
-          "mandatory": [
-           "shift",
-           "option"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-workspace 7"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "8",
-         "modifiers": {
-          "mandatory": [
-           "shift",
-           "option"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-workspace 8"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "9",
-         "modifiers": {
-          "mandatory": [
-           "shift",
-           "option"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-workspace 9"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
          "key_code": "b",
          "modifiers": {
           "mandatory": [
@@ -762,75 +402,6 @@
          }
         ],
         "from": {
-         "key_code": "tab",
-         "modifiers": {
-          "mandatory": [
-           "shift"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace workspace --no-stdin --wrap-around prev"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "tab",
-         "modifiers": {
-          "mandatory": [
-           "control"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace workspace-back-and-forth"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "tab",
-         "modifiers": {
-          "mandatory": [
-           "option"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace focus-monitor --wrap-around next"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
          "key_code": "left_arrow",
          "modifiers": {
           "mandatory": [
@@ -840,53 +411,12 @@
         },
         "to": [
          {
-          "shell_command": "/opt/homebrew/bin/aerospace move left"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "down_arrow",
-         "modifiers": {
-          "mandatory": [
+          "key_code": "left_arrow",
+          "modifiers": [
+           "fn",
+           "control",
            "shift"
           ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move down"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "up_arrow",
-         "modifiers": {
-          "mandatory": [
-           "shift"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move up"
          }
         ]
        },
@@ -909,7 +439,12 @@
         },
         "to": [
          {
-          "shell_command": "/opt/homebrew/bin/aerospace move right"
+          "key_code": "right_arrow",
+          "modifiers": [
+           "fn",
+           "control",
+           "shift"
+          ]
          }
         ]
        },
@@ -923,7 +458,7 @@
          }
         ],
         "from": {
-         "key_code": "1",
+         "key_code": "tab",
          "modifiers": {
           "mandatory": [
            "shift"
@@ -932,191 +467,10 @@
         },
         "to": [
          {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 1"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "2",
-         "modifiers": {
-          "mandatory": [
-           "shift"
+          "key_code": "left_arrow",
+          "modifiers": [
+           "control"
           ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 2"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "3",
-         "modifiers": {
-          "mandatory": [
-           "shift"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 3"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "4",
-         "modifiers": {
-          "mandatory": [
-           "shift"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 4"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "5",
-         "modifiers": {
-          "mandatory": [
-           "shift"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 5"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "6",
-         "modifiers": {
-          "mandatory": [
-           "shift"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 6"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "7",
-         "modifiers": {
-          "mandatory": [
-           "shift"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 7"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "8",
-         "modifiers": {
-          "mandatory": [
-           "shift"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 8"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "9",
-         "modifiers": {
-          "mandatory": [
-           "shift"
-          ]
-         }
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 9"
          }
         ]
        },
@@ -2070,227 +1424,15 @@
          }
         ],
         "from": {
-         "key_code": "t"
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace layout floating tiling"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "j"
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace layout horizontal vertical"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "f"
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace fullscreen"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "g"
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace layout accordion tiles"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "equal_sign"
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace resize smart +50"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "hyphen"
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace resize smart -50"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "e"
-        },
-        "to": [
-         {
-          "shell_command": "$HOME/.grand-line/bin/windows"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "n"
-        },
-        "to": [
-         {
-          "shell_command": "$HOME/.grand-line/bin/workspace new"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "d"
-        },
-        "to": [
-         {
-          "shell_command": "$HOME/.grand-line/bin/workspace close"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "tab"
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace workspace --no-stdin --wrap-around next"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
          "key_code": "left_arrow"
         },
         "to": [
          {
-          "shell_command": "/opt/homebrew/bin/aerospace focus left"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "down_arrow"
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace focus down"
-         }
-        ]
-       },
-       {
-        "type": "basic",
-        "conditions": [
-         {
-          "type": "variable_if",
-          "name": "caps_layer",
-          "value": 1
-         }
-        ],
-        "from": {
-         "key_code": "up_arrow"
-        },
-        "to": [
-         {
-          "shell_command": "/opt/homebrew/bin/aerospace focus up"
+          "key_code": "left_arrow",
+          "modifiers": [
+           "fn",
+           "control"
+          ]
          }
         ]
        },
@@ -2308,7 +1450,120 @@
         },
         "to": [
          {
-          "shell_command": "/opt/homebrew/bin/aerospace focus right"
+          "key_code": "right_arrow",
+          "modifiers": [
+           "fn",
+           "control"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "up_arrow"
+        },
+        "to": [
+         {
+          "key_code": "up_arrow",
+          "modifiers": [
+           "fn",
+           "control"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "down_arrow"
+        },
+        "to": [
+         {
+          "key_code": "down_arrow",
+          "modifiers": [
+           "fn",
+           "control"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "f"
+        },
+        "to": [
+         {
+          "key_code": "f",
+          "modifiers": [
+           "fn",
+           "control"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "r"
+        },
+        "to": [
+         {
+          "key_code": "r",
+          "modifiers": [
+           "fn",
+           "control"
+          ]
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
+         "key_code": "tab"
+        },
+        "to": [
+         {
+          "key_code": "right_arrow",
+          "modifiers": [
+           "control"
+          ]
          }
         ]
        },
@@ -2326,7 +1581,10 @@
         },
         "to": [
          {
-          "shell_command": "/opt/homebrew/bin/aerospace workspace 1"
+          "key_code": "1",
+          "modifiers": [
+           "control"
+          ]
          }
         ]
        },
@@ -2344,7 +1602,10 @@
         },
         "to": [
          {
-          "shell_command": "/opt/homebrew/bin/aerospace workspace 2"
+          "key_code": "2",
+          "modifiers": [
+           "control"
+          ]
          }
         ]
        },
@@ -2362,7 +1623,10 @@
         },
         "to": [
          {
-          "shell_command": "/opt/homebrew/bin/aerospace workspace 3"
+          "key_code": "3",
+          "modifiers": [
+           "control"
+          ]
          }
         ]
        },
@@ -2380,7 +1644,10 @@
         },
         "to": [
          {
-          "shell_command": "/opt/homebrew/bin/aerospace workspace 4"
+          "key_code": "4",
+          "modifiers": [
+           "control"
+          ]
          }
         ]
        },
@@ -2398,7 +1665,10 @@
         },
         "to": [
          {
-          "shell_command": "/opt/homebrew/bin/aerospace workspace 5"
+          "key_code": "5",
+          "modifiers": [
+           "control"
+          ]
          }
         ]
        },
@@ -2416,7 +1686,10 @@
         },
         "to": [
          {
-          "shell_command": "/opt/homebrew/bin/aerospace workspace 6"
+          "key_code": "6",
+          "modifiers": [
+           "control"
+          ]
          }
         ]
        },
@@ -2434,7 +1707,10 @@
         },
         "to": [
          {
-          "shell_command": "/opt/homebrew/bin/aerospace workspace 7"
+          "key_code": "7",
+          "modifiers": [
+           "control"
+          ]
          }
         ]
        },
@@ -2452,7 +1728,10 @@
         },
         "to": [
          {
-          "shell_command": "/opt/homebrew/bin/aerospace workspace 8"
+          "key_code": "8",
+          "modifiers": [
+           "control"
+          ]
          }
         ]
        },
@@ -2470,7 +1749,10 @@
         },
         "to": [
          {
-          "shell_command": "/opt/homebrew/bin/aerospace workspace 9"
+          "key_code": "9",
+          "modifiers": [
+           "control"
+          ]
          }
         ]
        },

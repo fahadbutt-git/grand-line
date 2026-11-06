@@ -25,17 +25,6 @@ final class SourceTests: XCTestCase {
         XCTAssertEqual(row.subtitle, "Bookmarks toolbar")
     }
 
-    func testAeroSpaceWindows() {
-        let output = "12|Safari|PubMed | glaucoma\n7|Ghostty|\nbad line\n"
-        let windows = WindowsProvider.parse(output)
-        XCTAssertEqual(windows, [WindowEntry(id: 12, app: "Safari", title: "PubMed | glaucoma"), WindowEntry(id: 7, app: "Ghostty", title: "")])
-        let rows = WindowsProvider().rows(windows)
-        XCTAssertEqual(rows[1].title, "Ghostty")
-        guard case .run(_, let arguments)? = rows[0].primary?.command else { return XCTFail() }
-        XCTAssertEqual(arguments, ["focus", "--window-id", "12"])
-        XCTAssertEqual(WindowsProvider.format, "%{window-id}|%{app-name}|%{window-title}")
-    }
-
     func testWebKeywordsAndQuicklinks() {
         let all = WebSearches.all(quicklinks: "# keyword\ttitle\turl\nwiki\tFrench Wikipedia\thttps://fr.wikipedia.org/w/index.php?search=%s\nlp\tLog\thttps://x.test/?q=%s\n")
         XCTAssertEqual(all.map(\.keyword), ["g", "pm", "gs", "yt", "wiki", "lp"])

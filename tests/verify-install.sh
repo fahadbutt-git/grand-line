@@ -49,9 +49,7 @@ while IFS=$'\t' read -r app repo _; do
 done < "$ROOT/config/grand-line/artcraft.tsv"
 
 echo "Settings and commands"
-for target in "$GRAND_LINE_LINK" "$HOME/.aerospace.toml"; do
-  if [[ -L "$target" && -e "$target" ]]; then pass "$target"; else fail "$target is not linked"; fi
-done
+if [[ -L "$GRAND_LINE_LINK" && -e "$GRAND_LINE_LINK" ]]; then pass "$GRAND_LINE_LINK"; else fail "$GRAND_LINE_LINK is not linked"; fi
 cmp -s "$ROOT/config/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json" \
   && pass "Karabiner has the current shortcuts" || fail "Karabiner settings differ from the package"
 grep -q "$GRAND_LINE_BIN" "$HOME/.zprofile" && pass "package commands are on the PATH for new shells" || fail ".zprofile does not add the package commands"
@@ -158,7 +156,6 @@ echo "System settings"
 if [[ "$CI" == 0 ]]; then
   echo "Desktop"
   [[ -f "$HOME/Documents/Finish setup.txt" ]] && pass "finishing checklist in Documents" || fail "checklist missing"
-  pgrep -qx AeroSpace && pass "AeroSpace is running" || note "AeroSpace is not running yet (open it and allow Accessibility)"
 fi
 
 echo

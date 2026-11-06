@@ -224,8 +224,8 @@ case "$MODE" in
     #   brew bundle install --file ~/.local/state/grand-line/brew-before-update.Brewfile
     brew bundle dump --file "$GRAND_LINE_STATE/brew-before-update.Brewfile" --force >/dev/null 2>&1
     if brew update; then
-      # Karabiner and AeroSpace keep running their old version until restarted.
-      restart="$(brew outdated --quiet 2>/dev/null | sed 's#.*/##' | grep -xE 'karabiner-elements|aerospace' | tr '\n' ' ')"
+      # Karabiner keeps running its old version until restarted.
+      restart="$(brew outdated --quiet 2>/dev/null | sed 's#.*/##' | grep -xE 'karabiner-elements' | tr '\n' ' ')"
       brew upgrade || failed+=("Homebrew")
     else
       failed+=("Homebrew")

@@ -48,10 +48,10 @@ final class SightSettingsTests: XCTestCase {
     }
 
     func testUnknownAndMissingSourcesAreRepaired() {
-        let sources = SourceSettings(order: ["files", "nonsense", "apps", "files"], disabled: ["windows", "gone"])
+        let sources = SourceSettings(order: ["files", "nonsense", "apps", "files"], disabled: ["menu", "gone"])
         XCTAssertEqual(sources.order.count, LauncherSource.allCases.count)
         XCTAssertEqual(Array(sources.order.prefix(2)), [.files, .apps])
-        XCTAssertEqual(sources.disabled, [.windows])
+        XCTAssertEqual(sources.disabled, [.menu])
     }
 
     func testDragMovesLikeSwiftUI() {

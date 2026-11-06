@@ -43,7 +43,6 @@ Toggle/Microphone muted	toggle mic		✓is_on mic-muted
 Toggle/Docker	toggle docker	?command -v colima	✓is_on docker
 Toggle/Local AI (Ollama)	toggle ollama	?command -v ollama	✓is_on ollama
 Toggle/Sight on Command + Space (off: Spotlight)	toggle search	?test -d /Applications/Sight.app	✓is_on search
-Toggle/Window tiling on or off	aerospace enable toggle
 Setup/Displays	open 'x-apple.systempreferences:com.apple.Displays-Settings.extension'
 Setup/Keyboard	open 'x-apple.systempreferences:com.apple.Keyboard-Settings.extension'
 Setup/Trackpad	open 'x-apple.systempreferences:com.apple.Trackpad-Settings.extension'
@@ -51,7 +50,6 @@ Setup/Sound output	audio
 Setup/Bluetooth devices	bluetooth
 Setup/Privacy and Security	open 'x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension'
 Setup/Edit this menu	open -a TextEdit "$GRAND_LINE_CONFIG/menu.tsv"
-Setup/Edit window tiling settings	open -a TextEdit "$HOME/.aerospace.toml"
 Setup/Default apps: ArtCraft and built-in	default-apps primary
 Setup/Default apps: Preview for PDFs	default-apps fallback
 Hardware/Battery	notice battery

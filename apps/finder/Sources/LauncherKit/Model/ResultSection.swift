@@ -1,8 +1,8 @@
 import Foundation
 
 /// The sections of the result list, in the order they are shown: the top
-/// hit, then what Return runs on the Mac (answers, apps, settings, commands,
-/// windows), then files, then bookmarks and other text, then the web, with the
+/// hit, then what Return runs on the Mac (answers, apps, settings, commands),
+/// then files, then bookmarks and other text, then the web, with the
 /// rows offered when nothing matches last.
 ///
 /// The raw values are saved with recents and favourites, so each keeps the
@@ -15,6 +15,8 @@ public enum ResultSection: Int, Codable, CaseIterable, Comparable, Sendable {
     case apps = 4
     case system = 7
     case grandLine = 5
+    /// No longer filled (the open windows list was removed); kept so
+    /// saved recents and section orders still read.
     case windows = 6
     case files = 11
     case bookmarks = 8

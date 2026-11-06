@@ -256,7 +256,7 @@ final class FallbackAndScriptTests: XCTestCase {
         commands.replace([CommandScript(name: "transcode", path: "/b/transcode", summary: "Convert", arguments: [])])
         let engine = SearchEngine(providers: [
             commands, SettingsPanes.provider(), ShellProvider(paths: paths), instant([Make.row("Safari")], id: "apps"),
-            WindowsProvider(), ReminderProvider(paths: paths),
+            ReminderProvider(paths: paths),
         ], router: router)
         let shell = engine.plan(">trans")
         XCTAssertEqual(Set(shell.providers.map(\.id)), ["commands", "shell"])
@@ -264,8 +264,6 @@ final class FallbackAndScriptTests: XCTestCase {
         XCTAssertTrue(engine.instantGroups(shell).flatMap(\.rows).contains { $0.id == "cmd:transcode" })
         XCTAssertEqual(engine.plan(",").providers.map(\.id), ["settings"])
         XCTAssertFalse(engine.instantGroups(engine.plan(",")).isEmpty, "the settings list on its own")
-        XCTAssertEqual(engine.plan("!saf").providers.map(\.id), ["windows"])
-        XCTAssertEqual(engine.plan("!saf").chip, "Windows")
         XCTAssertNil(engine.plan("safari").chip)
         XCTAssertEqual(engine.plan("~/Dri").chip, "Path")
         XCTAssertEqual(engine.plan("remind call the lab 20m").providers.map(\.id), ["reminder"])

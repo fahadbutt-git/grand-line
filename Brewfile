@@ -3,8 +3,6 @@
 # Video compression, image conversion and PDF shrinking use tools built into
 # macOS (avconvert, sips, tools/pdfshrink.swift), so no extra libraries.
 
-tap "nikitabobko/tap"
-
 # Command line tools (git, Swift and jq come with macOS and its command line tools)
 brew "gh"               # GitHub, for keeping this package in sync
 brew "duti"             # sets default apps per file type
@@ -92,7 +90,6 @@ brew "wakeonlan"        # wake the NAS or a server from sleep
 cask "zen"              # the one browser, and the default
 cask "spotify"
 
-# Keyboard, windows and clipboard
+# Keyboard and clipboard
 cask "karabiner-elements"
-cask "nikitabobko/tap/aerospace"
 cask "maccy"

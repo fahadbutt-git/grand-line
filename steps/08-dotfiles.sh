@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# Puts the window, terminal and keyboard settings in place and adds the
+# Puts the terminal and keyboard settings in place and adds the
 # package's commands (bin/) to the PATH.
 
 # shellcheck source=lib/overlay.sh
@@ -12,7 +12,6 @@ step_dotfiles() {
   link_into_place "$REPO_DIR" "$GRAND_LINE_LINK"
   append_once "export PATH=\"$GRAND_LINE_BIN:$GRAND_LINE_BUILD:\$PATH\"" "$HOME/.zprofile"
 
-  link_into_place "$cfg/aerospace/aerospace.toml" "$HOME/.aerospace.toml"
   link_into_place "$cfg/tmux" "$HOME/.config/tmux"
   link_into_place "$cfg/starship.toml" "$HOME/.config/starship.toml"
   link_into_place "$cfg/nvim" "$HOME/.config/nvim"

@@ -123,7 +123,7 @@ final class Services {
             aliases, apps, menu, commands, keybindings, settings, menuItems, processes,
             DefineProvider(lookup: { DictionaryLookup.define($0) }),
             snippets, symbols, bookmarks, web, files, saved,
-            WindowsProvider(), PathProvider(),
+            PathProvider(),
             ReminderProvider(paths: paths), ShellProvider(paths: paths), ClipboardProvider(), clipboardHistory,
             selection, scripts,
             PrefixListProvider(keywords: keywords),

@@ -15,8 +15,15 @@ macOS requires these clicks from you. Work down the list once.
    General, Login Items and Extensions, then allow Input Monitoring
    for karabiner_grabber and karabiner_observer when asked.
 
-2. AeroSpace (window tiling)
-   Open AeroSpace and allow Accessibility when asked.
+2. Desktops and window tiling (built into macOS)
+   Add desktops in Mission Control (three-finger swipe up, then +).
+   Caps + 1 to 9 switches desktop, Caps + Tab and Caps + Shift + Tab go
+   to the next and previous one. macOS cannot move a window to another
+   desktop by keyboard: drag it there in Mission Control, or right-click
+   its Dock icon, Options, Assign To. Tiling: Caps + Left, Right, Up and
+   Down fill that half, Caps + Shift + Left or Right puts this window and
+   the previous one side by side, Caps + F fills the screen and Caps + R
+   returns the window to its size before.
 
 3. Maccy (clipboard history)
    Open Maccy, allow Accessibility, and in its settings turn on
@@ -149,7 +156,6 @@ EOF
   if [[ "$CI_MODE" == 0 ]]; then
     open "$out" 2>/dev/null
     open -a "Karabiner-Elements" 2>/dev/null
-    open -a "AeroSpace" 2>/dev/null
     open -a "Maccy" 2>/dev/null
     open -a "Iceberg" 2>/dev/null
     # The file index needs Full Disk Access (or Files and Folders) to search.

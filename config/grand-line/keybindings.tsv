@@ -6,60 +6,25 @@ Caps + Escape	Menus	System menu (lock, sleep, restart, shut down)	$HOME/.grand-l
 Caps + W	Windows	Close window	
 Caps + Q	Windows	Quit app	
 Caps + Ctrl + L	Windows	Lock screen	
-Caps + T	Windows	Tile this window beside the others (press again to float it)	/opt/homebrew/bin/aerospace layout floating tiling
-Caps + J	Windows	Toggle split direction	/opt/homebrew/bin/aerospace layout horizontal vertical
-Caps + F	Windows	Full screen	/opt/homebrew/bin/aerospace fullscreen
-Caps + G	Windows	Toggle grouping (stacked windows)	/opt/homebrew/bin/aerospace layout accordion tiles
-Caps + =	Windows	Grow window	/opt/homebrew/bin/aerospace resize smart +50
-Caps + -	Windows	Shrink window	/opt/homebrew/bin/aerospace resize smart -50
-Caps + E	Windows	All windows on every workspace (type to filter, Return jumps there)	$HOME/.grand-line/bin/windows
-Caps + N	Workspaces	New workspace (takes this window to the next free number)	$HOME/.grand-line/bin/workspace new
-Caps + D	Workspaces	Close workspace (its windows move to the previous one)	$HOME/.grand-line/bin/workspace close
-Caps + Tab	Workspaces	Next workspace	/opt/homebrew/bin/aerospace workspace --no-stdin --wrap-around next
-Caps + Shift + Tab	Workspaces	Previous workspace	/opt/homebrew/bin/aerospace workspace --no-stdin --wrap-around prev
-Caps + Ctrl + Tab	Workspaces	Last used workspace	/opt/homebrew/bin/aerospace workspace-back-and-forth
-Caps + Option + Tab	Workspaces	Focus next monitor	/opt/homebrew/bin/aerospace focus-monitor --wrap-around next
-Caps + Option + Shift + Left	Workspaces	Move workspace to previous monitor	/opt/homebrew/bin/aerospace move-workspace-to-monitor --wrap-around prev
-Caps + Option + Shift + Right	Workspaces	Move workspace to next monitor	/opt/homebrew/bin/aerospace move-workspace-to-monitor --wrap-around next
-Caps + Left	Windows	Focus window left	/opt/homebrew/bin/aerospace focus left
-Caps + Shift + Left	Windows	Swap window left	/opt/homebrew/bin/aerospace move left
-Caps + Ctrl + Shift + Left	Windows	Move window to the monitor left	/opt/homebrew/bin/aerospace move-node-to-monitor --focus-follows-window --wrap-around left
-Caps + Down	Windows	Focus window down	/opt/homebrew/bin/aerospace focus down
-Caps + Shift + Down	Windows	Swap window down	/opt/homebrew/bin/aerospace move down
-Caps + Ctrl + Shift + Down	Windows	Move window to the monitor down	/opt/homebrew/bin/aerospace move-node-to-monitor --focus-follows-window --wrap-around down
-Caps + Up	Windows	Focus window up	/opt/homebrew/bin/aerospace focus up
-Caps + Shift + Up	Windows	Swap window up	/opt/homebrew/bin/aerospace move up
-Caps + Ctrl + Shift + Up	Windows	Move window to the monitor up	/opt/homebrew/bin/aerospace move-node-to-monitor --focus-follows-window --wrap-around up
-Caps + Right	Windows	Focus window right	/opt/homebrew/bin/aerospace focus right
-Caps + Shift + Right	Windows	Swap window right	/opt/homebrew/bin/aerospace move right
-Caps + Ctrl + Shift + Right	Windows	Move window to the monitor right	/opt/homebrew/bin/aerospace move-node-to-monitor --focus-follows-window --wrap-around right
-Caps + 1	Workspaces	Go to workspace 1	/opt/homebrew/bin/aerospace workspace 1
-Caps + Shift + 1	Workspaces	Move window to workspace 1 and follow	/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 1
-Caps + Option + Shift + 1	Workspaces	Move window to workspace 1, stay here	/opt/homebrew/bin/aerospace move-node-to-workspace 1
-Caps + 2	Workspaces	Go to workspace 2	/opt/homebrew/bin/aerospace workspace 2
-Caps + Shift + 2	Workspaces	Move window to workspace 2 and follow	/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 2
-Caps + Option + Shift + 2	Workspaces	Move window to workspace 2, stay here	/opt/homebrew/bin/aerospace move-node-to-workspace 2
-Caps + 3	Workspaces	Go to workspace 3	/opt/homebrew/bin/aerospace workspace 3
-Caps + Shift + 3	Workspaces	Move window to workspace 3 and follow	/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 3
-Caps + Option + Shift + 3	Workspaces	Move window to workspace 3, stay here	/opt/homebrew/bin/aerospace move-node-to-workspace 3
-Caps + 4	Workspaces	Go to workspace 4	/opt/homebrew/bin/aerospace workspace 4
-Caps + Shift + 4	Workspaces	Move window to workspace 4 and follow	/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 4
-Caps + Option + Shift + 4	Workspaces	Move window to workspace 4, stay here	/opt/homebrew/bin/aerospace move-node-to-workspace 4
-Caps + 5	Workspaces	Go to workspace 5	/opt/homebrew/bin/aerospace workspace 5
-Caps + Shift + 5	Workspaces	Move window to workspace 5 and follow	/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 5
-Caps + Option + Shift + 5	Workspaces	Move window to workspace 5, stay here	/opt/homebrew/bin/aerospace move-node-to-workspace 5
-Caps + 6	Workspaces	Go to workspace 6	/opt/homebrew/bin/aerospace workspace 6
-Caps + Shift + 6	Workspaces	Move window to workspace 6 and follow	/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 6
-Caps + Option + Shift + 6	Workspaces	Move window to workspace 6, stay here	/opt/homebrew/bin/aerospace move-node-to-workspace 6
-Caps + 7	Workspaces	Go to workspace 7	/opt/homebrew/bin/aerospace workspace 7
-Caps + Shift + 7	Workspaces	Move window to workspace 7 and follow	/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 7
-Caps + Option + Shift + 7	Workspaces	Move window to workspace 7, stay here	/opt/homebrew/bin/aerospace move-node-to-workspace 7
-Caps + 8	Workspaces	Go to workspace 8	/opt/homebrew/bin/aerospace workspace 8
-Caps + Shift + 8	Workspaces	Move window to workspace 8 and follow	/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 8
-Caps + Option + Shift + 8	Workspaces	Move window to workspace 8, stay here	/opt/homebrew/bin/aerospace move-node-to-workspace 8
-Caps + 9	Workspaces	Go to workspace 9	/opt/homebrew/bin/aerospace workspace 9
-Caps + Shift + 9	Workspaces	Move window to workspace 9 and follow	/opt/homebrew/bin/aerospace move-node-to-workspace --focus-follows-window 9
-Caps + Option + Shift + 9	Workspaces	Move window to workspace 9, stay here	/opt/homebrew/bin/aerospace move-node-to-workspace 9
+Caps + Left	Windows	Tile window to the left half	
+Caps + Right	Windows	Tile window to the right half	
+Caps + Up	Windows	Tile window to the top half	
+Caps + Down	Windows	Tile window to the bottom half	
+Caps + Shift + Left	Windows	This window left, the previous one right	
+Caps + Shift + Right	Windows	This window right, the previous one left	
+Caps + F	Windows	Fill the screen	
+Caps + R	Windows	Return the window to its size before	
+Caps + Tab	Desktops	Next desktop	
+Caps + Shift + Tab	Desktops	Previous desktop	
+Caps + 1	Desktops	Go to desktop 1	
+Caps + 2	Desktops	Go to desktop 2	
+Caps + 3	Desktops	Go to desktop 3	
+Caps + 4	Desktops	Go to desktop 4	
+Caps + 5	Desktops	Go to desktop 5	
+Caps + 6	Desktops	Go to desktop 6	
+Caps + 7	Desktops	Go to desktop 7	
+Caps + 8	Desktops	Go to desktop 8	
+Caps + 9	Desktops	Go to desktop 9	
 Caps + Return	Apps	Terminal	$HOME/.grand-line/bin/focus-or-open 'Terminal'
 Caps + Option + Return	Apps	Terminal in a tmux session	osascript -e 'tell application "Terminal" to do script "/opt/homebrew/bin/tmux new-session -A -s main"' -e 'tell application "Terminal" to activate'
 Caps + Shift + Return	Apps	Browser (Zen)	$HOME/.grand-line/bin/focus-or-open 'Zen'

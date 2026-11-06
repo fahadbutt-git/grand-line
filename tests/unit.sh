@@ -66,7 +66,8 @@ KEYBINDINGS_FILE="$ROOT/config/grand-line/keybindings.tsv" "$ROOT/bin/keybinding
 [[ "$(cat "$tmp/ran" 2>/dev/null)" == "menu System" ]] && t_ok "shortcut list runs the chosen shortcut" || t_fail "shortcut list did not run it" "$(cat "$tmp/ran" 2>/dev/null)"
 
 lines="$(KEYBINDINGS_FILE="$ROOT/config/grand-line/keybindings.tsv" "$ROOT/bin/keybindings" --print | wc -l | tr -d ' ')"
-[[ "$lines" -ge 90 ]] && t_ok "shortcut list prints all $lines shortcuts" || t_fail "shortcut list printed $lines lines"
+want="$(grep -vc "^#" "$ROOT/config/grand-line/keybindings.tsv")"
+[[ "$lines" -ge 60 && "$lines" -eq "$want" ]] && t_ok "shortcut list prints all $lines shortcuts" || t_fail "shortcut list printed $lines lines, not $want"
 
 # --- theme: retired; it says where the look comes from and changes nothing
 : > "$STUB_LOG"
@@ -390,19 +391,19 @@ unset XATTR_SOURCES GRAND_LINE_DOWNLOADS GRAND_LINE_DOWNLOAD_RULES MDLS_DATES GR
 
 # --- app install and remove keep the Brewfile in step
 mkdir -p "$HOME/.grand-line/config/grand-line"
-printf 'cask "zoom"\ncask "nikitabobko/tap/aerospace"\n' > "$HOME/.grand-line/Brewfile"
+printf 'cask "zoom"\ncask "example/tap/widget"\n' > "$HOME/.grand-line/Brewfile"
 printf 'FilmCraft\tstorytold/filmcraft\tVideo editor\nPdfCraft\tstorytold/pdfcraft\tPDF editor\n' > "$HOME/.grand-line/config/grand-line/artcraft.tsv"
-export GRAND_LINE_DETACHED=1 BREW_CASKS="iina zoom" BREW_INSTALLED="zoom aerospace"
+export GRAND_LINE_DETACHED=1 BREW_CASKS="iina zoom" BREW_INSTALLED="zoom widget"
 answers "iina"; "$ROOT/bin/app" install
 grep -qx 'cask "iina"' "$HOME/.grand-line/Brewfile" && t_ok "app install adds the app to the Brewfile" || t_fail "app install did not add to the Brewfile"
 "$ROOT/bin/app" install iina; [[ "$(grep -c 'cask "iina"' "$HOME/.grand-line/Brewfile")" == 1 ]] && t_ok "app install never adds a line twice" || t_fail "app install added a duplicate line"
-"$ROOT/bin/app" remove aerospace
-grep -q aerospace "$HOME/.grand-line/Brewfile" && t_fail "app remove left a tap cask in the Brewfile" || t_ok "app remove takes a tap cask off the Brewfile"
+"$ROOT/bin/app" remove widget
+grep -q widget "$HOME/.grand-line/Brewfile" && t_fail "app remove left a tap cask in the Brewfile" || t_ok "app remove takes a tap cask off the Brewfile"
 grep -q 'cask "zoom"' "$HOME/.grand-line/Brewfile" && t_ok "app remove leaves other apps alone" || t_fail "app remove touched other lines"
 "$ROOT/bin/app" remove "PdfCraft (ArtCraft)"
 grep -q '^PdfCraft' "$HOME/.grand-line/config/grand-line/artcraft.tsv" && t_fail "ArtCraft removal kept its row" || t_ok "app remove takes an ArtCraft app off its list"
 grep -q '^FilmCraft' "$HOME/.grand-line/config/grand-line/artcraft.tsv" && t_ok "ArtCraft removal leaves other rows" || t_fail "ArtCraft removal touched other rows"
-grep -q "brew uninstall --cask aerospace" "$STUB_LOG" && ! grep -q -- "--zap" "$STUB_LOG" && t_ok "app remove keeps the app's data (no --zap)" || t_fail "app remove deleted data"
+grep -q "brew uninstall --cask widget" "$STUB_LOG" && ! grep -q -- "--zap" "$STUB_LOG" && t_ok "app remove keeps the app's data (no --zap)" || t_fail "app remove deleted data"
 unset GRAND_LINE_DETACHED BREW_CASKS BREW_INSTALLED
 
 # --- grandline: history, undo, save, restore and experiments, on a scratch repository
@@ -563,45 +564,14 @@ printf '#!/bin/bash\nexit 1\n' > "$hd/on-test.d/15-fails"; chmod +x "$hd/on-test
 rm -rf "$hd"
 
 # --- focus or open, web apps, update lock and window
-export AEROSPACE_WINDOWS=$'7|Terminal|~\n9|Zen|Inbox (3) - Gmail'
-: > "$STUB_LOG"; "$ROOT/bin/focus-or-open" Terminal
-grep -q "aerospace focus --window-id 7" "$STUB_LOG" && ! grep -q "open -a" "$STUB_LOG" && t_ok "an app key focuses its open window" || t_fail "focus-or-open did not focus" "$(cat "$STUB_LOG")"
 : > "$STUB_LOG"; "$ROOT/bin/focus-or-open" Notion
-grep -q "open -a Notion" "$STUB_LOG" && t_ok "an app key opens an app with no window" || t_fail "focus-or-open did not open"
-: > "$STUB_LOG"; "$ROOT/bin/webapp" "https://mail.google.com" "Gmail"
-grep -q "aerospace focus --window-id 9" "$STUB_LOG" && ! grep -q "open " "$STUB_LOG" && t_ok "a web app key focuses its open window" || t_fail "webapp did not focus"
+grep -q "open -a Notion" "$STUB_LOG" && t_ok "an app key brings the app forward or opens it" || t_fail "focus-or-open did not open" "$(cat "$STUB_LOG")"
+: > "$STUB_LOG"; OSASCRIPT_REPLY=raised "$ROOT/bin/webapp" "https://mail.google.com" "Gmail"
+grep -q "osascript - Zen Gmail" "$STUB_LOG" && ! grep -q "^open " "$STUB_LOG" && t_ok "a web app key raises its open window" || t_fail "webapp did not raise" "$(cat "$STUB_LOG")"
 : > "$STUB_LOG"; "$ROOT/bin/webapp" "https://www.youtube.com" "YouTube"
-grep -q "open " "$STUB_LOG" && t_ok "a web app key opens a window when none matches" || t_fail "webapp did not open"
-unset AEROSPACE_WINDOWS
-# workspace new / close, with a stub that has workspaces 1 and 3 in use and 3 focused
-ws_stub="$tmp/aero-ws"
-cat > "$ws_stub" <<'STUB'
-#!/bin/bash
-echo "aerospace $*" >> "$STUB_LOG"
-case "$*" in
-  "list-workspaces --monitor all --empty no") printf '1\n3\n' ;;
-  "list-workspaces --focused") echo 3 ;;
-  "list-windows --workspace focused --format %{window-id}") printf '11\n12\n' ;;
-esac
-STUB
-chmod +x "$ws_stub"
-: > "$STUB_LOG"; GRAND_LINE_AEROSPACE="$ws_stub" "$ROOT/bin/workspace" new
-grep -q "move-node-to-workspace --focus-follows-window 2" "$STUB_LOG" && t_ok "workspace new takes the window to the lowest free number" || t_fail "workspace new" "$(cat "$STUB_LOG")"
-: > "$STUB_LOG"; GRAND_LINE_AEROSPACE="$ws_stub" "$ROOT/bin/workspace" close
-grep -q "move-node-to-workspace --window-id 11 1" "$STUB_LOG" && grep -q "move-node-to-workspace --window-id 12 1" "$STUB_LOG" && grep -q "aerospace workspace 1" "$STUB_LOG" \
-  && t_ok "workspace close moves every window to the previous workspace and goes there" || t_fail "workspace close" "$(cat "$STUB_LOG")"
-[[ "$(GRAND_LINE_AEROSPACE="$ws_stub" "$ROOT/bin/workspace" list | tr '\n' ' ')" == "1 3 * " ]] && t_ok "workspace list marks the current one" || t_fail "workspace list"
-# windows lists every window across workspaces, sorted by workspace
-win_stub="$tmp/aero-win"
-cat > "$win_stub" <<'STUB'
-#!/bin/bash
-echo "aerospace $*" >> "$STUB_LOG"
-[[ "$1" == list-windows ]] && printf '3|Claude|Chat|42\n1|Zen|Inbox|7\n'
-STUB
-chmod +x "$win_stub"
-got="$(GRAND_LINE_AEROSPACE="$win_stub" "$ROOT/bin/windows" --print)"
-[[ "$(head -1 <<<"$got")" == "1   Zen  —  Inbox   [7]" && "$(sed -n 2p <<<"$got")" == "3   Claude  —  Chat   [42]" ]] \
-  && t_ok "windows lists every window by workspace with its id" || t_fail "windows list" "$got"
+grep -q "^open -a Zen https://www.youtube.com" "$STUB_LOG" && t_ok "a web app key opens the site when no window matches" || t_fail "webapp did not open" "$(cat "$STUB_LOG")"
+: > "$STUB_LOG"; OSASCRIPT_FAIL="not allowed" "$ROOT/bin/webapp" "https://pubmed.ncbi.nlm.nih.gov" "PubMed"
+grep -q "^open -a Zen https://pubmed" "$STUB_LOG" && t_ok "a web app key still opens the site when System Events is not allowed" || t_fail "webapp fallback" "$(cat "$STUB_LOG")"
 locktmp="$(mktemp -d)"; lock="$locktmp/update.lock"
 mkdir "$lock"; echo "$$" > "$lock/pid"
 out="$(GRAND_LINE_UPDATE_LOCK="$lock" "$ROOT/bin/update" 2>&1)"
@@ -1276,6 +1246,22 @@ grep -q '^UNATTENDED_STEPS="folders,dotfiles,native-tools,downloads"$' "$ROOT/se
   exit 0
 ) && t_ok "setup leaves the Dock, desktop, animations, tiling and Finder views to macOS, and Apple's apps where they are" || t_fail "macOS look left alone (step $?)" "$(cat "$STUB_LOG")"
 
+(
+  export REPO_DIR="$ROOT" DRY_RUN=0 ONLY=""
+  source "$ROOT/lib/common.sh"; source "$ROOT/steps/10-macos-defaults.sh"
+  mkdir -p "$GRAND_LINE_STATE"; rm -f "$GRAND_LINE_STATE/done-desktop-keys"; touch "$GRAND_LINE_STATE/done-macos-defaults"
+  : > "$STUB_LOG"; step_macos_defaults >/dev/null
+  [[ "$(grep -c "defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add" "$STUB_LOG")" == 9 ]] || exit 1
+  grep -q -- "-dict-add 118 .*<integer>65535</integer><integer>18</integer><integer>262144</integer>" "$STUB_LOG" || exit 2
+  grep -q -- "-dict-add 123 .*<integer>22</integer><integer>262144</integer>" "$STUB_LOG" || exit 3
+  grep -q -- "-dict-add 126 .*<integer>25</integer><integer>262144</integer>" "$STUB_LOG" || exit 4
+  grep -qE -- "-dict-add (11[0-7]|12[7-9]|1[3-9][0-9]|[0-9]{1,2}) " "$STUB_LOG" && exit 5
+  : > "$STUB_LOG"; step_macos_defaults >/dev/null
+  grep -q symbolichotkeys "$STUB_LOG" && exit 6       # once, so your later changes are kept
+  rm -f "$GRAND_LINE_STATE/done-desktop-keys" "$GRAND_LINE_STATE/done-macos-defaults"
+  exit 0
+) && t_ok "Control + 1 to 9 switch desktops, turned on once and nothing else changed" || t_fail "desktop switch keys (step $?)" "$(cat "$STUB_LOG")"
+
 # --- the migration back to macOS's own look, Finder for folders, and fewer apps
 (
   m="$ROOT/migrations/1793914462-default-look-fewer-apps.sh"
@@ -1373,5 +1359,33 @@ grep -q '^UNATTENDED_STEPS="folders,dotfiles,native-tools,downloads"$' "$ROOT/se
   exit 0
 ) && t_ok "migration: Nexus's leftovers and the theme state go to the Trash, saved searches move to Sight, macOS's look is left alone" \
   || t_fail "Nexus leftovers migration (step $?)" "$(cat "$STUB_LOG")"
+
+# --- migration: AeroSpace goes, windows and desktops are macOS's own
+(
+  ah="$tmp/aero-home"; mkdir -p "$ah/.grand-line/config"; export HOME="$ah"
+  export GRAND_LINE_STATE="$ah/.local/state/grand-line"
+  run_file="$tmp/aero-running"; echo AeroSpace > "$run_file"; export STUB_RUNNING="$run_file"
+  ln -s "$ah/.grand-line/config/aerospace.toml" "$ah/.aerospace.toml"
+  m="$ROOT/migrations/1793940400-aerospace-to-native-windows.sh"
+  grep -qx '# grandline:unattended' "$m" || exit 1
+  : > "$STUB_LOG"
+  out="$(BREW_INSTALLED="zoom aerospace" BREW_TAPS="nikitabobko/tap" GRAND_LINE_REPO="$ROOT" bash "$m" 2>&1)" || { echo "$out"; exit 2; }
+  grep -q "^pkill -x AeroSpace" "$STUB_LOG" || exit 3
+  grep -q "^brew uninstall --cask aerospace$" "$STUB_LOG" && ! grep -q -- "--zap" "$STUB_LOG" || exit 4
+  grep -q "^brew untap nikitabobko/tap" "$STUB_LOG" || exit 5
+  [[ ! -L "$ah/.aerospace.toml" && -L "$ah/.Trash/.aerospace.toml" ]] || exit 6
+  grep -q "^osascript -" "$STUB_LOG" || exit 7
+  grep -qE "brew uninstall --cask (zoom|karabiner)|^defaults write|^rm " "$STUB_LOG" && exit 8
+  # Again, with AeroSpace already gone: nothing is uninstalled or moved, and it still succeeds.
+  : > "$STUB_LOG"
+  BREW_INSTALLED="zoom" GRAND_LINE_REPO="$ROOT" bash "$m" >/dev/null 2>&1 || exit 9
+  grep -qE "brew (uninstall|untap)|pkill" "$STUB_LOG" && exit 10
+  # A ~/.aerospace.toml of your own stays where it is.
+  echo mine > "$ah/.aerospace.toml"
+  BREW_INSTALLED="" GRAND_LINE_REPO="$ROOT" bash "$m" >/dev/null 2>&1 || exit 11
+  [[ "$(cat "$ah/.aerospace.toml")" == mine ]] || exit 12
+  exit 0
+) && t_ok "migration: AeroSpace quits and is uninstalled (data kept), its link goes to the Trash, the tap goes, safe to run again" \
+  || t_fail "AeroSpace migration (step $?)" "$(cat "$STUB_LOG")"
 
 exit $FAIL

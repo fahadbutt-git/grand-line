@@ -15,7 +15,7 @@ final class RouterTests: XCTestCase {
     func testEveryPrefix() {
         let cases: [(String, Prefix)] = [
             (". glauc kind:pdf", .files), ("=2+2", .calculator), ("?pm cornea", .web), ("%github", .bookmarks),
-            ("<safari", .windows), ("!safari", .windows), ("> ls -la", .shell), (";date", .snippets),
+            ("> ls -la", .shell), (";date", .snippets),
             ("$", .clipboard), (":alpha", .clipboardHistory), ("::alpha", .symbols), ("/", .providers),
             ("/glauc", .files), (",wifi", .settings), ("'cornea", .exact), ("@weekly", .saved),
         ]
@@ -58,7 +58,6 @@ final class RouterTests: XCTestCase {
 
     func testOldPrefixesKeepWorking() {
         XCTAssertEqual(router.parse(". glauc").prefix, .files)
-        XCTAssertEqual(router.parse("<safari").prefix, .windows)
         XCTAssertEqual(router.parse("$").prefix, .clipboard)
         // Without Maccy's store, ":" is the symbols, as before.
         XCTAssertEqual(noMaccy.parse(":alpha").prefix, .symbols)
@@ -74,7 +73,6 @@ final class RouterTests: XCTestCase {
     func testPrefixesShowTheirFirstTrigger() {
         XCTAssertEqual(Prefix.files.display, "/")
         XCTAssertEqual(Prefix.files.completion, "/ ")
-        XCTAssertEqual(Prefix.windows.display, "!")
         XCTAssertEqual(Prefix.symbols.display, "::")
         XCTAssertEqual(Prefix.calculator.chip, "Maths")
         XCTAssertEqual(Prefix.clipboardHistory.chip, "Clipboard")

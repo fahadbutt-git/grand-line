@@ -36,7 +36,7 @@ final class EngineTests: XCTestCase {
 
     func testGlobalSkipsProvidersThatOptOut() {
         let engine = SearchEngine(providers: [
-            SlowProvider(id: "windows", prefix: .windows, inGlobalSearch: false, rows: []),
+            SlowProvider(id: "shell", prefix: .shell, inGlobalSearch: false, rows: []),
             instant([Make.row("alpha")], id: "b"),
         ], router: router)
         XCTAssertEqual(engine.plan("alpha").providers.map { $0.id }, ["b"])

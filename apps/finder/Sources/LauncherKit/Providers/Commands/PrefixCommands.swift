@@ -1,7 +1,7 @@
 import Foundation
 
 /// "remind …" a new reminder: "remind call Smith in 20 min", "remind pay rent
-/// 2h", "remind submit at 3pm". (It was the `!` prefix, which is now windows.)
+/// 2h", "remind submit at 3pm".
 public struct ReminderProvider: InstantProvider {
     public let id = "reminder"
     public let title = "Reminder"
