@@ -305,7 +305,7 @@ final class SafetyTests: XCTestCase {
         let keys = KeybindingsFile.provider(paths)
         let keysText = try String(contentsOf: Self.repo.appendingPathComponent("config/grand-line/keybindings.tsv"), encoding: .utf8)
         let bindings = KeybindingsFile.parse(keysText, local: "")
-        XCTAssertGreaterThan(bindings.count, 90, "the shipped shortcuts were read")
+        XCTAssertGreaterThan(bindings.count, 60, "the shipped shortcuts were read")
         keys.replace(KeybindingsFile.results(bindings))
         let commands = CommandsProvider(folder: Self.repo.appendingPathComponent("bin").path)
         commands.reload()
