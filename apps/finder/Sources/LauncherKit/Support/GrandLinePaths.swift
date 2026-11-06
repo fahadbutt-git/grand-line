@@ -33,7 +33,6 @@ public struct GrandLinePaths: Sendable, Equatable {
     public var userConfig: String { home + "/.config/grand-line" }
     public var menuLocal: String { userConfig + "/menu.local.tsv" }
     public var bindingsLocal: String { userConfig + "/bindings.local.tsv" }
-    public var savedSearches: String { userConfig + "/nexus/saved-searches.tsv" }
     /// Sight's settings: aliases, quicklinks and external providers.
     public var settings: String { userConfig + "/sight" }
     public var aliases: String { settings + "/aliases.tsv" }
@@ -41,10 +40,10 @@ public struct GrandLinePaths: Sendable, Equatable {
     public var externalProviders: String { settings + "/providers.tsv" }
     /// Script commands: executables that print rows as JSON lines (ScriptCommands).
     public var scripts: String { settings + "/scripts" }
-    /// ~/.local/state/grand-line, where Nexus writes its selection.
+    /// Saved searches for `@name` in a `.` query: name TAB query.
+    public var savedSearches: String { settings + "/saved-searches.tsv" }
+    /// ~/.local/state/grand-line, the package's state.
     public var localState: String { home + "/.local/state/grand-line" }
-    /// Nexus's selection while it is in front, one path per line (lib/bin-common.sh finder_selection).
-    public var nexusSelection: String { localState + "/nexus-selection" }
     public var downloads: String { home + "/Downloads" }
     /// Maccy's history (SwiftData, in its sandbox container). Read only, from a copy.
     public var maccyStore: String { home + "/Library/Containers/org.p0deje.Maccy/Data/Library/Application Support/Maccy/Storage.sqlite" }

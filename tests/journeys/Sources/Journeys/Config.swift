@@ -2,7 +2,7 @@ import Foundation
 
 /// One app from tests/journeys/apps.tsv, the only place app names live.
 struct AppEntry {
-    /// What the app is for: files, launcher, notch. Journeys refer to this.
+    /// What the app is for: launcher, notch, index. Journeys refer to this.
     let role: String
     let folder: String
     let product: String
@@ -49,7 +49,7 @@ struct Options {
       --fixture-script FILE   tests/journeys/make-fixture.sh (run before each journey)
       --config FILE           apps.tsv (default: next to the fixture script)
       --out DIR               screenshots and results (default ./journey-results)
-      --only A,B              roles (files, launcher, notch) or journey names or prefixes
+      --only A,B              roles (launcher, notch, index) or journey names or prefixes
       --list                  list the journeys and exit
       --github                print GitHub Actions annotations and a step summary
       --check-permissions     report Accessibility and Screen Recording, exit 0 if both granted

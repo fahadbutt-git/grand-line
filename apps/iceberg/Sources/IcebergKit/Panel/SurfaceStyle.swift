@@ -4,16 +4,16 @@ import CoreGraphics
 #endif
 
 /// How a floating surface (the drop basket) is drawn, from the macOS
-/// accessibility display options. Normally a translucent material with the
-/// theme's panel colour laid over it and a hairline edge. Reduce
+/// accessibility display options. Normally the system's translucent material
+/// alone, with a hairline edge. Reduce
 /// Transparency makes it solid. Increase Contrast makes it solid with a
 /// defined edge that leans towards the text colour.
 public struct SurfaceStyle: Equatable, Sendable {
-    /// Draw the blurred material behind the theme's colour.
+    /// Draw the blurred material.
     public var usesMaterial: Bool
-    /// The theme's panel colour over the material (1 is solid).
+    /// The window background colour over the material (0 is the material alone, 1 is solid).
     public var tintOpacity: Double
-    /// How far the edge moves from the theme's line colour towards its text colour.
+    /// How far the edge moves from the separator colour towards the text colour.
     public var edgeEmphasis: Double
     /// The edge's width in device pixels.
     public var edgePixels: Int
@@ -32,7 +32,7 @@ public struct SurfaceStyle: Equatable, Sendable {
         if reduceTransparency {
             return SurfaceStyle(usesMaterial: false, tintOpacity: 1, edgeEmphasis: 0, edgePixels: 1)
         }
-        return SurfaceStyle(usesMaterial: true, tintOpacity: 0.62, edgeEmphasis: 0, edgePixels: 1)
+        return SurfaceStyle(usesMaterial: true, tintOpacity: 0, edgeEmphasis: 0, edgePixels: 1)
     }
 
     /// Lines inside the panel (dividers, chip edges): with Increase

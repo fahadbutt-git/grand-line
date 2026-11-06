@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Sets up a fresh Mac: apps, tools, settings, keyboard layer, window tiling,
-# default apps and themes. Safe to run again at any time.
+# Sets up a fresh Mac: apps, tools, settings, keyboard layer, window tiling
+# and default apps. Safe to run again at any time.
 #
 #   bash setup.sh               full setup
 #   bash setup.sh --dry-run     print every action without changing anything
@@ -115,8 +115,9 @@ for f in "$REPO_DIR"/steps/[0-9][0-9]-*.sh; do
 done
 
 # A fresh install needs none of the one-time changes in migrations/, so they
-# are recorded as done. A Mac set up before migrations existed already has a
-# theme, so its migrations still run (bin/update runs them).
+# are recorded as done. A Mac set up before migrations existed has the state
+# file the old theme step wrote, so its migrations still run (bin/update
+# runs them).
 if [[ ! -d "$GRAND_LINE_STATE/migrations" && ! -f "$GRAND_LINE_STATE/theme" ]]; then
   run "$REPO_DIR/bin/migrate" --mark-all
 fi

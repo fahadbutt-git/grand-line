@@ -337,8 +337,7 @@ public actor FileIndex {
     }
 
     /// Removes these paths and everything below them: the folders a snapshot
-    /// from a wider scope (Nexus indexed all of ~/Library) holds but this index
-    /// leaves out.
+    /// from a wider scope holds but this index leaves out.
     public func prune(_ paths: Set<String>) {
         var removed = false
         for path in paths {
@@ -554,8 +553,8 @@ public actor FileIndex {
     }
 
     /// Removes what the exclusions leave out from an index loaded from a
-    /// snapshot (Nexus's, which indexed all of ~/Library, or this index's own
-    /// from before a folder appeared in ~/Library). Returns the entries removed.
+    /// snapshot (one from a wider scope, or this index's own from before a
+    /// folder appeared in ~/Library). Returns the entries removed.
     @discardableResult
     public func pruneExcluded() -> Int {
         let before = storage.removedCount

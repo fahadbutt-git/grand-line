@@ -43,7 +43,7 @@ final class RecoveryTests: XCTestCase {
     }
 
     func testSnapshotsWithoutVolumesStillResume() {
-        // Sight's and Nexus's snapshots from before the service saved no UUIDs.
+        // Sight's snapshot from before the service saved no UUIDs.
         XCTAssertEqual(startup(storedVolumes: [:]), .resume(since: 500))
         XCTAssertEqual(startup(currentVolumes: [:]), .resume(since: 500), "a volume that cannot be read is not a new one")
     }

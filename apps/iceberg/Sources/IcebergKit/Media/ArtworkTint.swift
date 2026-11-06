@@ -8,7 +8,7 @@ public enum ArtworkTint {
     public static let sampleSide = 24
 
     /// From premultiplied RGBA bytes (CoreGraphics' usual layout). Nil for a
-    /// grey, black or white cover, so the caller uses the theme's accent.
+    /// grey, black or white cover, so the caller uses the accent colour.
     public static func dominant(rgba: [UInt8]) -> RGB? {
         let bins = 12
         var weight = [Double](repeating: 0, count: bins)
@@ -59,7 +59,7 @@ public enum ArtworkTint {
         return RGB(red: 1, green: 1, blue: 1)
     }
 
-    /// The bars' colour: the cover's, else the theme's accent, readable on black.
+    /// The bars' colour: the cover's, else the system accent colour, readable on black.
     public static func tint(cover: RGB?, accent: RGB) -> RGB {
         readableOnBlack(cover ?? accent)
     }

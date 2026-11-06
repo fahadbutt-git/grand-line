@@ -59,7 +59,7 @@ public struct IndexStatus: Sendable, Equatable, Codable {
     }
 }
 
-/// What the Settings windows of Nexus and Sight call for the index section:
+/// What Sight's Settings window calls for the index section:
 /// its state, and a Rebuild button.
 public protocol IndexStatusProviding: Sendable {
     func status() async -> IndexStatus

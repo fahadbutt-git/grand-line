@@ -4,12 +4,12 @@ import AppRuntime
 import Combine
 import IcebergKit
 
-/// Starts the theme, the widgets and one panel per display that should have
+/// Starts the colours, the widgets and one panel per display that should have
 /// one, and rebuilds the panels when displays come and go.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let paths = IcebergPaths()
-    private var theme: ThemeStore?
+    private var palette: SystemPalette?
     private var host: PanelHost?
     private var controllers: [UInt32: NotchController] = [:]
     private var settingsWindow: SettingsWindow?
@@ -30,16 +30,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // After three crashes in ten minutes Iceberg stays closed (and says so once).
         guard crashRecord.launch(displayName: "Iceberg") else { exit(0) }
         termination = TerminationSignal.handle { DispatchQueue.main.async { MainActor.assumeIsolated { NSApp.terminate(nil) } } }
-        let theme = ThemeStore(paths: paths)
-        let host = PanelHost(paths: paths, theme: theme)
-        self.theme = theme
+        let palette = SystemPalette()
+        let host = PanelHost(paths: paths, palette: palette)
+        self.palette = palette
         self.host = host
         settingsWindow = SettingsWindow(host: host)
         host.onLayoutChange = { [weak self] in self?.rebuildPanels(force: true) }
         host.openSettings = { [weak self] in self?.showSettings() }
         host.hotKey.action = { [weak self] in self?.targetController()?.toggle(byKeyboard: true) }
         host.onEscape = { [weak self] in self?.controllers.values.forEach { $0.close() } }
-        let basket = BasketController(shelf: host.shelf, theme: theme)
+        let basket = BasketController(shelf: host.shelf, palette: palette)
         self.basket = basket
         host.drag.onShake = { [weak host, weak basket] point in
             guard host?.settings.dragBasket == true else { return }
@@ -129,7 +129,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "Open or close the panel", action: #selector(togglePanel), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",").target = self
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Reload widgets and theme", action: #selector(reloadAll), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Reload Widgets", action: #selector(reloadAll), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Open widgets folder", action: #selector(openWidgetsFolder), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Open the log", action: #selector(openLog), keyEquivalent: "").target = self
         menu.addItem(.separator())

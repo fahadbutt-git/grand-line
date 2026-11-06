@@ -7,10 +7,6 @@ import SwiftUI
 /// pressing the current one records it rather than opening the window.
 struct HotkeyRecorder: NSViewRepresentable {
     let hotkey: LauncherHotkey?
-    let textColor: NSColor
-    let dimColor: NSColor
-    let fieldColor: NSColor
-    let accentColor: NSColor
     let onRecord: (LauncherHotkey) -> Void
     let onRecording: (Bool) -> Void
 
@@ -22,7 +18,6 @@ struct HotkeyRecorder: NSViewRepresentable {
 
     func updateNSView(_ view: RecorderView, context: Context) {
         view.hotkey = hotkey
-        view.colors = (textColor, dimColor, fieldColor, accentColor)
         view.onRecord = onRecord
         view.onRecording = onRecording
         view.needsDisplay = true
@@ -30,7 +25,6 @@ struct HotkeyRecorder: NSViewRepresentable {
 
     final class RecorderView: NSView {
         var hotkey: LauncherHotkey?
-        var colors: (text: NSColor, dim: NSColor, field: NSColor, accent: NSColor) = (.labelColor, .secondaryLabelColor, .controlBackgroundColor, .controlAccentColor)
         var onRecord: ((LauncherHotkey) -> Void)?
         var onRecording: ((Bool) -> Void)?
         private(set) var recording = false {
@@ -106,18 +100,32 @@ struct HotkeyRecorder: NSViewRepresentable {
             onRecord?(candidate)
         }
 
+        // The system's colours, resolved for this view's appearance as it
+        // draws, so the field follows Light and Dark and the accent colour.
+        override func viewDidChangeEffectiveAppearance() {
+            super.viewDidChangeEffectiveAppearance()
+            needsDisplay = true
+        }
+
         override func draw(_ dirtyRect: NSRect) {
-            let box = bounds.insetBy(dx: 0.5, dy: 0.5)
-            let path = NSBezierPath(roundedRect: box, xRadius: 5, yRadius: 5)
-            colors.field.setFill()
+            let box = bounds.insetBy(dx: 1.5, dy: 1.5)
+            let path = NSBezierPath(roundedRect: box, xRadius: 6, yRadius: 6)
+            NSColor.controlBackgroundColor.setFill()
             path.fill()
-            (recording ? colors.accent : colors.dim.withAlphaComponent(0.4)).setStroke()
-            path.lineWidth = recording ? 2 : 1
+            NSColor.separatorColor.setStroke()
+            path.lineWidth = 1
             path.stroke()
+            if recording {
+                // The focus ring macOS draws round a field being edited.
+                let ring = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 6.5, yRadius: 6.5)
+                NSColor.keyboardFocusIndicatorColor.setStroke()
+                ring.lineWidth = 2.5
+                ring.stroke()
+            }
             let font = NSFont.preferredFont(forTextStyle: .body)
             let text = NSAttributedString(string: caption, attributes: [
                 .font: font,
-                .foregroundColor: recording ? colors.dim : colors.text,
+                .foregroundColor: recording ? NSColor.placeholderTextColor : NSColor.labelColor,
             ])
             let size = text.size()
             text.draw(at: NSPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2))

@@ -35,7 +35,7 @@ let appFolder = URL(fileURLWithPath: #filePath)
     .deletingLastPathComponent()   // Tests
     .deletingLastPathComponent()   // iceberg
 
-/// The package's root, for its real theme files.
+/// The package's root, for its real configuration files.
 let repoFolder = appFolder.deletingLastPathComponent().deletingLastPathComponent()
 
 /// Collects results from commands finishing on other threads.

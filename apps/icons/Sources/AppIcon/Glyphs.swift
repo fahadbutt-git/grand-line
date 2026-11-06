@@ -39,17 +39,15 @@ public struct IconMark: Sendable, Hashable {
     }
 }
 
-/// The three apps' glyphs. Original, generic shapes.
+/// The apps' glyphs. Original, generic shapes.
 public enum IconGlyph: String, Sendable, CaseIterable {
-    case nexus, sight, iceberg
+    case sight, iceberg
 
-    /// The theme key for this app's own colour. Named for the app's job,
-    /// not its name: files, search, notch.
-    public var themeKey: String {
+    /// The app's own colour on its icon.
+    public var color: IconColor {
         switch self {
-        case .nexus: return "ICON_FILES"
-        case .sight: return "ICON_SEARCH"
-        case .iceberg: return "ICON_NOTCH"
+        case .sight: return IconColor(hex: "ff6a3d")!
+        case .iceberg: return IconColor(hex: "64d2ff")!
         }
     }
 
@@ -57,7 +55,6 @@ public enum IconGlyph: String, Sendable, CaseIterable {
     /// `IconGlyphs.detailSize`, so the icon still reads at 16 and 32.
     public func marks(pixels: Double = IconGlyphs.canvas) -> [IconMark] {
         switch self {
-        case .nexus: return IconGlyphs.nexus
         case .sight:
             return pixels >= IconGlyphs.detailSize ? IconGlyphs.sight + IconGlyphs.sightDetail + IconGlyphs.sightTop
                                                    : IconGlyphs.sight + IconGlyphs.sightTop
@@ -76,16 +73,6 @@ public enum IconGlyphs {
     public static let detailSize: Double = 64
     public static let tile: [IconMark] = [
         IconMark(.rrect, .tile, [100, 100, 824, 824, 185]),
-    ]
-
-    /// Nexus: a sailing ship seen from the side, with a pennant.
-    public static let nexus: [IconMark] = [
-        IconMark(.segment, .soft, [236, 742, 788, 742, 16]),
-        IconMark(.polygon, .accent, [232, 612, 792, 612, 714, 712, 310, 712]),
-        IconMark(.segment, .ink, [512, 236, 512, 612, 22]),
-        IconMark(.polygon, .ink, [534, 284, 534, 580, 748, 580]),
-        IconMark(.polygon, .ink, [490, 336, 490, 580, 312, 580]),
-        IconMark(.polygon, .accent, [520, 220, 520, 268, 606, 244]),
     ]
 
     /// Sight: the back of an eye as an ophthalmoscope shows it. The

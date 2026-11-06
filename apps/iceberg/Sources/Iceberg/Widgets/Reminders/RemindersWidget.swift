@@ -122,7 +122,7 @@ final class RemindersWidget: ObservableObject, NotchWidget {
 
 struct RemindersView: View {
     @ObservedObject var model: RemindersWidget
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -147,7 +147,7 @@ struct RemindersView: View {
 }
 
 private struct ReminderRow: View {
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     @ObservedObject private var display = DisplayOptions.shared
     let item: AgendaReminder
     let done: Bool
@@ -163,7 +163,7 @@ private struct ReminderRow: View {
             Button(action: toggle) {
                 Image(systemName: done ? "checkmark.circle.fill" : "circle")
                     .font(SymbolScale.body)
-                    .foregroundStyle(done ? theme.highlight : theme.muted)
+                    .foregroundStyle(done ? palette.highlight : palette.muted)
                     .contentTransition(.symbolEffect(.replace))
                     .animation(Motion.content(reduceMotion: display.reduceMotion), value: done)
             }
@@ -172,14 +172,14 @@ private struct ReminderRow: View {
             .accessibilityLabel(done ? "Mark \(item.title) as not done" : "Mark \(item.title) as done")
             Text(item.title)
                 .font(TypeScale.body)
-                .strikethrough(done, color: theme.muted)
-                .foregroundStyle(done ? theme.muted : theme.foreground)
+                .strikethrough(done, color: palette.muted)
+                .foregroundStyle(done ? palette.muted : palette.foreground)
                 .lineLimit(1)
                 .animation(Motion.content(reduceMotion: display.reduceMotion), value: done)
             if overdue && !done {
                 Text("Overdue")
                     .font(TypeScale.caption)
-                    .foregroundStyle(theme.color(.theme(.red)) ?? theme.muted)
+                    .foregroundStyle(palette.color(.named(.red)) ?? palette.muted)
             }
         }
     }

@@ -1,11 +1,11 @@
 import Foundation
 
-/// "selection": Alfred-style actions on the files selected in Nexus or Finder
-/// when the window opened (open, show in Nexus, Quick Look, copy paths, names
-/// or files, move, AirDrop, move to the Trash, add to the buffer). More words
+/// "selection": Alfred-style actions on the files selected in Finder when the
+/// window opened (open, show in Finder, Quick Look, copy paths, names or
+/// files, move, AirDrop, move to the Trash, add to the buffer). More words
 /// narrow the actions: "selection trash". The window reads the selection the
-/// way lib/bin-common.sh's finder_selection does: Nexus's state file when Nexus
-/// is in front, else Finder's selection through AppleScript.
+/// way lib/bin-common.sh's finder_selection does: Finder's selection through
+/// AppleScript.
 public final class SelectionProvider: InstantProvider, @unchecked Sendable {
     public static let providerID = "selection"
     public static let word = "selection"
@@ -30,7 +30,7 @@ public final class SelectionProvider: InstantProvider, @unchecked Sendable {
     return out
     """
 
-    /// Paths from Nexus's state file or the script's output: one per line, blanks dropped.
+    /// Paths from the script's output: one per line, blanks dropped.
     public static func parse(_ text: String) -> [String] {
         var seen = Set<String>()
         return text.split(whereSeparator: \.isNewline)
@@ -38,12 +38,7 @@ public final class SelectionProvider: InstantProvider, @unchecked Sendable {
             .filter { $0.hasPrefix("/") && seen.insert($0).inserted }
     }
 
-    public static func readNexus(_ file: String) -> [String] {
-        guard let data = FileManager.default.contents(atPath: file) else { return [] }
-        return parse(String(decoding: data, as: UTF8.self))
-    }
-
-    /// The selection as the window found it, and where ("Nexus", "Finder").
+    /// The selection as the window found it, and where ("Finder").
     public func set(_ paths: [String], from source: String) {
         lock.withLock {
             self.paths = paths
@@ -66,7 +61,7 @@ public final class SelectionProvider: InstantProvider, @unchecked Sendable {
         guard !paths.isEmpty else {
             return [LaunchResult(
                 id: "selection:none",
-                title: "Nothing is selected in Finder or Nexus",
+                title: "Nothing is selected in Finder",
                 subtitle: "Select files there, then open this window and type selection",
                 icon: .symbol(symbol),
                 section: .files,

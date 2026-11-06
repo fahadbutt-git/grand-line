@@ -225,15 +225,9 @@ final class TintAndTextTests: XCTestCase {
         XCTAssertEqual(ChipText.shown("No 3").text, "No 3")
     }
 
-    func testNotchPaletteKeysAndFallbacks() {
-        let theme = Theme.graphite
-        let plain = NotchPalette(fields: [:], theme: theme)
-        XCTAssertEqual(plain.panel, theme.background)
-        XCTAssertEqual(plain.card, theme.backgroundLighter)
-        let set = NotchPalette(fields: ["NOTCH_PANEL": "101010", "FIELD": "202020", "LINE": "303030"], theme: theme)
-        XCTAssertEqual(set.panel.hex, "101010")
-        XCTAssertEqual(set.card.hex, "202020")
-        XCTAssertEqual(set.line.hex, "303030")
-        XCTAssertEqual(NotchPalette(fields: ["NOTCH_CARD": "aaaaaa", "FIELD": "202020"], theme: theme).card.hex, "aaaaaa")
+    func testColoursAreNamedOrHex() {
+        XCTAssertEqual(WidgetColor.parse("warning"), .named(.yellow))
+        XCTAssertEqual(WidgetColor.parse("#202020"), .hex(RGB(hex: "202020")!))
+        XCTAssertNil(WidgetColor.parse("chartreuse-ish"))
     }
 }

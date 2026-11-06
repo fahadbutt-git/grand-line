@@ -5,7 +5,7 @@ import IndexService
 import ServiceManagement
 
 // Grand Line Index: the background agent that keeps one name index of the home
-// folder for Nexus and Sight. It has no window and no menu bar item. launchd
+// folder for Sight. It has no window and no menu bar item. launchd
 // runs it from Contents/Library/LaunchAgents/com.grandline.index.plist
 // (registered with SMAppService), keeps it alive and starts it when an app
 // connects to the com.grandline.index Mach service. Because it is its own app,

@@ -5,8 +5,8 @@
 # results.tsv go to the output folder, which opens at the end.
 #
 #   bash tests/journeys/run.sh                 every journey
-#   bash tests/journeys/run.sh files           one app, by role (files, launcher, notch)
-#   bash tests/journeys/run.sh files-search    one journey, or a name prefix
+#   bash tests/journeys/run.sh launcher        one app, by role (launcher, notch, index)
+#   bash tests/journeys/run.sh launcher-answers one journey, or a name prefix
 #   bash tests/journeys/run.sh --list
 #
 # Options: --apps DIR uses bundles already built there, --out DIR, --no-build,

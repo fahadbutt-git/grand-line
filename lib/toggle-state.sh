@@ -72,11 +72,3 @@ flag() {
   mkdir -p "$TOGGLE_FLAGS"
   if [[ "$2" == on ]]; then boot_time > "$TOGGLE_FLAGS/$1"; else rm -f "$TOGGLE_FLAGS/$1"; fi
 }
-
-# theme_is NAME: succeeds when NAME is the current theme, or the family
-# (harbour for harbour-dark and harbour-light) it belongs to.
-theme_is() {
-  local current=""
-  read -r current < "$HOME/.local/state/grand-line/theme" 2>/dev/null
-  [[ "$current" == "$1" || "$current" == "$1-dark" || "$current" == "$1-light" ]]
-}

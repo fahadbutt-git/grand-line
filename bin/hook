@@ -1,5 +1,5 @@
 #!/bin/bash
-# grandline:summary=Run your own scripts at named moments (post-update, theme-set)
+# grandline:summary=Run your own scripts at named moments (post-update)
 # hook NAME [ARGS...]
 # Runs ~/.config/grand-line/hooks/NAME, then every file in NAME.d/ in name
 # order, passing ARGS. Only executable files run, and *.sample files never do.

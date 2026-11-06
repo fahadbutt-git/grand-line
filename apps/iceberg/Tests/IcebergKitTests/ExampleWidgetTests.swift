@@ -28,7 +28,7 @@ final class ExampleWidgetTests: XCTestCase {
         let shown = CommandOutputParser.display(for: r)
         XCTAssertFalse(shown.failed, r.stderr)
         XCTAssertTrue(shown.text.hasPrefix("Docker on"), shown.text)
-        XCTAssertEqual(shown.color, .theme(.highlight))
+        XCTAssertEqual(shown.color, .named(.highlight))
     }
 
     func testWeatherScriptWithoutLocationAsksForIt() {

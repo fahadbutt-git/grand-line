@@ -30,7 +30,7 @@ public enum IndexServiceName {
     /// The bundle identifier of Grand Line Index.app.
     public static let bundleID = "com.grandline.index"
     /// The apps that may ask the service.
-    public static let clients = ["com.grandline.nexus", "com.grandline.sight"]
+    public static let clients = ["com.grandline.sight"]
     /// Picks another service, for the journeys: they start their own agent
     /// with a fixture home under a label beginning `com.grandline.index.`.
     public static let environmentKey = "GRAND_LINE_INDEX_SERVICE"

@@ -3,7 +3,7 @@ import IndexKit
 import os
 
 /// The shared name index the Grand Line Index agent keeps: loaded from its
-/// snapshot (or adopted from Sight's or Nexus's on the first start), caught up
+/// snapshot (or adopted from Sight's on the first start), caught up
 /// with FSEvents from the stored event, walked again only when FSEvents history
 /// cannot be trusted, saved every few minutes and on quit, and swept once a week
 /// at background priority.
@@ -99,9 +99,9 @@ public final class IndexServiceCore: @unchecked Sendable {
         }
         if let found = adopted {
             index = found.index
-            // Nexus indexed all of ~/Library, and this index's own snapshot
-            // may predate a rule (or hold a folder made in ~/Library since):
-            // whatever the rules leave out goes, from every snapshot.
+            // This index's own snapshot, or the one it adopted, may predate a
+            // rule (or hold a folder made in ~/Library since): whatever the
+            // rules leave out goes, from every snapshot.
             let pruned = await index.pruneExcluded()
             if pruned > 0 { log.info("Left out \(pruned) entries the rules exclude") }
             if found.origin != .own || pruned > 0 {

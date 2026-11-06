@@ -1,16 +1,11 @@
 import AppKit
 import SwiftUI
-import ThemeKit
 
 /// Motion for the search window: critically damped springs, never on the
-/// typing path, and short cross-fades instead when Reduce Motion is on (or
-/// the theme sets UI_MOTION=reduced).
+/// typing path, and short cross-fades instead when Reduce Motion is on.
 enum Motion {
-    /// The theme's UI_MOTION, kept by ThemeStore.
-    @MainActor static var themeReduced = false
-
     @MainActor static var reduced: Bool {
-        themeReduced || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     }
 
     /// The window materialising and going away: scale and blur together.
@@ -33,22 +28,22 @@ enum Motion {
     @MainActor static func selectionAnimation() -> Animation? { reduced ? nil : selection }
 }
 
-/// The type scale: system text styles, so tracking and leading come from
-/// Apple's tables, with weight for emphasis rather than size.
+/// The type scale: system text styles, so tracking, leading and the user's
+/// text size come from macOS, with weight for emphasis rather than size.
 enum Typo {
-    /// The query: macOS Title 2 (17 pt).
-    static let fieldNS = NSFont.preferredFont(forTextStyle: .title2)
-    static let field = Font.title2
+    /// The query: macOS Title 1 (22 pt), as Spotlight's field.
+    static let fieldNS = NSFont.preferredFont(forTextStyle: .title1)
+    static let field = Font.title
     /// Row titles, action names, preview text: Body (13 pt).
     static let row = Font.body
     /// Subtitles, accessories, chips, footer: Subheadline (11 pt).
     static let detail = Font.subheadline
     /// Section headings and the action panel title.
     static let heading = Font.subheadline.weight(.semibold)
-    /// The scope chip in the field.
-    static let scope = Font.callout.weight(.medium)
+    /// The scope token in the field.
+    static let scope = Font.body.weight(.medium)
     /// Key caps.
-    static let key = Font.subheadline.weight(.medium)
+    static let key = Font.subheadline
 }
 
 /// Spacing on one 4 pt grid: every row, heading and the field start their
@@ -62,59 +57,33 @@ enum Space {
     static let column: CGFloat = inset + rowPadding
 }
 
-/// The window's surface: a behind-window material with the theme's
-/// background laid over it, solid under Reduce Transparency.
-struct PanelSurface: View {
-    let theme: Theme
-    let radius: CGFloat
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.colorSchemeContrast) private var contrast
-
-    var body: some View {
-        ZStack {
-            if reduceTransparency {
-                Color(theme.background)
-            } else {
-                VisualEffectBackground(material: .popover, radius: radius)
-                // The theme's colour, translucent, so the material still shows through.
-                Color(theme.background).opacity(contrast == .increased ? 0.94 : 0.72)
-            }
-        }
-    }
+/// Whether this Mac draws Liquid Glass (macOS 26 and later, built with its SDK).
+enum Glass {
+    static let available: Bool = {
+        #if compiler(>=6.2)
+        if #available(macOS 26.0, *) { return true }
+        #endif
+        return false
+    }()
 }
 
-/// The edge of the window: a fine line, a defined one under Increase Contrast.
-struct PanelBorder: View {
-    let theme: Theme
-    let radius: CGFloat
-    @Environment(\.colorSchemeContrast) private var contrast
-    @Environment(\.displayScale) private var scale
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: radius, style: .continuous)
-            .strokeBorder(contrast == .increased ? Color(theme.dim) : Color(theme.line).opacity(0.7),
-                          lineWidth: contrast == .increased ? 1 : 1 / max(scale, 1))
-    }
+/// The system's own colours. Every one is dynamic: it follows Light and
+/// Dark, the accent colour, the highlight colour and Increase Contrast as
+/// they change, with nothing of Sight's own.
+enum Palette {
+    /// The selected row: the same accent fill a focused table or outline uses.
+    static let selection = Color(nsColor: .selectedContentBackgroundColor)
+    /// Text on the selected row.
+    static let selectionText = Color(nsColor: .alternateSelectedControlTextColor)
+    static let separator = Color(nsColor: .separatorColor)
 }
 
-/// A hairline divider, one device pixel, softer over the material.
-struct Hairline: View {
-    let theme: Theme
-    @Environment(\.colorSchemeContrast) private var contrast
-    @Environment(\.displayScale) private var scale
-
-    var body: some View {
-        Rectangle()
-            .fill(Color(theme.line).opacity(contrast == .increased ? 1 : 0.6))
-            .frame(height: 1 / max(scale, 1))
-    }
-}
-
-/// NSVisualEffectView blending behind the window, kept active while Sight
-/// itself is not the active app, with continuous corners from its mask so
-/// the blur and the window shadow follow the same shape.
-struct VisualEffectBackground: NSViewRepresentable {
-    let material: NSVisualEffectView.Material
+/// The window's surface. On macOS 26 and later it is Liquid Glass, as
+/// Spotlight is; before that a behind-window popover material. Both handle
+/// Reduce Transparency and Increase Contrast themselves.
+struct PanelSurface: NSViewRepresentable {
+    enum Kind { case window, menu }
+    var kind: Kind = .window
     let radius: CGFloat
 
     final class Coordinator {
@@ -123,26 +92,42 @@ struct VisualEffectBackground: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    func makeNSView(context: Context) -> NSVisualEffectView {
+    func makeNSView(context: Context) -> NSView {
+        #if compiler(>=6.2)
+        if #available(macOS 26.0, *) {
+            let glass = NSGlassEffectView()
+            glass.cornerRadius = radius
+            context.coordinator.radius = radius
+            return glass
+        }
+        #endif
         let view = NSVisualEffectView()
-        view.blendingMode = .behindWindow
+        // The window: blends with what is behind it. The action panel: with
+        // the window's own content, as a menu does.
+        view.material = kind == .window ? .popover : .menu
+        view.blendingMode = kind == .window ? .behindWindow : .withinWindow
+        // Kept active while Sight is not the active app (its panel never activates it).
         view.state = .active
         view.isEmphasized = false
         update(view, context.coordinator)
         return view
     }
 
-    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+    func updateNSView(_ view: NSView, context: Context) {
         update(view, context.coordinator)
     }
 
-    private func update(_ view: NSVisualEffectView, _ coordinator: Coordinator) {
-        if view.material != material { view.material = material }
-        // The mask is drawn again only when the radius changes (a theme's RADIUS_WINDOW).
-        if coordinator.radius != radius {
-            coordinator.radius = radius
-            view.maskImage = Self.mask(radius: radius)
+    private func update(_ view: NSView, _ coordinator: Coordinator) {
+        guard coordinator.radius != radius else { return }
+        coordinator.radius = radius
+        #if compiler(>=6.2)
+        if #available(macOS 26.0, *), let glass = view as? NSGlassEffectView {
+            glass.cornerRadius = radius
+            return
         }
+        #endif
+        // Continuous corners from the mask, so the blur and the window shadow follow one shape.
+        (view as? NSVisualEffectView)?.maskImage = Self.mask(radius: radius)
     }
 
     /// A stretchable continuous rounded rectangle: the corners are kept, the middle stretches.
@@ -159,6 +144,40 @@ struct VisualEffectBackground: NSViewRepresentable {
         image.capInsets = NSEdgeInsets(top: edge, left: edge, bottom: edge, right: edge)
         image.resizingMode = .stretch
         return image
+    }
+}
+
+/// The edge of the window before Liquid Glass: a fine light line, as on
+/// Spotlight and menus, and a defined one under Increase Contrast. Glass
+/// draws its own edge.
+struct PanelBorder: View {
+    let radius: CGFloat
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.displayScale) private var scale
+
+    var body: some View {
+        if !Glass.available {
+            let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+            if contrast == .increased {
+                shape.strokeBorder(Color.primary.opacity(0.5), lineWidth: 1)
+            } else {
+                // Dark mode lights the edge from inside, Light mode darkens it.
+                shape.strokeBorder(scheme == .dark ? Color.white.opacity(0.18) : Color.black.opacity(0.1),
+                                   lineWidth: 1 / max(scale, 1))
+            }
+        }
+    }
+}
+
+/// A divider, one device pixel, in the system separator colour.
+struct Hairline: View {
+    @Environment(\.displayScale) private var scale
+
+    var body: some View {
+        Rectangle()
+            .fill(Palette.separator)
+            .frame(height: 1 / max(scale, 1))
     }
 }
 
@@ -192,24 +211,24 @@ struct PressableRow<Label: View>: View {
     }
 }
 
-/// The highlight behind a row: the theme's selection, inset with continuous
-/// corners, darker while pressed; a faint wash on hover.
+/// The highlight behind a row: the system's selection colour (the accent),
+/// inset with continuous corners, a shade deeper while pressed; a faint fill
+/// on hover, as a menu or a sidebar shows.
 struct RowHighlight: View {
-    let theme: Theme
     let selected: Bool
     let pressed: Bool
     let hovered: Bool
     var namespace: Namespace.ID?
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: Metrics.rowRadius(theme), style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: Metrics.rowRadius, style: .continuous)
         ZStack {
             if selected {
                 highlight(shape)
             } else if pressed {
-                shape.fill(Color(theme.text).opacity(0.12))
+                shape.fill(.fill.secondary)
             } else if hovered {
-                shape.fill(Color(theme.text).opacity(0.05))
+                shape.fill(.fill.quaternary)
             }
         }
         .padding(.horizontal, Space.inset)
@@ -217,8 +236,8 @@ struct RowHighlight: View {
 
     @ViewBuilder private func highlight(_ shape: RoundedRectangle) -> some View {
         let fill = shape
-            .fill(Color(theme.selection))
-            .overlay(shape.fill(Color(theme.text).opacity(pressed ? 0.1 : 0)))
+            .fill(Palette.selection)
+            .overlay(shape.fill(Color.black.opacity(pressed ? 0.12 : 0)))
         if let namespace {
             fill.matchedGeometryEffect(id: "selection", in: namespace)
         } else {
@@ -227,22 +246,23 @@ struct RowHighlight: View {
     }
 }
 
-/// A key cap: "⌘K", "↩".
+/// A key hint, as Spotlight and menus show one: the key symbols in a small
+/// rounded cap, in the secondary label colour, white on a selected row.
 struct Keycap: View {
     let keys: String
-    let theme: Theme
-    var color: Color?
+    var onSelection = false
+    var emphasis: Color?
 
     var body: some View {
         Text(keys)
             .font(Typo.key.monospacedDigit())
-            .foregroundStyle(color ?? Color(theme.text))
+            .foregroundStyle(emphasis ?? (onSelection ? Palette.selectionText.opacity(0.85) : Color.secondary))
             .lineLimit(1)
             .padding(.horizontal, 5)
             .frame(minWidth: 18, minHeight: 18)
             .background(
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(Color(theme.text).opacity(0.08))
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(onSelection ? AnyShapeStyle(Color.white.opacity(0.2)) : AnyShapeStyle(.fill.tertiary))
             )
             .fixedSize()
     }

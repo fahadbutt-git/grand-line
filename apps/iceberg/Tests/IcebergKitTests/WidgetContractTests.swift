@@ -17,16 +17,16 @@ final class WidgetContractTests: XCTestCase {
         XCTAssertEqual(d.tooltip, "Battery\n2:10 left")
         XCTAssertEqual(d.classes, ["warning"])
         XCTAssertEqual(d.percentage, 42)
-        // A class naming a theme colour colours the text.
-        XCTAssertEqual(d.color, .theme(.yellow))
+        // A class naming a colour colours the text.
+        XCTAssertEqual(d.color, .named(.yellow))
         XCTAssertFalse(d.failed)
     }
 
     func testClassListsAndColourPrecedence() {
         let d = CommandOutputParser.parse(#"{"text": "x", "class": ["muted-off", "critical"], "color": "blue"}"#)
         XCTAssertEqual(d.classes, ["muted-off", "critical"])
-        XCTAssertEqual(d.color, .theme(.blue), "color wins over class")
-        XCTAssertEqual(CommandOutputParser.parse(#"{"text": "x", "class": "a critical"}"#).color, .theme(.red))
+        XCTAssertEqual(d.color, .named(.blue), "color wins over class")
+        XCTAssertEqual(CommandOutputParser.parse(#"{"text": "x", "class": "a critical"}"#).color, .named(.red))
         XCTAssertNil(CommandOutputParser.parse(#"{"text": "x", "class": "custom-thing"}"#).color)
     }
 

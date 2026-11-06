@@ -4,100 +4,28 @@ Everything in this package, and every app built for it, follows these rules so t
 
 ## Type
 
-Apple's own type for every letter and number. The one exception is a few terminal icons, below.
+Apple's own type for every letter and number.
 
 - **Interface text: SF Pro**, the macOS system font, in every window, menu, panel and notice of Sight and Iceberg. Apps use the system font API (SwiftUI `.body`, `.callout` and so on), never a hard-coded family.
 - **Code: SF Mono** (the `font-sf-mono` cask) inside Sight and Iceberg. The package sets no font in Terminal, Neovim or any other app.
 - **Icons: SF Symbols** for every interface icon (buttons, sidebar, menus, chips). No icon fonts. The apps and files themselves keep the icons and thumbnails macOS draws for them, as in Finder and Spotlight, because that is how you recognise them.
-- One size scale: 11 (labels, shortcuts), 13 (rows), 15 to 17 (inputs and titles). Numbers that line up in columns use tabular figures.
+- One size scale, from the system text styles so they follow the text size you set: Subheadline 11 (labels, shortcuts), Body 13 (rows), Title 2 17 (titles) and Title 1 22 (Sight's query, as Spotlight's). Emphasis comes from weight, not size. Numbers that change or line up in columns use tabular figures.
 
-## Colour
+## Colour and appearance
 
-- Themes colour the package's own apps, Sight and Iceberg, and nothing else. macOS (appearance, accent colour, wallpaper, Dock, desktop) and every other app and tool (Terminal, Neovim, tmux, starship, btop, lazygit, Claude Code, Zen) keep their own default look. Without a chosen theme, Sight and Iceberg use their built-in look.
-- In Sight and Iceberg, every colour comes from the active theme file in `config/themes/<name>.theme`.
-- Themes are built from Apple's system colours (the Human Interface Guidelines palette for light and dark appearance), so the package matches macOS. Daylight, the light theme, is Finder's neutral white with Apple's light system colours.
-- `TERM_BG`, `TERM_FG` and `TERM_SELECTION` are the background, text and selected-row colours for every surface, not only the terminal.
-- `HIGHLIGHT` marks matches and the focused item. `PALETTE` holds 16 colours, kept for older themes.
-- The semantic keys name a role, not a hue: `ACCENT_HEX` (the accent as a colour, while `ACCENT`, a macOS accent number, is no longer applied to macOS), `MUTED` (secondary text), `BG_LIGHTER` and `BG_DARKER` (raised and sunken surfaces).
-- Apps built for the package read the theme from `~/.local/state/grand-line/theme` (the theme's name) and the theme file, and follow light or dark mode from it. With Follow macOS chosen in Settings, Appearance, a theme with a dark and a light variant switches with the system.
-- Text keeps at least 4.5:1 contrast against its background in every theme, including Daylight, where every terminal colour reads at 4.5:1 on white (the tests check it).
+Sight and Iceberg look like Apple's own apps, and the package never changes how macOS or any other app looks.
 
-### Theme format
+- **Every colour is the system's.** Text uses the label colours (primary, secondary, tertiary), lines the separator colour, the selected row the system's selection colour (the accent), focus and matches the accent colour, and states the system red, orange, yellow, green and blue. These are dynamic, so they follow Light and Dark, the accent and highlight colours and Increase Contrast as you set them in System Settings, Appearance and Accessibility, with nothing to restart. No app reads a colour from a file, and there are no themes.
+- **Surfaces are system materials.** Sight is Liquid Glass on macOS 26 and later (`NSGlassEffectView`), as Spotlight is, and a behind-window popover material before that. Its action panel is a menu surface. Iceberg's drop basket is the popover material. Settings windows use the sidebar material and the window background. Reduce Transparency and Increase Contrast are handled by the materials themselves.
+- **The notch is black.** Iceberg's panel grows out of the camera housing, so like the Dynamic Island it stays black in Light and Dark, with the label colours and the accent colour drawn for a dark appearance in that view only. Its Settings window, the drop basket and the menus follow macOS.
+- **macOS and other apps keep their own look.** The package sets no appearance, accent colour, highlight colour, wallpaper, Dock, desktop or font, and writes no colours into Terminal, Neovim, tmux, starship, btop, lazygit, Claude Code or any other app. The Dark mode setting in Sight changes macOS's appearance only when you choose it.
+- Text keeps at least 4.5:1 contrast against its background, which the system colours give in both appearances.
 
-Theme files are format 1: `KEY=value` lines, `#` comments, values in quotes when they hold a space. Every key below sits in one namespace. A required key must be in the file or its parent. An optional key may be left out and then takes its default, so a theme written before a key existed still works. The checker (`theme check`, run on every load by the shell, Nexus, Sight and Iceberg alike, and by the tests on every shipped theme) fills the defaults, rejects bad values with `FILE:LINE` messages, and warns about weak contrast. A theme with errors is never applied: `theme set` refuses it and the apps show its base theme (Graphite or Daylight) with the errors listed.
+The icons are original, generic glyphs drawn from one table (`apps/icons`): the back of an eye (optic disc, vessels arching around the macula) for search, and an iceberg for the notch app. They sit on Apple's icon grid (an 824 point tile on a 1024 canvas, corners of 185), use no gradients or shadows, and leave fine detail out at 16 and 32 pixels.
 
-**Format and inheritance**
+## Shape, motion and density
 
-| Key | | Meaning and default |
-| --- | --- | --- |
-| `FORMAT` | required | `1`, the format the file is written in. A newer number is an error, and a file without it is read as 1 with a warning |
-| `EXTENDS` | optional | One parent theme in the same folder. The parent's keys come first and the file's own replace them, so a light variant extends its dark sibling and sets only what differs. Parents may extend in turn (8 deep at most). A loop or a missing parent is an error |
-| `LABEL`, `MODE` | required | The name shown in menus, and `dark` or `light` |
-| `FAMILY` | optional | The family a dark and light pair belongs to, in files named `FAMILY-dark.theme` and `FAMILY-light.theme`. `theme set FAMILY` picks the variant for the current macOS appearance, and `theme mode toggle` switches between them (Graphite and Daylight pair up without it) |
-| `ACCENT` | optional | The macOS accent colour number (-1 graphite, 0 red, 1 orange, 2 yellow, 3 green, 4 blue, 5 purple, 6 pink, or `multicolor`). Default -1 |
-| `BACKGROUND`, `NVIM` | optional | Kept for older themes and no longer applied: a picture in `backgrounds/` and a Neovim scheme. The theme never sets the wallpaper or Neovim's colours |
-
-**Colour.** Every colour is six hex digits (`57b4f0`, and a leading `#` is accepted and dropped).
-
-| Key | | Meaning and default |
-| --- | --- | --- |
-| `TERM_BG`, `TERM_FG` | required | Surface and text, for every surface, not only the terminal |
-| `PALETTE` | required | The 16 terminal colours, in order (templates see them as `COLOR0` to `COLOR15`) |
-| `ACCENT_HEX` | optional | The accent as a colour. Default `HIGHLIGHT`, else `COLOR4` |
-| `HIGHLIGHT` | optional | Matches and the focused item. Default `ACCENT_HEX` |
-| `TERM_CURSOR`, `TERM_SELECTION` | optional | Cursor and selected row. Default the accent, and the surface with a quarter of the accent |
-| `MUTED` | optional | Secondary text. Default the text 45% of the way to the surface |
-| `BG_LIGHTER`, `BG_DARKER` | optional | Raised surfaces (cards, chips) and sunken ones (the desk behind windows). Default the surface with 4% of the text, and the surface 30% toward black (dark) or with 10% of the text (light) |
-| `SIDEBAR`, `FIELD`, `LINE` | optional | The sidebar, text fields and dividers. Missing: each app derives them from `BG_LIGHTER`, the surface and the text |
-| `NOTCH_PANEL`, `NOTCH_CARD`, `NOTCH_LINE` | optional | Iceberg's open panel, its chips and its column dividers. Missing: `TERM_BG`, then `FIELD` or `BG_LIGHTER`, then `LINE`. The part of the panel under the camera, and the closed notch, are always black so they meet the hardware |
-| `COLOR_<NAME>` | optional | Colours of your own, for your own templates |
-
-**Font, radius and spacing.** The design rules below as numbers, so the apps can share them.
-
-| Key | | Meaning and default |
-| --- | --- | --- |
-| `FONT_UI`, `FONT_MONO` | optional | Interface and code type. Default `SF Pro` and `SF Mono` (the system fonts) |
-| `FONT_SIZE` | optional | Row text in points, 9 to 24. Default 13 |
-| `RADIUS_WINDOW`, `RADIUS_CHIP` | optional | Corner radius of windows (0 to 32) and of chips and keys (0 to 16). Default 10 and 5 |
-| `SPACING_UNIT` | optional | The step paddings are multiples of, 2 to 16 points. Default 4 |
-
-**Density and motion**
-
-| Key | | Meaning and default |
-| --- | --- | --- |
-| `UI_DENSITY` | optional | `compact`, `regular` or `comfortable` rows in every app. No default: missing, each app keeps its own choice in Settings, Appearance |
-| `UI_MOTION` | optional | `full` or `reduced` animation. Default `full` |
-
-**Icon style**
-
-| Key | | Meaning and default |
-| --- | --- | --- |
-| `ICON_STYLE` | optional | The app icons: `line` (a dark tile, a light glyph and the app's colour as its hot point), `solid` (the app's colour as the tile, a dark glyph) or `mono` (a black tile, the glyph in the app's colour). Default `line`. Shipped themes keep it in every file, since the icon script reads files as written |
-| `ICON_TILE`, `ICON_INK` | optional | The tile (line and mono) and the glyph (line and solid). Missing: a dark tile (the theme's surface when it is dark) and light ink, while mono is black and solid ink is near black |
-| `ICON_ACCENT`, `ICON_SOFT` | optional | Every app's colour, and the quiet fills (the sea, the iceberg under water). Missing: `ACCENT_HEX`, then `HIGHLIGHT`, and soft is the tile with a quarter of the accent |
-| `ICON_FILES`, `ICON_SEARCH`, `ICON_NOTCH` | optional | One app's own colour: the file browser (Nexus, no longer installed), search (Sight, also the warm tone of its eye) and the notch app (Iceberg). Missing: `ICON_ACCENT` |
-
-**Kinds**
-
-| Key | | Meaning and default |
-| --- | --- | --- |
-| `KIND_STYLE` | optional | How Sight marks a file's kind: `tag` (a tinted tag with the extension), `dot`, `solid` (a filled tag) or `text` (the kind's name in its colour). Default `tag` |
-| `KIND_FOLDER`, `KIND_DOCUMENT`, `KIND_PDF`, `KIND_PRESENTATION`, `KIND_SPREADSHEET`, `KIND_IMAGE`, `KIND_VIDEO`, `KIND_CODE`, `KIND_ARCHIVE`, `KIND_TEXT` | optional | The colour of each kind. Default the accent, then `COLOR4`, `COLOR1`, `COLOR3`, `COLOR2`, `COLOR5`, `COLOR13`, `COLOR11`, `COLOR9`, and `MUTED` |
-
-**Contrast.** The checker warns when text (`TERM_FG`) falls under 4.5:1, or secondary text (`MUTED`) under 3:1, on the window (`TERM_BG`) or the sidebar (`SIDEBAR`, else `BG_LIGHTER`). It is a warning, not an error, because the apps lift text that falls short. `theme check --strict` fails on it too.
-
-**Commands.** `theme check [--strict] [NAME|FILE...]` checks themes (all of them by default). `theme resolve NAME` prints a theme with its parent and defaults filled in. `theme set NAME` records the theme for Sight and Iceberg, and nothing else. `theme apply` tells them to read it again, and `theme refresh` (what the updates run) does nothing, since they watch the file themselves. Only one theme change runs at a time. `theme import-base16 FILE.yaml NAME` makes a theme from a base16 scheme (flat or with a `palette:` block): `base00` the surface, `base01` raised surfaces, `base02` the selection, `base04` secondary text, `base05` text and cursor, `base07` the brightest palette entry, `base08` to `base0F` red, orange, yellow, green, cyan, blue, magenta and brown, with `base0D` as the accent. It is dark unless the scheme says it is light, and is kept only if it passes the checker.
-
-**Live switching.** After `theme set`, `theme mode` and `theme apply` the command posts the distributed notification `com.grandline.theme.changed` (with the theme's name), through JavaScript for Automation, so no helper is built and no Apple event is sent. Sight and Iceberg reload on it at once. They also watch the state and theme files, which catches edits made by hand.
-
-The icons are original, generic glyphs drawn from one table (`apps/icons`): a sailing ship for the file browser, the back of an eye (optic disc, vessels arching around the macula) for search, and an iceberg for the notch app. They sit on Apple's icon grid (an 824 point tile on a 1024 canvas, corners of 185), use no gradients or shadows, and leave fine detail out at 16 and 32 pixels.
-
-## Shape and density
-
-- Dense and calm, like the search window: compact rows, hairline dividers, no gradients, no drop shadows beyond the window's own, no emoji.
-- Corner radius 10 on windows, 5 on chips and keys.
-- Every action has a keyboard shortcut, shown in a footer or the Caps + K list.
-
-## Adding a theme
-
-Copy an existing `.theme` file, or start from a base16 scheme with `theme import-base16`. For a light variant of a dark theme, write `EXTENDS=NAME-dark` and only the keys that differ (the shipped families keep `ICON_STYLE` and every colour in both files). Run `theme check NAME` until it passes, add its wallpaper to `backgrounds/`, and add its Neovim scheme to `config/nvim/lua/plugins/theme.lua` if it is not one already there (vscode.nvim covers both a dark and a light theme, through `MODE`). The tests also want every shipped theme to have its own `FORMAT=1` line and every key in the colour and kind tables resolved. `theme pick` then restyles the terminal, editor, menus, wallpaper, accent colour and the package's own apps together.
+- Dense and calm, like Spotlight: compact rows, hairline separators, no gradients, no drop shadows beyond the window's and the menu's own, no emoji.
+- Standard corner radii: Sight's window 24 on Liquid Glass and 14 before it, its selection highlight 10 and 6 (concentric with the window at a 6 point inset), menus and the action panel 14 and 8, Settings cards 10, key caps 5.
+- Rows highlight on mouse-down and run on mouse-up inside them. Motion uses critically damped springs, and every spring becomes a short cross-fade with Reduce Motion.
+- Every action has a keyboard shortcut, shown as a key cap beside its name in a footer or the Caps + K list, in the secondary label colour, as Spotlight and menus show them.

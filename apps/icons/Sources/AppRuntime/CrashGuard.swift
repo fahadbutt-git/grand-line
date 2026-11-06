@@ -72,8 +72,7 @@ public enum RelaunchDecision: Equatable, Sendable {
 }
 
 /// The run record on disk: `~/.local/state/grand-line-runtime/<name>.json`,
-/// beside the package's state folder rather than in it (the apps watch that
-/// folder for theme changes).
+/// beside the package's state folder rather than in it.
 public final class CrashGuard: @unchecked Sendable {
     public let name: String
     public let url: URL

@@ -27,7 +27,7 @@ final class Services {
     let aliases = AliasProvider()
     let processes = ProcessProvider()
     let saved = SavedSearchProvider()
-    /// "selection": actions on what is selected in Nexus or Finder.
+    /// "selection": actions on what is selected in Finder.
     let selection = SelectionProvider()
     /// `:` Maccy's history, read only.
     let clipboardHistory = ClipboardHistoryProvider()
@@ -66,6 +66,27 @@ final class Services {
     func start() {
         names.start()
         reloadSources(force: true)
+        forgetRowsOfRemovedApps()
+    }
+
+    /// Recents and favourites that open an app no longer on this Mac (the
+    /// settings of an app that was removed, say) are forgotten, so Recent
+    /// never offers a row that does nothing. Off the main thread: each target
+    /// is one question to LaunchServices.
+    private func forgetRowsOfRemovedApps() {
+        let usage = self.usage
+        BlockingWork.start(qos: .utility) {
+            var answers: [StaleTargets.Target: Bool] = [:]
+            let gone = usage.forgetRows { row in
+                StaleTargets.targets(of: row).contains { target in
+                    if let known = answers[target] { return known }
+                    let missing = AppTargets.isGone(target)
+                    answers[target] = missing
+                    return missing
+                }
+            }
+            if !gone.isEmpty { try? usage.saveIfChanged() }
+        }
     }
 
     /// Writes what Sight learned, only when it learned something. Quitting
@@ -186,16 +207,11 @@ final class Services {
     }
 
     /// What "selection" acts on, read as lib/bin-common.sh's finder_selection
-    /// does: Nexus's state file when Nexus was in front, else Finder's
-    /// selection through AppleScript (in the background; it may ask for
-    /// Automation the first time).
+    /// does: Finder's selection through AppleScript, when Finder was in front
+    /// (in the background; it may ask for Automation the first time).
     private func readSelection(frontApp: NSRunningApplication?) {
         let selection = self.selection
         switch frontApp?.bundleIdentifier {
-        case ActionPerformer.nexus:
-            // A small file, but on the disk: read off the main thread.
-            let file = paths.nexusSelection
-            BlockingWork.start(qos: .userInitiated) { selection.set(SelectionProvider.readNexus(file), from: "Nexus") }
         case "com.apple.finder":
             selection.set([], from: "Finder")
             Task.detached(priority: .userInitiated) {
@@ -213,4 +229,24 @@ private struct SourcesRead: @unchecked Sendable {
     let aliases: AliasTable
     let external: [ExternalProviderConfig]
     let scriptsChanged: Bool
+}
+
+/// Whether an app still answers for a target, asked of LaunchServices.
+enum AppTargets {
+    static func isGone(_ target: StaleTargets.Target) -> Bool {
+        let app: URL?
+        switch target {
+        case .scheme(let scheme):
+            guard let url = URL(string: scheme + "://") else { return false }
+            app = NSWorkspace.shared.urlForApplication(toOpen: url)
+        case .bundleID(let id):
+            app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)
+        case .executable(let path):
+            return !FileManager.default.isExecutableFile(atPath: path)
+        }
+        guard let app else { return true }
+        // An app in the Trash, or one deleted since, still answers until
+        // LaunchServices forgets it.
+        return app.path.contains("/.Trash/") || !FileManager.default.fileExists(atPath: app.path)
+    }
 }

@@ -3,14 +3,14 @@ import AppKit
 /// The notch app (role "notch"): the panel opens from its URL commands and on
 /// hover, closes on a click outside it, on Escape and when the pointer moves
 /// on after a keyboard or URL open, shows only the sections turned on, has
-/// settings if it has them, follows the theme, runs a signal widget when
+/// settings if it has them, runs a signal widget when
 /// `iceberg trigger` asks (also as the URL that starts it), and takes saved
 /// config files without a restart. Without a notch (CI) it sits as a pill at
 /// the top.
 enum NotchJourneys {
     static let role = "notch"
 
-    static var all: [Journey] { [panel, dismiss, settings, theme, signal, coldLaunch, reload] }
+    static var all: [Journey] { [panel, dismiss, settings, signal, coldLaunch, reload] }
 
     static func journey(_ name: String, _ summary: String, _ steps: [Step]) -> Journey {
         Journey(name, role: role, summary: summary, waitsForWindow: false,
@@ -86,48 +86,6 @@ enum NotchJourneys {
                     try ctx.check(problems.isEmpty, "settings layout: " + problems.prefix(5).joined(separator: "; "))
                 }
                 ctx.shot("settings window", window: ctx.settingsWindow)
-            },
-        ])
-    }
-
-    static var theme: Journey {
-        journey("notch-theme", "switching the theme state file recolours the open panel", [
-            step("open the panel in the dark theme") { ctx in
-                try ctx.notchURL("open")
-                try ctx.wait("the panel to open") { ctx.isNotchOpen() }
-                try ctx.wait("its widgets", timeout: 10) { ctx.notchTexts().contains { $0.contains("journey-ok") } }
-            },
-            step("switch to the light theme", layout: false) { ctx in
-                guard Capture.canRecordScreen else { throw StepSkip("no Screen Recording permission, so colours cannot be compared") }
-                Input.pause(0.6)
-                let dark = ctx.dir.appendingPathComponent("theme-dark.png")
-                guard Capture.shot(to: dark, window: ctx.notchWindowID()), let before = Capture.meanColour(of: dark) else {
-                    throw StepFailure("could not capture the panel")
-                }
-                let state = ctx.home.appendingPathComponent(".local/state/grand-line/theme")
-                try "daylight\n".write(to: state, atomically: true, encoding: .utf8)
-                let light = ctx.dir.appendingPathComponent("theme-light.png")
-                var after: Capture.Colour?
-                try ctx.wait("the panel's colours to change", timeout: 8, poll: 0.5) {
-                    guard Capture.shot(to: light, window: ctx.notchWindowID()), let colour = Capture.meanColour(of: light) else { return false }
-                    after = colour
-                    return colour.distance(to: before) > 0.15
-                }
-                ctx.note(String(format: "panel brightness %.2f in the dark theme, %.2f in the light one", before.luminance, after?.luminance ?? 0))
-                try ctx.check((after?.luminance ?? 0) > before.luminance, "the light theme made the panel darker")
-            },
-            step("and back to the dark theme", layout: false) { ctx in
-                let state = ctx.home.appendingPathComponent(".local/state/grand-line/theme")
-                try "graphite\n".write(to: state, atomically: true, encoding: .utf8)
-                // The theme is back either way; without Screen Recording the
-                // colours were not compared, which is a skip, not a pass.
-                guard Capture.canRecordScreen else { throw StepSkip("no Screen Recording permission, so colours cannot be compared") }
-                let back = ctx.dir.appendingPathComponent("theme-back.png")
-                let light = Capture.meanColour(of: ctx.dir.appendingPathComponent("theme-light.png"))
-                try ctx.wait("the panel to darken again", timeout: 8, poll: 0.5) {
-                    guard let light, Capture.shot(to: back, window: ctx.notchWindowID()), let colour = Capture.meanColour(of: back) else { return false }
-                    return colour.luminance < light.luminance - 0.1
-                }
             },
         ])
     }

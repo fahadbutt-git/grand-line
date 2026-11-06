@@ -11,7 +11,7 @@ final class ActionPanelTests: XCTestCase {
     func testFileRowsGetEveryFileAction() throws {
         let row = FileResults.result(FileHit(path: "/Users/me/Drive/Review.pdf", isFolder: false), paths: paths)
         let actions = ActionPanel.actions(for: row)
-        for wanted in ["Open", "Open with…", "Show in Nexus", "Quick Look", "Copy path", "Copy name", "Copy file", "Add to buffer", "Move to Trash"] {
+        for wanted in ["Open", "Open with…", "Show in Finder", "Quick Look", "Copy path", "Copy name", "Copy file", "Add to buffer", "Move to Trash"] {
             XCTAssertTrue(titles(actions).contains(wanted), wanted)
         }
         XCTAssertEqual(Set(actions.map(\.command)).count, actions.count, "no action twice")
@@ -21,7 +21,7 @@ final class ActionPanelTests: XCTestCase {
         XCTAssertEqual(trash.command, .files(.trash, ["/Users/me/Drive/Review.pdf"]))
         XCTAssertNotNil(trash.confirmation, "moving to the Trash asks first")
         // The row's own actions come first, in their order.
-        XCTAssertEqual(Array(titles(actions).prefix(3)), ["Open", "Show in Nexus", "Quick Look"])
+        XCTAssertEqual(Array(titles(actions).prefix(3)), ["Open", "Show in Finder", "Quick Look"])
     }
 
     func testFoldersHaveNoOpenWith() {
@@ -46,7 +46,7 @@ final class ActionPanelTests: XCTestCase {
     func testAppsCalculatorBookmarksAndCommands() throws {
         let app = ActionPanel.actions(for: AppCatalog.result("/Applications/Safari.app", paths: paths))
         XCTAssertEqual(app.first { $0.title == "Copy name" }?.command, .copyText("Safari"))
-        XCTAssertTrue(titles(app).contains("Show in Nexus"))
+        XCTAssertTrue(titles(app).contains("Show in Finder"))
 
         let rates = CurrencyRatesStore(fileURL: nil)
         let sum = try XCTUnwrap(CalculatorProvider(rates: rates).instantResults(for: LaunchQuery(raw: "2+2")).first)
@@ -190,22 +190,19 @@ final class ActionPanelTests: XCTestCase {
 
     // MARK: "selection"
 
-    func testSelectionReadsNexusStateFile() throws {
-        let file = try Make.folder().appendingPathComponent("nexus-selection")
-        try Make.write("/x/a.txt\n\n/x/b.pdf\n/x/a.txt\nnot a path\n", to: file)
-        XCTAssertEqual(SelectionProvider.readNexus(file.path), ["/x/a.txt", "/x/b.pdf"])
-        XCTAssertEqual(SelectionProvider.readNexus("/no/such/file"), [])
-        XCTAssertEqual(paths.nexusSelection, "/Users/me/.local/state/grand-line/nexus-selection")
+    func testSelectionParsesTheScriptOutput() {
+        XCTAssertEqual(SelectionProvider.parse("/x/a.txt\n\n/x/b.pdf\n/x/a.txt\nnot a path\n"), ["/x/a.txt", "/x/b.pdf"])
+        XCTAssertEqual(SelectionProvider.parse(""), [])
     }
 
     func testSelectionKeywordListsActionsForTheSelectedFiles() {
         let provider = SelectionProvider()
-        provider.set(["/x/a.txt", "/x/b.pdf"], from: "Nexus")
+        provider.set(["/x/a.txt", "/x/b.pdf"], from: "Finder")
         let rows = provider.instantResults(for: LaunchQuery(raw: "selection"))
         XCTAssertEqual(rows.first?.title, "Open 2 items")
         XCTAssertEqual(rows.first?.primary?.command, .files(.open, ["/x/a.txt", "/x/b.pdf"]))
         XCTAssertTrue(rows.contains { $0.primary?.command == .buffer(["/x/a.txt", "/x/b.pdf"]) })
-        XCTAssertTrue(rows.allSatisfy { $0.subtitle.hasPrefix("Nexus") })
+        XCTAssertTrue(rows.allSatisfy { $0.subtitle.hasPrefix("Finder") })
         XCTAssertEqual(provider.instantResults(for: LaunchQuery(raw: "sel")).count, rows.count)
         let narrowed = provider.instantResults(for: LaunchQuery(raw: "selection trash"))
         XCTAssertEqual(narrowed.first?.primary?.command, .files(.trash, ["/x/a.txt", "/x/b.pdf"]))

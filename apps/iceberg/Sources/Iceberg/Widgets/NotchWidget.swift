@@ -12,7 +12,7 @@ enum WidgetPlacement {
 /// What every built-in widget gets when it is made.
 @MainActor
 struct WidgetContext {
-    let theme: ThemeStore
+    let palette: SystemPalette
     let events: SharedEventStore
     let settings: IcebergSettings
     /// The shelf's files, shared by every panel and the drop basket.
@@ -50,7 +50,7 @@ extension NotchWidget {
 
 /// The small caption above a section ("Today"): 11 pt medium, muted.
 struct SectionCaption: View {
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     let text: String
     /// A count beside the caption (the shelf's files), in tabular digits.
     var count: Int?
@@ -59,12 +59,12 @@ struct SectionCaption: View {
         HStack(alignment: .firstTextBaseline, spacing: 5) {
             Text(text)
                 .font(TypeScale.captionEmphasis)
-                .foregroundStyle(theme.muted)
+                .foregroundStyle(palette.muted)
                 .lineLimit(1)
             if let count {
                 Text("\(count)")
                     .font(TypeScale.numeral)
-                    .foregroundStyle(theme.muted.opacity(0.75))
+                    .foregroundStyle(palette.muted.opacity(0.75))
                     .contentTransition(.numericText(value: Double(count)))
             }
         }
@@ -75,7 +75,7 @@ struct SectionCaption: View {
 /// chevron comes in beside it while the pointer rests on it, and it dims
 /// on mouse-down.
 struct CaptionLink: View {
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     let text: String
     let help: String
     let action: @MainActor () -> Void
@@ -87,7 +87,7 @@ struct CaptionLink: View {
                 SectionCaption(text: text)
                 Image(systemName: "chevron.right")
                     .font(TypeScale.label.weight(.semibold))
-                    .foregroundStyle(theme.muted)
+                    .foregroundStyle(palette.muted)
                     .opacity(hovering ? 1 : 0)
                     .offset(x: hovering ? 0 : -3)
             }
@@ -100,17 +100,17 @@ struct CaptionLink: View {
 
 /// A one-line note in place of content ("Nothing due today").
 struct EmptyNote: View {
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     let text: String
     var action: (@MainActor () -> Void)?
     var body: some View {
         if let action {
             Button(action: action) {
-                Text(text).font(TypeScale.body).foregroundStyle(theme.highlight).lineLimit(2)
+                Text(text).font(TypeScale.body).foregroundStyle(palette.highlight).lineLimit(2)
             }
             .buttonStyle(PanelButtonStyle(kind: .text))
         } else {
-            Text(text).font(TypeScale.body).foregroundStyle(theme.muted).lineLimit(2)
+            Text(text).font(TypeScale.body).foregroundStyle(palette.muted).lineLimit(2)
         }
     }
 }

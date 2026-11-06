@@ -56,7 +56,7 @@ final class NotchController {
         model = NotchModel(screen: screen, style: style)
         model.update(content: host.content)
 
-        let root = NotchRootView(model: model, host: host, theme: host.theme)
+        let root = NotchRootView(model: model, host: host, palette: host.palette)
         let hosting = FirstClickHostingView(rootView: root)
         hosting.sizingOptions = []
         hosting.autoresizingMask = [.width, .height]
@@ -271,7 +271,7 @@ final class NotchController {
 
     private func observe() {
         // The open panel's height follows the widget list and problems.
-        host.objectWillChange.merge(with: host.user.objectWillChange, host.theme.objectWillChange)
+        host.objectWillChange.merge(with: host.user.objectWillChange, host.palette.objectWillChange)
             .debounce(for: .milliseconds(50), scheduler: RunLoop.main)
             .sink { [weak self] _ in
                 guard let self else { return }

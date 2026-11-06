@@ -2,7 +2,7 @@ import AppKit
 import LaunchKit
 import LauncherKit
 import ServiceManagement
-import ThemeKit
+import SettingsKit
 
 /// Sight's Settings, read from its defaults domain (com.grandline.sight) and
 /// handed to the search services, the menu bar item and the shortcut as they
@@ -29,7 +29,7 @@ final class SightPreferencesStore: ObservableObject {
         self.defaults = defaults
         current = services.preferences
         hotkey = HotkeySetting.hotkey(defaults)
-        density = Density.current(theme: nil, defaults: defaults)
+        density = Density.current(defaults: defaults)
     }
 
     func update(_ change: (inout SightPreferences) -> Void) {
@@ -85,7 +85,9 @@ final class SightPreferencesStore: ObservableObject {
 
     // MARK: Density
 
-    func densityChanged(_ value: Density) {
+    func setDensity(_ value: Density) {
+        guard value != density else { return }
+        defaults.set(value.rawValue, forKey: Density.defaultsKey)
         density = value
         onDensityChange?()
     }

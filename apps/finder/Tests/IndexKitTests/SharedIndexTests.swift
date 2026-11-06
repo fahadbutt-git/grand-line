@@ -130,22 +130,21 @@ final class SharedIndexTests: XCTestCase {
 
     func testTheServicesOwnSnapshotWins() {
         let chosen = SnapshotAdoption.choose(
-            [candidate(.sight, age: 10), candidate(.own, age: 9_999), candidate(.nexus, age: 5)], roots: ["/Users/me"]
+            [candidate(.sight, age: 10), candidate(.own, age: 9_999)], roots: ["/Users/me"]
         )
         XCTAssertEqual(chosen?.origin, .own)
     }
 
-    func testTheNewerAppSnapshotIsAdopted() {
-        let roots = ["/Users/me"]
-        XCTAssertEqual(SnapshotAdoption.choose([candidate(.sight, age: 100), candidate(.nexus, age: 50)], roots: roots)?.origin, .nexus)
-        XCTAssertEqual(SnapshotAdoption.choose([candidate(.sight, age: 50), candidate(.nexus, age: 100)], roots: roots)?.origin, .sight)
+    func testTheAppSnapshotIsAdoptedWhenTheServiceHasNone() {
+        XCTAssertEqual(SnapshotAdoption.choose([candidate(.sight, age: 100)], roots: ["/Users/me"])?.origin, .sight)
+        XCTAssertNil(SnapshotAdoption.choose([], roots: ["/Users/me"]))
     }
 
     func testAFinishedSnapshotBeatsANewerUnfinishedOne() {
         let chosen = SnapshotAdoption.choose(
-            [candidate(.sight, age: 100), candidate(.nexus, age: 1, complete: false)], roots: ["/Users/me"]
+            [candidate(.sight, age: 1, complete: false), candidate(.sight, age: 100)], roots: ["/Users/me"]
         )
-        XCTAssertEqual(chosen?.origin, .sight)
+        XCTAssertEqual(chosen?.complete, true)
     }
 
     func testSnapshotsOfOtherFoldersAreLeftAlone() {
@@ -153,7 +152,7 @@ final class SharedIndexTests: XCTestCase {
             [candidate(.own, age: 1, roots: ["/Users/other"]), candidate(.sight, age: 100)], roots: ["/Users/me"]
         )
         XCTAssertEqual(chosen?.origin, .sight)
-        XCTAssertNil(SnapshotAdoption.choose([candidate(.nexus, age: 1, roots: ["/"])], roots: ["/Users/me"]))
+        XCTAssertNil(SnapshotAdoption.choose([candidate(.sight, age: 1, roots: ["/"])], roots: ["/Users/me"]))
     }
 
     func testAdoptsFromDiskAndPrunesWhatTheHomeIndexLeavesOut() async throws {
@@ -162,14 +161,14 @@ final class SharedIndexTests: XCTestCase {
         try Fixture.make("Library/Containers/com.example/conj-state.json", in: home)
         try Fixture.make("Library/CloudStorage/Drive/conj drive.docx", in: home)
         let locations = IndexLocations(home: home)
-        // Nexus indexed all of ~/Library.
-        let nexus = FileIndex(roots: [home])
-        await nexus.build(savingTo: locations.nexusSnapshot)
+        // An older snapshot of the whole home folder, all of ~/Library included.
+        let wide = FileIndex(roots: [home])
+        await wide.build(savingTo: locations.sightSnapshot)
         let candidates = SnapshotAdoption.candidates(locations)
-        XCTAssertEqual(candidates.map(\.origin), [.nexus])
+        XCTAssertEqual(candidates.map(\.origin), [.sight])
         let exclusions = IndexExclusions.home(home)
         let adopted = try XCTUnwrap(SnapshotAdoption.load(locations, exclusions: exclusions, order: .none))
-        XCTAssertEqual(adopted.origin, .nexus)
+        XCTAssertEqual(adopted.origin, .sight)
         await adopted.index.pruneExcluded()
         let names = await adopted.index.search("conj").map(\.name).sorted()
         XCTAssertEqual(names, ["Conj Flap", "Lid Study - CONJ.docx", "conj drive.docx"])
@@ -191,16 +190,16 @@ final class SharedIndexTests: XCTestCase {
         let paths = (0..<300).map { "F\($0 % 5)/" + ["conj flap \($0).pdf", "lid study \($0).docx"][$0 % 2] }
         let index = Fixture.index(paths)
         var sight: SearchNarrowing? = nil
-        var nexus: SearchNarrowing? = nil
+        var other: SearchNarrowing? = nil
         for (a, b) in [("c", "l"), ("co", "li"), ("con", "lid"), ("conj f", "lid s")] {
             let fromSight = await index.search(a, limit: 30, scope: nil, narrowing: sight)
             sight = fromSight.narrowing
-            let fromNexus = await index.search(b, limit: 30, scope: nil, narrowing: nexus)
-            nexus = fromNexus.narrowing
+            let fromOther = await index.search(b, limit: 30, scope: nil, narrowing: other)
+            other = fromOther.narrowing
             let fresh = await Fixture.index(paths).search(a, limit: 30).map(\.path)
             XCTAssertEqual(fromSight.matches.map(\.path), fresh, a)
             let freshB = await Fixture.index(paths).search(b, limit: 30).map(\.path)
-            XCTAssertEqual(fromNexus.matches.map(\.path), freshB, b)
+            XCTAssertEqual(fromOther.matches.map(\.path), freshB, b)
         }
     }
 

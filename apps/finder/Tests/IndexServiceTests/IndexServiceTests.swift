@@ -91,17 +91,14 @@ final class IndexServiceTests: XCTestCase {
 
     // MARK: The service core
 
-    func testTheServiceAdoptsTheNewestAppSnapshotAndSavesItsOwn() async throws {
+    func testTheServiceAdoptsTheAppSnapshotAndSavesItsOwn() async throws {
         let locations = IndexLocations(home: home)
+        try make("Documents/in sight.txt")
         await saveSnapshot(locations.sightSnapshot)
-        try make("Documents/after sight.txt")
-        await saveSnapshot(locations.nexusSnapshot)
-        // Make Sight's the older one.
-        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -86_400)], ofItemAtPath: locations.sightSnapshot.path)
         let core = IndexServiceCore(locations: locations, saveEvery: 3_600, latency: 0.1)
         let index = await core.index()
-        let found = await index.search("after sight")
-        XCTAssertEqual(found.first?.name, "after sight.txt", "Nexus's newer snapshot was adopted")
+        let found = await index.search("in sight")
+        XCTAssertEqual(found.first?.name, "in sight.txt", "Sight's snapshot was adopted")
         XCTAssertTrue(FileManager.default.fileExists(atPath: locations.snapshot.path), "adopted, then saved as the service's own")
         let status = await core.status()
         XCTAssertEqual(status.source, .service)
@@ -202,7 +199,7 @@ final class IndexServiceTests: XCTestCase {
         let ids = IndexServiceName.clients
         XCTAssertEqual(
             CodeSigning.requirement(allowing: ids, signer: CodeSigning.Signer(teamID: "ABCDE12345")),
-            "anchor apple generic and certificate leaf[subject.OU] = \"ABCDE12345\" and (identifier \"com.grandline.nexus\" or identifier \"com.grandline.sight\")"
+            "anchor apple generic and certificate leaf[subject.OU] = \"ABCDE12345\" and (identifier \"com.grandline.sight\")"
         )
         XCTAssertEqual(
             CodeSigning.requirement(allowing: ["com.grandline.index"], signer: CodeSigning.Signer(leafSHA1: "0A1B")),
@@ -210,7 +207,7 @@ final class IndexServiceTests: XCTestCase {
         )
         XCTAssertEqual(
             CodeSigning.requirement(allowing: ids, signer: CodeSigning.Signer(isAdHoc: true)),
-            "(identifier \"com.grandline.nexus\" or identifier \"com.grandline.sight\")"
+            "(identifier \"com.grandline.sight\")"
         )
         XCTAssertNil(CodeSigning.requirement(allowing: ids, signer: nil), "an unsigned development build sets none")
     }
@@ -245,12 +242,12 @@ final class IndexServiceTests: XCTestCase {
     }
 
     func testAnAdoptedSnapshotLosesWhatTheRulesLeaveOut() async throws {
-        // Nexus indexed all of ~/Library, including a folder made after any
-        // list of ~/Library's names would have been read.
+        // An older snapshot of all of ~/Library, including a folder made after
+        // any list of ~/Library's names would have been read.
         let locations = IndexLocations(home: home)
         try make("Library/Vendor/conj vendor.db")
-        let nexus = FileIndex(roots: [home])
-        await nexus.build(savingTo: locations.nexusSnapshot)
+        let wide = FileIndex(roots: [home])
+        await wide.build(savingTo: locations.sightSnapshot)
         let core = IndexServiceCore(locations: locations, saveEvery: 3_600, latency: 0.1)
         let index = await core.index()
         let names = await index.search("conj").map(\.name).sorted()

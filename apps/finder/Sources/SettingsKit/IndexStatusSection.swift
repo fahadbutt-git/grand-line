@@ -2,7 +2,7 @@ import IndexKit
 import SwiftUI
 
 /// The name index's state for a Settings pane, read through IndexKit's
-/// `IndexStatusProviding` (the shared index service in both apps), and its
+/// `IndexStatusProviding` (the shared index service), and its
 /// Rebuild button.
 @MainActor
 public final class IndexStatusModel: ObservableObject {
@@ -34,7 +34,6 @@ public final class IndexStatusModel: ObservableObject {
 }
 
 public struct IndexStatusSection: View {
-    @EnvironmentObject private var theme: SettingsTheme
     @ObservedObject var model: IndexStatusModel
     @Environment(\.settingsWindowVisible) private var windowVisible
     let idPrefix: String
@@ -50,21 +49,20 @@ public struct IndexStatusSection: View {
     }
 
     public var body: some View {
-        SettingsSection("Name index", note: "File names come from the Grand Line index, which Nexus and Sight share. Contents come from Spotlight.") {
+        SettingsSection("Name index", note: "File names come from the Grand Line index. Contents come from Spotlight.") {
             if let status = model.status {
                 SettingsRow("Files and folders indexed") {
                     Text(status.files.formatted())
-                        .font(.system(size: 13).monospacedDigit())
-                        .foregroundStyle(theme.text)
+                        .font(.body.monospacedDigit())
+                        .foregroundStyle(.secondary)
                         .accessibilityIdentifier("\(idPrefix).settings.index.count")
                 }
                 SettingsRow("Last in step with the disk") {
                     Text(status.lastSync.map { $0.formatted(.relative(presentation: .named)) } ?? "Not yet")
-                        .font(.system(size: 13))
-                        .foregroundStyle(theme.text)
+                        .foregroundStyle(.secondary)
                 }
                 SettingsRow("State", detail: status.source == .service ? "From the index service." : "From this app's copy while the service is out of reach.") {
-                    Text(state(status)).font(.system(size: 13)).foregroundStyle(theme.text)
+                    Text(state(status)).foregroundStyle(.secondary)
                 }
                 if let problem = status.problem {
                     SettingsRow("Index service not used", detail: problem)

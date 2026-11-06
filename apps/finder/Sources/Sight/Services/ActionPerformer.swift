@@ -6,7 +6,6 @@ import LauncherKit
 /// actions that close it, so pastes and menu clicks land in the app that was in front.
 @MainActor
 final class ActionPerformer {
-    static let nexus = "com.grandline.nexus"
     let paths: GrandLinePaths
     var previousApp: NSRunningApplication?
 
@@ -95,7 +94,7 @@ final class ActionPerformer {
         }
     }
 
-    /// An empty file, never over one that exists; then shown in Nexus.
+    /// An empty file, never over one that exists; then shown in Finder.
     func createFile(_ path: String) {
         let folder = (path as NSString).deletingLastPathComponent
         let manager = FileManager.default
@@ -112,24 +111,18 @@ final class ActionPerformer {
         }
     }
 
-    /// Folders open in Nexus when it is installed; everything else in its default app.
+    /// Folders open in Finder, everything else in its default app.
     func open(_ target: String) {
         if target.contains("://") { return openURL(target, bundleID: nil) }
         let url = URL(fileURLWithPath: target)
-        var isFolder: ObjCBool = false
-        let exists = FileManager.default.fileExists(atPath: target, isDirectory: &isFolder)
+        let exists = FileManager.default.fileExists(atPath: target)
         guard exists else {
             // macOS may keep Sight itself out of the folder (the index service
             // is the app with the folder permissions); LaunchServices opens it all the same.
             if !NSWorkspace.shared.open(url) { NSSound.beep() }
             return
         }
-        let isPackage = NSWorkspace.shared.isFilePackage(atPath: target)
-        if isFolder.boolValue, !isPackage, let nexus = NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.nexus) {
-            NSWorkspace.shared.open([url], withApplicationAt: nexus, configuration: NSWorkspace.OpenConfiguration())
-        } else {
-            NSWorkspace.shared.open(url)
-        }
+        NSWorkspace.shared.open(url)
     }
 
     func openURL(_ text: String, bundleID: String?) {

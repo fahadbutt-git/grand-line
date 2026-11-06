@@ -77,8 +77,7 @@ public final class MenuProvider: InstantProvider, @unchecked Sendable {
     /// duplicates: one that runs the same bin/toggle setting, bin/power action
     /// or capture, whatever else its line says ("toggle dark" and "toggle dark
     /// on" are both dark mode, with or without a path, `exec` or a VAR=value
-    /// before it). `theme mode` switches the theme's dark or light variant,
-    /// which the Dark mode row does too, so it is that row's copy.
+    /// before it).
     public static func settingDuplicated(by row: LaunchResult) -> String? {
         guard row.providerID == "menu" || row.providerID == "keybindings", case .shell(let line)? = row.primary?.command else { return nil }
         let words = line.split(whereSeparator: { $0 == " " || $0 == "\t" })
@@ -87,7 +86,6 @@ public final class MenuProvider: InstantProvider, @unchecked Sendable {
             .map { $0 }
         guard words.count >= 2 else { return nil }
         let command = (words[0] as NSString).lastPathComponent
-        if command == "theme", words[1] == "mode", let dark = SettingsActions.byKey["darkmode"] { return dark.id }
         for setting in SettingsActions.toggles + SettingsActions.actions {
             switch setting.kind {
             case .toggle(let name, _, _) where command == "toggle" && words[1] == name:

@@ -1,7 +1,7 @@
 import Foundation
 import IndexKit
 
-/// Accepts connections from Nexus and Sight, each with its own session.
+/// Accepts connections from Sight, each with its own session.
 public final class IndexListenerDelegate: NSObject, NSXPCListenerDelegate {
     let core: IndexServiceCore
     /// The code requirement a client must meet; nil accepts any process of
@@ -33,8 +33,8 @@ public final class IndexListenerDelegate: NSObject, NSXPCListenerDelegate {
     }
 }
 
-/// One client connection: its own narrowing cache, so Sight typing "conj" and
-/// Nexus typing "lid" do not undo each other's.
+/// One client connection: its own narrowing cache, so two clients typing
+/// "conj" and "lid" do not undo each other's.
 final class IndexSession: NSObject, IndexServiceXPC, @unchecked Sendable {
     private let core: IndexServiceCore
     private weak var connection: NSXPCConnection?

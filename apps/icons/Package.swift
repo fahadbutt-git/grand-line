@@ -1,12 +1,12 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-// The app icons of Grand Line, shared by Nexus, Sight and Iceberg, and the
-// small runtime pieces they share (AppRuntime).
+// The app icons of Grand Line, shared by Sight and Iceberg, and the small
+// runtime pieces they share (AppRuntime).
 //
 // AppIcon holds the glyphs (as a table that tools/make-icons.py also reads,
-// so the bundled .icns files and the icons drawn at run time match), the
-// ICON_* theme keys and their fallbacks, and the AppKit drawing.
+// so the bundled .icns files and the icons drawn at run time match), their
+// fixed colours, and the AppKit drawing (Iceberg's menu bar icon).
 let package = Package(
     name: "AppIcons",
     platforms: [.macOS(.v15)],

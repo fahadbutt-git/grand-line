@@ -4,7 +4,7 @@ import Foundation
 /// It uses kernel file events (kqueue through DispatchSource), so it costs
 /// nothing while nothing changes. A path that does not exist yet is watched
 /// through its nearest existing parent, and every change re-arms the watch,
-/// which follows files that editors and `theme pick` replace rather than edit.
+/// which follows files that editors replace rather than edit.
 final class FileWatcher {
     private let paths: [URL]
     private let debounce: TimeInterval

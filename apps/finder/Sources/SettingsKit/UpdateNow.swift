@@ -120,9 +120,8 @@ public final class UpdateModel: ObservableObject {
     }
 }
 
-/// The Update section both apps end their Advanced pane with.
+/// The Update section the Advanced pane ends with.
 public struct UpdateSection: View {
-    @EnvironmentObject private var theme: SettingsTheme
     @ObservedObject var model: UpdateModel
     let idPrefix: String
     let note: String

@@ -129,7 +129,6 @@ final class StressTests: XCTestCase {
             _ = WidgetConfig.parse(Data(text.utf8), fileName: "fuzz.json")
             _ = CommandOutputParser.parse(text)
             _ = IcebergSettings.parse(text)
-            _ = ThemeLoader.parse(text, name: "fuzz")
             var state = NowPlayingState()
             state.apply(line: text)
         }

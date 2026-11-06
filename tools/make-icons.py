@@ -1,20 +1,15 @@
 #!/usr/bin/env python3
-"""Draws the bundled app icons (AppIcon.icns) for Nexus, Sight, Grand Line Index and Iceberg.
+"""Draws the bundled app icons (AppIcon.icns) for Sight, Grand Line Index and Iceberg.
 
-The apps draw their icons again at run time from the active theme
-(apps/icons). This script draws the same glyphs, read from the table in
-apps/icons/Sources/AppIcon/Glyphs.swift, in a theme's colours, so an app has
-an icon before it first runs. Pure Python: PNGs are written with zlib and the
-.icns container by hand, so nothing needs installing.
+The glyphs are read from the table in apps/icons/Sources/AppIcon/Glyphs.swift
+and drawn in their fixed colours (IconPalette.bundled), so Iceberg's menu bar
+icon, drawn at run time from the same table, matches. Pure Python: PNGs are
+written with zlib and the .icns container by hand, so nothing needs installing.
 
-  python3 tools/make-icons.py                  graphite, into each app's Resources
-  python3 tools/make-icons.py --theme daylight
-  python3 tools/make-icons.py --previews DIR   also write DIR/<App>-<theme>.png (1024 and 32)
-  python3 tools/make-icons.py --theme signal-dark --previews DIR --previews-only
+  python3 tools/make-icons.py                  into each app's Resources
+  python3 tools/make-icons.py --previews DIR   also write DIR/<App>.png (1024 and 32)
+  python3 tools/make-icons.py --previews DIR --previews-only
   python3 tools/make-icons.py --check          the table parses and every .icns is sound
-  python3 tools/make-icons.py --theme nord --out DIR
-                                               write DIR/<App>/AppIcon.icns instead (bin/theme
-                                               puts these in the installed apps)
 """
 import argparse
 import math
@@ -27,10 +22,12 @@ from array import array
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GLYPHS = os.path.join(ROOT, "apps/icons/Sources/AppIcon/Glyphs.swift")
-THEMES = os.path.join(ROOT, "config/themes")
-# glyph table name, theme key, where the .icns goes
+# The colours of the bundled icons, as IconPalette.bundled and
+# IconGlyph.color in apps/icons: a dark tile, a light glyph, each app's colour.
+BUNDLED = {"MODE": "dark", "TERM_BG": "1c1c1e", "TERM_FG": "e5e5e7", "ACCENT_HEX": "98989d", "HIGHLIGHT": "409cff",
+           "ICON_STYLE": "line", "ICON_SEARCH": "ff6a3d", "ICON_NOTCH": "64d2ff"}
+# glyph table name, colour key, where the .icns goes
 APPS = [
-    ("nexus", "ICON_FILES", "apps/finder/Resources/Nexus/AppIcon.icns", "Nexus"),
     ("sight", "ICON_SEARCH", "apps/finder/Resources/Sight/AppIcon.icns", "Sight"),
     # The index agent shows only in Login Items and Privacy & Security, under
     # Sight's glyph, the app it mostly serves.
@@ -57,7 +54,7 @@ def read_tables(path=GLYPHS):
     return tables
 
 
-# --- colours, as apps/icons/Sources/AppIcon/IconTheme.swift ---------------------
+# --- colours, as apps/icons/Sources/AppIcon/IconPalette.swift -------------------
 
 def hex_color(text):
     if text is None:
@@ -75,65 +72,6 @@ def mix(a, b, t):
 def luminance(c):
     lin = [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
     return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
-
-
-def parse_theme(text):
-    """One file's KEY=value lines, read as ThemeSource.parse reads them."""
-    values = {}
-    for line in text.splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        for prefix in ("export ", "export\t"):
-            if line.startswith(prefix):
-                line = line[len(prefix):].strip()
-        if "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key, value = key.strip(), value.strip()
-        if not re.match(r"^[A-Z_][A-Z0-9_]*$", key):
-            continue
-        if value[:1] in ("\"", "'"):
-            end = value.find(value[0], 1)
-            value = value[1:end] if end >= 0 else value[1:]
-        else:
-            note = re.search(r"[ \t]#", value)
-            if note:
-                value = value[:note.start()].strip()
-        values[key] = value
-    return values
-
-
-MAX_DEPTH = 8   # ThemeSource.maxDepth
-
-
-def read_theme(name, folder=THEMES):
-    """The theme's keys with what it inherits through EXTENDS (the nearest
-    file that sets a key wins), as the apps and lib/templates.sh read it."""
-    chain, seen, current = [], set(), name
-    while current is not None:
-        if current in seen:
-            raise SystemExit("make-icons: EXTENDS=%s leads back to %s (a loop)" % (current, current))
-        if len(chain) >= MAX_DEPTH:
-            raise SystemExit("make-icons: %s: EXTENDS goes more than %d themes deep" % (name, MAX_DEPTH))
-        if not re.match(r"^[a-z0-9][a-z0-9_-]*$", current):
-            raise SystemExit("make-icons: %r is not a theme name" % current)
-        seen.add(current)
-        path = os.path.join(folder, current + ".theme")
-        try:
-            with open(path, encoding="utf-8") as f:
-                values = parse_theme(f.read())
-        except OSError:
-            if not chain:
-                raise
-            raise SystemExit("make-icons: EXTENDS=%s names no theme (%s.theme is missing)" % (current, current))
-        chain.append(values)
-        current = values.get("EXTENDS")
-    merged = {}
-    for values in reversed(chain):
-        merged.update(values)
-    merged.pop("EXTENDS", None)
-    return merged
 
 
 def palette(values, app_key):
@@ -400,11 +338,9 @@ def check(tables):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--theme", default="graphite")
     parser.add_argument("--previews", metavar="DIR")
     parser.add_argument("--only", choices=[a[3] for a in APPS])
     parser.add_argument("--check", action="store_true")
-    parser.add_argument("--out", metavar="DIR", help="write DIR/<App>/AppIcon.icns, leave the package's own")
     parser.add_argument("--previews-only", action="store_true", help="write the previews, leave the .icns files")
     args = parser.parse_args()
     tables = read_tables()
@@ -412,27 +348,24 @@ def main():
         problems = check(tables)
         print("\n".join(problems))
         return 1 if problems else 0
-    values = read_theme(args.theme)
+    values = BUNDLED
     for name, key, path, product in APPS:
         if args.only and args.only != product:
             continue
         sizes = render_sizes(tables, name, palette(values, key))
         if not args.previews_only:
-            if args.out:
-                target = os.path.join(args.out, product, "AppIcon.icns")
-            else:
-                target = os.path.join(ROOT, path)
+            target = os.path.join(ROOT, path)
             os.makedirs(os.path.dirname(target), exist_ok=True)
             with open(target, "wb") as f:
                 f.write(icns([(kind, png(sizes[s], s)) for kind, s in ICNS_TYPES]))
-            print("wrote", target if args.out else path)
+            print("wrote", path)
         if args.previews:
             os.makedirs(args.previews, exist_ok=True)
-            preview = os.path.join(args.previews, "%s-%s.png" % (product, args.theme))
+            preview = os.path.join(args.previews, "%s.png" % product)
             with open(preview, "wb") as f:
                 f.write(png(sizes[SIZE], SIZE))
             print("wrote", preview)
-            small = os.path.join(args.previews, "%s-%s-32.png" % (product, args.theme))
+            small = os.path.join(args.previews, "%s-32.png" % product)
             with open(small, "wb") as f:
                 f.write(png(sizes[32], 32))
     return 0

@@ -7,8 +7,8 @@
 # Extra Info.plist keys for a product go in apps/<folder>/Info/<product>.plist
 # (bare <key>/<value> lines), and its icon and other files in
 # apps/<folder>/Resources/<product>/. The icon is AppIcon.icns, drawn by
-# tools/make-icons.py and named by CFBundleIconFile in the Info fragment; the
-# apps redraw it in the theme's colours when they run (apps/icons). Dynamic libraries the app loads at run
+# tools/make-icons.py and named by CFBundleIconFile in the Info fragment.
+# Dynamic libraries the app loads at run
 # time are listed in apps/<folder>/frameworks.tsv (library product <TAB>
 # framework name); each is built and goes in Contents/Frameworks.
 # Apps are signed with hardened runtime by the package's own signing identity

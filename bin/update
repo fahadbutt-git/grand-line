@@ -167,15 +167,13 @@ no_upstream_note() {
 }
 
 # rebuild_apps: build the apps whose sources changed, replace them (the old
-# copy to the Trash), start again the ones that were running, then give them
-# the theme's icons.
+# copy to the Trash) and start again the ones that were running.
 rebuild_apps() {
   local report rc=0
   report="$(mktemp)"
   GRAND_LINE_APPS_REPORT="$report" bash "$REPO/setup.sh" --unattended --only native-tools || rc=1
   if [[ -s "$report" ]]; then
     changed+=("rebuilt $(sort -u "$report" | tr '\n' ' ' | sed 's/ $//; s/ /, /g')")
-    "$REPO/bin/theme" icons >/dev/null 2>&1
   fi
   rm -f "$report"
   return "$rc"
@@ -213,15 +211,11 @@ case "$MODE" in
       GRAND_LINE_APPS_REPORT="$report" bash "$REPO/setup.sh" --unattended "${skip[@]+"${skip[@]}"}" || failed+=("setup")
       if [[ -s "$report" ]]; then
         changed+=("rebuilt $(sort -u "$report" | tr '\n' ' ' | sed 's/ $//; s/ /, /g')")
-        "$REPO/bin/theme" icons >/dev/null 2>&1
       fi
       rm -f "$report"
       "$REPO/bin/migrate" --unattended; rc=$?
       [[ "$rc" == 3 ]] && needs+=("one-time changes wait for: update")
       [[ "$rc" == 1 ]] && failed+=("migrations")
-      # Only when the theme, its templates or the package changed: the tools
-      # and apps are reloaded only then, never mid-task for nothing.
-      "$REPO/bin/theme" refresh || failed+=("theme")
     fi
     ;;
   interactive)
@@ -241,12 +235,10 @@ case "$MODE" in
     echo "== New apps, ArtCraft apps and settings"
     report="$(mktemp)"
     GRAND_LINE_APPS_REPORT="$report" bash "$REPO/setup.sh" --update || failed+=("setup")
-    [[ -s "$report" ]] && "$REPO/bin/theme" icons >/dev/null 2>&1
     rm -f "$report"
 
     echo "== One-time changes"
     "$REPO/bin/migrate" || failed+=("migrations")
-    "$REPO/bin/theme" refresh || failed+=("theme")
 
     echo "== Neovim plugins and language versions"
     if command -v nvim >/dev/null; then

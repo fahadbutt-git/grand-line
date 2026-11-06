@@ -8,7 +8,7 @@ public enum KeyCommand: Sendable, Equatable {
     case pageDown
     /// Return: the row's first action.
     case primary
-    /// Command+Return: the row's second action (Show in Nexus for files).
+    /// Command+Return: the row's second action (Show in Finder for files).
     case secondary
     /// Option+Return: the row's alternate, a copy (path, URL, answer, name).
     case alternate

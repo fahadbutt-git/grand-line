@@ -243,7 +243,7 @@ public final class ScriptCommandsProvider: InstantProvider, @unchecked Sendable 
                 actions: [
                     LaunchAction.complete(script.name + " ", title: "Enter"),
                     LaunchAction("Edit", symbol: "pencil", shortcut: KeyShortcut("e"), .run("/usr/bin/open", arguments: ["-t", script.path])),
-                    LaunchAction("Show in Nexus", symbol: "folder", .reveal(script.path)),
+                    LaunchAction("Show in Finder", symbol: "folder", .reveal(script.path)),
                 ],
                 providerID: id
             )

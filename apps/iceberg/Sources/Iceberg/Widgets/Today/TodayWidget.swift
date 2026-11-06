@@ -116,7 +116,7 @@ final class TodayWidget: ObservableObject, NotchWidget {
 
 struct TodayView: View {
     @ObservedObject var model: TodayWidget
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -141,7 +141,7 @@ struct TodayView: View {
 }
 
 private struct EventRow: View {
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     let event: AgendaEvent
     let isCurrent: Bool
 
@@ -149,11 +149,11 @@ private struct EventRow: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(Agenda.timeLabel(event))
                 .font(isCurrent ? TypeScale.numeral.weight(.semibold) : TypeScale.numeral)
-                .foregroundStyle(isCurrent ? theme.highlight : theme.muted)
+                .foregroundStyle(isCurrent ? palette.highlight : palette.muted)
                 .frame(width: 46, alignment: .leading)
             Text(event.title)
                 .font(TypeScale.body)
-                .foregroundStyle(theme.foreground)
+                .foregroundStyle(palette.foreground)
                 .lineLimit(1)
                 .truncationMode(.tail)
         }

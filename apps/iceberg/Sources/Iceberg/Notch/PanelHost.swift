@@ -12,7 +12,7 @@ import IcebergKit
 @MainActor
 final class PanelHost: ObservableObject {
     let paths: IcebergPaths
-    let theme: ThemeStore
+    let palette: SystemPalette
     let user: UserWidgets
     let events: SharedEventStore
     /// The shelf (files dropped on the notch or the basket), kept across restarts.
@@ -57,10 +57,10 @@ final class PanelHost: ObservableObject {
     /// The distributed notification `iceberg trigger NAME` posts; its object is the widget's name.
     static let triggerNotification = "com.grandline.iceberg.trigger"
 
-    init(paths: IcebergPaths, theme: ThemeStore) {
+    init(paths: IcebergPaths, palette: SystemPalette) {
         self.paths = paths
-        self.theme = theme
-        self.user = UserWidgets(paths: paths, theme: theme)
+        self.palette = palette
+        self.user = UserWidgets(paths: paths, palette: palette)
         self.events = SharedEventStore()
         self.shelf = ShelfModel(paths: paths)
         self.hotKey = HotKey()
@@ -124,10 +124,10 @@ final class PanelHost: ObservableObject {
     /// The panel takes dropped files while the shelf is in it.
     var takesFiles: Bool { layout.isEnabled("shelf") }
 
-    /// Settings, theme and widget problems together, errors first. They are
+    /// Settings and widget problems together, errors first. They are
     /// listed in the Settings window, not in the panel.
     var allIssues: [ConfigIssue] {
-        let all = settingsIssues + theme.issues + user.issues
+        let all = settingsIssues + user.issues
         return all.filter { $0.severity == .error } + all.filter { $0.severity == .warning }
     }
 
@@ -164,7 +164,7 @@ final class PanelHost: ObservableObject {
         user.setMaxConcurrent(loaded.maxConcurrent)
         if shortcutChanged { hotKeyProblem = hotKey.register(loaded.toggleShortcut) }
         applyFeatures(loaded, layout: newLayout)
-        let context = WidgetContext(theme: theme, events: events, settings: loaded, shelf: shelf,
+        let context = WidgetContext(palette: palette, events: events, settings: loaded, shelf: shelf,
                                     availabilityChanged: { [weak self] in self?.objectWillChange.send() })
         let wanted = newLayout.builtins
         for (name, widget) in made where !wanted.contains(name) {
@@ -218,7 +218,6 @@ final class PanelHost: ObservableObject {
     func resumeShortcut() { hotKeyProblem = hotKey.resume() }
 
     func reloadEverything() {
-        theme.reload()
         reloadSettings()
         user.reload()
     }

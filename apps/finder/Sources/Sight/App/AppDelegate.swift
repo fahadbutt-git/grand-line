@@ -3,7 +3,7 @@ import AppRuntime
 import LaunchKit
 import LauncherKit
 import ServiceManagement
-import ThemeKit
+import SettingsKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -36,7 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         services.start()
         panel = PanelController(services: services)
         preferences = SightPreferencesStore(services: services)
-        settings = SightSettingsWindow(services: services, themes: panel.themes, store: preferences)
+        settings = SightSettingsWindow(services: services, store: preferences)
         wireSettings()
         watchMainThread()
         if !registerHotkey(preferences.hotkey) {
@@ -132,7 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func applyDensity() {
-        Metrics.row = CGFloat(Density.current(theme: panel.themes.theme, defaults: .standard).scaled(30))
+        Metrics.row = CGFloat(preferences.density.scaled(Double(Metrics.regularRow)))
         panel.model.objectWillChange.send()
     }
 

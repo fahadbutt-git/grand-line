@@ -24,8 +24,9 @@ public enum IconRenderer {
         return image
     }
 
-    public static func image(_ glyph: IconGlyph, theme: IconTheme) -> NSImage {
-        image(glyph, palette: theme.palette(for: glyph))
+    /// The app icon in its bundled colours.
+    public static func image(_ glyph: IconGlyph) -> NSImage {
+        image(glyph, palette: .bundled(for: glyph))
     }
 
     /// The glyph alone in black, as a template image for the menu bar:

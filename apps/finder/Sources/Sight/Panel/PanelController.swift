@@ -16,7 +16,6 @@ final class PanelPresence: ObservableObject {
 final class PanelController: NSObject, NSWindowDelegate {
     let services: Services
     let model: SearchModel
-    let themes = ThemeStore()
     let presence = PanelPresence()
     private let panel: SearchPanel
     /// Counts each show and hide, so a fade that finishes late never hides a window shown again.
@@ -24,6 +23,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// The window is fading out: still on screen, no longer taking clicks.
     private var dismissing = false
     private var monitor: Any?
+    private var colorObserver: NSObjectProtocol?
     private var changes: AnyCancellable?
     private var shadowPending = false
     /// Command + Comma in the search window opens Settings.
@@ -36,13 +36,19 @@ final class PanelController: NSObject, NSWindowDelegate {
         self.model = SearchModel(services: services)
         self.panel = SearchPanel(size: NSSize(width: Metrics.width + Metrics.preview + 40, height: 560))
         super.init()
-        let root = SearchView(model: model, themes: themes, presence: presence)
+        let root = SearchView(model: model, presence: presence)
         panel.contentView = NSHostingView(rootView: root)
         panel.delegate = self
         model.hide = { [weak self] in self?.hide() }
         model.show = { [weak self] in self?.show() }
         // Typing, pasting or pressing a menu item in the app in front needs the keys at once.
         model.performer.willActInFrontApp = { [weak self] in self?.finishDismissal() }
+        // The accent or highlight colour changed in System Settings: redraw
+        // with it at once (the window takes Light and Dark from macOS itself).
+        colorObserver = NotificationCenter.default.addObserver(
+            forName: NSColor.systemColorsDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.model.objectWillChange.send() }
+        }
         // App icons are read in the background; the rows redraw when they arrive.
         IconCache.onLoad = { [weak self] in
             guard let self, self.panel.isVisible else { return }
@@ -106,7 +112,6 @@ final class PanelController: NSObject, NSWindowDelegate {
         dismissing = false
         panel.ignoresMouseEvents = false
         generation += 1
-        panel.appearance = NSAppearance(named: themes.theme.appearanceName)
         panel.makeKeyAndOrderFront(nil)
         materialise()
         onVisibilityChange?(true)

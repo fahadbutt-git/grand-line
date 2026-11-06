@@ -43,7 +43,6 @@ They do not update themselves. Install with setup to stop the message for good.
 | `update auto on`, `off`, `status` | The daily unattended update (also in the Update menu) |
 | `update --apps-only --notify` | Updates this package and rebuilds only the apps whose sources changed, then posts one notification. The apps' "Update now" buttons run this |
 | `keybindings --print` | Prints every shortcut |
-| `theme pick` | Chooses the colours of Sight and Iceberg only (Graphite, Daylight, Nord, Forest, and the Harbour, Lantern, Signal, Ledger, Atlas and Paper families). It never changes macOS, the terminal, the editor or any other app. Without a choice, Sight and Iceberg use their built-in look. Rules in `DESIGN.md` |
 | `grandline commands` | Lists every command in the package with what it does |
 | `migrate --pending` | Lists the one-time changes an update has not run yet (`migrate` runs them) |
 | `app install`, `app remove` | Installs or removes an app and updates the Brewfile to match (also in the menu). `grandline publish` shares the change with your other Macs |
@@ -220,7 +219,7 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 
 Sight (search) and Iceberg (the notch) are built on this Mac from `apps/`, by the native-tools step, and installed in `/Applications`. Each app folder is a Swift package with an `apps.tsv` that names what it makes (product, app name, bundle id, and whether it lives in the menu bar only). Setup rebuilds an app only when its sources change (or the shared `apps/icons` package does), and the old copy goes to the Trash.
 
-Sight and Iceberg were formerly Byakugan and Den Den. The first `update` after the rename carries their settings, index and state over (`migrations/1793472900-rename-apps.sh`), and the old apps go to the Trash. Nexus, the file browser, is no longer built or installed: folders open in Finder. Its sources stay in `apps/finder/Sources/Nexus`, outside the build.
+Sight and Iceberg were formerly Byakugan and Den Den. The first `update` after the rename carries their settings, index and state over (`migrations/1793472900-rename-apps.sh`), and the old apps go to the Trash. Folders and Show in Finder open in Finder.
 
 ### Signing and permissions
 
@@ -230,7 +229,7 @@ Because the key is what keeps the permissions, it is guarded: it lives in its ow
 
 Grand Line Index is the file index Sight searches through. It runs in the background: its launch agent is inside the app (sealed by its signature) and the app registers it itself (`GrandLineIndex --register`), as you, never with sudo. It needs Full Disk Access (or Files and Folders for Desktop, Documents, Downloads and Google Drive); the checklist says where.
 
-Each app draws its icon in the theme's colours when it starts and whenever the theme changes (the `ICON_*` keys in `DESIGN.md`), for the Dock and for Finder. The bundles also carry a fixed `AppIcon.icns` in Graphite's colours, drawn by `python3 tools/make-icons.py` from the same glyph table (`apps/icons/Sources/AppIcon/Glyphs.swift`), so an app has an icon before it first runs. `theme set` and `theme mode` then put icons in the new theme's colours into the installed apps in the background (`theme icons`; `make-icons.py --out DIR`), and sign them again with the same identity, so Finder matches the theme and the permissions stay. Without the identity this is skipped, since an ad-hoc signature would cost the permissions. After changing a glyph, run the script and commit the `.icns` files; `tests/run-all.sh` checks they are sound.
+Sight and Iceberg look and behave like Apple's own apps: Sight like Spotlight (Liquid Glass on macOS 26 and later), Iceberg's widgets like Control Center's. They take Light or Dark, the accent colour and the highlight colour from System Settings, Appearance, and follow Reduce Motion, Reduce Transparency and Increase Contrast, with no themes and nothing to set (`DESIGN.md`). The bundles carry a fixed `AppIcon.icns`, drawn by `python3 tools/make-icons.py` from the glyph table (`apps/icons/Sources/AppIcon/Glyphs.swift`), which Iceberg's menu bar icon is drawn from too. After changing a glyph, run the script and commit the `.icns` files; `tests/run-all.sh` checks they are sound.
 
 Once installed, Sight answers Command + Space (so Caps + Space too). It switches back to Spotlight from the Toggle menu, or with `toggle search`, and the choice is kept across updates.
 
@@ -240,7 +239,7 @@ Typing a setting changes it, rather than opening System Settings. The row shows 
 
 | Type | Does |
 | --- | --- |
-| `dark`, `dark mode on`, `light mode` | Dark mode: the macOS appearance (while the theme follows macOS, its variant switches too) |
+| `dark`, `dark mode on`, `light mode` | Dark mode: the macOS appearance, changed only when you choose this row |
 | `wifi`, `turn off wifi`, `bt off`, `bluetooth` | Wi-Fi and Bluetooth |
 | `dnd`, `do not disturb`, `focus off` | Do Not Disturb (needs the two shortcuts below) |
 | `mute`, `unmute`, `volume 30`, `volume up`, `louder` | Sound. Volume steps by 10 |
@@ -269,7 +268,6 @@ Typing "sight settings" or "iceberg settings" opens that app's Settings window (
 | A shortcut | Add a line to `BINDINGS` in `tools/bindings.py`, run `python3 tools/bindings.py`, then `--only dotfiles` |
 | A menu entry | Add a line to `config/grand-line/menu.tsv`. It works at once. A third column `?test` shows it only when the test succeeds, a fourth `✓test` gives it a check mark (helpers in `lib/toggle-state.sh`) |
 | A command | Add an executable script to `bin/` with a `# grandline:summary=` line under the first. It is on the PATH at once, and `grandline commands` and Sight list it. Arguments Sight should ask for go in `# grandline:arg1=` lines (up to three), as `{"type":"text"\|"dropdown","placeholder":"…","data":[…],"optional":true}` |
-| A theme for Sight and Iceberg | Add `config/themes/name.theme` (copy an existing one). For a dark and light pair, name the files `name-dark.theme` and `name-light.theme` with `FAMILY=name` in both |
 | A one-time change for Macs already set up | Add `migrations/<unix time>-<what>.sh` (`date +%s` gives the time). `update` runs it once on each Mac. Mark it `# grandline:unattended` on a line of its own when it needs no password and asks nothing, so the daily update can run it too. The daily update runs them strictly in order and stops at the first one not marked |
 | An R package | Add a line to `config/grand-line/r-packages.txt`, then `--only r-packages` |
 | A native helper | Add `tools/name.swift`. Setup builds it into `~/.grand-line/.build` |
@@ -283,13 +281,13 @@ Keep personal changes in `~/.config/grand-line/`, outside the package, so an upd
 | --- | --- |
 | `bindings.local.tsv` | Your own Caps Lock shortcuts, in the same four columns as `config/grand-line/keybindings.tsv` (keys, group, description, command). The same keys replace a shipped shortcut, and `unbind<TAB>Caps + X` removes one. Merged into Karabiner's copy by `bash ~/grand-line/setup.sh --only dotfiles`, and shown in Caps + K at once |
 | `menu.local.tsv` | Your own menu entries, in the same columns as `menu.tsv`. The same path replaces a shipped entry, and `Path<TAB>-` removes it. Works at once |
-| `hooks/post-update`, `hooks/theme-set` | Scripts that run after every update, and after every theme change (with the theme's name). Several can go in `hooks/<name>.d/`. Setup copies examples there as `*.sample` files, which never run |
+| `hooks/post-update` | Scripts that run after every update. Several can go in `hooks/post-update.d/`. Setup copies examples there as `*.sample` files, which never run |
 
 ## Testing
 
 Run these before installing on a new Mac, and after any change.
 
-1. **Quick checks, any computer, about 1 minute.** Syntax, lint, macOS bash 3.2 compatibility, config validity, generated files up to date, menus, themes, the ArtCraft download choice, a full dry run that must not touch the home folder, and every Brewfile name against Homebrew's live catalogue.
+1. **Quick checks, any computer, about 1 minute.** Syntax, lint, macOS bash 3.2 compatibility, config validity, generated files up to date, menus, migrations, the ArtCraft download choice, a full dry run that must not touch the home folder, and every Brewfile name against Homebrew's live catalogue.
 
    ```
    bash tests/run-all.sh
@@ -357,7 +355,7 @@ Brewfile            apps and tools
 steps/              one file per setup step
 bin/                commands behind the menus and shortcuts
 lib/                shared helpers and paths
-config/             aerospace, karabiner, tmux, zsh, starship, nvim, git, themes
+config/             aerospace, karabiner, tmux, zsh, starship, nvim, git
                     (Sight and Iceberg only), and grand-line (menus, rules,
                     data files, hook samples)
 backgrounds/        pictures from earlier versions, no longer set as wallpaper
@@ -371,14 +369,13 @@ publish.sh          first upload of this package to GitHub
 
 ## Credits
 
-Much of how this package works is adapted from [Omarchy](https://github.com/basecamp/omarchy) by David Heinemeier Hansson and contributors, under the MIT License. It is rebuilt here for macOS, in bash 3.2, with Apple's fonts and colours. The pieces and the Omarchy files each is based on:
+Much of how this package works is adapted from [Omarchy](https://github.com/basecamp/omarchy) by David Heinemeier Hansson and contributors, under the MIT License. It is rebuilt here for macOS, in bash 3.2, with Apple's fonts and the system's own colours. The pieces and the Omarchy files each is based on:
 
 | Here | Based on, in Omarchy |
 | --- | --- |
 | Caps Lock layer (Super key layout) and the Caps + K shortcut list | `default/hypr/bindings/tiling.lua`, `default/hypr/bindings/utilities.lua`, `bin/omarchy-menu-keybindings` |
 | The menu (`bin/menu`, `menu.tsv`) and its Toggle group | `bin/omarchy-menu` |
 | Toggle states read from flag files (`lib/toggle-state.sh`) | `bin/omarchy-state`, `bin/omarchy-toggle-*` |
-| Theme files (`bin/theme`, `lib/templates.sh`) | `bin/omarchy-theme-set` |
 | Migrations (`bin/migrate`, `migrations/`) | `bin/omarchy-migrate`, `bin/omarchy-dev-add-migration`, `migrations/` |
 | Hooks (`bin/hook`, hook samples) | `bin/omarchy-hook`, `config/omarchy/hooks/` |
 | The update run (lock, staying awake, restart note) | `bin/omarchy-update`, `bin/omarchy-update-lock`, `bin/omarchy-update-stay-awake`, `bin/omarchy-update-restart` |

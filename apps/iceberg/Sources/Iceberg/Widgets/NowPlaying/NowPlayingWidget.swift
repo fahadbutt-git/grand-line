@@ -298,7 +298,7 @@ final class NowPlayingWidget: ObservableObject, NotchWidget {
 
 struct NowPlayingView: View {
     @ObservedObject var model: NowPlayingWidget
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     @ObservedObject private var display = DisplayOptions.shared
 
     var body: some View {
@@ -314,11 +314,11 @@ struct NowPlayingView: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(model.state.title ?? "")
                             .font(TypeScale.title)
-                            .foregroundStyle(theme.foreground)
+                            .foregroundStyle(palette.foreground)
                             .lineLimit(1)
                         Text([model.state.artist, model.state.album].compactMap { $0 }.joined(separator: " – "))
                             .font(TypeScale.caption)
-                            .foregroundStyle(theme.muted)
+                            .foregroundStyle(palette.muted)
                             .lineLimit(1)
                         PlaybackProgress(state: model.state)
                             .padding(.top, 5)
@@ -347,7 +347,7 @@ struct NowPlayingView: View {
 /// Previous, play or pause, next: a plate on hover, smaller on mouse-down,
 /// and play and pause trade places with the symbol's own replace effect.
 private struct ControlButton: View {
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     @ObservedObject private var display = DisplayOptions.shared
     let symbol: String
     let font: Font
@@ -358,7 +358,7 @@ private struct ControlButton: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(font)
-                .foregroundStyle(theme.foreground)
+                .foregroundStyle(palette.foreground)
                 .contentTransition(.symbolEffect(.replace))
                 .animation(Motion.content(reduceMotion: display.reduceMotion), value: symbol)
                 .frame(width: 24, height: 22)
@@ -372,7 +372,7 @@ private struct ControlButton: View {
 /// A thin bar with elapsed and remaining time. It redraws once a second,
 /// and only while it is on screen (the panel is open and something plays).
 private struct PlaybackProgress: View {
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     @Environment(\.displayScale) private var displayScale
     let state: NowPlayingState
 
@@ -393,8 +393,8 @@ private struct PlaybackProgress: View {
             GeometryReader { g in
                 let filled = PixelGrid.align(g.size.width * CGFloat(min(1, position / duration)), scale: displayScale)
                 ZStack(alignment: .leading) {
-                    Capsule().fill(theme.selection)
-                    Capsule().fill(theme.muted)
+                    Capsule().fill(palette.selection)
+                    Capsule().fill(palette.muted)
                         .frame(width: max(4, filled))
                 }
             }
@@ -405,7 +405,7 @@ private struct PlaybackProgress: View {
                 Text("-" + Self.clock(max(0, duration - position)))
             }
             .font(TypeScale.numeral)
-            .foregroundStyle(theme.muted)
+            .foregroundStyle(palette.muted)
         }
     }
 
@@ -419,7 +419,7 @@ private struct PlaybackProgress: View {
 /// Album artwork, or a quiet placeholder, with a hairline edge so a dark
 /// cover keeps its shape on a dark panel.
 struct ArtworkView: View {
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     @Environment(\.displayScale) private var displayScale
     let image: NSImage?
     let side: CGFloat
@@ -432,17 +432,17 @@ struct ArtworkView: View {
                 Image(nsImage: image).resizable().interpolation(.high).aspectRatio(contentMode: .fill)
             } else {
                 ZStack {
-                    theme.raised
+                    palette.raised
                     // Sized to the artwork, which sets the scale here.
                     Image(systemName: "music.note")
                         .font(.system(size: (side * 0.4).rounded(), weight: .light))
-                        .foregroundStyle(theme.muted)
+                        .foregroundStyle(palette.muted)
                 }
             }
         }
         .frame(width: side, height: side)
         .clipShape(shape)
-        .overlay(shape.strokeBorder(theme.foreground.opacity(0.1), lineWidth: PixelGrid.hairline(scale: displayScale)))
+        .overlay(shape.strokeBorder(palette.foreground.opacity(0.1), lineWidth: PixelGrid.hairline(scale: displayScale)))
         .shadow(color: Color.black.opacity(0.18), radius: 3, y: 1)
     }
 }
@@ -452,7 +452,7 @@ struct ArtworkView: View {
 /// as part of the notch.
 struct LiveActivityView: View {
     @ObservedObject var model: NowPlayingWidget
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     /// The closed notch's height.
     let height: CGFloat
     /// The flare at each top corner, which nothing is drawn in.
@@ -464,7 +464,7 @@ struct LiveActivityView: View {
         let pad = NotchGeometry.wingPadding(collapsedHeight: height)
         let side = NotchGeometry.wingArtworkSide(collapsedHeight: height)
         let wing = NotchGeometry.wingWidth(collapsedHeight: height)
-        let tint = ArtworkTint.tint(cover: model.artworkTint, accent: theme.theme.accent).color
+        let tint = ArtworkTint.tint(cover: model.artworkTint, accent: palette.accentRGB).color
         HStack(spacing: 0) {
             CoverThumb(image: model.artwork, side: side)
                 .padding(.leading, pad)

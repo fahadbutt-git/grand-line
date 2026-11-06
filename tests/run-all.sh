@@ -127,60 +127,6 @@ check "every native helper has a matching source file" bash -c '
   done
   exit $bad'
 
-# A theme's keys are read through the checker (lib/templates.sh), so a light
-# variant that EXTENDS its dark sibling is checked with what it inherits.
-check "theme check: every shipped theme passes the format 1 checker" bin/theme check
-
-check "every theme has its own FORMAT=1, its background and all fields" bash -c '
-  source lib/templates.sh
-  bad=0
-  for t in config/themes/*.theme; do
-    grep -qx "FORMAT=1" "$t" || { echo "$t: no FORMAT=1 line of its own"; bad=1; }
-    r="$(theme_resolve "$t" 2>/dev/null)" || { echo "$t: does not resolve"; bad=1; continue; }
-    get() { printf "%s\n" "$r" | sed -n "s/^$1=//p" | tr -d \"; }
-    for k in LABEL MODE ACCENT ACCENT_HEX BACKGROUND TERM_BG TERM_FG TERM_CURSOR TERM_SELECTION MUTED BG_LIGHTER BG_DARKER PALETTE HIGHLIGHT NVIM \
-             ICON_STYLE KIND_STYLE KIND_FOLDER KIND_DOCUMENT KIND_PDF KIND_PRESENTATION KIND_SPREADSHEET KIND_IMAGE KIND_VIDEO KIND_CODE KIND_ARCHIVE KIND_TEXT; do
-      printf "%s\n" "$r" | grep -q "^$k=" || { echo "$t: no $k"; bad=1; }
-    done
-    # ICON_STYLE and KIND_STYLE may come through EXTENDS: the apps and
-    # tools/make-icons.py read the resolved theme, as theme_resolve does.
-    printf "%s\n" "$r" | grep -qE "^ICON_STYLE=\"?(line|solid|mono)\"?$" || { echo "$t: ICON_STYLE must be line, solid or mono"; bad=1; }
-    printf "%s\n" "$r" | grep -qE "^KIND_STYLE=\"?(tag|dot|solid|text)\"?$" || { echo "$t: KIND_STYLE must be tag, dot, solid or text"; bad=1; }
-    fam=$(get FAMILY)
-    if [[ -n "$fam" ]]; then
-      [[ "${t##*/}" == "$fam-dark.theme" || "${t##*/}" == "$fam-light.theme" ]] || { echo "$t: FAMILY=$fam needs the file named $fam-dark or $fam-light"; bad=1; }
-      [[ -f "config/themes/$fam-dark.theme" && -f "config/themes/$fam-light.theme" ]] || { echo "$t: family $fam needs both a dark and a light file"; bad=1; }
-    fi
-    bg=$(get BACKGROUND)
-    [[ -f "backgrounds/$bg" ]] || { echo "$t: backgrounds/$bg missing"; bad=1; }
-  done; exit $bad'
-
-check "light themes: every terminal colour reads at 4.5:1 on the background" python3 -c '
-import glob, subprocess, sys
-def lum(h):
-    c = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
-    c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
-    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
-def ratio(a, b):
-    hi, lo = sorted((lum(a), lum(b)), reverse=True)
-    return (hi + 0.05) / (lo + 0.05)
-def resolved(path):
-    out = subprocess.run(["bash", "-c", "source lib/templates.sh && theme_resolve \"$1\"", "_", path],
-                         capture_output=True, text=True, check=True).stdout
-    return {k: v.strip("\"") for k, v in (line.split("=", 1) for line in out.splitlines() if "=" in line)}
-bad = 0
-for path in sorted(glob.glob("config/themes/*.theme")):
-    t = resolved(path)
-    bg = t["TERM_BG"]
-    colours = [("TERM_FG", t["TERM_FG"])]
-    if t["MODE"] == "light":
-        colours += [("MUTED", t["MUTED"]), ("HIGHLIGHT", t["HIGHLIGHT"])]
-        colours += [("PALETTE %d" % i, c) for i, c in enumerate(t["PALETTE"].split())]
-    for name, c in colours:
-        if ratio(c, bg) < 4.5:
-            print("%s: %s #%s is %.2f:1 on #%s" % (path, name, c, ratio(c, bg), bg)); bad = 1
-sys.exit(bad)'
-
 check "every bin/ command has a \"# grandline:summary=\" line (grandline commands lists them)" bash -c '
   bad=0
   for f in bin/*; do grep -q "^# grandline:summary=." "$f" || { echo "$f has no summary"; bad=1; }; done
@@ -231,7 +177,7 @@ check "nothing downloaded is piped into a shell or eval'd" bash tests/security-c
 check "the apps ask for no exceptions to hardened runtime beyond the allowed list" bash tests/security-checks.sh --entitlements
 
 echo "Behaviour"
-check "unit tests (menus, shortcuts, overlays, themes, migrations, hooks, ArtCraft)" bash tests/unit.sh
+check "unit tests (menus, shortcuts, overlays, migrations, hooks, ArtCraft)" bash tests/unit.sh
 check "dry run of the whole setup changes nothing" bash tests/dryrun.sh
 
 if [[ "$OFFLINE" == 0 ]]; then

@@ -26,7 +26,7 @@ final class FilesTests: XCTestCase {
         XCTAssertEqual(row.accessory, "today")
         XCTAssertEqual(row.match.highlights, [0..<3])
         let titles = row.actions.map(\.title)
-        XCTAssertEqual(Array(titles.prefix(3)), ["Open", "Show in Nexus", "Quick Look"])
+        XCTAssertEqual(Array(titles.prefix(3)), ["Open", "Show in Finder", "Quick Look"])
         XCTAssertTrue(titles.contains("Open with…"))
         XCTAssertTrue(titles.contains("Copy path"))
         XCTAssertTrue(titles.contains("Copy file"))
@@ -38,9 +38,10 @@ final class FilesTests: XCTestCase {
                        .run("/Users/me/.grand-line/bin/transcode", arguments: ["pdf", hit.path]))
     }
 
-    func testFoldersOpenInNexus() {
+    func testFoldersOpenInFinder() {
         let row = FileResults.result(FileHit(path: "/Users/me/Drive", isFolder: true), paths: paths)
-        XCTAssertEqual(row.primary?.title, "Open in Nexus")
+        XCTAssertEqual(row.primary?.title, "Open")
+        XCTAssertEqual(row.primary?.command, .open("/Users/me/Drive"))
         XCTAssertEqual(row.subtitle, "~")
         XCTAssertFalse(row.actions.contains { $0.title == "Open with…" })
         XCTAssertEqual(FileResults.transcodeModes("mov"), ["video"])

@@ -1,11 +1,11 @@
 import AppKit
 import SwiftUI
-import ThemeKit
 
-/// The query field: an NSTextField, so the panel can focus it and keys reach it first.
+/// The query field: an NSTextField, so the panel can focus it and keys reach
+/// it first. Its text, placeholder and insertion point are the system's own
+/// colours, so it reads as Spotlight's field in Light and in Dark.
 struct SearchField: NSViewRepresentable {
     @ObservedObject var model: SearchModel
-    let theme: Theme
 
     func makeNSView(context: Context) -> NSTextField {
         let field = NSTextField()
@@ -13,32 +13,27 @@ struct SearchField: NSViewRepresentable {
         field.drawsBackground = false
         field.focusRingType = .none
         field.font = Typo.fieldNS
+        field.textColor = .labelColor
         field.cell?.lineBreakMode = .byTruncatingTail
         field.cell?.isScrollable = true
         field.delegate = context.coordinator
         model.field = field
-        style(field, context.coordinator)
+        placeholder(field, context.coordinator)
         return field
     }
 
     func updateNSView(_ field: NSTextField, context: Context) {
         if field.stringValue != model.text { field.stringValue = model.text }
-        style(field, context.coordinator)
+        placeholder(field, context.coordinator)
     }
 
-    /// Colours and the placeholder, set again only when the theme or the
-    /// placeholder changes, never on each keystroke.
-    private func style(_ field: NSTextField, _ coordinator: Coordinator) {
-        let key = "\(theme.strong.hex) \(theme.faint.hex) \(theme.accent.hex) \(model.placeholder)"
-        if let editor = field.currentEditor() as? NSTextView {
-            editor.insertionPointColor = NSColor(theme.accent)
-        }
-        guard coordinator.styled != key else { return }
-        coordinator.styled = key
-        field.textColor = NSColor(theme.strong)
+    /// The placeholder, set again only when it changes, never on each keystroke.
+    private func placeholder(_ field: NSTextField, _ coordinator: Coordinator) {
+        guard coordinator.placeholder != model.placeholder else { return }
+        coordinator.placeholder = model.placeholder
         field.placeholderAttributedString = NSAttributedString(
             string: model.placeholder,
-            attributes: [.foregroundColor: NSColor(theme.faint), .font: Typo.fieldNS]
+            attributes: [.foregroundColor: NSColor.placeholderTextColor, .font: Typo.fieldNS]
         )
     }
 
@@ -46,8 +41,8 @@ struct SearchField: NSViewRepresentable {
 
     final class Coordinator: NSObject, NSTextFieldDelegate {
         let model: SearchModel
-        /// What the field was last styled with.
-        var styled = ""
+        /// The placeholder the field last got.
+        var placeholder: String?
 
         init(model: SearchModel) { self.model = model }
 

@@ -116,7 +116,7 @@ enum LauncherJourneys {
             },
             step("Command+K opens the action panel with the file actions") { ctx in
                 try ctx.key("cmd+k")
-                let wanted = ["action.open-with", "action.show-in-nexus", "action.quick-look", "action.copy-path",
+                let wanted = ["action.open-with", "action.show-in-finder", "action.quick-look", "action.copy-path",
                               "action.copy-name", "action.add-to-buffer", "action.move-to-trash"]
                 try ctx.wait("the action panel") { ctx.panelIdentifiers().contains("action.copy-name") }
                 let shown = ctx.panelIdentifiers()
@@ -589,5 +589,13 @@ extension Ctx {
         // And back.
         _ = try flip("back after the double Return", from: rowNow, system: readSetting(setting).map(LauncherJourneys.normalise))
         restored = true
+    }
+}
+
+extension Ctx {
+    /// Whether the keys go to a text field now.
+    func isEditingText() -> Bool {
+        guard let focused = ax.element("AXFocusedUIElement") else { return false }
+        return Layout.inputRoles.contains(focused.role) || focused.role == "AXTextArea"
     }
 }

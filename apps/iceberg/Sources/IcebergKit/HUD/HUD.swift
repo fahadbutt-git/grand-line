@@ -4,7 +4,7 @@ import Foundation
 /// bar or a short text in the right one.
 public struct HUDEvent: Equatable, Sendable {
     public enum Kind: String, Sendable, Equatable { case volume, brightness, battery, device }
-    /// How the symbol is coloured, as theme colours.
+    /// How the symbol is coloured, as system colours.
     public enum Tone: String, Sendable, Equatable { case normal, good, warning, critical }
 
     public var kind: Kind

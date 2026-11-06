@@ -134,9 +134,9 @@ final class HUDCenter: ObservableObject {
 
 /// A HUD in the closed notch: the symbol in the left wing, the level bar
 /// and its text (or the text alone) in the right one. White on the black
-/// notch, which it is part of, so it takes no material; the bar and the
-/// symbol's state colours come from the theme. A new level slides the bar
-/// and rolls the digits in place, and a new symbol (muted, charging)
+/// notch, which it is part of, so it takes no material. The bar is the
+/// accent colour and the symbol's states the system's green, yellow and
+/// red. A new level slides the bar and rolls the digits in place, and a new symbol (muted, charging)
 /// replaces the old one, all critically damped.
 struct HUDView: View {
     let event: HUDEvent
@@ -144,7 +144,7 @@ struct HUDView: View {
     let height: CGFloat
     /// The flare at each top corner, which nothing is drawn in.
     let inset: CGFloat
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     @ObservedObject private var display = DisplayOptions.shared
 
     var body: some View {
@@ -164,7 +164,7 @@ struct HUDView: View {
             Spacer(minLength: 0)
             HStack(spacing: 6) {
                 if let level = event.level {
-                    LevelBar(level: level, color: theme.theme.accent.color, trackOpacity: display.increaseContrast ? 0.36 : 0.2)
+                    LevelBar(level: level, color: palette.highlight, trackOpacity: display.increaseContrast ? 0.36 : 0.2)
                         .frame(height: 4)
                         .animation(change, value: level)
                 }
@@ -189,9 +189,9 @@ struct HUDView: View {
     private var symbolColor: Color {
         switch event.tone {
         case .normal: return Color.white
-        case .good: return theme.color(.theme(.green)) ?? Color.white
-        case .warning: return theme.color(.theme(.yellow)) ?? Color.white
-        case .critical: return theme.color(.theme(.red)) ?? Color.white
+        case .good: return palette.color(.named(.green)) ?? Color.white
+        case .warning: return palette.color(.named(.yellow)) ?? Color.white
+        case .critical: return palette.color(.named(.red)) ?? Color.white
         }
     }
 }

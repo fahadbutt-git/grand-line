@@ -76,17 +76,17 @@ private func powerSourceChanged(_ context: UnsafeMutableRawPointer?) {
 
 struct BatteryView: View {
     @ObservedObject var model: BatteryWidget
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
 
     var body: some View {
         if let r = model.reading {
             HStack(spacing: 5) {
                 Text("\(r.percent)%")
                     .font(TypeScale.numeral.weight(.medium))
-                    .foregroundStyle(r.isLow ? theme.color(.theme(.red)) ?? theme.foreground : theme.foreground)
+                    .foregroundStyle(r.isLow ? palette.color(.named(.red)) ?? palette.foreground : palette.foreground)
                 Image(systemName: r.symbol)
                     .font(SymbolScale.body)
-                    .foregroundStyle(r.isLow ? theme.color(.theme(.red)) ?? theme.foreground : theme.muted)
+                    .foregroundStyle(r.isLow ? palette.color(.named(.red)) ?? palette.foreground : palette.muted)
             }
             .help(r.summary)
         }

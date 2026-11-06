@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- The Grand Line Index agent, registered by `GrandLineIndex` with its register option
      (SMAppService.agent). launchd runs it at login, keeps it running, and
-     starts it when Nexus or Sight connect to the Mach service. -->
+     starts it when Sight connects to the Mach service. -->
 <plist version="1.0">
 <dict>
   <key>Label</key><string>com.grandline.index</string>

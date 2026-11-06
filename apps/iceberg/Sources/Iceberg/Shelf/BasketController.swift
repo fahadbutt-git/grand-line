@@ -9,15 +9,15 @@ import IcebergKit
 /// again. It goes when the drag ends with nothing dropped, on a click
 /// outside it, or with its close button.
 ///
-/// It is a floating surface, so it sits on a macOS material (the theme's
-/// panel colour laid over it) with the window's own shadow. It
+/// It is a floating surface, so it sits on the system's popover material,
+/// in Light or Dark as macOS is, with the window's own shadow. It
 /// materialises at the pointer (the window fades, shadow and all, while
 /// the content grows and sharpens) and leaves the same way. Shown again
 /// while it is leaving, it turns round where it is.
 @MainActor
 final class BasketController {
     private let shelf: ShelfModel
-    private let theme: ThemeStore
+    private let palette: SystemPalette
     private let state = BasketState()
     private var panel: NSPanel?
     private var container: BasketContainerView?
@@ -26,9 +26,9 @@ final class BasketController {
 
     static let size = CGSize(width: 240, height: 160)
 
-    init(shelf: ShelfModel, theme: ThemeStore) {
+    init(shelf: ShelfModel, palette: SystemPalette) {
         self.shelf = shelf
-        self.theme = theme
+        self.palette = palette
     }
 
     /// Shown, or on its way in: false as soon as it starts to leave.
@@ -135,7 +135,7 @@ final class BasketController {
         }
         container.registerForDraggedTypes([.fileURL])
         let view = BasketView(state: state, shelf: shelf, close: { [weak self] in self?.hide() })
-            .environmentObject(theme)
+            .environmentObject(palette)
         let hosting = FirstClickHostingView(rootView: AnyView(view))
         hosting.autoresizingMask = [.width, .height]
         container.addSubview(hosting)
@@ -201,7 +201,7 @@ struct BasketView: View {
     @ObservedObject var state: BasketState
     @ObservedObject var shelf: ShelfModel
     let close: () -> Void
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     @ObservedObject private var display = DisplayOptions.shared
     @Environment(\.displayScale) private var displayScale
 
@@ -212,8 +212,8 @@ struct BasketView: View {
         let surface = display.surface
         let dropped = shelf.entries.filter { state.ids.contains($0.id) }
         let edge = state.targeted
-            ? theme.highlight
-            : theme.line(emphasis: surface.edgeEmphasis)
+            ? palette.highlight
+            : palette.line(increaseContrast: surface.edgeEmphasis > 0)
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 SectionCaption(text: "Basket", count: dropped.isEmpty ? nil : dropped.count)
@@ -221,7 +221,7 @@ struct BasketView: View {
                 Button(action: close) {
                     Image(systemName: "xmark")
                         .font(SymbolScale.accessory)
-                        .foregroundStyle(theme.muted)
+                        .foregroundStyle(palette.muted)
                         .frame(width: 16, height: 16)
                 }
                 .buttonStyle(PanelButtonStyle(kind: .icon))
@@ -232,11 +232,11 @@ struct BasketView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "tray.and.arrow.down")
                         .font(SymbolScale.illustration)
-                        .foregroundStyle(theme.highlight)
+                        .foregroundStyle(palette.highlight)
                         .symbolEffect(.bounce, value: state.targeted)
                     Text("Drop to keep it on the shelf")
                         .font(TypeScale.callout)
-                        .foregroundStyle(theme.muted)
+                        .foregroundStyle(palette.muted)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .transition(.opacity)
@@ -259,9 +259,10 @@ struct BasketView: View {
         .background {
             ZStack {
                 if surface.usesMaterial {
-                    VisualEffectBackground(material: .hudWindow, cornerRadius: Self.radius)
+                    VisualEffectBackground(material: .popover, cornerRadius: Self.radius)
                 }
-                shape.fill(theme.panel.opacity(surface.tintOpacity))
+                // Solid only with Reduce Transparency or Increase Contrast.
+                shape.fill(palette.background.opacity(surface.tintOpacity))
             }
         }
         .overlay(shape.strokeBorder(edge, lineWidth: PixelGrid.width(pixels: state.targeted ? 3 : surface.edgePixels,
@@ -269,6 +270,5 @@ struct BasketView: View {
         .clipShape(shape)
         // The window fades (with its shadow); the content grows and sharpens.
         .modifier(Materialise(progress: state.shown ? 1 : 0, anchor: .center, reduceMotion: display.reduceMotion, fades: false))
-        .preferredColorScheme(theme.colorScheme)
     }
 }

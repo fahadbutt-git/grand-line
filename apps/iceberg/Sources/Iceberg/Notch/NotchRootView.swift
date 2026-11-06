@@ -3,12 +3,13 @@ import SwiftUI
 import IcebergKit
 
 /// The whole panel: the closed notch (black, to match the camera housing,
-/// or a black pill on other displays) growing into the open panel, whose
-/// colours all come from the theme.
+/// or a black pill on other displays) growing into the open panel. Like the
+/// Dynamic Island it stays black in Light and Dark, with the system's label
+/// colours, separators and accent colour drawn for a dark appearance.
 struct NotchRootView: View {
     @ObservedObject var model: NotchModel
     @ObservedObject var host: PanelHost
-    @ObservedObject var theme: ThemeStore
+    @ObservedObject var palette: SystemPalette
     @ObservedObject private var display = DisplayOptions.shared
     @Environment(\.displayScale) private var displayScale
 
@@ -28,7 +29,7 @@ struct NotchRootView: View {
             if open {
                 // The shape clips the outer half of the stroke, which leaves
                 // whole device pixels inside the edge.
-                shape.stroke(theme.line(increaseContrast: display.increaseContrast),
+                shape.stroke(palette.line(increaseContrast: display.increaseContrast),
                              lineWidth: 2 * PixelGrid.width(pixels: display.increaseContrast ? 2 : 1, scale: displayScale))
                     .transition(.opacity)
             }
@@ -54,24 +55,17 @@ struct NotchRootView: View {
         .onTapGesture { model.onTap?() }
         .contextMenu { PanelMenu(host: host) }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .environmentObject(theme)
-        .preferredColorScheme(theme.colorScheme)
+        .environmentObject(palette)
+        // Dark whatever macOS uses elsewhere: the panel is part of the camera
+        // housing. Only this view's colours resolve dark; the window and the
+        // rest of the app keep the system's appearance.
+        .environment(\.colorScheme, palette.notchScheme)
     }
 
-    /// Closed, all black like the camera housing (the pill too, so the
-    /// wings look the same everywhere). Open, the theme's panel fades in over
-    /// it, and only the piece under the camera stays black.
+    /// Black, closed and open, like the camera housing it grows out of
+    /// (the pill too, so the wings look the same everywhere).
     private func surface(open: Bool) -> some View {
-        ZStack(alignment: .top) {
-            Color.black
-            theme.panel.opacity(open ? 1 : 0)
-            if model.style == .notch {
-                NotchShape(topRadius: 0, bottomRadius: NotchMetrics.collapsedBottomRadius)
-                    .fill(Color.black)
-                    .frame(width: model.cameraWidth, height: model.bandHeight)
-                    .opacity(open ? 1 : 0)
-            }
-        }
+        palette.panel
     }
 }
 
@@ -81,7 +75,7 @@ struct PanelMenu: View {
     var body: some View {
         Button("Settings…") { host.openSettings?() }
         Divider()
-        Button("Reload widgets and theme") { host.reloadEverything() }
+        Button("Reload Widgets") { host.reloadEverything() }
         Button("Open widgets folder") { host.user.openFolder() }
         Button("Open the log") { NSWorkspace.shared.open(Log.file) }
         Divider()
@@ -94,7 +88,7 @@ struct ExpandedPanel: View {
     @ObservedObject var model: NotchModel
     @ObservedObject var host: PanelHost
     @ObservedObject var user: UserWidgets
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     @ObservedObject private var display = DisplayOptions.shared
     @Environment(\.displayScale) private var displayScale
 
@@ -110,7 +104,7 @@ struct ExpandedPanel: View {
                     ForEach(Array(sections.enumerated()), id: \.offset) { index, widget in
                         if index > 0 {
                             Rectangle()
-                                .fill(theme.line(increaseContrast: display.increaseContrast))
+                                .fill(palette.line(increaseContrast: display.increaseContrast))
                                 .frame(width: PixelGrid.hairline(scale: displayScale))
                                 .padding(.horizontal, 12)
                         }
@@ -148,7 +142,7 @@ struct ExpandedPanel: View {
                 if host.showsDate {
                     Text(Self.dateText(Date()))
                         .font(TypeScale.captionEmphasis)
-                        .foregroundStyle(theme.muted)
+                        .foregroundStyle(palette.muted)
                         .lineLimit(1)
                 } else {
                     Color.clear

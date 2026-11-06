@@ -8,7 +8,7 @@
 GRAND_LINE_LINK="${GRAND_LINE_LINK:-$HOME/.grand-line}"
 GRAND_LINE_BIN="$GRAND_LINE_LINK/bin"
 GRAND_LINE_BUILD="$GRAND_LINE_LINK/.build"        # compiled helpers (tools/*.swift)
-GRAND_LINE_STATE="$HOME/.local/state/grand-line"  # remembered theme, ArtCraft versions
+GRAND_LINE_STATE="$HOME/.local/state/grand-line"  # migrations done, ArtCraft versions
 GRAND_LINE_LOGS="$HOME/Library/Logs/grand-line"
 
 SCREENSHOTS_DIR="$HOME/Pictures/Screenshots"

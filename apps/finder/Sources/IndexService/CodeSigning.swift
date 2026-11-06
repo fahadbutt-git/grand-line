@@ -75,7 +75,7 @@ public enum CodeSigning {
     public static func trustWarning(_ signer: Signer?) -> String? {
         guard trust(signer) == .sameUserOnly else { return nil }
         let how = signer == nil ? "unsigned" : "signed ad hoc"
-        return "The index service is \(how): it accepts any program of this user that names itself as Nexus, Sight or Iceberg. Run: update (it signs the apps with this Mac's own identity)"
+        return "The index service is \(how): it accepts any program of this user that names itself as Sight or Iceberg. Run: update (it signs the apps with this Mac's own identity)"
     }
 
     /// How this program is signed, read once.

@@ -24,20 +24,15 @@ public struct IndexLocations: Sendable, Equatable {
         URL(fileURLWithPath: home).appendingPathComponent("Library/Application Support/Sight/names.index")
     }
 
-    /// The snapshot Nexus kept before the service (AppPaths.nameIndex).
-    public var nexusSnapshot: URL {
-        URL(fileURLWithPath: home).appendingPathComponent("Library/Application Support/Nexus/name-index.snapshot")
-    }
-
     /// The one root the shared index covers: the home folder, as a real path.
     public var roots: [String] { [FolderWatcher.realPath(home)] }
 }
 
 /// Which saved index to start from: the service's own, else the best of what
-/// Sight and Nexus saved before there was a service, so nothing is walked again.
+/// Sight saved before there was a service, so nothing is walked again.
 public enum SnapshotAdoption {
     public enum Origin: String, Sendable, Equatable {
-        case own, sight, nexus
+        case own, sight
     }
 
     public struct Candidate: Sendable, Equatable {
@@ -80,7 +75,6 @@ public enum SnapshotAdoption {
         let files: [(URL, Origin)] = [
             (locations.snapshot, .own),
             (locations.sightSnapshot, .sight),
-            (locations.nexusSnapshot, .nexus),
         ]
         var found: [Candidate] = []
         for (url, origin) in files {

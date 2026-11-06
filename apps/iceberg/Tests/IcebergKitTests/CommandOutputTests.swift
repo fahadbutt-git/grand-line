@@ -18,14 +18,14 @@ final class CommandOutputTests: XCTestCase {
 
     func testJSONOutput() {
         let d = CommandOutputParser.parse(#"{"text": "3 new", "icon": "tray", "color": "highlight"}"#)
-        XCTAssertEqual(d, WidgetDisplay(text: "3 new", icon: "tray", color: .theme(.highlight)))
+        XCTAssertEqual(d, WidgetDisplay(text: "3 new", icon: "tray", color: .named(.highlight)))
     }
 
     func testJSONNumbersAndAliases() {
         XCTAssertEqual(CommandOutputParser.parse(#"{"text": 42}"#).text, "42")
         XCTAssertEqual(CommandOutputParser.parse(#"{"text": 4.5}"#).text, "4.5")
         XCTAssertEqual(CommandOutputParser.parse(#"{"label": "x"}"#).text, "x")
-        XCTAssertEqual(CommandOutputParser.parse(#"{"text": "a", "color": "warning"}"#).color, .theme(.yellow))
+        XCTAssertEqual(CommandOutputParser.parse(#"{"text": "a", "color": "warning"}"#).color, .named(.yellow))
         XCTAssertEqual(CommandOutputParser.parse(##"{"text": "a", "color": "#ff0000"}"##).color, .hex(RGB(red: 1, green: 0, blue: 0)))
         XCTAssertNil(CommandOutputParser.parse(#"{"text": "a", "color": "sparkly"}"#).color)
         XCTAssertNil(CommandOutputParser.parse(#"{"text": "a", "icon": "  "}"#).icon)
@@ -69,8 +69,8 @@ final class CommandOutputTests: XCTestCase {
     }
 
     func testColorNames() {
-        XCTAssertEqual(WidgetColor.parse("RED"), .theme(.red))
-        XCTAssertEqual(WidgetColor.parse("muted"), .theme(.muted))
+        XCTAssertEqual(WidgetColor.parse("RED"), .named(.red))
+        XCTAssertEqual(WidgetColor.parse("muted"), .named(.muted))
         XCTAssertEqual(WidgetColor.parse("fff"), .hex(RGB(red: 1, green: 1, blue: 1)))
         XCTAssertNil(WidgetColor.parse("#12345"))
     }

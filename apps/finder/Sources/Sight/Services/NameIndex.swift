@@ -4,7 +4,7 @@ import IndexService
 
 /// The name index of the home folder (without ~/Library, but with Google Drive
 /// in ~/Library/CloudStorage). Sight no longer keeps one of its own: it asks the
-/// Grand Line Index service, which Nexus shares, and which is already current
+/// Grand Line Index service, which is already current
 /// when the panel opens. While the service is out of reach, answers come from a
 /// copy read from the service's snapshot (see SharedIndexClient).
 final class NameIndex: IndexStatusProviding, @unchecked Sendable {

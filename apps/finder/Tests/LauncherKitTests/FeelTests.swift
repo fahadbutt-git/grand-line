@@ -122,10 +122,10 @@ final class FeelTests: XCTestCase {
     func testTheFooterSaysWhatReturnDoesThenTheActions() {
         let row = FileResults.result(FileHit(path: "/Users/me/notes.txt", isFolder: false), paths: GrandLinePaths(home: "/Users/me"))
         let hints = FooterHints.hints(for: row, confirming: nil)
-        XCTAssertEqual(hints.map(\.label), ["Open", "Show in Nexus", "Actions"])
+        XCTAssertEqual(hints.map(\.label), ["Open", "Show in Finder", "Actions"])
         XCTAssertEqual(hints.map(\.keys), ["↵", "⌘↵", "⌘K"])
         // Command held: the first hint is what Command+Return does.
-        XCTAssertEqual(FooterHints.hints(for: row, confirming: nil, held: .command).first, .init(keys: "⌘↵", label: "Show in Nexus"))
+        XCTAssertEqual(FooterHints.hints(for: row, confirming: nil, held: .command).first, .init(keys: "⌘↵", label: "Show in Finder"))
         XCTAssertEqual(FooterHints.hints(for: row, confirming: nil, held: .option).first, .init(keys: "⌥↵", label: "Copy path"))
         XCTAssertEqual(ModifierPreview.subtitle(for: row, held: .option), "⌥↵ Copy path")
         XCTAssertNil(ModifierPreview.subtitle(for: row, held: .none))

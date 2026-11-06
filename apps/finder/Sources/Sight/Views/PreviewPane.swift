@@ -1,12 +1,10 @@
 import LauncherKit
 import Quartz
 import SwiftUI
-import ThemeKit
 
 /// Quick Look for the selected file, or the text of a definition or snippet.
 struct PreviewPane: View {
     let row: LaunchResult
-    let theme: Theme
 
     var body: some View {
         if let path = row.previewPath {
@@ -15,12 +13,11 @@ struct PreviewPane: View {
             ScrollView {
                 Text(row.detail ?? "")
                     .font(Typo.row)
-                    .foregroundStyle(Color(theme.text))
+                    .foregroundStyle(.primary)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
             }
-            .background(Color(theme.panel))
         }
     }
 }

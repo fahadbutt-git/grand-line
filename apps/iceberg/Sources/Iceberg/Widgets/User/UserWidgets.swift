@@ -37,7 +37,7 @@ final class UserWidgets: ObservableObject {
     @Published private(set) var lastReload: Date?
 
     private let paths: IcebergPaths
-    private let theme: ThemeStore
+    private let palette: SystemPalette
     private let scheduler = RefreshScheduler()
     private let pool = CommandPool(maxConcurrent: 4)
     private var maxConcurrent = 4
@@ -51,9 +51,9 @@ final class UserWidgets: ObservableObject {
     /// The panel's names, in order (`PanelLayout.enabled`).
     private var selection: [String] = []
 
-    init(paths: IcebergPaths, theme: ThemeStore) {
+    init(paths: IcebergPaths, palette: SystemPalette) {
         self.paths = paths
-        self.theme = theme
+        self.palette = palette
         installExamplesIfFirstRun()
         gate.lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
         scheduler.isPaused = gate.isPaused
@@ -300,7 +300,7 @@ final class UserWidgets: ObservableObject {
         for id in plan.waiting {
             stats[id, default: WidgetStats()].recordSkip()
             displays[id] = WidgetDisplay(text: "Waiting: \(maxConcurrent) streams already run", icon: "pause.circle",
-                                         color: .theme(.muted), failed: true)
+                                         color: .named(.muted), failed: true)
         }
         waitingStreams = Set(plan.waiting)
         for id in plan.start {
@@ -370,7 +370,7 @@ final class UserWidgets: ObservableObject {
         Log.info("widget \(id): \(exit.reason); starting it again in \(Int(FailureBackoff.streamDelay(afterFailures: failures))) s")
         if exit.lines == 0 || exit.launchError != nil {
             displays[id] = WidgetDisplay(text: CommandOutputParser.clean(exit.reason), icon: "exclamationmark.triangle",
-                                         color: .theme(.muted), failed: true)
+                                         color: .named(.muted), failed: true)
         }
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
@@ -442,8 +442,7 @@ final class UserWidgets: ObservableObject {
         [
             "GRAND_LINE_ICEBERG_WIDGET": w.id,
             "GRAND_LINE_ICEBERG_WIDGETS_DIR": paths.widgetsFolder.path,
-            "GRAND_LINE_ICEBERG_THEME": theme.theme.name,
-            "GRAND_LINE_ICEBERG_MODE": theme.theme.mode.rawValue,
+            "GRAND_LINE_ICEBERG_MODE": palette.systemIsDark ? "dark" : "light",
         ]
     }
 
@@ -484,7 +483,7 @@ private extension String {
 /// The chips, three to a row, scrolling past four rows.
 struct UserWidgetGrid: View {
     @ObservedObject var model: UserWidgets
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
 
     var body: some View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: NotchMetrics.chipSpacing), count: NotchMetrics.chipColumns)
@@ -505,7 +504,7 @@ struct UserWidgetGrid: View {
 }
 
 private struct UserWidgetChip: View {
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     @ObservedObject private var options = DisplayOptions.shared
     @Environment(\.displayScale) private var displayScale
     let widget: WidgetConfig
@@ -515,7 +514,7 @@ private struct UserWidgetChip: View {
 
     var body: some View {
         let output = display
-        let tint = theme.color(output?.color)
+        let tint = palette.color(output?.color)
         let shown = output.map { ChipText.shown($0.text) }
         let quiet = output?.failed == true || shown?.needsSetup == true
         let value = shown?.text ?? (busy ? "…" : "")
@@ -523,17 +522,17 @@ private struct UserWidgetChip: View {
             HStack(spacing: 6) {
                 Image(systemName: Self.symbol(output?.icon ?? widget.icon))
                     .font(SymbolScale.row)
-                    .foregroundStyle(tint ?? theme.muted)
+                    .foregroundStyle(tint ?? palette.muted)
                     .frame(width: 14)
                 Text(widget.title)
                     .font(TypeScale.caption)
-                    .foregroundStyle(theme.muted)
+                    .foregroundStyle(palette.muted)
                     .lineLimit(1)
                     .layoutPriority(0)
                 Spacer(minLength: 4)
                 Text(value)
                     .font(TypeScale.value)
-                    .foregroundStyle(quiet ? theme.muted : (tint ?? theme.foreground))
+                    .foregroundStyle(quiet ? palette.muted : (tint ?? palette.foreground))
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .layoutPriority(1)
@@ -548,7 +547,7 @@ private struct UserWidgetChip: View {
                     GeometryReader { geo in
                         let width = PixelGrid.align(max(2, (geo.size.width - 12) * p / 100), scale: displayScale)
                         Capsule()
-                            .fill(tint ?? theme.highlight)
+                            .fill(tint ?? palette.highlight)
                             .frame(width: width, height: 2)
                             .offset(x: 6, y: geo.size.height - 3)
                             .animation(Motion.content(reduceMotion: options.reduceMotion), value: p)

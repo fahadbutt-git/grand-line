@@ -286,15 +286,11 @@ final class SafetyTests: XCTestCase {
         XCTAssertEqual(MenuProvider.settingDuplicated(by: try menuRow("Toggle/Microphone muted\ttoggle mic")), "setting.micmute")
         XCTAssertEqual(MenuProvider.settingDuplicated(by: try menuRow("System/Shut down\tpower shutdown")), "setting.shutdown")
         XCTAssertNil(MenuProvider.settingDuplicated(by: try menuRow("Toggle/Docker\ttoggle docker")))
-        XCTAssertNil(MenuProvider.settingDuplicated(by: try menuRow("Style/Graphite\ttheme set graphite")))
     }
 
-    func testThemeModeAndPrefixedCommandsAreDarkModesCopies() throws {
-        XCTAssertEqual(MenuProvider.settingDuplicated(by: try menuRow("Style/Dark or light variant\ttheme mode toggle")), "setting.darkmode")
-        XCTAssertEqual(MenuProvider.settingDuplicated(by: try menuRow("Mine/Dark\t$HOME/.grand-line/bin/theme mode dark")), "setting.darkmode")
+    func testPrefixedCommandsAreDarkModesCopies() throws {
         XCTAssertEqual(MenuProvider.settingDuplicated(by: try menuRow("Mine/Dark\tGRAND_LINE_QUIET=1 exec \"$HOME/.grand-line/bin/toggle\" dark")),
                        "setting.darkmode")
-        XCTAssertNil(MenuProvider.settingDuplicated(by: try menuRow("Style/Pick a theme\ttheme pick")))
         XCTAssertNil(MenuProvider.settingDuplicated(by: try menuRow("Mine/Modes\tmode dark")))
     }
 

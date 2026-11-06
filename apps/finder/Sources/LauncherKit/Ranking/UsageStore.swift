@@ -307,6 +307,19 @@ public final class UsageStore: @unchecked Sendable {
         for (key, entry) in data.abbreviations where entry.id == id { data.abbreviations[key] = nil }
     }
 
+    /// Forgets every remembered row (recents, favourites and what was
+    /// learned for them) that `isGone` says can no longer work, such as a row
+    /// whose app was removed. Returns the ids forgotten.
+    @discardableResult
+    public func forgetRows(where isGone: (LaunchResult) -> Bool) -> [String] {
+        lock.lock()
+        let snapshots = data.snapshots
+        lock.unlock()
+        let gone = snapshots.filter { isGone($0.value) }.map(\.key).sorted()
+        for id in gone { forget(id) }
+        return gone
+    }
+
     /// Whether anything was learned or forgotten since the last save.
     public var hasUnsavedChanges: Bool {
         lock.lock()

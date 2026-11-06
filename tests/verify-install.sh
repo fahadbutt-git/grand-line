@@ -104,7 +104,6 @@ for list in "$ROOT"/apps/*/apps.tsv; do
 done
 state="$HOME/.local/state/grand-line"
 [[ -z "$(defaults read -g NSFileViewer 2>/dev/null)" ]] && pass "Show in Finder opens Finder" || fail "Show in Finder opens $(defaults read -g NSFileViewer 2>/dev/null)"
-[[ ! -d /Applications/Nexus.app ]] && pass "Nexus is not installed" || fail "Nexus is still installed"
 if [[ -d "/Applications/Sight.app" ]]; then
   spotlight="$(defaults read com.apple.symbolichotkeys AppleSymbolicHotKeys 2>/dev/null | awk '/^ *64 = /,/};/' | sed -nE 's/^ *enabled = ([01]);/\1/p' | head -1)"
   if [[ "$(cat "$state/takeover-search" 2>/dev/null || echo on)" == on ]]; then

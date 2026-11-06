@@ -1,10 +1,10 @@
+import AppKit
 import SwiftUI
-import ThemeKit
 
-/// A group of rows under a heading, on a raised card with hairlines between
-/// rows, in the theme's colours (DESIGN.md: hairline dividers, no shadows).
+/// A group of rows under a heading, in the grouped style of System Settings:
+/// a rounded inset card with separators between rows, in the system's own
+/// colours, so it follows Light and Dark and Increase Contrast by itself.
 public struct SettingsSection<Content: View>: View {
-    @EnvironmentObject private var theme: SettingsTheme
     let title: String
     let note: String?
     let content: Content
@@ -16,33 +16,40 @@ public struct SettingsSection<Content: View>: View {
     }
 
     public var body: some View {
+        let shape = RoundedRectangle(cornerRadius: SettingsMetrics.cardRadius, style: .continuous)
         VStack(alignment: .leading, spacing: 6) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(theme.strong)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .accessibilityAddTraits(.isHeader)
                 if let note {
                     Text(note)
-                        .font(.system(size: 11))
-                        .foregroundStyle(theme.dim)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .padding(.horizontal, 2)
-            // Every row draws a hairline above itself; the first one is clipped away.
+            // Every row draws a separator above itself; the first one is clipped away.
             VStack(alignment: .leading, spacing: 0) { content }
                 .padding(.top, -1)
-                .clipped()
-                .background(RoundedRectangle(cornerRadius: 8).fill(theme.panel))
-                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(theme.hairline, lineWidth: 1))
+                .clipShape(shape)
+                .background(shape.fill(.fill.quinary))
+                .overlay(shape.strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5))
         }
     }
+}
+
+/// System Settings' measurements for the grouped cards.
+public enum SettingsMetrics {
+    public static let cardRadius: CGFloat = 10
+    public static let rowPadding: CGFloat = 10
 }
 
 /// One line of a section: a title and an optional line of detail on the left,
 /// the control on the right.
 public struct SettingsRow<Control: View>: View {
-    @EnvironmentObject private var theme: SettingsTheme
     let title: String
     let detail: String?
     let symbol: String?
@@ -59,29 +66,35 @@ public struct SettingsRow<Control: View>: View {
         HStack(alignment: .center, spacing: 10) {
             if let symbol {
                 Image(systemName: symbol)
-                    .font(.system(size: 13))
-                    .foregroundStyle(theme.dim)
+                    .font(.body)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.secondary)
                     .frame(width: 18)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 13))
-                    .foregroundStyle(theme.text)
+                    .font(.body)
+                    .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                 if let detail {
                     Text(detail)
-                        .font(.system(size: 11))
-                        .foregroundStyle(theme.dim)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             Spacer(minLength: 12)
             control
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, SettingsMetrics.rowPadding)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
-        .overlay(alignment: .top) { Rectangle().fill(theme.hairline).frame(height: 1) }
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor))
+                .frame(height: 0.5)
+                .padding(.horizontal, SettingsMetrics.rowPadding)
+        }
     }
 }
 
@@ -170,7 +183,7 @@ public struct ReorderButtons: View {
 
     private func arrow(_ symbol: String, enabled: Bool, help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol).font(.system(size: 11, weight: .semibold)).frame(width: 18, height: 18)
+            Image(systemName: symbol).font(.subheadline.weight(.semibold)).frame(width: 18, height: 18)
         }
         .buttonStyle(.borderless)
         .disabled(!enabled)
@@ -181,7 +194,6 @@ public struct ReorderButtons: View {
 
 /// A short line under a control: a result, or why something is off.
 public struct SettingsNote: View {
-    @EnvironmentObject private var theme: SettingsTheme
     let text: String
     let symbol: String?
 
@@ -192,12 +204,12 @@ public struct SettingsNote: View {
 
     public var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            if let symbol { Image(systemName: symbol).foregroundStyle(theme.dim) }
+            if let symbol { Image(systemName: symbol) }
             Text(text)
-                .foregroundStyle(theme.dim)
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
         }
-        .font(.system(size: 11))
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
     }
 }

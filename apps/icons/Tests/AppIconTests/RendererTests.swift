@@ -6,9 +6,9 @@ import AppKit
 final class RendererTests: XCTestCase {
     func testEverySizeIsDrawn() {
         for glyph in IconGlyph.allCases {
-            let image = IconRenderer.image(glyph, theme: IconTheme.bundled)
+            let image = IconRenderer.image(glyph)
             XCTAssertEqual(image.representations.count, IconRenderer.sizes.count)
-            let big = IconRenderer.cgImage(glyph, palette: IconTheme.bundled.palette(for: glyph), pixels: 1024)
+            let big = IconRenderer.cgImage(glyph, palette: .bundled(for: glyph), pixels: 1024)
             XCTAssertEqual(big?.width, 1024)
         }
         XCTAssertTrue(IconRenderer.templateImage(.iceberg).isTemplate)

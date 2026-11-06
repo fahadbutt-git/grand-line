@@ -1,25 +1,28 @@
 import Foundation
 
-/// A colour a widget asks for. Widgets name theme colours so they follow the
-/// theme; a hex colour is accepted but DESIGN.md prefers names.
+/// A colour a widget asks for. Widgets name system colours, so they follow
+/// Light and Dark and the accent colour; a hex colour is accepted but
+/// DESIGN.md prefers names.
 public enum WidgetColor: Equatable, Sendable {
-    case theme(ThemeColorName)
+    case named(ColorName)
     case hex(RGB)
 
     public static func parse(_ raw: String) -> WidgetColor? {
         let s = raw.trimmingCharacters(in: .whitespaces).lowercased()
-        if let name = ThemeColorName(rawValue: s) { return .theme(name) }
-        if let alias = ThemeColorName.aliases[s] { return .theme(alias) }
+        if let name = ColorName(rawValue: s) { return .named(name) }
+        if let alias = ColorName.aliases[s] { return .named(alias) }
         if let rgb = RGB(hex: s) { return .hex(rgb) }
         return nil
     }
 }
 
-/// The theme colours a widget may name.
-public enum ThemeColorName: String, Sendable, CaseIterable {
+/// The system colours a widget may name: text, secondary text, the accent
+/// colour (highlight and accent), and macOS's red, green, yellow, blue,
+/// purple (magenta) and cyan.
+public enum ColorName: String, Sendable, CaseIterable {
     case foreground, muted, highlight, accent, red, green, yellow, blue, magenta, cyan
 
-    static let aliases: [String: ThemeColorName] = [
+    static let aliases: [String: ColorName] = [
         "fg": .foreground, "text": .foreground, "normal": .foreground, "default": .foreground,
         "dim": .muted, "grey": .muted, "gray": .muted, "secondary": .muted,
         "focus": .highlight, "ok": .green, "good": .green, "warn": .yellow, "warning": .yellow,
@@ -65,9 +68,9 @@ public struct WidgetDisplay: Equatable, Sendable {
 ///
 /// - Output starting with `{` is read as one JSON object:
 ///   `{"text": "...", "alt": "...", "tooltip": "...", "class": "...", "percentage": 50}`,
-///   plus Iceberg's own `icon` (an SF Symbol name) and `color` (a theme colour
+///   plus Iceberg's own `icon` (an SF Symbol name) and `color` (a system colour
 ///   name). Only `text` is needed; a number is shown as written. A `class`
-///   that names a theme colour ("warning", "critical") colours the text when
+///   that names a colour ("warning", "critical") colours the text when
 ///   `color` is not given.
 /// - Anything else shows its first non-empty line (Waybar's plain-text form).
 /// - Colour codes (ANSI escapes) are removed and the text is cut to `maxLength`.
@@ -79,10 +82,10 @@ public enum CommandOutputParser {
 
     public static func display(for result: CommandResult) -> WidgetDisplay {
         if result.timedOut {
-            return WidgetDisplay(text: "No answer after \(formatSeconds(result.timeout))", icon: "clock.badge.exclamationmark", color: .theme(.muted), failed: true)
+            return WidgetDisplay(text: "No answer after \(formatSeconds(result.timeout))", icon: "clock.badge.exclamationmark", color: .named(.muted), failed: true)
         }
         if let launchError = result.launchError {
-            return WidgetDisplay(text: launchError, icon: "exclamationmark.triangle", color: .theme(.muted), failed: true)
+            return WidgetDisplay(text: launchError, icon: "exclamationmark.triangle", color: .named(.muted), failed: true)
         }
         var shown = parse(result.stdout)
         let succeeded = result.exitCode == 0
@@ -90,7 +93,7 @@ public enum CommandOutputParser {
             if shown.text.isEmpty {
                 shown.text = failureReason(result)
                 shown.icon = shown.icon ?? "exclamationmark.triangle"
-                shown.color = shown.color ?? .theme(.muted)
+                shown.color = shown.color ?? .named(.muted)
             }
             shown.failed = true
         }
@@ -149,8 +152,8 @@ public enum CommandOutputParser {
         var color = object["color"]?.stringValue.flatMap(WidgetColor.parse)
         if color == nil {
             for c in classes {
-                if let name = ThemeColorName(rawValue: c.lowercased()) ?? ThemeColorName.aliases[c.lowercased()] {
-                    color = .theme(name)
+                if let name = ColorName(rawValue: c.lowercased()) ?? ColorName.aliases[c.lowercased()] {
+                    color = .named(name)
                     break
                 }
             }

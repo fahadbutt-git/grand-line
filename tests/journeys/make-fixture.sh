@@ -2,7 +2,7 @@
 # Makes a home-like folder for the journeys: the usual top-level folders, files
 # of many kinds with names search and sort can work on, a Trash with items in
 # it, a fake Google Drive, app-cache clutter that search must leave out, and
-# the settings the notch app and the themes read.
+# the settings the notch app reads.
 #
 #   bash tests/journeys/make-fixture.sh DIR
 #   bash tests/journeys/make-fixture.sh --files 3000 DIR
@@ -21,8 +21,6 @@ if [ "${1:-}" = "--files" ]; then
 fi
 case "$extra_files" in *[!0-9]*|"") echo "make-fixture.sh: --files needs a number" >&2; exit 2 ;; esac
 dest="${1:?usage: make-fixture.sh [--files N] DIR}"
-here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-repo="$(cd "$here/../.." && pwd)"
 
 case "$dest" in
   /|"$HOME"|"$HOME/") echo "make-fixture.sh: refusing to use $dest" >&2; exit 1 ;;
@@ -146,10 +144,8 @@ file "Library/Application Support/com.example.app/conj-state.json"
 file ".cache/conj-junk.tmp"
 file "Documents/Projects/Conj Flap/node_modules/conj-module/index.js"
 
-# Theme and notch app settings, as setup leaves them.
+# The notch app's settings, as setup leaves them.
 mkdir -p .local/state/grand-line .grand-line/config .config/grand-line/iceberg/widgets
-cp -R "$repo/config/themes" .grand-line/config/themes
-printf 'graphite\n' > .local/state/grand-line/theme
 # The panel list names what shows, in order: built-in items by id and script
 # widgets by file name (journey.toml is "journey"). Only the battery and the
 # Journey widget, so the panel shows exactly these and nothing asks for

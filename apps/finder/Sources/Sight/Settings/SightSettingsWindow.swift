@@ -4,7 +4,6 @@ import LaunchKit
 import LauncherKit
 import SettingsKit
 import SwiftUI
-import ThemeKit
 
 /// Sight's Settings window (Cmd+, while the search window is in front, the
 /// menu bar item, `sight://settings[/pane]`, and the query "sight settings"):
@@ -15,14 +14,12 @@ final class SightSettingsWindow {
 
     let store: SightPreferencesStore
     private let services: Services
-    private let themes: ThemeStore
     private var controller: SettingsWindowController?
     /// Called as the window comes forward and goes back, to put up the menus.
     var onKeyChange: ((Bool) -> Void)?
 
-    init(services: Services, themes: ThemeStore, store: SightPreferencesStore) {
+    init(services: Services, store: SightPreferencesStore) {
         self.services = services
-        self.themes = themes
         self.store = store
     }
 
@@ -35,17 +32,14 @@ final class SightSettingsWindow {
     }
 
     private func make() -> SettingsWindowController {
-        let theme = SettingsTheme(themes.theme, updates: themes.$theme.eraseToAnyPublisher())
         let store = self.store
         let services = self.services
-        let appearance = AppearanceModel(theme: theme)
-        appearance.onDensityChange = { store.densityChanged($0) }
         let index = IndexStatusModel(provider: { services.names })
         let update = UpdateModel()
         let prefix = Self.idPrefix
         let panes = [
             SettingsPane("general", title: "General", symbol: "gearshape") {
-                SightGeneralPane(store: store, theme: theme)
+                SightGeneralPane(store: store)
             },
             SettingsPane("sources", title: "Sources", symbol: "square.stack.3d.up") {
                 SightSourcesPane(store: store)
@@ -57,13 +51,13 @@ final class SightSettingsWindow {
                 SightWebPane(store: store)
             },
             SettingsPane("appearance", title: "Appearance", symbol: "paintpalette") {
-                AppearancePane(model: appearance, idPrefix: prefix)
+                SightAppearancePane(store: store, idPrefix: prefix)
             },
             SettingsPane("advanced", title: "Advanced", symbol: "slider.horizontal.3") {
                 SightAdvancedPane(store: store, update: update, paths: services.paths)
             },
         ]
-        let controller = SettingsWindowController(appName: "Sight", idPrefix: prefix, theme: theme, panes: panes)
+        let controller = SettingsWindowController(appName: "Sight", idPrefix: prefix, panes: panes)
         controller.onKeyChange = { [weak self] key in self?.onKeyChange?(key) }
         return controller
     }
@@ -75,7 +69,6 @@ private func settingID(_ suffix: String) -> String { "sight.settings." + suffix 
 
 struct SightGeneralPane: View {
     @ObservedObject var store: SightPreferencesStore
-    @ObservedObject var theme: SettingsTheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -84,8 +77,6 @@ struct SightGeneralPane: View {
                     HStack(spacing: 8) {
                         HotkeyRecorder(
                             hotkey: store.hotkey,
-                            textColor: NSColor(theme.theme.text), dimColor: NSColor(theme.theme.dim),
-                            fieldColor: NSColor(theme.theme.field), accentColor: NSColor(theme.theme.highlight),
                             onRecord: { store.setHotkey($0) },
                             onRecording: { store.onRecording?($0) }
                         )
@@ -121,6 +112,17 @@ struct SightGeneralPane: View {
 
     private func binding(_ key: WritableKeyPath<SightPreferences, Bool>) -> Binding<Bool> {
         Binding(get: { store.current[keyPath: key] }, set: { value in store.update { $0[keyPath: key] = value } })
+    }
+}
+
+// MARK: Appearance
+
+struct SightAppearancePane: View {
+    @ObservedObject var store: SightPreferencesStore
+    let idPrefix: String
+
+    var body: some View {
+        AppearancePane(density: store.density, idPrefix: idPrefix) { store.setDensity($0) }
     }
 }
 
@@ -178,17 +180,11 @@ struct SightSearchPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            SettingsSection("Files", note: "Sight finds names in the home folder through the index Nexus shares. Nexus's Settings set where searches start and rebuild the index.") {
+            SettingsSection("Files", note: "Sight finds names in the home folder through the Grand Line index, and contents through Spotlight.") {
                 SettingsRow("Folders", detail: "~ (the home folder), with ~/Library/CloudStorage for Google Drive")
                 SettingsRow("Left out", detail: exclusions)
-                SettingsRow("Index settings") {
-                    Button("Open Nexus Settings › Search") {
-                        if let url = URL(string: "nexus://settings/search") { NSWorkspace.shared.open(url) }
-                    }
-                    .accessibilityIdentifier(settingID("search.openNexus"))
-                }
             }
-            IndexStatusSection(model: index, idPrefix: SightSettingsWindow.idPrefix, allowsRebuild: false, home: home)
+            IndexStatusSection(model: index, idPrefix: SightSettingsWindow.idPrefix, home: home)
             SettingsSection("Rows per section", note: "How many results each section shows. A prefix shows eight times as many.") {
                 ForEach(ResultLayout.adjustable, id: \.self) { section in
                     let count = store.current.limits[section] ?? section.limit
@@ -358,7 +354,7 @@ struct SightAdvancedPane: View {
                 Text("usage.json goes to the Trash. Rankings, recents and favourites start fresh.")
             }
             UpdateSection(model: update, idPrefix: SightSettingsWindow.idPrefix,
-                          note: "Rebuilds Sight, Nexus and Iceberg from the package and reopens them.")
+                          note: "Rebuilds Sight and Iceberg from the package and reopens them.")
         }
     }
 }

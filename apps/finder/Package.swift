@@ -8,18 +8,14 @@ let package = Package(
         .library(name: "QueryKit", targets: ["QueryKit"]),
         .library(name: "IndexKit", targets: ["IndexKit"]),
         .library(name: "IndexService", targets: ["IndexService"]),
-        .library(name: "FileKit", targets: ["FileKit"]),
-        .library(name: "ArchiveKit", targets: ["ArchiveKit"]),
-        .library(name: "ThemeKit", targets: ["ThemeKit"]),
         .library(name: "LaunchKit", targets: ["LaunchKit"]),
-        .library(name: "BrowserKit", targets: ["BrowserKit"]),
         .library(name: "LauncherKit", targets: ["LauncherKit"]),
         .executable(name: "Sight", targets: ["Sight"]),
         // The background agent Sight searches through (Grand Line Index.app).
         .executable(name: "GrandLineIndex", targets: ["GrandLineIndex"]),
     ],
     dependencies: [
-        // The app icons, shared with Iceberg.
+        // AppRuntime (log, hang watchdog, crash guard), shared with Iceberg.
         .package(path: "../icons"),
     ],
     targets: [
@@ -39,26 +35,14 @@ let package = Package(
             swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [.linkedFramework("ServiceManagement")]
         ),
-        .target(name: "FileKit", dependencies: ["IndexKit"]),
-        .target(name: "ArchiveKit"),
-        .target(name: "ThemeKit", dependencies: ["IndexKit", .product(name: "AppIcon", package: "icons")]),
         .target(name: "LaunchKit"),
-        // The Settings window both apps share: its layout, the Appearance pane and Update now.
+        // Sight's Settings window: its layout, its controls, the index status and Update now.
         .target(
             name: "SettingsKit",
-            dependencies: ["ThemeKit", "IndexKit", .product(name: "AppIcon", package: "icons")],
+            dependencies: ["IndexKit"],
             swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [.linkedFramework("AppKit"), .linkedFramework("SwiftUI")]
         ),
-        .target(
-            name: "BrowserKit",
-            dependencies: ["QueryKit", "IndexKit", "FileKit", "ArchiveKit", "LaunchKit"],
-            swiftSettings: [.swiftLanguageMode(.v5)],
-            // SystemPasteboard: files on NSPasteboard.
-            linkerSettings: [.linkedFramework("AppKit")]
-        ),
-        // The Nexus file browser is no longer built or installed. Its sources
-        // stay in Sources/Nexus, outside the build.
         .target(
             name: "LauncherKit",
             dependencies: ["IndexKit", "QueryKit"],
@@ -66,8 +50,8 @@ let package = Package(
         ),
         .executableTarget(
             name: "Sight",
-            dependencies: ["LauncherKit", "IndexKit", "IndexService", "QueryKit", "ThemeKit", "LaunchKit", "SettingsKit",
-                           .product(name: "AppIcon", package: "icons"), .product(name: "AppRuntime", package: "icons")],
+            dependencies: ["LauncherKit", "IndexKit", "IndexService", "QueryKit", "LaunchKit", "SettingsKit",
+                           .product(name: "AppRuntime", package: "icons")],
             swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [.linkedFramework("AppKit"), .linkedFramework("SwiftUI"), .linkedFramework("Quartz"), .linkedFramework("Carbon"), .linkedFramework("ApplicationServices"), .linkedFramework("CoreServices")]
         ),
@@ -78,15 +62,7 @@ let package = Package(
             dependencies: ["IndexService", "IndexKit"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
-        .testTarget(name: "FileKitTests", dependencies: ["FileKit", "IndexKit"]),
-        .testTarget(name: "ArchiveKitTests", dependencies: ["ArchiveKit"]),
-        .testTarget(name: "ThemeKitTests", dependencies: ["ThemeKit", .product(name: "AppIcon", package: "icons")]),
         .testTarget(name: "LaunchKitTests", dependencies: ["LaunchKit"]),
-        .testTarget(
-            name: "BrowserKitTests",
-            dependencies: ["BrowserKit", "FileKit", "IndexKit", "ArchiveKit", "LaunchKit"],
-            swiftSettings: [.swiftLanguageMode(.v5)]
-        ),
         // The shared runtime pieces (apps/icons, AppRuntime), tested here so CI runs them.
         .testTarget(name: "AppRuntimeTests", dependencies: [.product(name: "AppRuntime", package: "icons")],
                     swiftSettings: [.swiftLanguageMode(.v5)]),

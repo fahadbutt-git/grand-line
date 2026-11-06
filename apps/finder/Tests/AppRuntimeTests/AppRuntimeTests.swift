@@ -138,7 +138,7 @@ final class AppRuntimeTests: XCTestCase {
     // MARK: Busy marker
 
     func testTheBusyMarkerIsThereWhileAnyReasonHolds() throws {
-        let marker = BusyMarker(name: "nexus", home: home)
+        let marker = BusyMarker(name: "worker", home: home)
         marker.set("copy", busy: true)
         marker.set("move", busy: true)
         marker.set("copy", busy: false)

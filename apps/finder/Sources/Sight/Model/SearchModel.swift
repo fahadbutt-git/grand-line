@@ -2,7 +2,6 @@ import AppKit
 import LauncherKit
 import QueryKit
 import SwiftUI
-import ThemeKit
 
 /// The action panel (Command+K): the selected row's actions, the buffer's,
 /// or a list of apps for Open With. Its keys are LauncherKit's ActionPanelModel.
@@ -454,23 +453,24 @@ final class SearchModel: ObservableObject {
 enum Metrics {
     static let width: CGFloat = 720
     static let preview: CGFloat = 340
-    /// A result row: 30 at regular density (Settings, Appearance).
-    static var row: CGFloat = 30
-    static let header: CGFloat = 24
-    static let maxList: CGFloat = 9 * 30 + 3 * 24
+    /// A result row at regular density (Settings, Appearance).
+    static let regularRow: CGFloat = 32
+    static var row: CGFloat = regularRow
+    static let header: CGFloat = 26
+    static let maxList: CGFloat = 9 * regularRow + 3 * header
     /// Space above the first row and below the last, so their highlight clears the dividers.
-    static let listInset: CGFloat = 4
-    /// The field row and the footer.
-    static let field: CGFloat = 44
+    static let listInset: CGFloat = 6
+    /// The field row, as tall as Spotlight's, and the footer.
+    static let field: CGFloat = 52
     static let footer: CGFloat = 30
     /// The preview pane is as tall as the field, a full list and the footer.
     static let previewHeight: CGFloat = field + maxList + listInset * 2 + footer
 
-    /// The window's corners: the theme's RADIUS_WINDOW (10 by default) plus
-    /// 4, as a larger floating surface reads with a larger radius.
-    static func radius(_ theme: Theme) -> CGFloat { CGFloat(theme.tokens.radiusWindow) + 4 }
-    /// The action panel, a smaller surface inside the window.
-    static func panelRadius(_ theme: Theme) -> CGFloat { CGFloat(theme.tokens.radiusWindow) }
-    /// The selection highlight: the theme's RADIUS_CHIP (5 by default) plus 1.
-    static func rowRadius(_ theme: Theme) -> CGFloat { CGFloat(theme.tokens.radiusChip) + 1 }
+    /// The window's corners: Liquid Glass panels are rounder than the
+    /// materials before them.
+    static let radius: CGFloat = Glass.available ? 24 : 14
+    /// The action panel, a menu-like surface inside the window.
+    static let panelRadius: CGFloat = Glass.available ? 14 : 8
+    /// The selection highlight, concentric with the window at its inset.
+    static let rowRadius: CGFloat = Glass.available ? 10 : 6
 }

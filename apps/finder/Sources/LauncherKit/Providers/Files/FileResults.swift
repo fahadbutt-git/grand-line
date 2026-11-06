@@ -25,8 +25,8 @@ public struct FileHit: Sendable, Equatable {
     public var ext: String { (path as NSString).pathExtension.lowercased() }
 }
 
-/// Rows for files, with every file action: open (folders in Nexus), show in
-/// Nexus, Quick Look, open with, copy path or file, move, AirDrop, transcode.
+/// Rows for files, with every file action: open, show in
+/// Finder, Quick Look, open with, copy path or file, move, AirDrop, transcode.
 public enum FileResults {
     /// A file Spotlight found only by its contents ranks in the last tier,
     /// below every file whose name matches.
@@ -110,8 +110,8 @@ public enum FileResults {
     public static func actions(_ hit: FileHit, paths: GrandLinePaths) -> [LaunchAction] {
         let path = hit.path
         var actions: [LaunchAction] = [
-            LaunchAction(hit.isFolder ? "Open in Nexus" : "Open", symbol: "arrow.up.forward", .open(path)),
-            LaunchAction("Show in Nexus", symbol: "folder", .reveal(path)),
+            LaunchAction("Open", symbol: "arrow.up.forward", .open(path)),
+            LaunchAction("Show in Finder", symbol: "folder", .reveal(path)),
             LaunchAction("Quick Look", symbol: "eye", shortcut: KeyShortcut("y"), closesWindow: false, .quickLook(path)),
         ]
         if !hit.isFolder { actions.append(LaunchAction("Open with…", symbol: "arrow.up.right.square", shortcut: KeyShortcut("o"), .openWith(path))) }

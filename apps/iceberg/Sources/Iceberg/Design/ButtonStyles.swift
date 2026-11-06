@@ -26,7 +26,7 @@ struct PanelButtonStyle: ButtonStyle {
 private struct PanelButtonBody: View {
     let configuration: ButtonStyleConfiguration
     let kind: PanelButtonStyle.Kind
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.displayScale) private var displayScale
     @ObservedObject private var display = DisplayOptions.shared
@@ -64,18 +64,18 @@ private struct PanelButtonBody: View {
         switch kind {
         case .icon:
             Circle()
-                .fill(theme.foreground.opacity(pressed ? 0.16 : (active ? 0.09 : 0)))
+                .fill(palette.foreground.opacity(pressed ? 0.16 : (active ? 0.09 : 0)))
                 .padding(-4)
         case .text:
             EmptyView()
         case .plate(let radius):
             let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
             shape
-                .fill(active || pressed ? theme.selection : theme.card)
-                .overlay(shape.fill(theme.foreground.opacity(pressed ? 0.06 : 0)))
+                .fill(active || pressed ? palette.selection : palette.card)
+                .overlay(shape.fill(palette.foreground.opacity(pressed ? 0.06 : 0)))
                 .overlay {
                     if display.increaseContrast {
-                        shape.strokeBorder(theme.strongLine, lineWidth: PixelGrid.hairline(scale: displayScale))
+                        shape.strokeBorder(palette.strongLine, lineWidth: PixelGrid.hairline(scale: displayScale))
                     }
                 }
         }

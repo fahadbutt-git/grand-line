@@ -1,64 +1,17 @@
 import AppKit
 
-/// The Settings windows of the file browser and the launcher: each opens
-/// from its shortcut and its URL, shows every pane from the sidebar, flips one
-/// harmless option and back, and keeps its layout (sidebar on the left, the
-/// pane beside it, nothing clipped).
+/// The launcher's Settings window: it opens from its shortcut and its URL,
+/// shows every pane from the sidebar, flips one harmless option and back,
+/// and keeps its layout (sidebar on the left, the pane beside it, nothing
+/// clipped).
 enum SettingsJourneys {
-    static var all: [Journey] { [files, launcher] }
+    static var all: [Journey] { [launcher] }
 
-    static let filesPanes = ["general", "sidebar", "tags", "views", "search", "appearance", "advanced"]
     static let launcherPanes = ["general", "sources", "search", "web", "appearance", "advanced"]
 
     static func journey(_ name: String, role: String, summary: String, waitsForWindow: Bool, _ steps: [Step]) -> Journey {
         Journey(name, role: role, summary: summary, waitsForWindow: waitsForWindow,
                 window: { ctx in ctx.appSettingsWindow() }, rules: rules, steps: steps)
-    }
-
-    // MARK: Files
-
-    static var files: Journey {
-        var steps: [Step] = [
-            step("open Settings with Cmd+,") { ctx in
-                ctx.activate()
-                _ = try ctx.mainWindow()
-                try ctx.key("cmd+,")
-                try ctx.waitForSettings()
-                if let window = ctx.appSettingsWindow() {
-                    window.move(to: CGPoint(x: 80, y: 80))
-                    window.resize(to: CGSize(width: 780, height: 580))
-                }
-            },
-        ]
-        steps += filesPanes.map { pane in step("pane: \(pane)") { ctx in try ctx.openSettingsPane(pane) } }
-        steps += [
-            step("General: hide the status bar and show it again") { ctx in
-                try ctx.openSettingsPane("general")
-                let before = try ctx.settingValue("general.statusBar")
-                try ctx.pressSetting("general.statusBar")
-                try ctx.wait("the switch to turn \(before == "1" ? "off" : "on")") { (try? ctx.settingValue("general.statusBar")) != before }
-                if before == "1" {
-                    try ctx.wait("the browser window's status bar to go") { ctx.browserStatus() == nil }
-                }
-                try ctx.pressSetting("general.statusBar")
-                try ctx.wait("the switch to return") { (try? ctx.settingValue("general.statusBar")) == before }
-                if before == "1" {
-                    try ctx.wait("the status bar to come back") { ctx.browserStatus() != nil }
-                }
-            },
-            step("nexus://settings/search opens the Search pane") { ctx in
-                try ctx.openSettingsPane("general")
-                guard let scheme = ctx.app.urlScheme else { throw StepSkip("apps.tsv names no URL scheme for \(ctx.app.name)") }
-                try ctx.openApp(["\(scheme)://settings/search"])
-                try ctx.wait("the Search pane") { ctx.settingNode("search.pane") != nil }
-            },
-            step("Cmd+W closes Settings", layout: false) { ctx in
-                try ctx.key("cmd+w")
-                try ctx.wait("the Settings window to close") { ctx.appSettingsWindow() == nil }
-            },
-        ]
-        return journey("files-settings", role: FilesJourneys.role, summary: "Settings opens, shows every pane, flips the status bar and back",
-                       waitsForWindow: true, steps)
     }
 
     // MARK: Launcher
@@ -109,7 +62,7 @@ enum SettingsJourneys {
     static func rules(_ ctx: Ctx, _ snap: Snapshot, _ window: CGRect) -> [String] {
         guard ctx.appSettingsWindow() != nil else { return [] }
         var problems: [String] = []
-        let panes = ctx.app.role == FilesJourneys.role ? filesPanes : launcherPanes
+        let panes = launcherPanes
         var sidebarRight: CGFloat = 0
         for pane in panes {
             guard let entry = snap.identified(ctx.app.id("settings.\(pane)")), let frame = entry.frame else {
@@ -163,11 +116,5 @@ extension Ctx {
     func openSettingsPane(_ pane: String) throws {
         try pressSetting(pane)
         try wait("the \(pane) pane") { self.settingNode("\(pane).pane") != nil }
-    }
-
-    /// The browser window's status bar count, whichever window is in front.
-    func browserStatus() -> Int? {
-        let browser = windows().first { $0.string("AXSubrole") == "AXStandardWindow" && $0.title != "\(app.name) Settings" }
-        return browser.flatMap { FilesJourneys.statusCount(snapshot($0)) }
     }
 }

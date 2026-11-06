@@ -163,7 +163,7 @@ final class CompilerTests: XCTestCase {
         XCTAssertTrue(SortKey.name.ascending)
     }
 
-    // MARK: A plain word, as Nexus and Sight search it
+    // MARK: A plain word, as Sight searches it
 
     func testConjCompilesToNameOrContentAndNothingElse() {
         let query = Fixture.compile("conj")

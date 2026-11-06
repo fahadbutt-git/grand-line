@@ -1,7 +1,7 @@
 import Foundation
 
 /// The shortcuts shown at the bottom of the window for the selected row,
-/// read as "Open ↵ · Show in Nexus ⌘↵ · Actions ⌘K": what Return does first,
+/// read as "Open ↵ · Show in Finder ⌘↵ · Actions ⌘K": what Return does first,
 /// in the row's own words. While Command or Option is held, the first hint
 /// is what Return does with that modifier.
 public enum FooterHints {

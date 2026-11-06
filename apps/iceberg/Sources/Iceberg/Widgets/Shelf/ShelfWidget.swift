@@ -25,7 +25,7 @@ final class ShelfWidget: NotchWidget {
 
 struct ShelfSectionView: View {
     @ObservedObject var shelf: ShelfModel
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     @ObservedObject private var display = DisplayOptions.shared
     @Environment(\.displayScale) private var displayScale
 
@@ -40,7 +40,7 @@ struct ShelfSectionView: View {
                         Image(systemName: "xmark.circle.fill")
                             .font(SymbolScale.accessory)
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(theme.muted)
+                            .foregroundStyle(palette.muted)
                     }
                     .buttonStyle(PanelButtonStyle(kind: .icon))
                     .help("Take everything off the shelf. The files stay where they are.")
@@ -51,7 +51,7 @@ struct ShelfSectionView: View {
             if let note = shelf.note {
                 Text(note)
                     .font(TypeScale.caption)
-                    .foregroundStyle(theme.muted)
+                    .foregroundStyle(palette.muted)
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .transition(.opacity)
@@ -77,8 +77,8 @@ struct ShelfSectionView: View {
         .background {
             // The drop target: a quiet fill and a dashed edge while a file is over the panel.
             let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
-            shape.fill(theme.highlight.opacity(0.08))
-                .overlay(shape.strokeBorder(theme.highlight,
+            shape.fill(palette.highlight.opacity(0.08))
+                .overlay(shape.strokeBorder(palette.highlight,
                                             style: StrokeStyle(lineWidth: 2 * PixelGrid.hairline(scale: displayScale), dash: [4, 3])))
                 .opacity(shelf.isDropTargeted ? 1 : 0)
                 .scaleEffect(shelf.isDropTargeted || display.reduceMotion ? 1 : 0.98)
@@ -109,7 +109,7 @@ struct ScrollEdgeFade: View {
 struct ShelfRow: View {
     @ObservedObject var shelf: ShelfModel
     let entry: ShelfModel.Entry
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     @ObservedObject private var display = DisplayOptions.shared
     @Environment(\.displayScale) private var displayScale
     @Local private var hovering = false
@@ -124,7 +124,7 @@ struct ShelfRow: View {
                     .opacity(entry.missing ? 0.5 : 1)
                 Text(entry.item.name)
                     .font(TypeScale.callout)
-                    .foregroundStyle(entry.missing ? theme.muted : theme.foreground)
+                    .foregroundStyle(entry.missing ? palette.muted : palette.foreground)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: 0)
@@ -149,7 +149,7 @@ struct ShelfRow: View {
             Button(action: { shelf.popUpMenu(for: entry) }) {
                 Image(systemName: "ellipsis.circle")
                     .font(SymbolScale.row)
-                    .foregroundStyle(theme.muted)
+                    .foregroundStyle(palette.muted)
             }
             .buttonStyle(PanelButtonStyle(kind: .icon))
             .opacity(hovering ? 1 : 0.6)
@@ -159,11 +159,11 @@ struct ShelfRow: View {
         .padding(.horizontal, 6)
         .frame(height: 24)
         .background(
-            shape.fill(hovering || pressed ? theme.selection : theme.card)
-                .overlay(shape.fill(theme.foreground.opacity(pressed ? 0.06 : 0)))
+            shape.fill(hovering || pressed ? palette.selection : palette.card)
+                .overlay(shape.fill(palette.foreground.opacity(pressed ? 0.06 : 0)))
                 .overlay {
                     if display.increaseContrast {
-                        shape.strokeBorder(theme.strongLine, lineWidth: PixelGrid.hairline(scale: displayScale))
+                        shape.strokeBorder(palette.strongLine, lineWidth: PixelGrid.hairline(scale: displayScale))
                     }
                 }
         )

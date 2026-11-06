@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Behaviour tests for the menus, shortcut list, themes and ArtCraft download
+# Behaviour tests for the menus, shortcut list, migrations and ArtCraft download
 # choice. Mac-only commands are replaced by the stubs in tests/stubs.
 
 set -uo pipefail
@@ -68,164 +68,13 @@ KEYBINDINGS_FILE="$ROOT/config/grand-line/keybindings.tsv" "$ROOT/bin/keybinding
 lines="$(KEYBINDINGS_FILE="$ROOT/config/grand-line/keybindings.tsv" "$ROOT/bin/keybindings" --print | wc -l | tr -d ' ')"
 [[ "$lines" -ge 90 ]] && t_ok "shortcut list prints all $lines shortcuts" || t_fail "shortcut list printed $lines lines"
 
-# --- themes: only Sight and Iceberg take them, nothing else changes
-mkdir -p "$HOME/.claude"
+# --- theme: retired; it says where the look comes from and changes nothing
 : > "$STUB_LOG"
-"$ROOT/bin/theme" set nord >/dev/null 2>&1
-[[ "$(cat "$HOME/.local/state/grand-line/theme" 2>/dev/null)" == nord ]] && t_ok "theme remembers the current theme" || t_fail "theme state not saved"
-! grep -qE "AppleAccentColor|AppleHighlightColor|dark mode|picture" "$STUB_LOG" \
-  && t_ok "theme set leaves the macOS appearance, accent colour and wallpaper alone" || t_fail "theme touched macOS" "$(cat "$STUB_LOG")"
-[[ ! -e "$HOME/.config/ghostty/theme.conf" && ! -e "$HOME/.config/btop/themes/grand-line.theme" && ! -e "$HOME/Library/Application Support/lazygit/config.yml" \
-   && ! -e "$HOME/.claude/themes/grand-line.json" && ! -d "$HOME/.local/state/grand-line/current" ]] \
-  && t_ok "theme set writes nothing into other apps' settings" || t_fail "theme wrote other apps' settings"
-# shellcheck source=lib/templates.sh
-source "$ROOT/lib/templates.sh"
-if ! "$ROOT/bin/theme" set nonexistent >/dev/null 2>&1; then t_ok "unknown theme fails cleanly"; else t_fail "unknown theme did not fail"; fi
-# A family name picks the variant for the current appearance (the defaults stub says light).
-"$ROOT/bin/theme" set harbour >/dev/null 2>&1
-[[ "$(cat "$HOME/.local/state/grand-line/theme" 2>/dev/null)" == harbour-light ]] && t_ok "theme set FAMILY picks the variant for the appearance" || t_fail "family not resolved" "$(cat "$HOME/.local/state/grand-line/theme")"
-"$ROOT/bin/theme" mode toggle >/dev/null 2>&1
-[[ "$(cat "$HOME/.local/state/grand-line/theme" 2>/dev/null)" == harbour-dark ]] && t_ok "theme mode toggle switches to the other variant" || t_fail "theme mode toggle"
-"$ROOT/bin/theme" set graphite >/dev/null 2>&1; "$ROOT/bin/theme" mode light >/dev/null 2>&1
-[[ "$(cat "$HOME/.local/state/grand-line/theme" 2>/dev/null)" == daylight ]] && t_ok "Graphite and Daylight pair up as dark and light" || t_fail "graphite to daylight"
-(source "$ROOT/lib/toggle-state.sh"; echo signal-dark > "$HOME/.local/state/grand-line/theme"; theme_is signal && ! theme_is sig) \
-  && t_ok "theme_is matches a family by its variants" || t_fail "theme_is family"
-names="$("$ROOT/bin/theme" list)"
-[[ "$(printf '%s\n' "$names" | sed -n 1p)" == atlas ]] && grep -qx paper <<< "$names" && grep -qx paper-light <<< "$names" \
-  && t_ok "theme list names families and every variant" || t_fail "theme list"
-"$ROOT/bin/theme" set nord >/dev/null 2>&1
-
-# --- theme format 1: EXTENDS, the checker, colour forms, live switching, apply, base16
-tt="$tmp/themes"; mkdir -p "$tt"
-# Every value the shipped themes had before EXTENDS still resolves the same.
-bad=""
-while read -r n kv; do
-  [[ "$n" == "#" || -z "$n" ]] && continue
-  got="$(theme_get "$ROOT/config/themes/$n.theme" "${kv%%=*}")"
-  [[ "$got" == "${kv#*=}" ]] || bad="$bad $n:${kv%%=*}=$got"
-done < "$ROOT/tests/fixtures/theme-values-before-extends.txt"
-[[ -z "$bad" ]] && t_ok "EXTENDS: every shipped theme resolves to the values it had before" || t_fail "EXTENDS changed values" "$bad"
-short=1
-for fam in harbour lantern signal ledger atlas paper; do
-  grep -qx "EXTENDS=$fam-dark" "$ROOT/config/themes/$fam-light.theme" || short=0
-  [[ $(wc -l < "$ROOT/config/themes/$fam-light.theme") -lt $(wc -l < "$ROOT/config/themes/$fam-dark.theme") ]] || short=0
-done
-[[ "$short" == 1 ]] && t_ok "EXTENDS: each light variant extends its dark sibling and is shorter" || t_fail "light variants do not extend"
-fresh="$(for t in "$ROOT"/config/themes/*.theme; do n="${t##*/}"; n="${n%.theme}"; theme_resolve "$t" 2>/dev/null | sed "s/^/$n /"; done)"
-[[ "$fresh" == "$(grep -v '^#' "$ROOT/tests/fixtures/theme-resolved.txt")" ]] \
-  && t_ok "tests/fixtures/theme-resolved.txt (read by the Swift tests) is current" || t_fail "theme-resolved.txt is stale; regenerate it (see its header)"
-cmp -s "$ROOT/apps/finder/Sources/ThemeKit/ThemeSpec.swift" "$ROOT/apps/iceberg/Sources/IcebergKit/Theme/ThemeSpec.swift" \
-  && t_ok "ThemeKit and IcebergKit share one ThemeSpec.swift" || t_fail "the two ThemeSpec.swift copies differ"
-
-printf 'FORMAT=1\nEXTENDS=b\nLABEL=A\n' > "$tt/a.theme"
-printf 'FORMAT=1\nEXTENDS=a\nLABEL=B\n' > "$tt/b.theme"
-out="$("$ROOT/bin/theme" check "$tt/a.theme" 2>&1)"; rc=$?
-[[ $rc != 0 && "$out" == *"b.theme:2: error: EXTENDS=a leads back to a (a loop)"* ]] && t_ok "EXTENDS: a loop is an error, not a hang" || t_fail "EXTENDS loop" "$out"
-printf 'FORMAT=1\nEXTENDS=gone\n' > "$tt/c.theme"
-out="$("$ROOT/bin/theme" check "$tt/c.theme" 2>&1)"
-[[ "$out" == *"c.theme:2: error: EXTENDS=gone names no theme"* ]] && t_ok "EXTENDS: a missing parent names the line" || t_fail "missing parent" "$out"
-cat > "$tt/base.theme" <<'EOF'
-FORMAT=1
-LABEL="Base"
-MODE=dark
-TERM_BG=1a1b1e
-TERM_FG=e8e9eb
-PALETTE="24262a f2665a 3cc57f e3c24a 6e8bff a281f5 57b4f0 e8e9eb 6d7076 f5857b 63d199 e9ce6e 8ba2ff b59af7 79c3f3 ffffff"
-KIND_STYLE=dot
-EOF
-cat > "$tt/kid.theme" <<'EOF'
-FORMAT=1
-EXTENDS=base
-LABEL="Kid"
-TERM_FG=#FFFFFF
-EOF
-r="$(theme_resolve "$tt/kid.theme")"
-grep -qx 'LABEL=Kid' <<< "$r" && grep -qx 'TERM_FG=ffffff' <<< "$r" && grep -qx 'TERM_BG=1a1b1e' <<< "$r" \
-  && grep -qx 'KIND_STYLE=dot' <<< "$r" && ! grep -q '^EXTENDS=' <<< "$r" \
-  && t_ok "EXTENDS: the child's keys win, the rest come from the parent" || t_fail "inheritance" "$r"
-r="$(theme_resolve "$tt/base.theme")"
-grep -qx 'ACCENT_HEX=6e8bff' <<< "$r" && grep -qx 'HIGHLIGHT=6e8bff' <<< "$r" && grep -qx 'MUTED=8b8c8f' <<< "$r" \
-  && grep -qx 'KIND_PDF=f2665a' <<< "$r" && grep -qx 'UI_MOTION=full' <<< "$r" && grep -qx 'RADIUS_WINDOW=10' <<< "$r" \
-  && grep -qx 'BACKGROUND=graphite.jpg' <<< "$r" && ! grep -q '^UI_DENSITY=' <<< "$r" \
-  && t_ok "checker fills the defaults (colours from the theme's own, density left to each app)" || t_fail "defaults" "$r"
-cat > "$tt/bad.theme" <<'EOF'
-FORMAT=2
-LABEL="Bad"
-MODE=dusk
-TERM_BG=12345g
-TERM_FG=eeeeee
-PALETTE="000000 111111"
-UI_MOTION=wild
-RADIUS_CHIP=99
-EOF
-out="$("$ROOT/bin/theme" check "$tt/bad.theme" 2>&1)"; rc=$?
-n=0
-for want in "bad.theme:1: error: FORMAT=2 is newer" "bad.theme:3: error: MODE=dusk" "bad.theme:4: error: TERM_BG=12345g is not a six-digit hex colour" \
-            "bad.theme:6: error: PALETTE has 2 colours" "bad.theme:7: error: UI_MOTION=wild" "bad.theme:8: error: RADIUS_CHIP=99"; do
-  [[ "$out" == *"$want"* ]] && n=$((n + 1))
-done
-[[ $rc != 0 && $n == 6 ]] && t_ok "checker rejects bad values with FILE:LINE messages" || t_fail "checker messages" "$out"
-printf 'FORMAT=1\nLABEL=Dim\nMODE=dark\nTERM_BG=202020\nTERM_FG=444444\nMUTED=303030\nPALETTE="%s"\n' \
-  "$(printf '%s ' 000000 111111 222222 333333 444444 555555 666666 777777 888888 999999 aaaaaa bbbbbb cccccc dddddd eeeeee | sed 's/ $//') ffffff" > "$tt/dim.theme"
-out="$("$ROOT/bin/theme" check "$tt/dim.theme" 2>&1)"; rc=$?
-[[ $rc == 0 && "$out" == *"dim.theme:5: warning: TERM_FG #444444 is"*"text needs 4.5:1"* && "$out" == *"dim.theme:6: warning: MUTED #303030"*"needs 3.0:1"* ]] \
-  && t_ok "checker warns when text falls under 4.5:1 or secondary text under 3:1" || t_fail "contrast warnings" "$out"
-"$ROOT/bin/theme" check --strict "$tt/dim.theme" >/dev/null 2>&1 && t_fail "--strict passed a warning" || t_ok "theme check --strict fails on warnings"
-
-# Colour forms, and templates written for bare values still render one #.
-mkdir -p "$tmp/forms"
-printf '%s\n' '{{ ACCENT_HEX }}|{{ ACCENT_HEX.hex }}|{{ ACCENT_HEX.rgb }}|{{ ACCENT_HEX.dec }}|#{{ COLOR1 }}|{{ COLOR1.rgb }}|{{ LABEL }}|{{ LABEL.hex }}|{{ MODE.dec }}' > "$tmp/forms/f.tpl"
-render_templates "$ROOT/config/themes/harbour-dark.theme" harbour-dark "$tmp/forms-out" "$tmp/forms" 2>/dev/null
-[[ "$(cat "$tmp/forms-out/f")" == '#57b4f0|57b4f0|87,180,240|0.341 0.706 0.941|#f2665a|242,102,90|Harbour Dark|{{ LABEL.hex }}|{{ MODE.dec }}' ]] \
-  && t_ok "templates: every colour as #rrggbb, .hex, .rgb and .dec" || t_fail "colour forms" "$(cat "$tmp/forms-out/f" 2>/dev/null)"
-render_templates "$tt/bad.theme" bad "$tmp/forms-bad" "$tmp/forms" 2>/dev/null && t_fail "a theme with errors rendered" \
-  || { [[ ! -f "$tmp/forms-bad/f" ]] && t_ok "templates: a theme with errors renders nothing"; }
-
-# A copy of the package, so test themes never land in the real themes folder.
-pkg="$tmp/pkg"; mkdir -p "$pkg/config"
-cp -R "$ROOT/bin" "$ROOT/lib" "$pkg/"; cp -R "$ROOT/config/themes" "$pkg/config/"
-
-# theme set: a broken theme changes nothing; a good one tells the apps at once.
-cp "$tt/bad.theme" "$pkg/config/themes/bad.theme"
-"$pkg/bin/theme" set bad >/dev/null 2>&1; rc=$?
-[[ $rc != 0 && "$(cat "$HOME/.local/state/grand-line/theme")" == nord ]] && t_ok "theme set refuses a theme with errors" || t_fail "broken theme applied"
-: > "$STUB_LOG"
-"$ROOT/bin/theme" set harbour-light >/dev/null 2>&1
-grep -q "osascript -l JavaScript .*postNotificationNameObjectUserInfoDeliverImmediately.*com.grandline.theme.changed.* harbour-light$" "$STUB_LOG" \
-  && t_ok "theme set posts com.grandline.theme.changed for the apps" || t_fail "no theme notification" "$(grep JavaScript "$STUB_LOG")"
-
-# theme apply tells Sight and Iceberg and reloads no other tool. refresh does nothing.
-: > "$STUB_LOG"
-"$ROOT/bin/theme" apply >/dev/null 2>&1
-grep -q "com.grandline.theme.changed" "$STUB_LOG" && ! grep -q "USR2" "$STUB_LOG" \
-  && t_ok "theme apply tells the apps and reloads no other tool" || t_fail "theme apply" "$(cat "$STUB_LOG")"
-: > "$STUB_LOG"
-"$ROOT/bin/theme" refresh >/dev/null 2>&1
-! grep -qE "USR2|theme.changed" "$STUB_LOG" && t_ok "theme refresh does nothing" || t_fail "refresh reloaded" "$(cat "$STUB_LOG")"
-
-# base16 import (into the copy of the package).
-if "$pkg/bin/theme" import-base16 "$ROOT/tests/fixtures/base16-flat.yaml" tide >/dev/null 2>&1; then
-  r="$(theme_resolve "$pkg/config/themes/tide.theme" 2>/dev/null)"
-  grep -qx 'MODE=dark' <<< "$r" && grep -qx 'TERM_BG=1b2027' <<< "$r" && grep -qx 'TERM_FG=dde3ea' <<< "$r" \
-    && grep -qx 'ACCENT_HEX=5a9cf0' <<< "$r" && grep -qx 'ACCENT=4' <<< "$r" && grep -qx 'KIND_ARCHIVE=c29468' <<< "$r" \
-    && grep -q '^PALETTE="1b2027 f2665a 3cc57f e3c24a 5a9cf0 a281f5 57c4d0 dde3ea 5c6672 ' <<< "$r" \
-    && "$pkg/bin/theme" check tide >/dev/null 2>&1 \
-    && t_ok "import-base16 maps base00 to base0F onto a dark theme that passes the checker" || t_fail "base16 mapping" "$r"
-else t_fail "import-base16 failed"; fi
-"$pkg/bin/theme" import-base16 "$ROOT/tests/fixtures/base16-tinted.yaml" shore >/dev/null 2>&1 \
-  && [[ "$(theme_get "$pkg/config/themes/shore.theme" MODE)" == light && "$(theme_get "$pkg/config/themes/shore.theme" TERM_BG)" == fbfaf7 ]] \
-  && t_ok "import-base16 reads the newer palette: layout, and a light variant stays light" || t_fail "tinted base16"
-"$pkg/bin/theme" import-base16 "$ROOT/tests/fixtures/base16-flat.yaml" tide >/dev/null 2>&1 \
-  && t_fail "import-base16 replaced a theme without --force" || t_ok "import-base16 keeps an existing theme unless --force"
-grep -v base0F "$ROOT/tests/fixtures/base16-flat.yaml" > "$tmp/short.yaml"
-out="$("$pkg/bin/theme" import-base16 "$tmp/short.yaml" short 2>&1)"
-[[ "$out" == *"lacks base0F"* && ! -e "$pkg/config/themes/short.theme" ]] && t_ok "import-base16 refuses a scheme with a colour missing" || t_fail "short scheme" "$out"
-"$ROOT/bin/theme" set nord >/dev/null 2>&1
-
-echo "$HOME/Pictures/Backgrounds/a.jpg" > "$HOME/.local/state/grand-line/background"; : > "$STUB_LOG"
-! "$ROOT/bin/theme" next-background >/dev/null 2>&1 && ! grep -q "picture" "$STUB_LOG" \
-  && t_ok "the theme command no longer changes the wallpaper" || t_fail "next-background still runs"
-rm -f "$HOME/.local/state/grand-line/background"
+out="$("$ROOT/bin/theme" pick 2>&1)"; rc=$?
+[[ $rc == 0 && "$out" == *"System Settings, Appearance"* ]] && t_ok "theme says Sight and Iceberg follow macOS" || t_fail "theme" "$rc $out"
+out="$("$ROOT/bin/theme" refresh 2>&1)"; rc=$?
+[[ $rc == 0 && -z "$out" ]] && t_ok "theme refresh (from an older update) is quiet" || t_fail "theme refresh" "$rc $out"
+[[ ! -s "$STUB_LOG" && ! -e "$HOME/.local/state/grand-line/theme" ]] && t_ok "theme changes nothing on the Mac" || t_fail "theme touched something" "$(cat "$STUB_LOG")"
 
 # --- setup.sh options
 if ! bash "$ROOT/setup.sh" --dry-run --only artcraf >/dev/null 2>&1; then t_ok "setup rejects a misspelled step name"; else t_fail "misspelled step name was accepted"; fi
@@ -586,7 +435,7 @@ Toggle/Always	echo always > "$tmp/ran"
 Toggle/Hidden	echo hidden	?false
 Toggle/On	echo on > "$tmp/ran"		✓true
 Toggle/Shown not checked	echo x	?true	✓false
-Toggle/Theme	echo t		✓theme_is nord
+Toggle/Checked	echo t		✓test -n x
 Toggle/Old	echo old
 EOF
 export MENU_FILE="$tmp/menu.tsv" MENU_LOCAL="$tmp/menu.local.tsv"
@@ -594,7 +443,7 @@ printf 'Toggle/Old\t-\nToggle/Always\techo mine > "%s/ran"\nToggle/Mine\techo ne
 rm -f "$tmp/ran"; answers "On ✓"
 "$ROOT/bin/menu" Toggle
 seen="$(sed '/^--$/d' "$CHOOSE_SEEN" | tr '\n' '|')"
-[[ "$seen" == "Always|On ✓|Shown not checked|Theme ✓|Mine|" ]] && t_ok "menu hides failed guards, checks passing tests, merges your entries" \
+[[ "$seen" == "Always|On ✓|Shown not checked|Checked ✓|Mine|" ]] && t_ok "menu hides failed guards, checks passing tests, merges your entries" \
   || t_fail "menu showed" "$seen"
 [[ "$(cat "$tmp/ran" 2>/dev/null)" == on ]] && t_ok "menu runs a checked entry" || t_fail "checked entry did not run"
 rm -f "$tmp/ran"; answers "Always"; "$ROOT/bin/menu" Toggle
@@ -702,17 +551,15 @@ plan="$(HOME="$fh" bash "$ROOT/setup.sh" --dry-run --only folders 2>&1)"
 grep -q "mark-all" <<<"$plan" && t_fail "an existing Mac had its migrations marked" || t_ok "an existing Mac keeps its migrations to run"
 
 # --- hooks: the named file and NAME.d/ in order, never .sample or non-executable
-hd="$HOME/.config/grand-line/hooks"; mkdir -p "$hd/theme-set.d"
+hd="$HOME/.config/grand-line/hooks"; mkdir -p "$hd/on-test.d"
 mkhook() { printf '#!/bin/bash\necho "%s $*" >> "%s/hooks.log"\n' "$2" "$tmp" > "$1"; chmod +x "$1"; }
-mkhook "$hd/theme-set" main; mkhook "$hd/theme-set.d/20-b" b; mkhook "$hd/theme-set.d/10-a" a
-mkhook "$hd/theme-set.d/30-c.sample" sample; mkhook "$hd/theme-set.d/40-off" off; chmod -x "$hd/theme-set.d/40-off"
-printf '#!/bin/bash\nexit 1\n' > "$hd/theme-set.d/15-fails"; chmod +x "$hd/theme-set.d/15-fails"
-"$ROOT/bin/hook" theme-set nord 2>/dev/null
+mkhook "$hd/on-test" main; mkhook "$hd/on-test.d/20-b" b; mkhook "$hd/on-test.d/10-a" a
+mkhook "$hd/on-test.d/30-c.sample" sample; mkhook "$hd/on-test.d/40-off" off; chmod -x "$hd/on-test.d/40-off"
+printf '#!/bin/bash\nexit 1\n' > "$hd/on-test.d/15-fails"; chmod +x "$hd/on-test.d/15-fails"
+"$ROOT/bin/hook" on-test nord 2>/dev/null
 [[ "$(tr '\n' '|' < "$tmp/hooks.log")" == "main nord|a nord|b nord|" ]] && t_ok "hooks run in order with their arguments, skipping samples, plain files and failures" \
   || t_fail "hooks ran" "$(cat "$tmp/hooks.log")"
 ! "$ROOT/bin/hook" ../x 2>/dev/null && t_ok "a hook name cannot leave the hooks folder" || t_fail "hook name not checked"
-: > "$tmp/hooks.log"; "$ROOT/bin/theme" set forest >/dev/null 2>&1
-grep -q "^main forest" "$tmp/hooks.log" && t_ok "theme set fires the theme-set hook with the theme name" || t_fail "theme-set hook not fired"
 rm -rf "$hd"
 
 # --- focus or open, web apps, update lock and window
@@ -746,7 +593,7 @@ grep -q "osascript - .*/bin/in-window --run .*/bin/app install zoom" "$STUB_LOG"
 grep -qx 'cask "mpv"' "$HOME/.grand-line/Brewfile" && grep -q "brew install --cask mpv" "$STUB_LOG" \
   && t_ok "app install in a window runs there, not in the background" || t_fail "app install in a window"
 
-# --- toggle states: flag files and the current theme
+# --- toggle states: flag files
 # shellcheck source=lib/toggle-state.sh
 source "$ROOT/lib/toggle-state.sh"
 flag docker on; is_on docker && t_ok "a toggle flag reads as on" || t_fail "flag on"
@@ -754,8 +601,6 @@ flag docker off; ! is_on docker && t_ok "a cleared toggle flag reads as off" || 
 echo "{ sec = 1" > "$TOGGLE_FLAGS/docker"; ! is_on docker && t_ok "a Docker flag from before the last restart reads as off" || t_fail "stale Docker flag read as on"
 flag docker off
 ! is_on no-such-toggle && t_ok "an unknown toggle reads as off" || t_fail "unknown toggle"
-echo forest > "$HOME/.local/state/grand-line/theme"
-theme_is forest && ! theme_is nord && t_ok "theme_is matches only the current theme" || t_fail "theme_is"
 
 # --- toggle: explicit on and off, new settings, and the status Sight reads
 T="$ROOT/bin/toggle"
@@ -792,26 +637,17 @@ grep -q "defaults write com.apple.finder AppleShowAllFiles -bool true" "$STUB_LO
 grep -q "defaults write com.apple.dock autohide -bool true" "$STUB_LOG" && t_ok "toggle dock off hides the Dock automatically" || t_fail "dock off"
 # Dark mode is macOS's appearance (System Events), read back from AppleInterfaceStyle.
 export STUB_APPEARANCE="$tmp/appearance"; : > "$STUB_APPEARANCE"
-echo harbour-light > "$HOME/.local/state/grand-line/theme"; rm -f "$HOME/.local/state/grand-line/theme-follows-macos"
+mkdir -p "$HOME/.local/state/grand-line"
 : > "$STUB_LOG"; GRAND_LINE_QUIET=1 "$T" dark on >/dev/null; code=$?
 [[ $code == 0 && "$(cat "$STUB_APPEARANCE")" == Dark ]] && grep -q "set dark mode to true" "$STUB_LOG" \
-  && [[ "$(cat "$HOME/.local/state/grand-line/theme")" == harbour-light ]] \
-  && t_ok "toggle dark on sets the macOS appearance and leaves a theme that does not follow macOS" || t_fail "dark on" "$code $(cat "$STUB_LOG")"
+  && ! grep -q "theme" "$STUB_LOG" \
+  && t_ok "toggle dark on sets the macOS appearance, when asked, and nothing else" || t_fail "dark on" "$code $(cat "$STUB_LOG")"
 "$T" status dark | grep -qx "dark on" && t_ok "toggle status reads dark mode from AppleInterfaceStyle" || t_fail "status dark after dark on"
 : > "$STUB_LOG"; GRAND_LINE_QUIET=1 "$T" dark on >/dev/null
 ! grep -q "set dark mode" "$STUB_LOG" && t_ok "toggle dark on leaves the appearance alone when it is already dark" || t_fail "dark on when dark" "$(cat "$STUB_LOG")"
 : > "$STUB_LOG"; GRAND_LINE_QUIET=1 "$T" dark >/dev/null; code=$?
 [[ $code == 0 && ! -s "$STUB_APPEARANCE" ]] && grep -q "set dark mode to false" "$STUB_LOG" \
   && t_ok "toggle dark with no state switches back to light" || t_fail "dark flip" "$code $(cat "$STUB_LOG")"
-# While the theme follows macOS, its variant switches with the appearance.
-touch "$HOME/.local/state/grand-line/theme-follows-macos"
-: > "$STUB_LOG"; GRAND_LINE_QUIET=1 GRAND_LINE_TEST_PATH="$GRAND_LINE_TEST_PATH:$ROOT/bin" "$T" dark on >/dev/null; code=$?
-[[ $code == 0 && "$(cat "$STUB_APPEARANCE")" == Dark && "$(cat "$HOME/.local/state/grand-line/theme")" == harbour-dark ]] \
-  && t_ok "toggle dark on switches a theme that follows macOS to its dark variant" || t_fail "dark on following macOS" "$code $(cat "$HOME/.local/state/grand-line/theme")"
-: > "$STUB_LOG"; GRAND_LINE_QUIET=1 GRAND_LINE_TEST_PATH="$GRAND_LINE_TEST_PATH:$ROOT/bin" "$T" dark off >/dev/null; code=$?
-[[ $code == 0 && ! -s "$STUB_APPEARANCE" && "$(cat "$HOME/.local/state/grand-line/theme")" == harbour-light ]] \
-  && t_ok "toggle dark off switches it back to its light variant" || t_fail "dark off following macOS" "$code $(cat "$HOME/.local/state/grand-line/theme")"
-rm -f "$HOME/.local/state/grand-line/theme-follows-macos"
 # System Events answered but macOS kept its appearance: a failure, never a success.
 out="$(STUB_APPEARANCE_STUCK=1 GRAND_LINE_QUIET=1 "$T" dark on)"; code=$?
 [[ $code == 1 && "$out" == *"kept the light appearance"* ]] && t_ok "toggle dark fails when the appearance did not change" || t_fail "dark readback" "$code $out"
@@ -1191,55 +1027,10 @@ EOF
 ) && t_ok "a background service's launch agent is sealed in its bundle, registered as you, restarted by launchd" \
   || t_fail "background service (step $?)" "$(cat "$STUB_LOG")"
 
-# --- theme-matched Finder icons: the apps get the theme's icon and keep their signature
-(
-  irepo="$tmp/icons-repo"; mkdir -p "$irepo/apps/demo" "$irepo/tools" "$tmp/IconApps/Demo App.app/Contents/Resources"
-  printf 'Demo\tDemo App\tcom.example.demo\tyes\n' > "$irepo/apps/demo/apps.tsv"
-  cat > "$irepo/tools/make-icons.py" <<'EOF'
-import sys, os
-args = sys.argv[1:]
-out = args[args.index("--out") + 1]; theme = args[args.index("--theme") + 1]
-os.makedirs(os.path.join(out, "Demo"), exist_ok=True)
-open(os.path.join(out, "Demo", "AppIcon.icns"), "w").write("icon " + theme)
-EOF
-  app="$tmp/IconApps/Demo App.app"; echo old > "$app/Contents/Resources/AppIcon.icns"
-  export GRAND_LINE_APPS_DEST="$tmp/IconApps"
-  source "$ROOT/lib/signing.sh"; source "$ROOT/lib/app-icons.sh"
-  # Without the identity nothing changes: an ad-hoc signature would cost permissions.
-  SIGN_KEYCHAIN="$tmp/none.keychain-db"
-  refresh_app_icons nord "$irepo" >/dev/null; [[ "$(cat "$app/Contents/Resources/AppIcon.icns")" == old ]] || exit 1
-  export STUB_SECURITY="$tmp/sec"; SIGN_KEYCHAIN="$tmp/kc/grand-line-signing.keychain-db"
-  : > "$STUB_LOG"; refresh_app_icons nord "$irepo" >/dev/null || exit 2
-  [[ "$(cat "$app/Contents/Resources/AppIcon.icns")" == "icon nord" ]] || exit 3
-  grep -qF 'certificate leaf = H"0123456789abcdef' "$app/.stub-signature" || exit 4
-  compgen -G "$tmp/IconApps/.*.app*" >/dev/null && exit 5   # no copies left behind
-  : > "$STUB_LOG"; refresh_app_icons nord "$irepo" >/dev/null
-  grep -q "^codesign" "$STUB_LOG" && exit 6   # already matching: left alone
-  exit 0
-) && t_ok "theme icons: the installed apps get the theme's icon, re-signed with the identity, skipped without it" \
-  || t_fail "theme icons (step $?)" "$(cat "$STUB_LOG")"
-python3 "$ROOT/tools/make-icons.py" --theme nord --only Iceberg --out "$tmp/icons-out" >/dev/null 2>&1
-[[ -s "$tmp/icons-out/Iceberg/AppIcon.icns" ]] && git -C "$ROOT" diff --quiet -- apps/iceberg/Resources/Iceberg/AppIcon.icns \
-  && t_ok "make-icons --out writes the icons elsewhere, leaving the package's own" || t_fail "make-icons --out"
-# A light variant takes ICON_STYLE and its app colours through EXTENDS, as the apps read it.
-mkdir -p "$tmp/icon-themes"
-printf 'FORMAT=1\nLABEL="Base"\nMODE=dark\nICON_STYLE=mono   # inherited\nICON_FILES=#123456\nFAMILY=base\n' > "$tmp/icon-themes/base-dark.theme"
-printf 'FORMAT=1\nEXTENDS=base-dark\nLABEL="Base Light"\nMODE=light\n' > "$tmp/icon-themes/base-light.theme"
-printf 'EXTENDS=loop-b\n' > "$tmp/icon-themes/loop-a.theme"; printf 'EXTENDS=loop-a\n' > "$tmp/icon-themes/loop-b.theme"
-if python3 -I -B - "$ROOT/tools/make-icons.py" "$tmp/icon-themes" <<'EOF'
-import importlib.util, sys
-spec = importlib.util.spec_from_file_location("make_icons", sys.argv[1])
-m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-v = m.read_theme("base-light", folder=sys.argv[2])
-assert v["ICON_STYLE"] == "mono" and v["ICON_FILES"] == "#123456" and v["MODE"] == "light", v
-assert v["LABEL"] == "Base Light" and v["FAMILY"] == "base" and "EXTENDS" not in v, v
-assert m.palette(v, "ICON_FILES")["ink"] == m.hex_color("123456")   # mono: the app colour is the ink
-try:
-    m.read_theme("loop-a", folder=sys.argv[2]); sys.exit("a loop was not caught")
-except SystemExit as e:
-    assert "loop" in str(e), e
-EOF
-then t_ok "make-icons reads a theme with what it inherits through EXTENDS (and stops at a loop)"; else t_fail "make-icons EXTENDS"; fi
+# --- bundled icons: make-icons draws previews without touching the package's icons
+python3 "$ROOT/tools/make-icons.py" --only Iceberg --previews "$tmp/icons-out" --previews-only >/dev/null 2>&1
+[[ -s "$tmp/icons-out/Iceberg.png" ]] && git -C "$ROOT" diff --quiet -- apps/iceberg/Resources/Iceberg/AppIcon.icns \
+  && t_ok "make-icons --previews-only writes previews, leaving the package's own icons" || t_fail "make-icons previews"
 
 # --- updates: only signed commits apply by themselves
 if command -v ssh-keygen >/dev/null 2>&1; then
@@ -1516,5 +1307,42 @@ grep -q '^UNATTENDED_STEPS="folders,dotfiles,native-tools,downloads"$' "$ROOT/se
   exit 0
 ) && t_ok "the unattended update swaps an app only when the Mac is idle and the app is not in use" \
   || t_fail "update swap decision (step $?)"
+
+# --- migration: what is left of Nexus and the themes goes to the Trash
+(
+  mh="$tmp/nexus-home"; mkdir -p "$mh"; export HOME="$mh"
+  st="$mh/.local/state/grand-line"; export GRAND_LINE_STATE="$st"
+  export GRAND_LINE_APPS_DEST="$tmp/nexus-apps"; mkdir -p "$GRAND_LINE_APPS_DEST/Nexus.app/Contents" "$GRAND_LINE_APPS_DEST/Sight.app"
+  lib="$mh/Library"
+  mkdir -p "$lib/Preferences" "$lib/Application Support/Nexus" "$lib/Caches/com.grandline.nexus" "$lib/LaunchAgents" \
+           "$lib/Saved Application State/com.grandline.nexus.savedState" "$lib/Application Support/Sight" \
+           "$mh/.config/grand-line/nexus" "$mh/.config/grand-line/hooks" "$st/current"
+  echo prefs > "$lib/Preferences/com.grandline.nexus.plist"; echo keep > "$lib/Preferences/com.grandline.sight.plist"
+  echo agent > "$lib/LaunchAgents/com.grandline.nexus.helper.plist"
+  printf 'weekly\tmodified:week\n' > "$mh/.config/grand-line/nexus/saved-searches.tsv"
+  echo s > "$mh/.config/grand-line/nexus/settings.json"
+  echo graphite > "$st/theme"; touch "$st/theme-follows-macos"
+  echo sample > "$mh/.config/grand-line/hooks/theme-set.sample"; echo mine > "$mh/.config/grand-line/hooks/post-update"
+  : > "$STUB_LOG"
+  out="$(GRAND_LINE_REPO="$ROOT" bash "$ROOT/migrations/1793924100-nexus-leftovers-and-themes.sh" 2>&1)" || { echo "$out"; exit 1; }
+  for gone in "$lib/Preferences/com.grandline.nexus.plist" "$lib/Application Support/Nexus" "$lib/Caches/com.grandline.nexus" \
+              "$lib/Saved Application State/com.grandline.nexus.savedState" "$lib/LaunchAgents/com.grandline.nexus.helper.plist" \
+              "$mh/.config/grand-line/nexus" "$GRAND_LINE_APPS_DEST/Nexus.app" "$st/theme" "$st/theme-follows-macos" "$st/current" \
+              "$mh/.config/grand-line/hooks/theme-set.sample"; do
+    [[ ! -e "$gone" ]] || { echo "still there: $gone"; exit 2; }
+  done
+  # Application Support/Nexus and ~/.config/grand-line/nexus share a name on
+  # a case-insensitive disk, so the second gets a unique name in the Trash.
+  trashed_settings=("$mh/.Trash/"[Nn]exus*/settings.json)
+  [[ -f "$mh/.Trash/com.grandline.nexus.plist" && -d "$mh/.Trash/Nexus.app" && -f "${trashed_settings[0]}" ]] || exit 3
+  [[ "$(cat "$mh/.config/grand-line/sight/saved-searches.tsv")" == $'weekly\tmodified:week' ]] || exit 4
+  [[ -f "$lib/Preferences/com.grandline.sight.plist" && -d "$GRAND_LINE_APPS_DEST/Sight.app" && -f "$mh/.config/grand-line/hooks/post-update" ]] || exit 5
+  grep -q "^defaults delete com.grandline.nexus$" "$STUB_LOG" || exit 6
+  grep -q "^launchctl bootout gui/.*/com.grandline.nexus.helper" "$STUB_LOG" || exit 7
+  ! grep -qE "AppleInterfaceStyle|AppleAccentColor|AppleHighlightColor|dark mode" "$STUB_LOG" || exit 8
+  GRAND_LINE_REPO="$ROOT" bash "$ROOT/migrations/1793924100-nexus-leftovers-and-themes.sh" >/dev/null 2>&1 || exit 9
+  exit 0
+) && t_ok "migration: Nexus's leftovers and the theme state go to the Trash, saved searches move to Sight, macOS's look is left alone" \
+  || t_fail "Nexus leftovers migration (step $?)" "$(cat "$STUB_LOG")"
 
 exit $FAIL

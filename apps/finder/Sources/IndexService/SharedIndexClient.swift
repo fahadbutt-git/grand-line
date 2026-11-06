@@ -1,8 +1,8 @@
 import Foundation
 import IndexKit
 
-/// How Nexus and Sight search file names: they ask the Grand Line Index
-/// service, which keeps one index of the home folder for both. When the service
+/// How Sight searches file names: it asks the Grand Line Index service,
+/// which keeps one index of the home folder. When the service
 /// cannot be reached, the client starts it and meanwhile answers from its own
 /// copy, read from the service's snapshot (never written), so a search never
 /// waits on the service or comes back empty. If the service stays out of reach,
@@ -539,7 +539,7 @@ private final class EventReceiver: NSObject, IndexEventsXPC {
 }
 
 /// The client's own copy of the index, for when the service is out of reach:
-/// loaded from the service's snapshot (or Sight's or Nexus's from before the
+/// loaded from the service's snapshot (or Sight's from before the
 /// service) on first use, never saved.
 final class LocalIndex: @unchecked Sendable {
     let locations: IndexLocations

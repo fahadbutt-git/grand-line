@@ -1,6 +1,6 @@
 import Foundation
 
-/// `@name`: Nexus's saved searches (~/.config/grand-line/nexus/saved-searches.tsv,
+/// `@name`: saved searches (~/.config/grand-line/sight/saved-searches.tsv,
 /// name TAB query). Return runs one as a `.` search.
 public final class SavedSearchProvider: InstantProvider, @unchecked Sendable {
     public let id = "saved"

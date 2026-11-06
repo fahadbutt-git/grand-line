@@ -30,9 +30,9 @@ public enum ResultKind: Sendable, Equatable {
 }
 
 /// Command+K: every row's own actions, then the ones every row of its kind
-/// has (open with, show in Nexus, copy path and name, Quick Look, move to the
+/// has (open with, show in Finder, copy path and name, Quick Look, move to the
 /// Trash, add to the buffer for files; copy the result of a sum; open and copy
-/// a link). With files in the buffer, or on the Finder or Nexus selection,
+/// a link). With files in the buffer, or on the Finder selection,
 /// the actions apply to all of them.
 public enum ActionPanel {
     public static func actions(for result: LaunchResult) -> [LaunchAction] {
@@ -47,9 +47,9 @@ public enum ActionPanel {
         switch ResultKind.of(result) {
         case .file(let path, let isFolder):
             let name = (path as NSString).lastPathComponent
-            add(LaunchAction(isFolder ? "Open in Nexus" : "Open", symbol: "arrow.up.forward", .open(path)))
+            add(LaunchAction("Open", symbol: "arrow.up.forward", .open(path)))
             if !isFolder { add(LaunchAction("Open with…", symbol: "arrow.up.right.square", shortcut: KeyShortcut("o"), .openWith(path))) }
-            add(LaunchAction("Show in Nexus", symbol: "folder", .reveal(path)))
+            add(LaunchAction("Show in Finder", symbol: "folder", .reveal(path)))
             add(LaunchAction("Quick Look", symbol: "eye", shortcut: KeyShortcut("y"), closesWindow: false, .quickLook(path)))
             add(LaunchAction("Copy path", symbol: "doc.on.clipboard", shortcut: KeyShortcut("c", option: true), .copyText(path)))
             add(LaunchAction("Copy name", symbol: "textformat", shortcut: KeyShortcut("n", shift: true), .copyText(name)))
@@ -58,7 +58,7 @@ public enum ActionPanel {
             add(trash([path]))
         case .app(let path):
             let name = (path as NSString).lastPathComponent
-            add(LaunchAction("Show in Nexus", symbol: "folder", .reveal(path)))
+            add(LaunchAction("Show in Finder", symbol: "folder", .reveal(path)))
             add(LaunchAction("Copy path", symbol: "doc.on.clipboard", .copyText(path)))
             add(LaunchAction("Copy name", symbol: "textformat", shortcut: KeyShortcut("n", shift: true),
                              .copyText(name.hasSuffix(".app") ? String(name.dropLast(4)) : name)))
@@ -91,7 +91,7 @@ public enum ActionPanel {
         let count = paths.count == 1 ? names[0] : "\(paths.count) items"
         var list: [LaunchAction] = [
             LaunchAction("Open \(count)", symbol: "arrow.up.forward", .files(.open, paths)),
-            LaunchAction("Show in Nexus", symbol: "folder", .files(.reveal, paths)),
+            LaunchAction("Show in Finder", symbol: "folder", .files(.reveal, paths)),
             LaunchAction("Quick Look", symbol: "eye", closesWindow: false, .files(.quickLook, paths)),
             LaunchAction("Copy paths", symbol: "doc.on.clipboard", .copyText(paths.joined(separator: "\n"))),
             LaunchAction("Copy names", symbol: "textformat", .copyText(names.joined(separator: "\n"))),

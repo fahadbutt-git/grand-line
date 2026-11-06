@@ -13,7 +13,6 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     private let permissions: PermissionStatus
     private let recorder: ShortcutRecorder
     private var window: NSWindow?
-    private var themeSink: AnyCancellable?
 
     init(host: PanelHost) {
         self.host = host
@@ -31,7 +30,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 
     private func make() -> NSWindow {
-        let root = SettingsView(host: host, user: host.user, theme: host.theme, hud: host.hud, permissions: permissions,
+        let root = SettingsView(host: host, user: host.user, palette: host.palette, hud: host.hud, permissions: permissions,
                                 recorder: recorder)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 640),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -43,19 +42,9 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         window.delegate = self
         window.center()
         window.setFrameAutosaveName("IcebergSettings")
-        applyAppearance(host.theme.theme, to: window)
-        // Published before the value changes, so the new theme comes in the call.
-        themeSink = host.theme.$theme.sink { [weak self, weak window] theme in
-            guard let window else { return }
-            self?.applyAppearance(theme, to: window)
-        }
+        // No appearance or background of its own: the window follows Light
+        // and Dark and the accent colour as macOS sets them.
         return window
-    }
-
-    private func applyAppearance(_ theme: Theme, to window: NSWindow) {
-        window.appearance = NSAppearance(named: theme.mode == .light ? .aqua : .darkAqua)
-        window.backgroundColor = NSColor(srgbRed: theme.background.red, green: theme.background.green,
-                                         blue: theme.background.blue, alpha: 1)
     }
 
     func windowDidBecomeKey(_ notification: Notification) {
@@ -169,7 +158,7 @@ struct PanelRow: Identifiable, Equatable {
 struct SettingsView: View {
     @ObservedObject var host: PanelHost
     @ObservedObject var user: UserWidgets
-    @ObservedObject var theme: ThemeStore
+    @ObservedObject var palette: SystemPalette
     @ObservedObject var hud: HUDCenter
     @ObservedObject var permissions: PermissionStatus
     @ObservedObject var recorder: ShortcutRecorder
@@ -186,7 +175,7 @@ struct SettingsView: View {
                     Text(failure).lineLimit(3)
                 }
                 .font(TypeScale.caption)
-                .foregroundStyle(theme.color(.theme(.red)) ?? theme.foreground)
+                .foregroundStyle(palette.color(.named(.red)) ?? palette.foreground)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 8)
             }
@@ -206,7 +195,7 @@ struct SettingsView: View {
                     }
                     if shown.isEmpty {
                         Text("Nothing is shown. Turn something on below.")
-                            .font(TypeScale.body).foregroundStyle(theme.muted)
+                            .font(TypeScale.body).foregroundStyle(palette.muted)
                     }
                 } header: {
                     SettingsHeader(text: "Shown in the panel", note: "Drag, or use the arrows, to change the order.")
@@ -232,7 +221,7 @@ struct SettingsView: View {
                     }
                     .controlSize(.small)
                     Text("A widget is a small file in the widgets folder: a title, an SF Symbol and a shell command. New ones appear here, turned off.")
-                        .font(TypeScale.caption).foregroundStyle(theme.muted)
+                        .font(TypeScale.caption).foregroundStyle(palette.muted)
                 } header: {
                     SettingsHeader(text: "Widgets")
                 }
@@ -283,12 +272,8 @@ struct SettingsView: View {
                 }
             }
             .listStyle(.inset)
-            .scrollContentBackground(.hidden)
         }
-        .background(theme.background)
-        .tint(theme.highlight)
-        .environmentObject(theme)
-        .preferredColorScheme(theme.colorScheme)
+        .environmentObject(palette)
         .frame(minWidth: 480, minHeight: 420)
     }
 
@@ -399,9 +384,9 @@ struct SettingsView: View {
                 }
             }
             if let hint = recorder.hint {
-                Text(hint).font(TypeScale.caption).foregroundStyle(theme.muted)
+                Text(hint).font(TypeScale.caption).foregroundStyle(palette.muted)
             } else if let problem = host.hotKeyProblem {
-                Text(problem).font(TypeScale.caption).foregroundStyle(theme.color(.theme(.red)) ?? theme.foreground)
+                Text(problem).font(TypeScale.caption).foregroundStyle(palette.color(.named(.red)) ?? palette.foreground)
             }
         }
     }
@@ -476,30 +461,30 @@ struct SettingsView: View {
 
 /// A muted line under a setting, saying what it does or needs.
 private struct SettingNote: View {
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     let text: String
 
     var body: some View {
-        Text(text).font(TypeScale.caption).foregroundStyle(theme.muted).fixedSize(horizontal: false, vertical: true)
+        Text(text).font(TypeScale.caption).foregroundStyle(palette.muted).fixedSize(horizontal: false, vertical: true)
     }
 }
 
 private struct SettingsHeader: View {
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     let text: String
     var note: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(text).font(TypeScale.title).foregroundStyle(theme.foreground)
-            if let note { Text(note).font(TypeScale.caption).foregroundStyle(theme.muted) }
+            Text(text).font(TypeScale.title).foregroundStyle(palette.foreground)
+            if let note { Text(note).font(TypeScale.caption).foregroundStyle(palette.muted) }
         }
         .padding(.top, 6)
     }
 }
 
 private struct SettingsRowView: View {
-    @EnvironmentObject var theme: ThemeStore
+    @EnvironmentObject var palette: SystemPalette
     let row: PanelRow
     let on: Bool
     @ObservedObject var permissions: PermissionStatus
@@ -512,14 +497,14 @@ private struct SettingsRowView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: row.symbol)
                 .font(TypeScale.body)
-                .foregroundStyle(on ? theme.highlight : theme.muted)
+                .foregroundStyle(on ? palette.highlight : palette.muted)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
-                Text(row.title).font(TypeScale.body).foregroundStyle(theme.foreground)
-                Text(row.detail).font(TypeScale.caption).foregroundStyle(theme.muted).fixedSize(horizontal: false, vertical: true)
+                Text(row.title).font(TypeScale.body).foregroundStyle(palette.foreground)
+                Text(row.detail).font(TypeScale.caption).foregroundStyle(palette.muted).fixedSize(horizontal: false, vertical: true)
                 if let permission = row.permission, let note = note(permission) {
                     HStack(spacing: 6) {
-                        Text(note).font(TypeScale.caption).foregroundStyle(theme.muted)
+                        Text(note).font(TypeScale.caption).foregroundStyle(palette.muted)
                             .fixedSize(horizontal: false, vertical: true)
                         if permissions.states[permission] == .denied {
                             Button("Open Privacy Settings") { permissions.openPrivacySettings(permission) }

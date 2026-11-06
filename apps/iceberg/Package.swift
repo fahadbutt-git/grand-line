@@ -4,7 +4,7 @@ import PackageDescription
 // Iceberg, the notch app of Grand Line.
 //
 // IcebergKit holds everything that can be tested without a screen: config
-// parsing, command running, refresh scheduling, themes, layout and the
+// parsing, command running, refresh scheduling, colour names, layout and the
 // Now Playing stream. Iceberg is the AppKit and SwiftUI app on top of it.
 // MediaRemoteAdapter is the vendored Now Playing helper (BSD-3), built as a
 // dynamic library that /usr/bin/perl loads; Iceberg does not link it.
@@ -17,7 +17,7 @@ let package = Package(
         .library(name: "MediaRemoteAdapter", type: .dynamic, targets: ["MediaRemoteAdapter"]),
     ],
     dependencies: [
-        // The app icons, shared with Nexus and Sight.
+        // The glyph for the menu bar icon, and AppRuntime, shared with Sight.
         .package(path: "../icons"),
     ],
     targets: [
