@@ -619,6 +619,12 @@ m() { jq -c "[.profiles[0].complex_modifications.rules[1].manipulators[] | selec
 got="$(m '.from.key_code == "return_or_enter" and .from.modifiers.mandatory == ["shift"]')"
 [[ "$got" == *'"echo mine"'* && "$(jq length <<<"$got")" == 1 ]] && t_ok "overlay replaces a shipped shortcut" || t_fail "overlay replace" "$got"
 [[ "$(m '.from.key_code == "c" and .from.modifiers == null')" != "[]" ]] && t_ok "overlay leaves other shortcuts alone" || t_fail "overlay removed Caps + C"
+# A package update to the shortcuts keeps the mouse settings made in Karabiner's Devices tab.
+jq '.profiles[0].devices = [{"identifiers": {"is_pointing_device": true, "product_id": 1, "vendor_id": 2}, "mouse_flip_vertical_wheel": true}]' \
+  "$ROOT/config/karabiner/karabiner.json" > "$tmp/karabiner-old.json"
+kept="$(karabiner_keep_devices "$ROOT/config/karabiner/karabiner.json" "$tmp/karabiner-old.json")"
+[[ "$(jq '.profiles[0].devices[0].mouse_flip_vertical_wheel' <<<"$kept")" == true ]] && t_ok "Karabiner device settings survive an update" || t_fail "flipped mouse wheel was lost"
+[[ "$(jq '.profiles[0].complex_modifications' <<<"$kept")" == "$(jq '.profiles[0].complex_modifications' "$ROOT/config/karabiner/karabiner.json")" ]] && t_ok "the package's shortcuts still win" || t_fail "device merge changed the shortcuts"
 list="$(KEYBINDINGS_FILE="$ROOT/config/grand-line/keybindings.tsv" KEYBINDINGS_LOCAL="$tmp/bindings.local.tsv" "$ROOT/bin/keybindings" --print)"
 grep -q "^Caps + Shift + Z .*Zotero" <<<"$list" && ! grep -q "^Caps + X " <<<"$list" && grep -q "My browser" <<<"$list" \
   && t_ok "the shortcut list shows your shortcuts too" || t_fail "shortcut list ignores bindings.local.tsv"

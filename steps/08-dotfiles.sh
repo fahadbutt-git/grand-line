@@ -73,8 +73,19 @@ step_dotfiles() {
   [[ -L "$kdir" ]] && backup_path "$kdir"
   if [[ ! -f "$kdir/karabiner.json" || "$(cat "$sum_file" 2>/dev/null)" != "$sum" ]]; then
     run mkdir -p "$kdir"
+    local kept=""
+    if [[ -f "$kdir/karabiner.json" && "$DRY_RUN" != 1 ]]; then
+      # Keep the Devices tab settings (a mouse's flipped scroll wheel, say).
+      kept="$(mktemp)"
+      if karabiner_keep_devices "$kfile" "$kdir/karabiner.json" > "$kept" 2>/dev/null && [[ -s "$kept" ]]; then
+        kfile="$kept"
+      else
+        warn "Karabiner's device settings could not be read, so they were reset."
+      fi
+    fi
     [[ -f "$kdir/karabiner.json" ]] && backup_path "$kdir/karabiner.json"
     run cp "$kfile" "$kdir/karabiner.json"
+    [[ -n "$kept" ]] && rm -f "$kept"
     run mkdir -p "$GRAND_LINE_STATE"
     run_sh "printf '%s\n' $sum > $(printf '%q' "$sum_file")"
     # Karabiner reads the file on change, but a restart covers the first install.

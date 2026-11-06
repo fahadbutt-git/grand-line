@@ -39,3 +39,15 @@ karabiner_with_overlay() {
         | if $o.cmd then [manipulator($o)] + . else . end)
   ' "$1"
 }
+
+# karabiner_keep_devices NEW_JSON OLD_JSON: prints NEW_JSON with the device
+# settings from OLD_JSON carried over, profile by profile (matched by name).
+# These are the choices made in Karabiner's Devices tab, such as "Flip mouse
+# vertical wheel" for a mouse that should scroll the other way to the
+# trackpad, so a package update to the shortcuts never undoes them.
+karabiner_keep_devices() {
+  jq --slurpfile old "$2" '
+    ([$old[0].profiles[]? | select(.devices) | {key: .name, value: .devices}] | from_entries) as $dev
+    | .profiles |= map(if $dev[.name] then .devices = $dev[.name] else . end)
+  ' "$1"
+}
