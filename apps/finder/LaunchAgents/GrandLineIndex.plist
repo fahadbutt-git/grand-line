@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- The Grand Line Index agent. Setup writes it to
-     ~/Library/LaunchAgents/com.grandline.index.plist, with @PROGRAM@ replaced
-     by the installed program, and loads it (lib/service-agents.sh). launchd
+     ~/Library/LaunchAgents/com.grandline.index.plist, with the program placeholder
+     set to the installed program, and loads it (lib/service-agents.sh). launchd
      runs it at login, keeps it running, and starts it when Sight connects to
      the Mach service. GrandLineIndex with its register option writes the same
      keys when the file is missing (apps/finder/Sources/GrandLineIndex/main.swift). -->

@@ -24,9 +24,15 @@ service_agent_label() {
 
 # service_agent_plist TEMPLATE PROGRAM: the plist as it goes in ~/Library/LaunchAgents.
 service_agent_plist() {
-  local text
+  local text out=""
   text="$(cat "$1")"
-  printf '%s\n' "${text//@PROGRAM@/"$2"}"
+  # Piece by piece: a quoted replacement in ${//} is literal in bash 3.2, and
+  # an unquoted one gives & a meaning in bash 5.2.
+  while [[ "$text" == *@PROGRAM@* ]]; do
+    out="$out${text%%@PROGRAM@*}$2"
+    text="${text#*@PROGRAM@}"
+  done
+  printf '%s\n' "$out$text"
 }
 
 # service_agent_path LABEL: where its plist goes.
