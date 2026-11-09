@@ -20,6 +20,7 @@ REPO_DIR="$repo" DRY_RUN=0 bash -c '
   source "$1/lib/auto-update.sh"
   downloads_plist > "$2/downloads.plist"
   update_agent_plist > "$2/update.plist"
+  source "$1/lib/service-agents.sh"
+  service_agent_plist "$1/apps/finder/LaunchAgents/GrandLineIndex.plist" "/Applications/Grand Line Index.app/Contents/MacOS/GrandLineIndex" > "$2/index.plist"
 ' _ "$repo" "$dir" || { echo "agents.sh: could not write the agents" >&2; exit 1; }
-cp "$repo/apps/finder/Bundle/GrandLineIndex/Library/LaunchAgents/com.grandline.index.plist" "$dir/index.plist"
 python3 "$here/measure.py" agents --out "$out" "$dir"/*.plist

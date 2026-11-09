@@ -993,38 +993,101 @@ logged() { local _; for _ in 1 2 3 4 5 6 7 8 9 10; do grep -qF -- "$1" "$STUB_LO
   exit 0
 ) && t_ok "file indexes, search history and caches are kept out of Time Machine, settings are not" || t_fail "backup exclusions (step $?)" "$(cat "$STUB_LOG")"
 
-# --- a background service: its launch agent sealed in the bundle, registered as you
+# --- a background service: a plain launch agent in ~/Library/LaunchAgents, loaded as you
 (
-  srv="$tmp/svc-repo"; mkdir -p "$srv/apps/svc/Sources" "$srv/apps/svc/Bundle/Svc/Library/LaunchAgents" "$tmp/svc-bin" "$tmp/SvcApps"
+  srv="$tmp/svc-repo"; mkdir -p "$srv/apps/svc/Sources" "$srv/apps/svc/LaunchAgents" "$tmp/svc-bin" "$tmp/SvcApps" "$tmp/svc-home"
+  export HOME="$tmp/svc-home" STUB_LAUNCHD="$tmp/svc-launchd"; : > "$STUB_LAUNCHD"
   printf 'Svc\tSvc Index\tcom.example.svc\tno\n' > "$srv/apps/svc/apps.tsv"
   echo '// svc' > "$srv/apps/svc/Sources/main.swift"
-  printf '<plist><dict><key>Label</key><string>com.example.svc</string></dict></plist>\n' > "$srv/apps/svc/Bundle/Svc/Library/LaunchAgents/com.example.svc.plist"
+  printf '<plist><dict>\n  <key>Label</key><string>com.example.svc</string>\n  <key>Program</key><string>@PROGRAM@</string>\n</dict></plist>\n' > "$srv/apps/svc/LaunchAgents/Svc.plist"
   cat > "$tmp/svc-bin/swift" <<'EOF'
 #!/bin/bash
 args="$*"; pp="${args#*--package-path }"; dir="${pp%% *}"; mkdir -p "$dir/.build/release"
-printf '#!/bin/bash\necho "svc $*" >> "$STUB_LOG"\n[[ "$1" == --register ]] && { echo "requires approval"; exit 1; }\nexit 0\n' > "$dir/.build/release/Svc"
+printf '#!/bin/bash\necho "svc $*" >> "$STUB_LOG"\nexit 0\n' > "$dir/.build/release/Svc"
 chmod +x "$dir/.build/release/Svc"
 EOF
   chmod +x "$tmp/svc-bin/swift"
   export PATH="$tmp/svc-bin:$PATH" REPO_DIR="$srv" DRY_RUN=0 GRAND_LINE_APPS_DEST="$tmp/SvcApps"
   source "$ROOT/lib/common.sh"; source "$ROOT/lib/native-apps.sh"
-  app="$tmp/SvcApps/Svc Index.app"
+  app="$tmp/SvcApps/Svc Index.app" agent="$HOME/Library/LaunchAgents/com.example.svc.plist"
   : > "$STUB_LOG"; out="$(build_native_apps 2>&1)"
-  [[ -f "$app/Contents/Library/LaunchAgents/com.example.svc.plist" ]] || exit 1
-  # Copied in before signing, so the signature seals it.
-  [[ "$(grep -n "codesign --force --options runtime --sign - .*\.Svc Index\.app\.new$" "$STUB_LOG" | head -1 | cut -d: -f1)" -gt 0 ]] || exit 2
-  grep -q "^svc --register$" "$STUB_LOG" || exit 3
-  grep -q "Allow in the Background, Svc Index" <<<"$out" || exit 4
-  grep -q "sudo" "$STUB_LOG" && exit 5
-  grep -q "launchctl kickstart" "$STUB_LOG" && exit 6       # first install: nothing to restart
+  [[ -e "$app/Contents/Library/LaunchAgents" ]] && exit 1      # nothing in the bundle for Login Items
+  grep -qF "<string>$app/Contents/MacOS/Svc</string>" "$agent" || exit 2
+  grep -q "^launchctl bootstrap gui/501 $agent$" "$STUB_LOG" && grep -qx com.example.svc "$STUB_LAUNCHD" || exit 3
+  grep -q "Svc Index starts at login" <<<"$out" || exit 4
+  grep -qE "sudo|^svc --register|launchctl kickstart" "$STUB_LOG" && exit 5   # first install: nothing to restart
+  # A new build: launchd restarts it from the same path, nothing is loaded again.
   echo '// svc v2' > "$srv/apps/svc/Sources/main.swift"
   : > "$STUB_LOG"; build_native_apps >/dev/null 2>&1
-  grep -q "^launchctl kickstart -k gui/501/com.example.svc$" "$STUB_LOG" || exit 7
-  grep -q "^open -g" "$STUB_LOG" && exit 8                   # launchd restarts it, not open
-  DRY_RUN=1 install_app_bundle "$srv/apps/svc" Svc "Svc Index" com.example.svc no | grep -q "\[dry-run\] .*Svc --register" || exit 9
+  grep -q "^launchctl kickstart -k gui/501/com.example.svc$" "$STUB_LOG" || exit 6
+  grep -qE "^launchctl (bootstrap|bootout)|^open -g|^svc --" "$STUB_LOG" && exit 7
+  # Every setup run: nothing changes while it is in place...
+  : > "$STUB_LOG"; start_services >/dev/null 2>&1
+  grep -q "^launchctl \(bootstrap\|bootout\|kickstart\)" "$STUB_LOG" && exit 8
+  # ...and it comes back when it was unloaded or its plist changed.
+  : > "$STUB_LAUNCHD"; : > "$STUB_LOG"; start_services >/dev/null 2>&1
+  grep -q "^launchctl bootstrap gui/501 $agent$" "$STUB_LOG" || exit 9
+  echo changed > "$agent"; : > "$STUB_LOG"; start_services >/dev/null 2>&1
+  grep -q "^launchctl bootout gui/501/com.example.svc$" "$STUB_LOG" && grep -q "^launchctl bootstrap" "$STUB_LOG" || exit 10
+  grep -qF "<string>$app/Contents/MacOS/Svc</string>" "$agent" || exit 11
+  # A copy from before carried the agent in its bundle: it unregisters itself before it goes.
+  mkdir -p "$app/Contents/Library/LaunchAgents"; touch "$app/Contents/Library/LaunchAgents/com.example.svc.plist"
+  echo '// svc v3' > "$srv/apps/svc/Sources/main.swift"
+  : > "$STUB_LOG"; build_native_apps >/dev/null 2>&1
+  grep -q "^svc --unregister$" "$STUB_LOG" || exit 12
+  [[ -e "$app/Contents/Library/LaunchAgents" ]] && exit 13
+  DRY_RUN=1 install_app_bundle "$srv/apps/svc" Svc "Svc Index" com.example.svc no | grep -q "\[dry-run\] write ~/Library/LaunchAgents/com.example.svc.plist" || exit 14
   exit 0
-) && t_ok "a background service's launch agent is sealed in its bundle, registered as you, restarted by launchd" \
+) && t_ok "a background service gets a plain launch agent loaded as you, restarted by launchd after a rebuild, loaded again only when changed or unloaded" \
   || t_fail "background service (step $?)" "$(cat "$STUB_LOG")"
+
+# --- the index's launch agent template and what setup writes from it
+(
+  source "$ROOT/lib/service-agents.sh"
+  tpl="$ROOT/apps/finder/LaunchAgents/GrandLineIndex.plist"
+  [[ "$(service_agent_label "$tpl")" == com.grandline.index ]] || exit 1
+  [[ ! -e "$ROOT/apps/finder/Bundle/GrandLineIndex/Library/LaunchAgents" ]] || exit 2
+  text="$(service_agent_plist "$tpl" "/Applications/Grand Line Index.app/Contents/MacOS/GrandLineIndex")"
+  grep -q "@PROGRAM@\|BundleProgram\|AssociatedBundleIdentifiers" <<<"$text" && exit 3
+  [[ "$(grep -c "<string>/Applications/Grand Line Index.app/Contents/MacOS/GrandLineIndex</string>" <<<"$text")" == 2 ]] || exit 4
+  grep -q "<string>--serve</string>" <<<"$text" && grep -q "<key>com.grandline.index</key><true/>" <<<"$text" || exit 5
+  grep -A1 "<key>SuccessfulExit</key>" <<<"$text" | grep -q "<false/>" || grep -q "<key>SuccessfulExit</key><false/>" <<<"$text" || exit 6
+  if command -v python3 >/dev/null; then
+    python3 -c 'import plistlib,sys; d=plistlib.loads(sys.stdin.buffer.read()); assert d["ProgramArguments"][1]=="--serve" and d["KeepAlive"]=={"SuccessfulExit": False}' <<<"$text" || exit 7
+  fi
+  exit 0
+) && t_ok "Grand Line Index's launch agent starts the installed program with --serve, keeps its Mach service, and is not in the bundle" \
+  || t_fail "index launch agent template (step $?)"
+
+# --- migration: the index leaves Login Items for a plain launch agent
+(
+  mh="$tmp/idx-home"; mkdir -p "$mh" "$tmp/IdxApps/Grand Line Index.app/Contents/MacOS"; export HOME="$mh"
+  export GRAND_LINE_STATE="$mh/.local/state/grand-line" GRAND_LINE_APPS_DEST="$tmp/IdxApps" STUB_LAUNCHD="$tmp/idx-launchd"
+  program="$tmp/IdxApps/Grand Line Index.app/Contents/MacOS/GrandLineIndex" agent="$mh/Library/LaunchAgents/com.grandline.index.plist"
+  printf '#!/bin/bash\necho "index $*" >> "$STUB_LOG"\n[[ "$1" == --unregister ]] && exit 1\nexit 0\n' > "$program"; chmod +x "$program"
+  m="$ROOT/migrations/1794096000-index-agent-out-of-login-items.sh"
+  grep -qx '# grandline:unattended' "$m" || exit 1
+  # The old SMAppService job is loaded under the same label: it is unregistered, then replaced.
+  echo com.grandline.index > "$STUB_LAUNCHD"
+  : > "$STUB_LOG"
+  out="$(GRAND_LINE_REPO="$ROOT" bash "$m" 2>&1)" || { echo "$out"; exit 2; }
+  grep -q "^index --unregister$" "$STUB_LOG" || exit 3                  # its failure is ignored
+  grep -qF "<string>$program</string>" "$agent" || exit 4
+  grep -q "^launchctl bootout gui/501/com.grandline.index$" "$STUB_LOG" && grep -q "^launchctl bootstrap gui/501 $agent$" "$STUB_LOG" || exit 5
+  grep -qx com.grandline.index "$STUB_LAUNCHD" || exit 6
+  grep -q "now starts at login" <<<"$out" || exit 7
+  grep -qE "^rm |--register|kickstart" "$STUB_LOG" && exit 8
+  # Again: nothing is loaded or written again.
+  : > "$STUB_LOG"
+  GRAND_LINE_REPO="$ROOT" bash "$m" >/dev/null 2>&1 || exit 9
+  grep -qE "^launchctl (bootstrap|bootout)" "$STUB_LOG" && exit 10
+  # Without the app, it does nothing and succeeds.
+  : > "$STUB_LOG"
+  GRAND_LINE_APPS_DEST="$tmp/none" GRAND_LINE_REPO="$ROOT" bash "$m" >/dev/null 2>&1 || exit 11
+  grep -q "launchctl\|^index" "$STUB_LOG" && exit 12
+  exit 0
+) && t_ok "migration: Grand Line Index's old Login Items registration goes and its launch agent is loaded from ~/Library/LaunchAgents, safe to run again" \
+  || t_fail "index agent migration (step $?)" "$(cat "$STUB_LOG")"
 
 # --- bundled icons: make-icons draws previews without touching the package's icons
 python3 "$ROOT/tools/make-icons.py" --only Iceberg --previews "$tmp/icons-out" --previews-only >/dev/null 2>&1

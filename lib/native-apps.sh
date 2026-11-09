@@ -23,6 +23,8 @@ APPS_DEST="${GRAND_LINE_APPS_DEST:-/Applications}"
 APPS_CONFIG="${GRAND_LINE_APPS_CONFIG:-release}"
 # shellcheck source=lib/signing.sh
 source "$(dirname "${BASH_SOURCE[0]}")/signing.sh"
+# shellcheck source=lib/service-agents.sh
+source "$(dirname "${BASH_SOURCE[0]}")/service-agents.sh"
 
 # build_native_apps: build every app whose sources changed since its last
 # build. Returns 1 if any failed, and keeps the installed copy then.
@@ -103,33 +105,57 @@ build_and_install() {
 }
 
 # service_label DIR PRODUCT: the launchd label of a product that is a
-# background service (its Bundle folder holds a launch agent), or nothing.
+# background service (its folder has a launch agent template), or nothing.
 service_label() {
-  local plist
-  for plist in "$1/Bundle/$2/Library/LaunchAgents/"*.plist; do
-    [[ -f "$plist" ]] && { basename "$plist" .plist; return 0; }
-  done
+  local tpl
+  tpl="$(service_agent_template "$1" "$2")"
+  [[ -n "$tpl" ]] && service_agent_label "$tpl"
   return 0
 }
 
-# register_service APP PRODUCT LABEL REINSTALLED: the service registers its
-# own launch agent with macOS (SMAppService), as you, never with sudo. It
-# prints enabled, requires approval, or an error. A new copy of a running
-# service is started again by launchd.
-register_service() {
-  local app="$1" product="$2" label="$3" reinstall="$4" out
-  out="$("$app/Contents/MacOS/$product" --register 2>&1)"
-  if [[ $? -eq 0 ]]; then
-    ok "$(basename "$app" .app) runs in the background"
-  elif [[ "$out" == *"requires approval"* ]]; then
-    warn "Allow $(basename "$app" .app) to run: System Settings, General, Login Items, Allow in the Background, $(basename "$app" .app)"
-  else
-    warn "$(basename "$app" .app) could not register its background service: ${out:-no answer}"
+# start_service DIR PRODUCT NAME REINSTALLED: the service's launch agent in
+# ~/Library/LaunchAgents is written and loaded when it is missing or
+# different (lib/service-agents.sh), as you, never with sudo. A new copy of a
+# service that was running already is started again by launchd: the program
+# is at the same path, so nothing is registered again.
+start_service() {
+  local dir="$1" product="$2" name="$3" reinstall="$4" app tpl label
+  app="$APPS_DEST/$name.app"
+  tpl="$(service_agent_template "$dir" "$product")"
+  [[ -n "$tpl" && -x "$app/Contents/MacOS/$product" ]] || return 0
+  label="$(service_agent_label "$tpl")"
+  service_agent_unregister_legacy "$app" "$product" "$label"
+  if ! service_agent_ensure "$tpl" "$app/Contents/MacOS/$product"; then
+    warn "$name could not start in the background. Run: bash ~/grand-line/setup.sh --only native-tools"
+    return 0
   fi
-  if [[ "$reinstall" == 1 ]]; then
+  if [[ "$SERVICE_AGENT_STARTED" == 1 ]]; then
+    ok "$name starts at login and runs in the background"
+  elif [[ "$reinstall" == 1 ]]; then
     launchctl kickstart -k "gui/$(id -u)/$label" >/dev/null 2>&1
   fi
   return 0
+}
+
+# start_services: every installed background service has its launch agent
+# loaded. Setup runs it every time, so one that was removed or unloaded comes
+# back; when all are in place it changes nothing.
+start_services() {
+  local list dir product name id agent
+  [[ "${GRAND_LINE_APPS_SCRATCH:-0}" == 1 ]] && return 0
+  for list in "$REPO_DIR"/apps/*/apps.tsv; do
+    [[ -f "$list" ]] || continue
+    dir="$(dirname "$list")"
+    while IFS=$'\t' read -r product name id agent; do
+      [[ -z "$product" || "$product" == \#* ]] && continue
+      [[ -n "$(service_agent_template "$dir" "$product")" ]] || continue
+      if [[ "$DRY_RUN" == 1 ]]; then
+        run "write ~/Library/LaunchAgents/$(service_label "$dir" "$product").plist for $name and load it"
+        continue
+      fi
+      start_service "$dir" "$product" "$name" 0
+    done < "$list"
+  done
 }
 
 # apps_tree_clean: nothing that goes into an app differs from the last commit,
@@ -148,7 +174,7 @@ install_app_bundle() {
   if [[ "$DRY_RUN" == 1 ]]; then
     run "install $name in $app"
     if [[ -n "$(service_label "$dir" "$product")" ]]; then
-      run "$app/Contents/MacOS/$product --register"
+      run "write ~/Library/LaunchAgents/$(service_label "$dir" "$product").plist for $name and load it"
     fi
     return 0
   fi
@@ -171,8 +197,7 @@ install_app_bundle() {
   cp "$out/$product" "$new/Contents/MacOS/$product"
   [[ -d "$dir/Resources/$product" ]] && cp -R "$dir/Resources/$product/." "$new/Contents/Resources/"
   info_plist "$product" "$name" "$id" "$agent" "$dir/Info/$product.plist" > "$new/Contents/Info.plist"
-  # Files that belong elsewhere in the bundle (a background service's launch
-  # agent plist in Contents/Library/LaunchAgents), so the signature seals them.
+  # Files that belong elsewhere in the bundle, so the signature seals them.
   [[ -d "$dir/Bundle/$product" ]] && cp -R "$dir/Bundle/$product/." "$new/Contents/"
   # Sight carries the package's commands and their settings, so its settings
   # rows, power actions and menu work on a Mac where only the apps were
@@ -239,6 +264,9 @@ install_app_bundle() {
       return 0
     fi
   fi
+  # A copy built before its launch agent moved to ~/Library/LaunchAgents
+  # removes its own SMAppService registration while it still can.
+  [[ -n "$label" && "${GRAND_LINE_APPS_SCRATCH:-0}" != 1 ]] && service_agent_unregister_legacy "$app" "$product" "$label"
   # The installed copy goes to the Trash, then the new one takes its place.
   swap_in "$new" "$app" || { rm -rf "$new"; return 1; }
   [[ -x "$LSREGISTER" ]] && "$LSREGISTER" -f "$app" >/dev/null 2>&1
@@ -247,7 +275,7 @@ install_app_bundle() {
   [[ "$running" == 1 ]] && relaunch_app "$app" "$product" "$agent"
 
   if [[ -n "$label" && "${GRAND_LINE_APPS_SCRATCH:-0}" != 1 ]]; then
-    register_service "$app" "$product" "$label" "$reinstall"
+    start_service "$dir" "$product" "$name" "$reinstall"
   fi
   # bin/update reads the list of apps it replaced, for its one notification.
   [[ -n "${GRAND_LINE_APPS_REPORT:-}" ]] && printf '%s\n' "$name" >> "$GRAND_LINE_APPS_REPORT"

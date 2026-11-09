@@ -88,8 +88,9 @@ public final class SharedIndexClient: IndexStatusProviding, @unchecked Sendable 
         self.local = LocalIndex(locations: IndexLocations(home: home))
     }
 
-    /// Opens `open -g -j -b com.grandline.index`, which registers the agent
-    /// with launchd (or finds it registered) and exits. Not during journeys.
+    /// Opens `open -g -j -b com.grandline.index`, which starts the agent
+    /// (launchctl kickstart, or loads its plist in ~/Library/LaunchAgents
+    /// when launchd does not have it) and exits. Not during journeys.
     public static func defaultStarter(_ environment: [String: String] = ProcessInfo.processInfo.environment) -> Starter {
         if environment["GRAND_LINE_JOURNEY"] == "1" { return {} }
         return {

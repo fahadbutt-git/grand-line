@@ -64,13 +64,12 @@ macOS requires these clicks from you. Work down the list once.
    toggle.
 
 7. The file index (Grand Line Index)
-   Sight searches through an index that runs in the background. If
-   macOS asks, allow it in System Settings, General, Login Items, Allow
-   in the Background, Grand Line Index. Then give it Full Disk Access
-   (setup opens the page): System Settings, Privacy and Security, Full
-   Disk Access, +, choose Grand Line Index in Applications. Without it,
-   allow it Desktop, Documents, Downloads and Google Drive under Files
-   and Folders instead.
+   Sight searches through an index that setup starts in the background
+   at login; there is nothing to allow for that. Give it Full Disk
+   Access (setup opens the page): System Settings, Privacy and Security,
+   Full Disk Access, +, choose Grand Line Index in Applications. Without
+   it, allow it Desktop, Documents, Downloads and Google Drive under
+   Files and Folders instead.
 
 8. Volume for each app (FineTune)
    Open FineTune and allow audio access when asked. Its menu bar icon

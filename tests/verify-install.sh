@@ -113,9 +113,16 @@ fi
 index_app="/Applications/Grand Line Index.app"
 if [[ -d "$index_app" ]]; then
   status="$("$index_app/Contents/MacOS/GrandLineIndex" --status 2>&1)"
-  if [[ "$status" == enabled* ]]; then pass "Grand Line Index is registered to run in the background"
-  elif [[ "$CI" == 1 && "$status" == *"requires approval"* ]]; then note "Grand Line Index waits for approval in Login Items (expected on a test machine)"
+  if [[ "$status" == enabled* ]]; then pass "Grand Line Index runs in the background"
+  elif [[ "$CI" == 1 ]]; then note "Grand Line Index is not running in the background: ${status:-no answer}"
   else fail "Grand Line Index is not running in the background: ${status:-no answer}"; fi
+  agent_plist="$HOME/Library/LaunchAgents/com.grandline.index.plist"
+  if grep -q "<string>$index_app/Contents/MacOS/GrandLineIndex</string>" "$agent_plist" 2>/dev/null; then
+    pass "the index agent is a plain launch agent in ~/Library/LaunchAgents"
+  else fail "$agent_plist is missing or does not start $index_app"; fi
+  [[ -e "$index_app/Contents/Library/LaunchAgents" ]] \
+    && fail "Grand Line Index still carries a launch agent in its bundle (registered with Login Items)" \
+    || pass "Grand Line Index registers nothing with Login Items"
   launchctl print "gui/$(id -u)/com.grandline.index" >/dev/null 2>&1 \
     && pass "the index agent is loaded" || { if [[ "$CI" == 1 ]]; then note "the index agent is not loaded"; else fail "the index agent is not loaded"; fi; }
 fi

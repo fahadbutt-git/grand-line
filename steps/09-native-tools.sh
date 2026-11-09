@@ -62,6 +62,8 @@ step_native_tools() {
     return 1
   fi
   build_native_apps || failed=1
+  # Grand Line Index's launch agent, even when no app was rebuilt.
+  start_services
   [[ "$DRY_RUN" == 1 ]] || exclude_indexes_from_backup
   # The apps were renamed. Their files move to the new names right after the
   # new apps are installed and before anything starts them, so the first launch
