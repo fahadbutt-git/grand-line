@@ -25,13 +25,14 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         self.window = window
         permissions.refresh()
         host.hud.refreshPermissions()
+        host.pomodoro.refreshNotificationStatus()
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
     }
 
     private func make() -> NSWindow {
-        let root = SettingsView(host: host, user: host.user, palette: host.palette, hud: host.hud, permissions: permissions,
-                                recorder: recorder)
+        let root = SettingsView(host: host, user: host.user, palette: host.palette, hud: host.hud, pomodoro: host.pomodoro,
+                                permissions: permissions, recorder: recorder)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 640),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable],
                               backing: .buffered, defer: false)
@@ -50,6 +51,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     func windowDidBecomeKey(_ notification: Notification) {
         permissions.refresh()
         host.hud.refreshPermissions()
+        host.pomodoro.refreshNotificationStatus()
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -160,6 +162,7 @@ struct SettingsView: View {
     @ObservedObject var user: UserWidgets
     @ObservedObject var palette: SystemPalette
     @ObservedObject var hud: HUDCenter
+    @ObservedObject var pomodoro: PomodoroModel
     @ObservedObject var permissions: PermissionStatus
     @ObservedObject var recorder: ShortcutRecorder
     @Local private var failure: String?
@@ -244,6 +247,13 @@ struct SettingsView: View {
                 } header: {
                     SettingsHeader(text: "HUDs in the notch",
                                    note: "Shown beside the closed notch when something changes. Each starts turned off.")
+                }
+
+                Section {
+                    pomodoroSettings
+                } header: {
+                    SettingsHeader(text: "Pomodoro",
+                                   note: "Turn on Pomodoro in the list above. Caps + P starts, pauses and resumes it from any app.")
                 }
 
                 if let player = host.nowPlaying {
@@ -353,6 +363,43 @@ struct SettingsView: View {
         }
         .font(TypeScale.body)
     }
+
+    private var pomodoroSettings: some View {
+        let s = host.settings
+        return VStack(alignment: .leading, spacing: 8) {
+            minutesStepper("Focus", key: "pomodoro_focus", value: s.pomodoroFocus, range: PomodoroConfig.focusRange, step: 5)
+            minutesStepper("Short break", key: "pomodoro_short_break", value: s.pomodoroShortBreak,
+                           range: PomodoroConfig.shortBreakRange, step: 1)
+            minutesStepper("Long break", key: "pomodoro_long_break", value: s.pomodoroLongBreak,
+                           range: PomodoroConfig.longBreakRange, step: 5)
+            Stepper(value: Binding(
+                get: { s.pomodoroRounds },
+                set: { failure = host.save("pomodoro_rounds", .integer(Self.clamp($0, PomodoroConfig.roundsRange))) }),
+                    in: PomodoroConfig.roundsRange) {
+                Text("Long break after \(s.pomodoroRounds) focus \(s.pomodoroRounds == 1 ? "round" : "rounds")")
+            }
+            settingToggle("Start the next phase by itself", key: "pomodoro_auto_start", value: s.pomodoroAutoStart)
+            SettingNote(text: "Off: when a phase ends the timer waits at the next one until you start it.")
+            settingToggle("Play a sound when a phase ends", key: "pomodoro_sound", value: s.pomodoroSound)
+            SettingNote(text: "A notice says when each phase ends. macOS asks whether Iceberg may show notices the first time a timer starts. Do Not Disturb and Focus hold them, as they do any app's.")
+            if pomodoro.notificationsDenied {
+                HStack(spacing: 6) {
+                    SettingNote(text: "Notices are turned off for Iceberg, so only the notch shows a phase's end.")
+                    Button("Open Notification Settings") { pomodoro.openNotificationSettings() }.controlSize(.small)
+                }
+            }
+        }
+        .font(TypeScale.body)
+    }
+
+    private func minutesStepper(_ title: String, key: String, value: Int, range: ClosedRange<Int>, step: Int) -> some View {
+        Stepper(value: Binding(get: { value }, set: { failure = host.save(key, .integer(Self.clamp($0, range))) }),
+                in: range, step: step) {
+            Text("\(title): \(value) min")
+        }
+    }
+
+    static func clamp(_ n: Int, _ range: ClosedRange<Int>) -> Int { min(max(n, range.lowerBound), range.upperBound) }
 
     /// A HUD switch whose HUD needs Accessibility: turning it on asks macOS
     /// to list Iceberg there.

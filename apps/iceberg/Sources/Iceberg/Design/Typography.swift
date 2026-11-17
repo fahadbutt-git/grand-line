@@ -21,6 +21,8 @@ enum TypeScale {
     static let numeral = Font.subheadline.monospacedDigit()
     /// A chip's value: 13 pt medium with tabular digits.
     static let value = Font.body.weight(.medium).monospacedDigit()
+    /// The Pomodoro card's time left: the large title style, tabular digits.
+    static let timer = Font.largeTitle.weight(.medium).monospacedDigit()
     /// File names and code in Settings: 11 pt monospaced.
     static let code = Font.subheadline.monospaced()
 }

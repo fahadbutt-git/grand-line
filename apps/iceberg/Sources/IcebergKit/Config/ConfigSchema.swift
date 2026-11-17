@@ -246,7 +246,8 @@ extension ConfigSchema {
     /// `~/.config/grand-line/iceberg/iceberg.toml`.
     public static let settings = ConfigSchema(noun: "iceberg.toml", keys: [
         SchemaKey("panel", .names, "What the panel shows, in order: built-in items and widget file names.",
-                  example: "[\"date\", \"now-playing\", \"today\"]", defaultValue: "[\"date\", \"now-playing\", \"today\"]"),
+                  example: "[\"date\", \"now-playing\", \"today\", \"pomodoro\"]",
+                  defaultValue: "[\"date\", \"now-playing\", \"today\", \"pomodoro\"]"),
         SchemaKey("open_on", .choice(["hover", "click"]), "Open the panel when the pointer rests on the notch, or when it is clicked.",
                   example: "\"hover\"", defaultValue: "\"hover\""),
         SchemaKey("hover_delay", .number, "Seconds the pointer rests on the notch before the panel opens.",
@@ -280,6 +281,18 @@ extension ConfigSchema {
         SchemaKey("hud_replace_system", .bool,
                   "Iceberg handles the volume and brightness keys so macOS's own HUD does not show (needs Accessibility).",
                   example: "false", defaultValue: "false"),
+        SchemaKey("pomodoro_focus", .integer, "Minutes in a Pomodoro focus round.",
+                  example: "25", defaultValue: "25", range: 1...180, clamps: true),
+        SchemaKey("pomodoro_short_break", .integer, "Minutes in a short break after a focus round.",
+                  example: "5", defaultValue: "5", range: 1...60, clamps: true),
+        SchemaKey("pomodoro_long_break", .integer, "Minutes in the long break after the last focus round.",
+                  example: "15", defaultValue: "15", range: 1...120, clamps: true),
+        SchemaKey("pomodoro_rounds", .integer, "Focus rounds before a long break.",
+                  example: "4", defaultValue: "4", range: 1...12, clamps: true),
+        SchemaKey("pomodoro_auto_start", .bool, "Start the next Pomodoro phase by itself when one ends.",
+                  example: "false", defaultValue: "false"),
+        SchemaKey("pomodoro_sound", .bool, "Play a sound with the notice when a Pomodoro phase ends.",
+                  example: "true", defaultValue: "true"),
         SchemaKey("builtin", .names, "The older way to choose built-in items; panel replaces it.",
                   example: "[\"now-playing\", \"today\"]"),
     ])

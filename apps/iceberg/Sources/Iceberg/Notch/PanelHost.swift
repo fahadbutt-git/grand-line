@@ -21,6 +21,9 @@ final class PanelHost: ObservableObject {
     let drag = DragWatcher()
     /// The HUDs in the notch.
     let hud = HUDCenter()
+    /// The Pomodoro timer: runs whether or not its card is in the panel, so
+    /// `iceberg pomodoro` and the closed notch work either way.
+    let pomodoro: PomodoroModel
 
     @Published private(set) var settings = IcebergSettings()
     @Published private(set) var settingsIssues: [ConfigIssue] = []
@@ -63,10 +66,12 @@ final class PanelHost: ObservableObject {
         self.user = UserWidgets(paths: paths, palette: palette)
         self.events = SharedEventStore()
         self.shelf = ShelfModel(paths: paths)
+        self.pomodoro = PomodoroModel(paths: paths)
         self.hotKey = HotKey()
         self.escapeKey = HotKey(id: 2)
         escapeKey.action = { [weak self] in self?.onEscape?() }
         reloadSettings()
+        pomodoro.saveFocus = { [weak self] minutes in _ = self?.save("pomodoro_focus", .integer(minutes)) }
         watchConfig()
         triggerObserver = DistributedObserver(Self.triggerNotification) { [weak self] note in
             guard let name = note.object as? String, !name.isEmpty else { return }
@@ -164,7 +169,8 @@ final class PanelHost: ObservableObject {
         user.setMaxConcurrent(loaded.maxConcurrent)
         if shortcutChanged { hotKeyProblem = hotKey.register(loaded.toggleShortcut) }
         applyFeatures(loaded, layout: newLayout)
-        let context = WidgetContext(palette: palette, events: events, settings: loaded, shelf: shelf,
+        pomodoro.apply(PomodoroConfig(settings: loaded))
+        let context = WidgetContext(palette: palette, events: events, settings: loaded, shelf: shelf, pomodoro: pomodoro,
                                     availabilityChanged: { [weak self] in self?.objectWillChange.send() })
         let wanted = newLayout.builtins
         for (name, widget) in made where !wanted.contains(name) {

@@ -94,6 +94,7 @@ BINDINGS += [
     ("a", ["shift", "control"], "Apps", "Gemini", app("Gemini")),
     ("n", ["shift"], "Apps", "Notion", app("Notion")),
     ("n", ["control", "option"], "Apps", "Open or close the notch panel (Iceberg)", sh("open -g iceberg://toggle")),
+    ("p", [], "Apps", "Pomodoro timer: start, pause or resume (Iceberg)", cmd("iceberg pomodoro toggle")),
     ("t", ["shift"], "Apps", "Reminders (tasks)", app("Reminders")),
     ("g", ["shift"], "Apps", "WhatsApp", app("WhatsApp")),
     ("m", ["shift"], "Apps", "Spotify", app("Spotify")),

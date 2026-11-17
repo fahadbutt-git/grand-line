@@ -1451,4 +1451,73 @@ grep -q '^UNATTENDED_STEPS="folders,dotfiles,native-tools,downloads"$' "$ROOT/se
 ) && t_ok "migration: AeroSpace quits and is uninstalled (data kept), its link goes to the Trash, the tap goes, safe to run again" \
   || t_fail "AeroSpace migration (step $?)" "$(cat "$STUB_LOG")"
 
+# --- migration: the Pomodoro timer joins an existing panel list
+(
+  ph="$tmp/pomodoro-home"; mkdir -p "$ph/.config/grand-line/iceberg"; export HOME="$ph"
+  f="$ph/.config/grand-line/iceberg/iceberg.toml"
+  m="$ROOT/migrations/1794951185-pomodoro-in-the-notch.sh"
+  grep -qx '# grandline:unattended' "$m" || exit 1
+  run() { GRAND_LINE_REPO="$ROOT" bash "$m"; }
+  # No file, or a file without a panel list: nothing changes (the default has it).
+  out="$(run)" || exit 2; [[ -z "$out" && ! -e "$f" ]] || exit 3
+  printf '# mine\nopen_on = "click"\n' > "$f"
+  run >/dev/null || exit 4; [[ "$(cat "$f")" == $'# mine\nopen_on = "click"' ]] || exit 5
+  # After "today", and only the list changes.
+  printf '# mine\npanel = ["date", "today", "weather"]   # what shows\nhud_volume = true\n' > "$f"
+  out="$(run)" || exit 6; [[ "$out" == *Pomodoro* ]] || exit 7
+  [[ "$(cat "$f")" == $'# mine\npanel = ["date", "today", "pomodoro", "weather"]   # what shows\nhud_volume = true' ]] || { cat "$f"; exit 8; }
+  # Again: nothing to do, and nothing said.
+  out="$(run)" || exit 9; [[ -z "$out" ]] || exit 10
+  [[ "$(grep -c pomodoro "$f")" == 1 ]] || exit 11
+  # No "today": at the end; several lines; empty; a list that already has it.
+  printf 'panel = [\n  "battery",\n  "weather",\n]\n' > "$f"; run >/dev/null || exit 12
+  grep -q '"weather", "pomodoro",' "$f" || { cat "$f"; exit 13; }
+  printf 'panel = []\n' > "$f"; run >/dev/null || exit 14
+  [[ "$(cat "$f")" == 'panel = ["pomodoro"]' ]] || exit 15
+  printf 'panel = ["pomodoro", "date"]\n' > "$f"; kept="$(cat "$f")"; run >/dev/null || exit 16
+  [[ "$(cat "$f")" == "$kept" ]] || exit 17
+  # A link to the file stays a link.
+  mv "$f" "$ph/real.toml"; printf 'panel = ["today"]\n' > "$ph/real.toml"; ln -s "$ph/real.toml" "$f"
+  run >/dev/null || exit 18
+  [[ -L "$f" && "$(cat "$ph/real.toml")" == 'panel = ["today", "pomodoro"]' ]] || exit 19
+  exit 0
+) && t_ok "migration: \"pomodoro\" joins an existing panel list after \"today\", nothing else changes, safe to run again" \
+  || t_fail "Pomodoro panel migration (step $?)"
+
+# --- iceberg pomodoro: URLs to Iceberg, and status from its state file
+(
+  ih="$tmp/iceberg-home"; mkdir -p "$ih"; export HOME="$ih"
+  export GRAND_LINE_STATE="$ih/.local/state/grand-line"
+  ice="$ROOT/bin/iceberg"
+  : > "$STUB_LOG"
+  bash "$ice" pomodoro start || exit 1
+  bash "$ice" pomodoro start 50 || exit 2
+  bash "$ice" pomodoro toggle && bash "$ice" pomodoro pause && bash "$ice" pomodoro resume || exit 3
+  bash "$ice" pomodoro reset && bash "$ice" pomodoro skip || exit 4
+  [[ "$(grep -c '^open -g iceberg://pomodoro/' "$STUB_LOG")" == 7 ]] || { cat "$STUB_LOG"; exit 5; }
+  grep -qx 'open -g iceberg://pomodoro/start?minutes=50' "$STUB_LOG" && grep -qx 'open -g iceberg://pomodoro/toggle' "$STUB_LOG" || exit 6
+  : > "$STUB_LOG"
+  for bad in "start 0" "start 181" "start ten" "start 5 6" "pause 5" "lunch" ""; do
+    # shellcheck disable=SC2086
+    bash "$ice" pomodoro $bad 2>/dev/null; [[ $? == 2 ]] || { echo "$bad"; exit 7; }
+  done
+  [[ ! -s "$STUB_LOG" ]] || exit 8
+  out="$(bash "$ice" pomodoro status)" || exit 9; [[ "$out" == "No Pomodoro timer yet."* ]] || exit 10
+  sf="$GRAND_LINE_STATE/iceberg/pomodoro.json"; mkdir -p "${sf%/*}"
+  printf '{"completed":1,"ends_at":%s.5,"length":1500,"phase":"focus","remaining":1500,"rounds":4,"status":"running"}' \
+    "$(( $(date +%s) + 600 ))" > "$sf"
+  out="$(bash "$ice" pomodoro status)"; [[ "$out" == "Focus: "1[01]":"[0-9][0-9]" left (round 2 of 4)" ]] || { echo "$out"; exit 11; }
+  printf '{"completed":4,"length":900,"phase":"long_break","remaining":899.5,"rounds":4,"status":"paused"}' > "$sf"
+  [[ "$(bash "$ice" pomodoro status)" == "Long break: paused, 15:00 left (round 4 of 4)" ]] || exit 12
+  printf '{"completed":0,"length":300,"phase":"short_break","remaining":300,"rounds":4,"status":"idle"}' > "$sf"
+  [[ "$(bash "$ice" pomodoro status)" == "Not running. Next: Short break, 5:00 (round 1 of 4)" ]] || exit 13
+  # A running round whose end passed while Iceberg was not running shows 0:00.
+  printf '{"completed":0,"ends_at":1000,"length":1500,"phase":"focus","remaining":1500,"rounds":4,"status":"running"}' > "$sf"
+  [[ "$(bash "$ice" pomodoro status)" == "Focus: 0:00 left (round 1 of 4)" ]] || exit 14
+  echo 'garbage' > "$sf"
+  ! bash "$ice" pomodoro status >/dev/null 2>&1 || exit 15
+  exit 0
+) && t_ok "iceberg pomodoro: start, minutes, pause, resume, toggle, reset and skip go as iceberg:// URLs, bad words are refused, status reads the state file" \
+  || t_fail "iceberg pomodoro (step $?)" "$(cat "$STUB_LOG")"
+
 exit $FAIL

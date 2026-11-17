@@ -40,6 +40,10 @@ struct NotchRootView: View {
                 } else if let hud = model.hud {
                     HUDView(event: hud, height: model.bandHeight, inset: closed.top)
                         .transition(appear)
+                } else if model.showsTimer {
+                    PomodoroActivityView(model: host.pomodoro, height: model.bandHeight, inset: closed.top,
+                                         live: !model.displaysAsleep)
+                        .transition(appear)
                 } else if model.showsLiveActivity, let nowPlaying = host.nowPlaying {
                     LiveActivityView(model: nowPlaying, height: model.bandHeight,
                                      inset: closed.top,

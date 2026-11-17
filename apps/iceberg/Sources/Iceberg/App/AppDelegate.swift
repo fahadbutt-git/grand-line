@@ -48,6 +48,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         host.drag.onEnded = { [weak basket] in basket?.dragEnded() }
         // A HUD shows on the display with the pointer (else the built-in one).
         host.hud.onEvent = { [weak self] event in self?.targetController()?.showHUD(event) }
+        // A Pomodoro phase ran out: the notch grows for a moment with what comes next.
+        host.pomodoro.onPhaseEnd = { [weak self] end in self?.targetController()?.showHUD(.pomodoro(end)) }
         let dog = watchdog
         host.onPanelOpen = { dog.noteUse() }
         let center = NotificationCenter.default
@@ -79,7 +81,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `iceberg://toggle`, `open`, `close`, `reload` and `settings`, so a keyboard shortcut
     /// (Karabiner, `open -g iceberg://toggle`) can drive the panel, and
     /// `iceberg://trigger/NAME`, which runs a widget (`iceberg trigger NAME`
-    /// uses it when Iceberg is not running yet). `denden` is the former
+    /// uses it when Iceberg is not running yet), and `iceberg://pomodoro/ACTION`
+    /// (`iceberg pomodoro ...`). `denden` is the former
     /// scheme (Info/Iceberg.plist registers both). Before setup is done the
     /// commands are queued, not run (see LaunchQueue).
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -97,6 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .reload: host.reloadEverything()
         case .settings: showSettings()
         case .trigger(let names): for name in names { host.user.trigger(name) }
+        case .pomodoro(let command): host.pomodoro.perform(command)
         }
     }
 

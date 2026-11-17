@@ -1784,6 +1784,24 @@
          }
         ],
         "from": {
+         "key_code": "p"
+        },
+        "to": [
+         {
+          "shell_command": "$HOME/.grand-line/bin/iceberg pomodoro toggle"
+         }
+        ]
+       },
+       {
+        "type": "basic",
+        "conditions": [
+         {
+          "type": "variable_if",
+          "name": "caps_layer",
+          "value": 1
+         }
+        ],
+        "from": {
          "key_code": "a"
         },
         "to": [

@@ -295,6 +295,33 @@ final class NotchController {
             }
             .store(in: &bag)
         syncLiveActivity()
+
+        // The Pomodoro timer starting or stopping widens or narrows it too.
+        // (@Published sends before it sets, so the value comes with it.)
+        host.pomodoro.$timer
+            .map(\.isActive)
+            .removeDuplicates()
+            .sink { [weak self] active in self?.syncTimer(active) }
+            .store(in: &bag)
+    }
+
+    /// The Pomodoro time shows beside the closed notch while the timer runs
+    /// or is paused, in place of the music's wings, as wide as a HUD.
+    private func syncTimer(_ wanted: Bool) {
+        guard wanted != model.showsTimer else { return }
+        if model.isOpen || model.hud != nil {
+            // The open panel, or a HUD, has the window; the closed size follows later.
+            model.showsTimer = wanted
+            return
+        }
+        if wanted {
+            // Grow the window, then the shape.
+            settleToken &+= 1
+            panel.setFrame(NotchGeometry.topCentred(NotchGeometry.hudPanelSize(of: model.screen), on: model.screen), display: true)
+            withAnimation(wingAnimation) { model.showsTimer = true }
+        } else {
+            animate(wingAnimation) { model.showsTimer = false }
+        }
     }
 
     /// Follows the Now Playing widget, which comes and goes as it is turned
@@ -333,8 +360,9 @@ final class NotchController {
             model.showsLiveActivity = wanted
             return
         }
-        if model.hud != nil {
-            // A HUD is showing in a wider window; the wings follow when it goes.
+        if model.hud != nil || model.showsTimer {
+            // A HUD or the Pomodoro time is showing in a wider window; the
+            // wings follow when it goes.
             model.showsLiveActivity = wanted
             return
         }

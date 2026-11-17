@@ -4,7 +4,7 @@ import XCTest
 final class PanelLayoutTests: XCTestCase {
     func testFirstRunShowsTheDefaultsAndNoExamples() {
         let layout = PanelLayout(settings: IcebergSettings())
-        XCTAssertEqual(layout.enabled, ["date", "now-playing", "today"])
+        XCTAssertEqual(layout.enabled, ["date", "now-playing", "today", "pomodoro"])
         XCTAssertEqual(layout.widgets(available: ["weather", "services"]), [])
     }
 
@@ -82,7 +82,7 @@ final class PanelLayoutTests: XCTestCase {
     }
 
     func testCatalogue() {
-        XCTAssertEqual(PanelCatalog.builtins.map(\.id), ["date", "now-playing", "today", "reminders", "battery", "shelf"])
+        XCTAssertEqual(PanelCatalog.builtins.map(\.id), ["date", "now-playing", "today", "reminders", "battery", "shelf", "pomodoro"])
         XCTAssertEqual(PanelCatalog.builtin("shelf")?.placement, .section)
         XCTAssertFalse(PanelCatalog.defaultEnabled.contains("shelf"), "the shelf starts turned off")
         XCTAssertEqual(PanelCatalog.builtin("today")?.permission, .calendars)

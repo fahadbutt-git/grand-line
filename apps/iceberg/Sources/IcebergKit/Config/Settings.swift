@@ -64,6 +64,15 @@ public struct IcebergSettings: Equatable, Sendable {
     /// Iceberg takes the volume and brightness keys (Accessibility), so only
     /// its HUD shows and macOS's own does not.
     public var hudReplaceSystem = false
+    /// The Pomodoro timer: focus, short and long break lengths in minutes,
+    /// focus rounds before a long break, whether the next phase starts by
+    /// itself, and a sound at a phase's end.
+    public var pomodoroFocus = 25
+    public var pomodoroShortBreak = 5
+    public var pomodoroLongBreak = 15
+    public var pomodoroRounds = 4
+    public var pomodoroAutoStart = false
+    public var pomodoroSound = true
 
     public init() {}
 
@@ -153,6 +162,18 @@ public struct IcebergSettings: Equatable, Sendable {
                 settings.hudBluetooth = b
             case ("hud_replace_system", .bool(let b)):
                 settings.hudReplaceSystem = b
+            case ("pomodoro_focus", .integer(let n)):
+                settings.pomodoroFocus = n
+            case ("pomodoro_short_break", .integer(let n)):
+                settings.pomodoroShortBreak = n
+            case ("pomodoro_long_break", .integer(let n)):
+                settings.pomodoroLongBreak = n
+            case ("pomodoro_rounds", .integer(let n)):
+                settings.pomodoroRounds = n
+            case ("pomodoro_auto_start", .bool(let b)):
+                settings.pomodoroAutoStart = b
+            case ("pomodoro_sound", .bool(let b)):
+                settings.pomodoroSound = b
             case ("panel", .array(let items)):
                 var list: [String] = []
                 for item in items {
@@ -276,6 +297,12 @@ public struct IcebergSettings: Equatable, Sendable {
         case "hud_battery": hudBattery = other.hudBattery
         case "hud_bluetooth": hudBluetooth = other.hudBluetooth
         case "hud_replace_system": hudReplaceSystem = other.hudReplaceSystem
+        case "pomodoro_focus": pomodoroFocus = other.pomodoroFocus
+        case "pomodoro_short_break": pomodoroShortBreak = other.pomodoroShortBreak
+        case "pomodoro_long_break": pomodoroLongBreak = other.pomodoroLongBreak
+        case "pomodoro_rounds": pomodoroRounds = other.pomodoroRounds
+        case "pomodoro_auto_start": pomodoroAutoStart = other.pomodoroAutoStart
+        case "pomodoro_sound": pomodoroSound = other.pomodoroSound
         case "panel": panel = other.panel
         case "builtin":
             builtin = other.builtin

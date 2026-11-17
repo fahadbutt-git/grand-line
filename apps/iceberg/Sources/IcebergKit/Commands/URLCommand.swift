@@ -2,10 +2,13 @@ import Foundation
 
 /// What an `iceberg://` URL asks for: `toggle`, `open`, `close`, `reload`,
 /// `settings`, and `trigger/NAME` (or `trigger?widget=NAME`), which runs a
-/// widget. `denden` is the former scheme, kept so older shortcuts work.
+/// widget, and `pomodoro/ACTION` (`start`, with `?minutes=25` or
+/// `/start/25`, `pause`, `resume`, `toggle`, `reset`, `skip`), which drives
+/// the Pomodoro timer. `denden` is the former scheme, kept so older shortcuts work.
 public enum URLCommand: Equatable, Sendable {
     case toggle, open, close, reload, settings
     case trigger([String])
+    case pomodoro(PomodoroCommand)
 
     public static let schemes: Set<String> = ["iceberg", "denden"]
 
@@ -23,6 +26,13 @@ public enum URLCommand: Equatable, Sendable {
                 .queryItems?.filter { $0.name == "widget" }.compactMap(\.value) ?? []
             let names = (fromPath + fromQuery).filter { !$0.isEmpty }
             return names.isEmpty ? nil : .trigger(names)
+        case "pomodoro":
+            let parts = url.pathComponents.filter { $0 != "/" && !$0.isEmpty }
+            guard let action = parts.first, parts.count <= 2 else { return nil }
+            let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "minutes" })?.value
+            if parts.count == 2, query != nil { return nil }
+            return PomodoroCommand.parse(action: action, minutes: parts.count == 2 ? parts[1] : query).map { URLCommand.pomodoro($0) }
         default: return nil
         }
     }

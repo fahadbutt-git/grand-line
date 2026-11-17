@@ -16,4 +16,8 @@ public struct IcebergPaths: Sendable, Equatable {
 
     /// The shelf: a bookmark for each file on it (never the files themselves).
     public var shelfFile: URL { home.appendingPathComponent(".local/state/grand-line/iceberg/shelf.json") }
+
+    /// The Pomodoro timer, so a running one carries on after a restart
+    /// (`iceberg pomodoro status` reads it too).
+    public var pomodoroFile: URL { home.appendingPathComponent(".local/state/grand-line/iceberg/pomodoro.json") }
 }

@@ -44,11 +44,14 @@ public enum PanelCatalog {
         BuiltinItem(id: "shelf", title: "Shelf",
                     detail: "Drag files onto the notch to keep them here, then drag them out to any app. Only a link to each file is kept; the files stay where they are.",
                     symbol: "tray.and.arrow.down", placement: .section),
+        BuiltinItem(id: "pomodoro", title: "Pomodoro",
+                    detail: "A focus timer with short and long breaks. While it runs, the time shows beside the closed notch.",
+                    symbol: "timer", placement: .section),
     ]
 
     /// What a new install shows. Setup ships no widget turned on, so the
     /// example widgets stay off until you turn them on.
-    public static let defaultEnabled = ["date", "now-playing", "today"]
+    public static let defaultEnabled = ["date", "now-playing", "today", "pomodoro"]
 
     public static func builtin(_ id: String) -> BuiltinItem? { builtins.first { $0.id == id } }
     public static func isBuiltin(_ id: String) -> Bool { builtin(id) != nil }

@@ -1,10 +1,11 @@
 # Iceberg
 
-The notch app of Grand Line. Hover over the MacBook's camera notch and it opens into a panel with what you chose to show: the date, what is playing, today's calendar, reminders due today, the battery, a shelf for files, and small widgets you add. Move the pointer away and it closes back into the notch. A new install shows the date, Now Playing and Today; turn the rest on in Settings.
+The notch app of Grand Line. Hover over the MacBook's camera notch and it opens into a panel with what you chose to show: the date, what is playing, today's calendar, reminders due today, the battery, a shelf for files, a Pomodoro timer, and small widgets you add. Move the pointer away and it closes back into the notch. A new install shows the date, Now Playing, Today and the Pomodoro timer; turn the rest on in Settings.
 
 - **Now Playing** for any player macOS knows about (Spotify, Music, browsers), with artwork and previous, play or pause, next. While music plays, the closed notch grows a small wing each side, one notch height wide: the cover on the left (a rounded square) and playing bars on the right, tinted with the cover's strongest colour (the system accent colour for a grey cover). The bars rest low for a short while after a pause, then the notch goes back to its own width. With Reduce Motion the bars stay still and nothing springs: the panel, the wings and the basket cross-fade instead.
 - **Today**: what is left of today in every calendar macOS Calendar has. Google calendars appear once they are added in System Settings, Internet Accounts. Hidden while Calendars access is turned down; Settings says how to allow it.
 - **Reminders** due today or overdue. Tick one to complete it. Hidden while Reminders access is turned down.
+- **Pomodoro**: a focus timer. The card shows the time left in large tabular digits, the phase (Focus, Short break, Long break) and a dot per focus round before the long break (filled when done, a ring round the one running), with Start or Pause, Reset and Skip. Click the time, or the length beside the buttons, for 15, 25, 45 or 50 minutes of focus, or 5 more or fewer (the minus and plus buttons do the same); the choice is saved as `pomodoro_focus`, and a round already running keeps the time it has run. Breaks are 5 minutes, and 15 after every fourth focus round (`pomodoro_short_break`, `pomodoro_long_break`, `pomodoro_rounds`). When a phase ends, a macOS notice says what comes next ("Focus done. Take a 5 min break."), with its sound unless `pomodoro_sound = false`, and the closed notch grows for a moment; the timer then waits at the next phase, or starts it with `pomodoro_auto_start = true`. macOS asks whether Iceberg may show notices the first time a timer starts, never at launch, and Do Not Disturb and Focus hold them as they do any app's. While the timer runs or is paused, the closed notch shows it in wings as wide as a HUD: the phase's symbol on the left (a timer for focus, a cup for a break, pause while paused), tinted orange, green or cyan by phase, and the time left on the right. It takes the music's place there while it shows (the music's wings come back when it stops), and a HUD still shows over it for a moment. Caps + P starts, pauses and resumes it from any app, as do `iceberg pomodoro ...` and `iceberg://pomodoro/...` (below). The timer runs whether or not its card is in the panel.
 - **Date** and **Battery** in the top band.
 - **Shelf**: drag files onto the notch (it opens as a file comes near) to park them, then drag them out again to any app. The shelf keeps a bookmark to each file, never a copy, so it follows a file that is renamed or moved, and it is the same after a restart (`~/.local/state/grand-line/iceberg/shelf.json`). Taking a file off the shelf, or clearing it, never touches the file, and dragging one out gives the other app a copy (Finder copies rather than moves it). Double-click a file to open it; its menu (right-click, or the … button) has Open, Show in Finder and the quick actions.
 - **Quick actions** on shelved files (`shelf_quick_actions`): Compress to Zip (as Finder's Compress does, with `ditto`), Make a Smaller Copy of an image (JPEG and HEIC stay in their format at 70% quality; other images become JPEG), Convert an image to PNG, JPEG, HEIC or TIFF (`sips`), and Remove Background (Vision, on this Mac, as a PNG with a transparent background). Each makes a new file beside the original, named so it never clashes (`photo-compressed.jpg`, then `photo-compressed 2.jpg`), and puts it on the shelf too. No action overwrites, moves or deletes the original.
@@ -26,6 +27,7 @@ Lists every built-in item and every widget file with a switch, a line on what it
 - **General**: open on hover or click, the hover delay, the keyboard shortcut (click it and press new keys; Reset and Turn off beside it), which displays, the island or notch look on displays without a notch, artwork beside the closed notch, the menu bar item, open at login;
 - **Shelf and drag**: quick actions on shelved files, and the drop basket (the Shelf itself is turned on in the list above);
 - **HUDs in the notch**: volume, brightness, battery, headphones, and hiding macOS's own HUD, each with what it needs; when Accessibility or Bluetooth is turned down, a line says so with a button to the right pane of System Settings;
+- **Pomodoro**: the focus, short break and long break lengths, the focus rounds before a long break, starting the next phase by itself, and the sound; when notices are turned off for Iceberg, a line says so with a button to System Settings, Notifications;
 - **Now Playing**: where what is playing comes from (see below), with Check again;
 - **Diagnostics**: for each widget in the panel, how many times it ran, its average and last run time, what it last printed and its last error, whether it is paused or waiting after failures, and Run now;
 - **Problems**: each file Iceberg could not fully read, as `file:line`, what is wrong, and the fix in plain words. The panel itself never shows problems.
@@ -118,8 +120,14 @@ Two examples are copied into the folder the first time Iceberg runs (from `Resou
 ```
 iceberg trigger NAME...   run widgets now (by file name, without .toml); a stream widget restarts
 iceberg toggle | open | close | reload | settings
+iceberg pomodoro start [MINUTES]   start the phase shown, or resume; with MINUTES (1 to 180), a focus round that long now
+iceberg pomodoro pause | resume | toggle | reset | skip
+                          toggle starts when idle and pauses or resumes otherwise (Caps + P); skip ends the phase now
+iceberg pomodoro status   what the timer is doing: "Focus: 12:34 left (round 2 of 4)"
 iceberg schema            where iceberg.schema.json is, for editors
 ```
+
+The Pomodoro commands go to Iceberg as `iceberg://pomodoro/start?minutes=25` (or `start/25`), `pomodoro/pause`, `resume`, `toggle`, `reset` and `skip`, which also start Iceberg when it is not running. `status` reads the timer's state file, `~/.local/state/grand-line/iceberg/pomodoro.json`, and needs nothing running.
 
 A trigger reaches a running Iceberg as a distributed notification, so nothing comes forward. While the panel is closed the widget runs as the panel next opens (at once with `updates = "always"`), and during Low Power Mode once it ends (at once with `always = true`). When Iceberg is not running, `iceberg trigger` starts it with `iceberg://trigger/NAME`.
 
@@ -137,7 +145,7 @@ live_activity = true         # artwork beside the closed notch while music plays
 launch_at_login = true
 menu_bar_icon = true         # Iceberg's item in the menu bar
 max_concurrent = 4           # widget commands at once (and streams), 1 to 16
-panel = ["date", "now-playing", "today"]   # what shows, in order: built-in items and widget file names
+panel = ["date", "now-playing", "today", "pomodoro"]   # what shows, in order: built-in items and widget file names
 no_notch_style = "island"    # displays without a notch: "island" (a pill) or "notch" (a tab like the notch)
 shelf_quick_actions = true   # zip, smaller copy, convert, remove background on shelved files
 drag_basket = false          # shake while dragging a file to show a drop basket
@@ -146,9 +154,15 @@ hud_brightness = false       # needs Accessibility
 hud_battery = false
 hud_bluetooth = false        # headphones connecting; needs Bluetooth access
 hud_replace_system = false   # Iceberg takes the volume and brightness keys, so macOS's HUD does not show (Accessibility)
+pomodoro_focus = 25          # minutes, 1 to 180
+pomodoro_short_break = 5     # minutes, 1 to 60
+pomodoro_long_break = 15     # minutes, 1 to 120
+pomodoro_rounds = 4          # focus rounds before a long break, 1 to 12
+pomodoro_auto_start = false  # start the next phase by itself
+pomodoro_sound = true        # the notice's sound at a phase's end
 ```
 
-`panel` is the one list of what the panel shows. The built-in names are `date`, `now-playing`, `today`, `reminders`, `battery` and `shelf`; anything else is a widget's file name without `.toml`. Without `panel`, a file from before it keeps its `builtin = [...]` list (plus the date), and a new install shows `date`, `now-playing` and `today`. The Settings window writes `panel` and then drops the old `builtin` line.
+`panel` is the one list of what the panel shows. The built-in names are `date`, `now-playing`, `today`, `reminders`, `battery`, `shelf` and `pomodoro`; anything else is a widget's file name without `.toml`. Without `panel`, a file from before it keeps its `builtin = [...]` list (plus the date), and a new install shows `date`, `now-playing`, `today` and `pomodoro`. The first `update` after the timer came adds `pomodoro` after `today` in an existing `panel` list (`migrations/1794951185-pomodoro-in-the-notch.sh`); only that list changes. The Settings window writes `panel` and then drops the old `builtin` line.
 
 `toggle_shortcut` is modifier names and a key joined with `+`: `ctrl`, `option`, `cmd`, `shift` (at least one besides `shift`), then a letter, digit, `space`, `return`, `escape`, an arrow, or `f1` to `f15`. It needs no Accessibility permission. If another app holds the same keys, Settings says so.
 
@@ -177,6 +191,8 @@ Nothing polls. Now Playing, the calendars, reminders and the battery are pushed 
 
 One timer is set for the next widget due, and none while nothing is due.
 
+The Pomodoro timer keeps the phase's end date, never a ticking count: one timer is set for that moment and none while it is paused or idle. The time left is worked out from the clock, once a second, only while it is on screen (the open panel, or the closed notch while the timer shows, and not while the displays sleep). A timer does not count time asleep, so on wake (and when the clock changes) Iceberg works the phase out again from the clock; a phase that ended in sleep is announced if it ended in the last ten minutes, and with `pomodoro_auto_start` each later phase starts at the planned end of the one before. The state is written to `pomodoro.json` only when it changes, so a running timer carries on after Iceberg restarts.
+
 The shelf, the basket and the HUDs add nothing while idle. The shelf and the basket listen to the left mouse button (down, dragged, up) only while one of them is turned on; a drag that carries no files is settled after a few events, and only a file drag feeds the shake detector. The HUDs are pushed by macOS: a CoreAudio listener for the volume, IOKit's power notice for the battery, IOBluetooth's connect notice for headphones, and a keyboard event tap that hears only the volume, mute and brightness keys (only while a HUD that needs it is on). A HUD's one-shot timer runs only while it shows. The shelf reads its file at start and writes it when it changes; quick actions run only when chosen. The playback bar redraws once a second, only while the panel is open and something plays. Settings, Diagnostics shows what each widget costs.
 
 ## Build and test
@@ -190,9 +206,9 @@ bash build.sh --open     # the same, then opened
 bash build.sh --test     # or: swift test
 ```
 
-The tests cover widget and settings parsing (TOML and JSON), the schema checks and that `iceberg.schema.json` and this README match them, what shows and in what order, writing iceberg.toml without losing comments, the cover tint, the widget output contract (Waybar's fields), the three widget kinds, the command runner and stream runner (time limits, killed process groups, capped and thinned output), refresh scheduling with backoff, sleep and Low Power Mode, hot reload (a broken save keeps the last good widget, saved scripts re-run their widgets), the diagnostics, the keyboard shortcut, the Now Playing stream, its health check and AppleScript fallback, colour names, panel sizes and placement, battery and agenda logic, the shelf (its list, its file, bookmarks that follow a renamed file, quick-action names that never clash and commands that write only a new file), the shake and drag detectors, what each HUD shows and when (volume, brightness, battery, headphones, the media keys and their steps), and stress cases: 50 widgets, hung commands, malformed and binary files, random input.
+The tests cover widget and settings parsing (TOML and JSON), the schema checks and that `iceberg.schema.json` and this README match them, what shows and in what order, writing iceberg.toml without losing comments, the cover tint, the widget output contract (Waybar's fields), the three widget kinds, the command runner and stream runner (time limits, killed process groups, capped and thinned output), refresh scheduling with backoff, sleep and Low Power Mode, hot reload (a broken save keeps the last good widget, saved scripts re-run their widgets), the diagnostics, the keyboard shortcut, the Now Playing stream, its health check and AppleScript fallback, colour names, panel sizes and placement, battery and agenda logic, the shelf (its list, its file, bookmarks that follow a renamed file, quick-action names that never clash and commands that write only a new file), the shake and drag detectors, what each HUD shows and when (volume, brightness, battery, headphones, the media keys and their steps), the Pomodoro timer (phases and rounds, the long break, pause and resume from the end date, skip and reset, catching up after sleep, its state file, its settings, and its command and URL words), and stress cases: 50 widgets, hung commands, malformed and binary files, random input.
 
-The user journeys (`tests/journeys`, on a Mac) also drive a signal widget through `bin/iceberg trigger` and `iceberg://trigger/NAME`, and save widget files and iceberg.toml while the panel is open.
+The user journeys (`tests/journeys`, on a Mac) also drive a signal widget through `bin/iceberg trigger` and `iceberg://trigger/NAME`, save widget files and iceberg.toml while the panel is open, and start, pause and reset the Pomodoro timer with `iceberg://pomodoro/...`, checking its card, its state file and the closed notch's wings. `tests/unit.sh` covers `iceberg pomodoro` (its URLs and `status`) and the migration that adds it to the panel.
 
 ## Layout
 
@@ -201,7 +217,7 @@ Package.swift
 apps.tsv                     how setup builds and names the app
 Info/Iceberg.plist           extra Info.plist keys (permissions, URL scheme)
 Resources/Iceberg/           copied into the app: adapter script, iceberg.schema.json, example widgets, licence, AppIcon.icns
-Sources/IcebergKit/          everything testable: Config (and its schema), Commands, Scheduling, Diagnostics, Layout, Media, Agenda, Battery, Panel, Shelf (the list, its file, output names, quick-action commands, the shake and drag detectors), HUD (what each HUD shows and when)
+Sources/IcebergKit/          everything testable: Config (and its schema), Commands, Scheduling, Diagnostics, Layout, Media, Agenda, Battery, Panel, Shelf (the list, its file, output names, quick-action commands, the shake and drag detectors), HUD (what each HUD shows and when), Pomodoro (the timer's phases, its state file and its commands)
 Sources/Iceberg/Settings/    the Settings window
 Sources/Iceberg/App/         start-up, displays, URL commands
 Sources/Iceberg/Notch/       the panel window, its shape, open and close, HUDs beside the notch

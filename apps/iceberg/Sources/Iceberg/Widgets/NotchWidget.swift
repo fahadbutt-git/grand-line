@@ -17,6 +17,8 @@ struct WidgetContext {
     let settings: IcebergSettings
     /// The shelf's files, shared by every panel and the drop basket.
     let shelf: ShelfModel
+    /// The Pomodoro timer, one for the app (the card, the closed notch, the command).
+    let pomodoro: PomodoroModel
     /// Call when `isAvailable` changes (a permission granted or taken
     /// away), so the panel adds or drops the widget.
     let availabilityChanged: @MainActor () -> Void

@@ -1,14 +1,18 @@
 #!/bin/bash
-# grandline:summary=Drive the notch panel: run a widget now, open or close the panel, reload its files
+# grandline:summary=Drive the notch panel: run a widget now, open or close the panel, the Pomodoro timer
 # iceberg trigger NAME...   runs widgets that have signal = true (by file name, without .toml);
 #                           a stream widget starts its script again
 # iceberg toggle | open | close | reload | settings
+# iceberg pomodoro start [MINUTES] | pause | resume | toggle | reset | skip | status
+#                           the Pomodoro timer (toggle: start, or pause and resume)
 # iceberg schema            prints where iceberg.schema.json is, for editors
 # A trigger reaches a running Iceberg as a distributed notification, so the
 # panel is not opened or brought forward; when Iceberg is not running it is
 # started once with iceberg://trigger/NAME/OTHER, and runs them as soon as
 # it is ready. While the panel is closed the widget runs as it next opens
-# (or at once, with updates = "always").
+# (or at once, with updates = "always"). The Pomodoro commands go as
+# iceberg://pomodoro/ACTION, which also starts Iceberg; status reads the
+# timer's state file and needs nothing running.
 # Exit status: 0 done, 2 usage, 1 Iceberg could not be reached.
 source "$(dirname "$(readlink -f "$0")")/../lib/bin-common.sh"
 
@@ -16,6 +20,7 @@ NOTIFICATION="com.grandline.iceberg.trigger"
 
 usage() {
   echo "usage: iceberg trigger NAME... | toggle | open | close | reload | settings | schema" >&2
+  echo "       iceberg pomodoro start [MINUTES] | pause | resume | toggle | reset | skip | status" >&2
   exit 2
 }
 
@@ -41,6 +46,47 @@ function run(argv) {
     .postNotificationNameObjectUserInfoDeliverImmediately(argv[0], argv[1], $.NSDictionary.dictionary, true);
 }
 EOF
+}
+
+# The Pomodoro timer's state, as Iceberg keeps it: "Focus: 12:34 left (round 2 of 4)".
+pomodoro_status() {
+  local file="$GRAND_LINE_STATE/iceberg/pomodoro.json" text phase status length remaining ends completed rounds
+  local label round left now clock
+  if [[ ! -f "$file" ]]; then
+    echo "No Pomodoro timer yet. Start one with: iceberg pomodoro start"
+    return 0
+  fi
+  text="$(tr -d '\n' < "$file")"
+  field() { printf '%s' "$text" | sed -n "s/.*\"$1\" *: *\"\{0,1\}\([^\",}]*\).*/\1/p"; }
+  phase="$(field phase)"; status="$(field status)"; length="$(field length)"
+  remaining="$(field remaining)"; ends="$(field ends_at)"
+  completed="$(field completed)"; rounds="$(field rounds)"
+  [[ "$completed" =~ ^[0-9]+$ ]] || completed=0
+  [[ "$rounds" =~ ^[0-9]+$ ]] || rounds=4
+  case "$phase" in
+    focus) label="Focus"; round=$((completed + 1)); [[ $round -gt $rounds ]] && round=$rounds ;;
+    short_break) label="Short break"; round=$completed ;;
+    long_break) label="Long break"; round=$completed ;;
+    *) echo "The Pomodoro state file could not be read: $file" >&2; return 1 ;;
+  esac
+  [[ $round -lt 1 ]] && round=1
+  if [[ "$status" == running && "$ends" =~ ^[0-9] ]]; then
+    now="$(date +%s)"
+    left=$(( ${ends%%.*} - now ))
+    [[ "$ends" == *.* ]] && left=$((left + 1))
+  else
+    left="${remaining:-${length:-0}}"
+    # Whole seconds, rounded up.
+    if [[ "$left" == *.* ]]; then left=$(( ${left%%.*} + 1 )); fi
+  fi
+  [[ "$left" =~ ^-?[0-9]+$ ]] || left=0
+  [[ $left -lt 0 ]] && left=0
+  clock="$((left / 60)):$(printf '%02d' $((left % 60)))"
+  case "$status" in
+    running) echo "$label: $clock left (round $round of $rounds)" ;;
+    paused) echo "$label: paused, $clock left (round $round of $rounds)" ;;
+    *) echo "Not running. Next: $label, $clock (round $round of $rounds)" ;;
+  esac
 }
 
 open_url() {
@@ -76,6 +122,31 @@ case "${1:-}" in
   toggle|open|close|reload|settings)
     open_url "$1"
     ;;
+  pomodoro)
+    shift
+    case "${1:-}" in
+      start)
+        if [[ $# -gt 2 ]]; then usage; fi
+        if [[ -n "${2:-}" ]]; then
+          if ! [[ "$2" =~ ^[0-9]{1,3}$ ]] || (( 10#$2 < 1 || 10#$2 > 180 )); then
+            echo "iceberg: minutes must be a whole number from 1 to 180, not \"$2\"" >&2; exit 2
+          fi
+          open_url "pomodoro/start?minutes=$((10#$2))"
+        else
+          open_url "pomodoro/start"
+        fi
+        ;;
+      pause|resume|toggle|reset|skip)
+        [[ $# -eq 1 ]] || usage
+        open_url "pomodoro/$1"
+        ;;
+      status)
+        [[ $# -eq 1 ]] || usage
+        pomodoro_status
+        ;;
+      *) usage ;;
+    esac
+    ;;
   schema)
     for f in "$GRAND_LINE_LINK/apps/iceberg/Resources/Iceberg/iceberg.schema.json" \
              "/Applications/Iceberg.app/Contents/Resources/iceberg.schema.json"; do
@@ -85,7 +156,7 @@ case "${1:-}" in
     exit 1
     ;;
   -h|--help|help)
-    sed -n '3,10p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '3,15p' "$0" | sed 's/^# \{0,1\}//'
     ;;
   *)
     usage

@@ -152,6 +152,7 @@ Hold Caps Lock where Omarchy uses the Super key. Tap it alone for Escape. Caps +
 | Caps + Ctrl + Shift + A | Gemini |
 | Caps + Shift + N | Notion |
 | Caps + Ctrl + Option + N | Open or close the notch panel (Iceberg) |
+| Caps + P | Pomodoro timer: start, pause or resume (Iceberg) |
 | Caps + Shift + T | Reminders (tasks) |
 | Caps + Shift + G | WhatsApp |
 | Caps + Shift + M | Spotify |
@@ -302,7 +303,7 @@ The unattended run (`update --unattended`, launch agent `com.grandline.update`, 
 
 ## What runs in the background
 
-Kept deliberately small: Karabiner-Elements (keyboard), Maccy (clipboard), Handy (waits for the dictation key), FineTune (per-app volume), Iceberg (music, calendar, reminders, a file shelf, HUDs and your own widgets in the notch) and Google Drive. Docker, local AI (Ollama) and the VPNs run only while you turn them on. Shortcut commands start, act and exit, and long jobs (video compression, keep-awake, app installs) run on their own so they never block the keyboard. The Downloads sorter is not a running process: macOS starts it at low priority when Downloads changes, and once an hour for the age rules. The daily update runs at a quiet hour and exits. Grand Line Index keeps the file index current for Sight. The checklist shows how to stop other apps opening at login.
+Kept deliberately small: Karabiner-Elements (keyboard), Maccy (clipboard), Handy (waits for the dictation key), FineTune (per-app volume), Iceberg (music, calendar, reminders, a file shelf, a Pomodoro timer, HUDs and your own widgets in the notch) and Google Drive. Docker, local AI (Ollama) and the VPNs run only while you turn them on. Shortcut commands start, act and exit, and long jobs (video compression, keep-awake, app installs) run on their own so they never block the keyboard. The Downloads sorter is not a running process: macOS starts it at low priority when Downloads changes, and once an hour for the age rules. The daily update runs at a quiet hour and exits. Grand Line Index keeps the file index current for Sight. The checklist shows how to stop other apps opening at login.
 
 ## Security
 

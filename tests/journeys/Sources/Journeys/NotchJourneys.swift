@@ -10,7 +10,7 @@ import AppKit
 enum NotchJourneys {
     static let role = "notch"
 
-    static var all: [Journey] { [panel, dismiss, settings, signal, coldLaunch, reload] }
+    static var all: [Journey] { [panel, dismiss, settings, signal, coldLaunch, reload, pomodoro] }
 
     static func journey(_ name: String, _ summary: String, _ steps: [Step]) -> Journey {
         Journey(name, role: role, summary: summary, waitsForWindow: false,
@@ -237,6 +237,40 @@ extension NotchJourneys {
         ])
     }
 
+    /// The Pomodoro timer: its card, driven by scheme://pomodoro/..., and the
+    /// closed notch's wings while it runs or is paused.
+    static var pomodoro: Journey {
+        journey("notch-pomodoro", "the Pomodoro card starts, pauses and resets, and the closed notch shows the time meanwhile", [
+            step("put the Pomodoro card in the panel and open it") { ctx in
+                try ctx.editSettings { $0.replacingOccurrences(of: "panel = [\"battery\", \"journey\"]",
+                                                                 with: "panel = [\"battery\", \"journey\", \"pomodoro\"]") }
+                Input.pause(0.5)
+                try ctx.notchURL("open")
+                try ctx.wait("the panel to open") { ctx.isNotchOpen() }
+                // The time is read out as words ("Focus, 25 minutes left"), so the phase is what is looked for.
+                try ctx.wait("the Pomodoro card", timeout: 6) { Ctx.anyContains(ctx.notchTexts(), "Focus") }
+            },
+            step("scheme://pomodoro/start?minutes=2 starts a round, and the closed notch shows it") { ctx in
+                try ctx.notchURL("pomodoro/start?minutes=2")
+                try ctx.wait("the state file to say running", timeout: 6) { ctx.pomodoroState().contains("\"status\":\"running\"") }
+                try ctx.notchURL("close")
+                try ctx.wait("the panel to close") { !ctx.isNotchOpen() }
+                guard let closed = ctx.closedFrame else { throw StepFailure("no closed frame") }
+                try ctx.wait("wings beside the closed notch", timeout: 5) { (ctx.notchFrame()?.width ?? 0) > closed.width + 20 }
+                ctx.shot("the closed notch with the timer", window: ctx.notchWindow())
+            },
+            step("pause, then reset: the wings go") { ctx in
+                try ctx.notchURL("pomodoro/pause")
+                try ctx.wait("the state file to say paused", timeout: 6) { ctx.pomodoroState().contains("\"status\":\"paused\"") }
+                guard let closed = ctx.closedFrame else { throw StepFailure("no closed frame") }
+                try ctx.check((ctx.notchFrame()?.width ?? 0) > closed.width + 20, "the wings went while paused")
+                try ctx.notchURL("pomodoro/reset")
+                try ctx.wait("the state file to say idle", timeout: 6) { ctx.pomodoroState().contains("\"status\":\"idle\"") }
+                try ctx.wait("the notch back to its own width", timeout: 5) { abs((ctx.notchFrame()?.width ?? 0) - closed.width) < 4 }
+            },
+        ])
+    }
+
     /// Hot reload: widget files and iceberg.toml saved while the panel is open.
     static var reload: Journey {
         journey("notch-reload", "saving a widget file or iceberg.toml updates the open panel without a restart", [
@@ -299,6 +333,11 @@ extension Ctx {
     func writeWidgetFile(_ name: String, _ text: String, inPlace: Bool = false) throws {
         let url = icebergFolder.appendingPathComponent("widgets/\(name)")
         try write(url, text, inPlace: inPlace)
+    }
+
+    /// The Pomodoro timer's state file in the fixture home, or "" when there is none.
+    func pomodoroState() -> String {
+        (try? String(contentsOf: home.appendingPathComponent(".local/state/grand-line/iceberg/pomodoro.json"), encoding: .utf8)) ?? ""
     }
 
     /// Writes a file in the fixture home.

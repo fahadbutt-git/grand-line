@@ -11,6 +11,9 @@ final class NotchModel: ObservableObject {
     @Published var showsLiveActivity = false
     /// A HUD (volume, brightness, battery, headphones) beside the closed notch.
     @Published var hud: HUDEvent?
+    /// The Pomodoro time beside the closed notch, while it runs or is paused.
+    /// It takes the music's place (and the HUDs' width).
+    @Published var showsTimer = false
     /// System Settings, Accessibility, Display, Reduce motion.
     @Published var reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     /// Low Power Mode, and displays asleep: the playing bars rest then.
@@ -68,7 +71,7 @@ final class NotchModel: ObservableObject {
     var cameraWidth: CGFloat { style == .notch ? NotchGeometry.collapsedSize(of: screen).width : 0 }
 
     var collapsedPanelSize: CGSize {
-        if hud != nil { return NotchGeometry.hudPanelSize(of: screen) }
+        if hud != nil || showsTimer { return NotchGeometry.hudPanelSize(of: screen) }
         return NotchGeometry.collapsedPanelSize(of: screen, liveActivity: showsLiveActivity)
     }
 

@@ -3,7 +3,7 @@ import Foundation
 /// What a HUD in the notch shows: a symbol in the left wing, and a level
 /// bar or a short text in the right one.
 public struct HUDEvent: Equatable, Sendable {
-    public enum Kind: String, Sendable, Equatable { case volume, brightness, battery, device }
+    public enum Kind: String, Sendable, Equatable { case volume, brightness, battery, device, timer }
     /// How the symbol is coloured, as system colours.
     public enum Tone: String, Sendable, Equatable { case normal, good, warning, critical }
 

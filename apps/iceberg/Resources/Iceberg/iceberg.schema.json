@@ -6,7 +6,7 @@
   "type": "object",
   "properties": {
     "panel": {
-      "description": "What the panel shows, in order: built-in items (date, now-playing, today, reminders, battery, shelf) and widget file names without .toml.",
+      "description": "What the panel shows, in order: built-in items (date, now-playing, today, reminders, battery, shelf, pomodoro) and widget file names without .toml.",
       "type": "array",
       "items": {
         "type": "string",
@@ -15,7 +15,8 @@
       "default": [
         "date",
         "now-playing",
-        "today"
+        "today",
+        "pomodoro"
       ]
     },
     "open_on": {
@@ -121,6 +122,44 @@
       "description": "Iceberg handles the volume and brightness keys itself, so macOS's own HUD does not show. Needs Accessibility; only for the HUDs turned on.",
       "type": "boolean",
       "default": false
+    },
+    "pomodoro_focus": {
+      "description": "Minutes in a Pomodoro focus round. The panel offers 15, 25, 45 and 50, and 5 more or fewer.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 180,
+      "default": 25
+    },
+    "pomodoro_short_break": {
+      "description": "Minutes in a short break after a focus round.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 60,
+      "default": 5
+    },
+    "pomodoro_long_break": {
+      "description": "Minutes in the long break after the last focus round of a set.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 120,
+      "default": 15
+    },
+    "pomodoro_rounds": {
+      "description": "Focus rounds before a long break.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 12,
+      "default": 4
+    },
+    "pomodoro_auto_start": {
+      "description": "Start the next Pomodoro phase by itself when one ends. Off: the timer waits at the next phase until you start it.",
+      "type": "boolean",
+      "default": false
+    },
+    "pomodoro_sound": {
+      "description": "Play the notice's sound when a Pomodoro phase ends (Do Not Disturb and Focus silence it, as they do every notice).",
+      "type": "boolean",
+      "default": true
     },
     "builtin": {
       "description": "The older way to choose built-in items; panel replaces it.",
