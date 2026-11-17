@@ -175,7 +175,7 @@ final class TOMLEditorTests: XCTestCase {
         XCTAssertEqual(s.openOn, .click)
         XCTAssertEqual(s.hoverDelay, 0.3)
         XCTAssertFalse(s.launchAtLogin)
-        XCTAssertEqual(PanelLayout(settings: s).enabled, ["date", "now-playing", "weather", "today"])
+        XCTAssertEqual(PanelLayout(settings: s).enabled, ["date", "now-playing", "weather", "today", "pomodoro"])
         let text = try String(contentsOf: url, encoding: .utf8)
         XCTAssertTrue(text.hasPrefix("# Iceberg's settings."), text)
     }
